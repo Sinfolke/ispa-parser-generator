@@ -23,6 +23,39 @@ public:
         UNDEF, REDUCE
     };
 
+    // --- New Target Architecture Types ---
+    struct ActionTarget {
+        std::size_t id;
+        auto operator==(const ActionTarget &other) const -> bool = default;
+        auto operator<(const ActionTarget &other) const -> bool { return id < other.id; };
+    private:
+        friend struct uhash;
+        auto members() const  {
+            return std::tie(id);
+        }
+    };
+
+    struct SemanticTarget {
+        std::size_t id;
+        auto operator==(const SemanticTarget &other) const -> bool = default;
+        auto operator<(const SemanticTarget &other) const -> bool { return id < other.id; };
+    private:
+        friend struct uhash;
+        auto members() const  {
+            return std::tie(id);
+        }
+    };
+
+    struct DFATarget {
+        std::size_t id;
+        auto operator==(const DFATarget &other) const -> bool = default;
+        auto operator<(const DFATarget &other) const -> bool { return id < other.id; };
+    private:
+        friend struct uhash;
+        auto members() const  {
+            return std::tie(id);
+        }
+    };
     struct TokenBinding {
         std::size_t token_id = NULL_STATE;
         std::optional<std::size_t> target_semantic_state = std::nullopt;
@@ -62,54 +95,62 @@ public:
             return std::tie(next, table_type);
         }
     };
-
-    // Flat entry of the Action table (table 2). `variable` names the capture register
-    // this BEGIN/END/PUSH operates on. `DFA_next_state` is left unresolved (NULL_STATE)
-    // here - it's filled in later by the DFA layer once subset construction has assigned
-    // final state numbers.
     struct ActionState {
         Action action = Action::UNDEF;
         LangAPI::Variable variable{};
-        std::size_t DFA_next_state = NULL_STATE;
+        std::size_t next_nfa_state = NULL_STATE;
+        std::variant<DFATarget, ActionTarget, SemanticTarget> next_state;
         auto operator==(const ActionState &other) const -> bool = default;
+        auto operator<(const ActionState &other) const -> bool {
+            if (action != other.action) {
+                return action < other.action;
+            }
+            if (variable != other.variable) {
+                return variable < other.variable;
+            }
+            return next_state < other.next_state;
+        };
     private:
         friend struct ::uhash;
         auto members() const {
-            return std::tie(action, variable, DFA_next_state);
+            return std::tie(action, variable, next_state);
         }
     };
 
     struct SemanticState {
         LangAPI::Inheritance instance_value;
         LangAPI::Statements statements;
-        std::size_t next_state = NULL_STATE;
+        std::variant<DFATarget, ActionTarget, SemanticTarget> next_state;
+        std::size_t nfa_index = NULL_STATE;
+        auto operator==(const SemanticState &other) const -> bool = default;
+        auto operator<(const SemanticState &other) const -> bool {
+            if (instance_value != other.instance_value) {
+                return instance_value < other.instance_value;
+            }
+            return next_state < other.next_state;
+        };
+    private:
+        friend struct ::uhash;
+        auto members() const {
+            return std::tie(instance_value, next_state);
+        }
     };
 
     using TemplatedDataBlock = utype::unordered_map<std::string, TemplatedDataBlockValue>;
     using DataBlock = std::variant<std::monostate, TemplatedDataBlock, TemplatedDataBlockValue>;
     using ActionTable = stdu::vector<ActionState>;
     using SemanticTable = stdu::vector<SemanticState>;
-
     struct state {
         utype::unordered_map<TransitionKey, stdu::vector<TransitionValue>> transitions;
-        stdu::vector<char> skip_chars;
-
         // Replaced raw accept_index with the new detailed binding
         std::optional<TokenBinding> accept_binding = std::nullopt;
-
         utype::unordered_set<TransitionValue> epsilon_transitions;
-        std::size_t any = NULL_STATE;
         stdu::vector<std::string> rule_name;
-        DataBlock dtb;
-        bool optional = false;
-        bool last = false;
-        // Set on synthetic BEGIN/END/PUSH states; indexes into NFA::getActionTable().
-        std::size_t action_index = NULL_STATE;
         auto operator==(const state &other) const -> bool = default;
     private:
         friend struct ::uhash;
         auto members() const {
-            return std::tie(transitions, skip_chars, accept_binding, epsilon_transitions, any, rule_name, dtb, optional, last, action_index);
+            return std::tie(transitions, accept_binding, epsilon_transitions, rule_name);
         }
     };
 

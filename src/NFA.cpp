@@ -29,11 +29,8 @@ auto NFA::applyQuantifierAndActions(
 
     std::size_t entry_state = body.start;
     std::size_t exit_state  = body.end;
+    std::size_t end_action_idx = NULL_STATE;
 
-    // Emit Action table hooks (BEGIN / END|PUSH) if storing AST nodes. A repeating
-    // ('+'/'*') capture closes with PUSH instead of END so each pass through the loop
-    // appends its slice onto the back array of the array stack, rather than clobbering
-    // a single scalar - this is what lets a quantifier partition its input correctly.
     if (has_store) {
         auto r_begin = name_;
         auto r_end = name_;
@@ -44,25 +41,25 @@ auto NFA::applyQuantifierAndActions(
 
         const Action close_action = is_repeating ? Action::PUSH : Action::END;
 
-        action_table.push_back(ActionState {.action = Action::BEGIN, .variable = LangAPI::Variable {.name = corelib::text::join(r_begin, "_")}});
+        action_table.push_back(ActionState {
+            .action = Action::BEGIN,
+            .variable = LangAPI::Variable {.name = corelib::text::join(r_begin, "_")},
+            .next_nfa_state = body.start
+        });
         std::size_t begin_action_idx = action_table.size() - 1;
 
-        action_table.push_back(ActionState {.action = close_action, .variable = LangAPI::Variable {.name = corelib::text::join(r_end, "_")}});
-        std::size_t end_action_idx = action_table.size() - 1;
+        action_table.push_back(ActionState {
+            .action = close_action,
+            .variable = LangAPI::Variable {.name = corelib::text::join(r_end, "_")},
+            .next_nfa_state = end
+        });
+        end_action_idx = action_table.size() - 1;
 
-        std::size_t begin_state = states.size();
-        states.emplace_back();
-        states[begin_state].action_index = begin_action_idx;
-        states[start].epsilon_transitions.insert({begin_state, TableType::DFA});
-        states[begin_state].epsilon_transitions.insert({body.start, TableType::DFA});
-        entry_state = begin_state;
+        states[start].epsilon_transitions.insert({begin_action_idx, TableType::Action});
+        states[body.end].epsilon_transitions.insert({end_action_idx, TableType::Action});
 
-        std::size_t end_state = states.size();
-        states.emplace_back();
-        states[end_state].action_index = end_action_idx;
-        states[body.end].epsilon_transitions.insert({end_state, TableType::DFA});
-        states[end_state].epsilon_transitions.insert({end, TableType::DFA});
-        exit_state = end_state;
+        entry_state = start;
+        exit_state = body.end;
 
         value_types.push_back(LLIR::BuilderBase::deduceVarTypeByRuleMember(member));
 
@@ -79,17 +76,27 @@ auto NFA::applyQuantifierAndActions(
     switch (member.quantifier) {
         case '?':
             states[start].epsilon_transitions.insert({end, TableType::DFA});
-            states[start].optional = true;
             break;
         case '+':
-            states[exit_state].epsilon_transitions.insert({loop_target, TableType::DFA});
-            states[body.start].optional = true;
+            if (has_store) {
+                auto loop_entry = action_table[end_action_idx];
+                loop_entry.next_nfa_state = loop_target;
+                action_table.push_back(std::move(loop_entry));
+                states[exit_state].epsilon_transitions.insert({action_table.size() - 1, TableType::Action});
+            } else {
+                states[exit_state].epsilon_transitions.insert({loop_target, TableType::DFA});
+            }
             break;
         case '*':
             states[start].epsilon_transitions.insert({end, TableType::DFA});
-            states[exit_state].epsilon_transitions.insert({loop_target, TableType::DFA});
-            states[start].optional = true;
-            states[body.start].optional = true;
+            if (has_store) {
+                auto loop_entry = action_table[end_action_idx];
+                loop_entry.next_nfa_state = loop_target;
+                action_table.push_back(std::move(loop_entry));
+                states[exit_state].epsilon_transitions.insert({action_table.size() - 1, TableType::Action});
+            } else {
+                states[exit_state].epsilon_transitions.insert({loop_target, TableType::DFA});
+            }
             break;
         default:
             break;
@@ -169,7 +176,7 @@ void NFA::markAccept(
     }
 
     std::reverse(state.instance_value.args.begin(), state.instance_value.args.end());
-    state.next_state = nestedReduction ? next_state : NULL_STATE;
+    state.next_state = DFATarget {nestedReduction ? next_state : NULL_STATE};
 
     semantic_table.push_back(state);
     const std::size_t reduce_idx = semantic_table.size() - 1;
@@ -179,7 +186,6 @@ void NFA::markAccept(
 
     // Assigned for ALL accepting rules
     states[state_id].accept_binding = binding;
-    states[state_id].last = true;
 }
 void NFA::handleTerminal(const AST::RuleMember &member, const stdu::vector<std::string> &name, const std::size_t &start, const std::size_t &end, bool &isLastMember, bool addStoreActions) {
     if (addStoreActions && !member.prefix.empty()) {
@@ -214,17 +220,6 @@ void NFA::handleNonTermnal(const AST::RuleMember &member, const stdu::vector<std
 
     // NFA.cpp inside NFA::handleNonTermnal
     applyQuantifierAndActions(member, start, end, {body_start, body_end}, isLastMember, addStoreActions, true);
-
-    // WAS: if (!states[body_start].last && !states[body_start].optional)
-    if (!states[body_end].last && !states[body_end].optional)
-        return;
-
-    // WAS: auto states_to_propagate_last = getStatesToPropagate(body_start);
-    auto states_to_propagate_last = getStatesToPropagate(body_end);
-    for (const auto s : states_to_propagate_last) {
-        states[s].last = states[body_end].last;
-        states[s].optional = states[body_end].optional;
-    }
 }
 
 void NFA::handleGroup(const AST::RuleMember &member,
@@ -274,17 +269,6 @@ void NFA::handleString(const AST::RuleMember &member, const std::string &str, co
     std::size_t body_end = current;
 
     applyQuantifierAndActions(member, start, end, {body_start, body_end}, isLastMember, addStoreActions, false);
-
-    // WAS: if (!states[start].last && !states[start].optional)
-    if (!states[end].last && !states[end].optional)
-        return;
-
-    // WAS: auto states_to_propagate_last = getStatesToPropagate(start);
-    auto states_to_propagate_last = getStatesToPropagate(end);
-    for (const auto s : states_to_propagate_last) {
-        states[s].last = states[end].last;
-        states[s].optional = states[end].optional;
-    }
 }
 
 void NFA::handleCsequence(const AST::RuleMember &member, const AST::RuleMemberCsequence &csequence, const std::size_t &start, const std::size_t &end, bool isLastMember, bool addStoreActions) {
@@ -338,16 +322,25 @@ auto NFA::buildStateFragment(const AST::RuleMember &member, bool isLastMember, b
         no_add_space_skip_next = true;
         return {NULL_STATE, NULL_STATE};
     }
+
+    const std::size_t entry = states.size();
+    states.emplace_back();
     const std::size_t start = states.size();
     states.emplace_back();
     const std::size_t end   = states.size();
     states.emplace_back();
+
+    // Bridge the public entry unconditionally into the internal start state.
+    states[entry].epsilon_transitions.insert({start, TableType::DFA});
 
     if (member.isName()) {
         const auto &name = member.getName();
         if ((is_char_table && tree.getTreeMap().contains(name.name)) || !name.isTerminal()) {
             auto it = fragment_cache.find(name.name);
             if (it != fragment_cache.end()) {
+                if (isLastMember) {
+                    markAccept(it->second.end, it->second.end, member, true);
+                }
                 return {it->second.start, it->second.end};
             }
 
@@ -357,7 +350,7 @@ auto NFA::buildStateFragment(const AST::RuleMember &member, bool isLastMember, b
             handleNonTermnal(member, name.name, start, end, isLastMember, addStoreActions);
 
             processing.erase(name.name);
-            fragment_cache[name.name] = {start, end};
+            fragment_cache[name.name] = {entry, end};
         } else {
             handleTerminal(member, name.name, start, end, isLastMember, addStoreActions);
         }
@@ -368,9 +361,17 @@ auto NFA::buildStateFragment(const AST::RuleMember &member, bool isLastMember, b
         bool was_group = false;
 
         bool was_storing_group = store_entire_group;
-        if (!member.prefix.empty()) {
+        const bool group_has_prefix = !member.prefix.empty();
+        if (group_has_prefix) {
             store_entire_group = true;
         }
+
+        std::size_t body_start = states.size();
+        states.emplace_back();
+        std::size_t body_end = states.size();
+        states.emplace_back();
+
+        bool any_option_has_prefix = false;
 
         for (const auto &option_ptr : op.options) {
             no_add_space_skip_next = cached_no_space_skip;
@@ -381,17 +382,14 @@ auto NFA::buildStateFragment(const AST::RuleMember &member, bool isLastMember, b
             if (fragment.invalid())
                 continue;
 
-            states[start].epsilon_transitions.insert({fragment.start, TableType::DFA});
-            states[fragment.end].epsilon_transitions.insert({end, TableType::DFA});
+            states[body_start].epsilon_transitions.insert({fragment.start, TableType::DFA});
+            states[fragment.end].epsilon_transitions.insert({body_end, TableType::DFA});
 
-            if (isLastMember) {
-                markAccept(fragment.end, end, *option_ptr, false);
-            }
-            if (!states[fragment.start].last)
-                continue;
-            auto states_to_propagate_last = getStatesToPropagate(start);
-            for (const auto s : states_to_propagate_last) {
-                states[s].last = states[start].last;
+            if (!option_ptr->prefix.empty()) {
+                any_option_has_prefix = true;
+                if (isLastMember && !group_has_prefix) {
+                    markAccept(fragment.end, body_end, *option_ptr, false);
+                }
             }
         }
 
@@ -400,6 +398,13 @@ auto NFA::buildStateFragment(const AST::RuleMember &member, bool isLastMember, b
         if (was_group && cached_group_count == group_count) {
             group_count++;
         }
+
+        const bool suppress_default_accept = !group_has_prefix && any_option_has_prefix;
+        applyQuantifierAndActions(
+            member, start, end, {body_start, body_end},
+            isLastMember && !suppress_default_accept,
+            addStoreActions, false
+        );
     } else if (member.isGroup()) {
         handleGroup(member, member.getGroup().values, start, end, isLastMember, addStoreActions);
     } else if (member.isString()) {
@@ -418,9 +423,9 @@ auto NFA::buildStateFragment(const AST::RuleMember &member, bool isLastMember, b
     }
 
     if (!no_add_space_skip_next)
-        add_space_skip_places.push_back(start);
+        add_space_skip_places.push_back(entry);
     no_add_space_skip_next = false;
-    return {start, end};
+    return {entry, end};
 }
 
 void NFA::build(bool addStoreActions) {
@@ -479,7 +484,6 @@ void NFA::build(bool addStoreActions) {
         }
         if (last_state != NULL_STATE && last_state < states.size()) {
             states[last_state].rule_name = name_;
-            states[last_state].dtb = nfadtb;
         }
     }
 
@@ -545,17 +549,81 @@ auto NFA::investigateHasNext(std::size_t place, const stdu::vector<std::string> 
 }
 
 void NFA::addSpaceSkip() {
-    for (const auto &place : add_space_skip_places) {
-        std::unordered_set<std::size_t> visited;
-        auto &state = states[place];
+    /*
+     * Do not loop whitespace directly back to `place` when its epsilon
+     * closure contains an Action edge.  Such a loop re-enters the closure
+     * and executes BEGIN again.
+     *
+     * Instead, construct an action-free projection of the epsilon closure:
+     *
+     *     place --whitespace--> skip_state --whitespace--> skip_state
+     *
+     * skip_state contains the consuming transitions reachable through normal
+     * DFA epsilon edges, but deliberately excludes Action/Semantic edges.
+     * Thus skipped whitespace can never re-fire BEGIN, while the next real
+     * character follows the same content transitions as the original entry.
+     */
+    for (const auto place : add_space_skip_places) {
+        std::unordered_set<std::size_t> whitespace_chars;
+
         if (is_char_table) {
-            for (const auto c : constants::whitespace_chars) {
-                if (!investigateHasNext(place, c, visited)) {
-                    state.transitions[c] = {{place, TableType::DFA}};
+            for (const auto c : constants::whitespace_chars)
+                whitespace_chars.insert(static_cast<unsigned char>(c));
+        }
+
+        // A whitespace character that is already a valid content transition
+        // must not be converted into a skip transition.
+        std::unordered_set<std::size_t> skip_chars;
+        for (const auto c : whitespace_chars) {
+            std::unordered_set<std::size_t> visited;
+            if (!investigateHasNext(place, static_cast<char>(c), visited))
+                skip_chars.insert(c);
+        }
+
+        if (skip_chars.empty())
+            continue;
+
+        NFA::state skip_state;
+        std::unordered_set<std::size_t> visited;
+
+        std::function<void(std::size_t)> collect =
+            [&](std::size_t id) {
+                if (!visited.insert(id).second)
+                    return;
+
+                const auto &source = states[id];
+
+                // Preserve all consuming transitions.
+                for (const auto &[key, targets] : source.transitions) {
+                    auto &dst = skip_state.transitions[key];
+                    dst.insert(dst.end(), targets.begin(), targets.end());
                 }
-            }
-        } else {
-            state.transitions[constants::whitespace] = {{place, TableType::DFA}};
+
+                // Traverse only ordinary DFA epsilon edges.  Action and
+                // Semantic edges are intentionally excluded.
+                for (const auto &epsilon : source.epsilon_transitions) {
+                    if (epsilon.table_type == TableType::DFA)
+                        collect(epsilon.next);
+                }
+            };
+
+        collect(place);
+
+        const std::size_t skip_state_id = states.size();
+        states.emplace_back(std::move(skip_state));
+
+        auto &skip = states[skip_state_id];
+        for (const auto c : skip_chars) {
+            skip.transitions[static_cast<char>(c)] = {
+                {skip_state_id, TableType::DFA}
+            };
+        }
+
+        auto &state = states[place];
+        for (const auto c : skip_chars) {
+            state.transitions[static_cast<char>(c)] = {
+                {skip_state_id, TableType::DFA}
+            };
         }
     }
 }
@@ -572,9 +640,19 @@ void NFA::acceptMapVisitState(std::size_t index, std::optional<TokenBinding> cur
         accept_map[index] = current_binding.value();
     }
 
-    // Propagate bindings strictly through epsilon transitions
     for (const auto &e : states[index].epsilon_transitions) {
-        acceptMapVisitState(e.next, current_binding, visited);
+        std::size_t target = e.next;
+
+        if (e.table_type == TableType::Action) {
+            target = action_table.at(e.next).next_nfa_state;
+        } else if (e.table_type == TableType::Semantic) {
+            continue;
+        }
+
+        if (target == NULL_STATE)
+            continue;
+
+        acceptMapVisitState(target, current_binding, visited);
     }
 }
 
@@ -585,8 +663,6 @@ void NFA::buildAcceptMap() {
             std::unordered_set<std::size_t> local_visited;
             acceptMapVisitState(i, states[i].accept_binding, local_visited);
         }
-        // Note: Missing entries in the map safely imply no acceptance,
-        // no need to populate with a "NULL_STATE" binding.
     }
 }
 
@@ -688,12 +764,19 @@ std::ostream& operator<<(std::ostream& os, const NFA::state& s) {
         os << "(none)\n";
     } else {
         for (const auto &t : s.epsilon_transitions) {
-            os << t.next << ", ";
+            switch (t.table_type) {
+                case NFA::TableType::Action:
+                    os << "action_table[" << t.next << "], ";
+                    break;
+                case NFA::TableType::Semantic:
+                    os << "semantic_table[" << t.next << "], ";
+                    break;
+                default:
+                    os << t.next << ", ";
+                    break;
+            }
         }
-    }
-
-    if (s.action_index != NFA::NULL_STATE) {
-        os << "\n\taction_table[" << s.action_index << "]";
+        os << "\n";
     }
 
     if (s.accept_binding.has_value()) {
@@ -711,7 +794,6 @@ std::ostream& operator<<(std::ostream& os, const NFA::state& s) {
     }
     return os;
 }
-
 
 std::ostream& operator<<(std::ostream& os, const NFA& nfa) {
     for (std::size_t i = 0; i < nfa.getStates().size(); ++i) {

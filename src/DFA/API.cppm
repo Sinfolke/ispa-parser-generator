@@ -29,14 +29,14 @@ export namespace DFA {
 
         NFA::TableType table_type;
 
-        // For ActionTarget:
+        // For NFA::ActionTarget:
         //   actual action opcode
         //   target_partition = partition of the next DFA state
         //
-        // For SemanticTarget:
+        // For NFA::SemanticTarget:
         //   action_id identifies the semantic table entry
         //
-        // For DFATarget:
+        // For NFA::DFATarget:
         //   target_partition identifies the next DFA state.
         NFA::Action action;
         std::size_t action_id;
@@ -87,10 +87,12 @@ export namespace DFA {
             );
         }
     };
+    using TransitionTarget = std::variant<NFA::DFATarget, NFA::ActionTarget, NFA::SemanticTarget>;
     template<typename Transition>
     struct State {
         std::unordered_set<std::size_t> nfa_states;
         Transition transitions;
+        std::optional<TransitionTarget> entry_action = std::nullopt;
         std::optional<NFA::TokenBinding> accept_binding = std::nullopt;
         bool operator==(const State &other) const = default;
     private:
@@ -110,22 +112,7 @@ export namespace DFA {
         auto operator()(const std::pair<NFA::TransitionKey, TransitionValue> &a, const std::pair<NFA::TransitionKey, TransitionValue> &b) const -> bool;
     };
 
-    // --- New Target Architecture Types ---
-    struct ActionTarget {
-        std::size_t id;
-        NFA::Action action;
-    };
-
-    struct SemanticTarget {
-        std::size_t id;
-    };
-
-    struct DFATarget {
-        std::size_t id;
-    };
-
     // Unified Transition Target for pure DFA runtime
-    using TransitionTarget = std::variant<DFATarget, ActionTarget, SemanticTarget>;
 
     // Mapper for output code generation
     class StateOffsetMapper {
@@ -136,11 +123,11 @@ export namespace DFA {
         [[nodiscard]] std::size_t resolve(const TransitionTarget& target) const {
             return std::visit([this](auto&& arg) -> std::size_t {
                 using T = std::decay_t<decltype(arg)>;
-                if constexpr (std::is_same_v<T, DFATarget>) {
+                if constexpr (std::is_same_v<T, NFA::DFATarget>) {
                     return arg.id;
-                } else if constexpr (std::is_same_v<T, ActionTarget>) {
+                } else if constexpr (std::is_same_v<T, NFA::ActionTarget>) {
                     return dfa_size_ + arg.id;
-                } else if constexpr (std::is_same_v<T, SemanticTarget>) {
+                } else if constexpr (std::is_same_v<T, NFA::SemanticTarget>) {
                     return dfa_size_ + lr_size_ + arg.id;
                 }
             }, target);
@@ -153,7 +140,7 @@ export namespace DFA {
     };
     using FullCharTable = std::array<TransitionValue, std::numeric_limits<unsigned char>::max() + 1>;
 
-    using Transitions = utype::unordered_map<NFA::TransitionKey, std::variant<DFATarget, ActionTarget, SemanticTarget>>;
+    using Transitions = utype::unordered_map<NFA::TransitionKey, std::variant<NFA::DFATarget, NFA::ActionTarget, NFA::SemanticTarget>>;
     using SortedTransitions = stdu::vector<std::pair<NFA::TransitionKey, TransitionValue>>;
     using SingleState = State<Transitions>;
     using CharMachineStateVariant = std::variant<FullCharTable, SortedTransitions>;

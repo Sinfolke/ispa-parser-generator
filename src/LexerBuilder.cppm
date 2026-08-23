@@ -32,7 +32,7 @@ private:
     std::size_t highest_states_count = 0;
     std::size_t highest_transition_count = 0;
     stdu::vector<NFA::ActionState> lr_table;
-    stdu::vector<LangAPI::Statements> semantic_table;
+    stdu::vector<NFA::SemanticState> semantic_table;
     std::size_t max_registers_count = 0;
 public:
     LexerBuilder(AST::Tree &ast) : ast(ast) {};

@@ -112,9 +112,27 @@ namespace LangRepr {
                             encoded = LangAPI::Int::createRValue(LangAPI::Int {.value = static_cast<long long>(t.next)});
                         }
                     } else if (t.table_type == NFA::TableType::Action) {
-                        encoded = LangAPI::Int::createRValue(LangAPI::Int {.value = static_cast<long long>(t.next + state_count)});
+                        // t.next is final_st -- the DFA state to continue to
+                        // AFTER this action/semantic chain resolves -- NOT the
+                        // index of which lr_table entry to invoke. That real
+                        // index lives in t.accept_index (populated from
+                        // target.id in classify()). The runtime doesn't need
+                        // final_st pre-baked into this sentinel at all: once
+                        // it looks up lr_table[accept_index] and executes it,
+                        // THAT entry's own next_state field (already correctly
+                        // resolved/rebased by DFA.cpp's optimize/minimize
+                        // passes) tells it what to do next -- continue to
+                        // another action, a semantic reduction, or a DFA
+                        // state -- chaining progressively at runtime rather
+                        // than needing to be resolved in advance here.
+                        // Embedding final_st here instead produced an
+                        // arbitrary DFA-state-sized number in the slot the
+                        // runtime treats as an action-table index, indexing
+                        // clean off the end of the real (much smaller) table.
+                        encoded = LangAPI::Int::createRValue(LangAPI::Int {.value = static_cast<long long>(t.accept_index + state_count)});
                     } else if (t.table_type == NFA::TableType::Semantic) {
-                        encoded = LangAPI::Int::createRValue(LangAPI::Int {.value = static_cast<long long>(t.next + state_count + lexer_builder.getLRTable().size())});
+                        // Same fix, mirrored for semantic_table.
+                        encoded = LangAPI::Int::createRValue(LangAPI::Int {.value = static_cast<long long>(t.accept_index + state_count + lexer_builder.getLRTable().size())});
                     } else {
                         throw Error("Unknown table type {}", (int) t.table_type);
                     }
@@ -151,7 +169,7 @@ namespace LangRepr {
     ) -> std::pair<std::shared_ptr<LangAPI::Declaration>, LangAPI::Visibility> {
         (void)state_count;
 
-        constexpr std::size_t lr_columns = 3;
+        constexpr std::size_t lr_columns = 2;
         const auto lr_state_count = states.size();
 
         stdu::vector<LangAPI::Expression> rows;
@@ -164,9 +182,26 @@ namespace LangRepr {
             row.push_back(LangAPI::Int::createExpression(LangAPI::Int {
                 .value = static_cast<long long>(state.action)
             }));
-            row.push_back(LangAPI::Int::createExpression(LangAPI::Int {
-                .value = static_cast<long long>(state.DFA_next_state)
-            }));
+            std::visit([&](const auto &target) {
+                using T = std::decay_t<decltype(target)>;
+                if (std::is_same_v<T, NFA::DFATarget>) {
+                    row.push_back(LangAPI::Int::createExpression(LangAPI::Int {
+                        .value = static_cast<long long>(target.id)
+                    }));
+                } else if (std::is_same_v<T, NFA::ActionTarget>) {
+                    row.push_back(LangAPI::Int::createExpression(LangAPI::Int {
+                        .value = static_cast<long long>(target.id + state_count)
+                    }));
+                } else if (std::is_same_v<T, NFA::SemanticTarget>) {
+                    row.push_back(LangAPI::Int::createExpression(LangAPI::Int {
+                        .value = static_cast<long long>(target.id + state_count + lexer_builder.getLRTable().size())
+                    }));
+                } else {
+                    throw Error("Unknown target type {}", (int) target.id);
+                }
+
+            }, state.next_state);
+
 
             rows.push_back(
                 LangAPI::Array::createExpression(
@@ -205,7 +240,37 @@ namespace LangRepr {
             LangAPI::Visibility::Private
         };
     }
-    auto ConstructLexer::makeSemanticSwitchFunction(const stdu::vector<LangAPI::Statements> semantic_table) -> LangAPI::Function {
+    auto ConstructLexer::makeSemanticSwitchFunction(const stdu::vector<NFA::SemanticState> semantic_table) -> LangAPI::Function {
+        stdu::vector<LangAPI::Statements> semantic_table_statements;
+        // change semantic table to raw Statements
+        for (const auto &semantic_state : semantic_table) {
+            LangAPI::Statements statements = semantic_state.statements;
+            LangAPI::RValue next_state;
+            std::visit([&](const auto &target) {
+                using T = std::decay_t<decltype(target)>;
+                if (std::is_same_v<T, NFA::DFATarget>) {
+                    if (target.id == NFA::NULL_STATE) {
+                        next_state = LangAPI::RValue {LangAPI::IspaLibSymbol {.exports = LangAPI::StdlibExports::DfaNullState}};
+                    } else {
+                        next_state = LangAPI::Int::createRValue(LangAPI::Int {.value = static_cast<long long>(target.id)});
+                    }
+                } else if (std::is_same_v<T, NFA::ActionTarget>) {
+                    next_state = LangAPI::Int::createRValue(LangAPI::Int {.value = static_cast<long long>(target.id + lexer_builder.getDFA().states.size())});
+                } else if (std::is_same_v<T, NFA::SemanticTarget>) {
+                    next_state = LangAPI::Int::createRValue(LangAPI::Int {.value = static_cast<long long>(target.id + lexer_builder.getDFA().states.size() + lexer_builder.getLRTable().size())});
+                } else {
+                    throw Error("Unknown target type {}", (int) target.id);
+                }
+
+            }, semantic_state.next_state);
+            statements.push_back(
+                LangAPI::Return::createStatement(LangAPI::Return {.value = LangAPI::MakeTuple::createExpression(LangAPI::MakeTuple {.args = {
+                    LangAPI::Int::createExpression(next_state),
+                    LangAPI::Inheritance::createExpression(semantic_state.instance_value)
+                }}
+            )}));
+            semantic_table_statements.push_back(std::move(statements));
+        }
         LangAPI::Function fun {
             .type = LangAPI::Type {LangAPI::ValueType::Tuple, LangAPI::Type {LangAPI::ValueType::Int}, LangAPI::Type {LangAPI::Symbol {"Token"}}},
             .name = "semantic_action_exec",
@@ -219,7 +284,7 @@ namespace LangRepr {
         LangAPI::Switch switch_;
         switch_.expression = LangAPI::Symbol::createExpression(LangAPI::Symbol {"state"});
         long long state = 0;
-        for (const auto &statements : semantic_table) {
+        for (const auto &statements : semantic_table_statements) {
             switch_.cases.emplace_back(LangAPI::Int::createRValue(LangAPI::Int {.value = state++}), ensureTypesNs(statements));
         }
         fun.statements = LangAPI::Switch::createStatements(switch_);

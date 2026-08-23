@@ -39,46 +39,43 @@ void DFA::mergeTwoNFA(
         // Symbol transitions: Rebase depending on target table type
         for (auto &[symbol, target_ids] : new_state.transitions) {
             for (auto &target : target_ids) {
-                if (target.table_type == NFA::TableType::Action) {
-                    if (target.next != NFA::NULL_STATE) target.next += action_offset;
-                } else if (target.table_type == NFA::TableType::Semantic) {
-                    if (target.next != NFA::NULL_STATE) target.next += semantic_offset;
-                } else {
-                    if (target.next != NFA::NULL_STATE) target.next += state_offset;
+                if (target.next != NFA::NULL_STATE) {
+                    if (target.table_type == NFA::TableType::Action) {
+                        target.next += action_offset;
+                    } else if (target.table_type == NFA::TableType::Semantic) {
+                        target.next += semantic_offset;
+                    } else {
+                        target.next += state_offset;
+                    }
                 }
             }
         }
 
         // Epsilon transitions: Rebase depending on target table type
-        // NOTE: declared fresh per-state — must not accumulate across iterations
         utype::unordered_set<NFA::TransitionValue> rebased_epsilon;
         for (auto target : new_state.epsilon_transitions) {
-            if (target.table_type == NFA::TableType::Action) {
-                if (target.next != NFA::NULL_STATE) target.next += action_offset;
-            } else if (target.table_type == NFA::TableType::Semantic) {
-                if (target.next != NFA::NULL_STATE) target.next += semantic_offset;
-            } else {
-                if (target.next != NFA::NULL_STATE) target.next += state_offset;
+            if (target.next != NFA::NULL_STATE) {
+                if (target.table_type == NFA::TableType::Action) {
+                    target.next += action_offset;
+                } else if (target.table_type == NFA::TableType::Semantic) {
+                    target.next += semantic_offset;
+                } else {
+                    target.next += state_offset;
+                }
             }
             rebased_epsilon.insert(target);
         }
         new_state.epsilon_transitions = std::move(rebased_epsilon);
 
-        // ANY transition reference
-        if (new_state.any != NFA::NULL_STATE) {
-            new_state.any += state_offset;
-        }
-
-        // State-level action index
-        if (new_state.action_index != NFA::NULL_STATE) {
-            new_state.action_index += action_offset;
-        }
-
-        // Accept binding target state
+        // Accept binding target state & rule rebasing
         if (new_state.accept_binding.has_value()) {
             auto &binding = *new_state.accept_binding;
-            if (binding.target_semantic_state.has_value()) {
+
+            if (binding.target_semantic_state.has_value() && *binding.target_semantic_state != NFA::NULL_STATE) {
                 *binding.target_semantic_state += semantic_offset;
+            }
+            if (rule_idx != NFA::NULL_STATE) {
+                binding.reduce_rule_id = rule_idx;
             }
         }
 
@@ -105,9 +102,28 @@ void DFA::mergeTwoNFA(
         auto second_actions = second.getActionTable();
 
         for (auto &action : second_actions) {
-            if (action.DFA_next_state != NFA::NULL_STATE) {
-                action.DFA_next_state += state_offset;
+            // Rebase next NFA state reference
+            if (action.next_nfa_state != NFA::NULL_STATE) {
+                action.next_nfa_state += state_offset;
             }
+
+            // Rebase variant target state
+            std::visit([&](auto &&target) {
+                using T = std::decay_t<decltype(target)>;
+                if constexpr (std::is_same_v<T, NFA::DFATarget>) {
+                    if (target.id != NFA::NULL_STATE) {
+                        target.id += state_offset;
+                    }
+                } else if constexpr (std::is_same_v<T, NFA::ActionTarget>) {
+                    if (target.id != NFA::NULL_STATE) {
+                        target.id += action_offset;
+                    }
+                } else if constexpr (std::is_same_v<T, NFA::SemanticTarget>) {
+                    if (target.id != NFA::NULL_STATE) {
+                        target.id += semantic_offset;
+                    }
+                }
+            }, action.next_state);
         }
 
         first_actions.insert(
@@ -124,12 +140,37 @@ void DFA::mergeTwoNFA(
      */
     {
         auto &first_semantic = first.getSemanticTable();
-        const auto &second_semantic = second.getSemanticTable();
+        auto second_semantic = second.getSemanticTable();
+
+        for (auto &semantic : second_semantic) {
+            // Rebase NFA index reference
+            if (semantic.nfa_index != NFA::NULL_STATE) {
+                semantic.nfa_index += state_offset;
+            }
+
+            // Rebase variant target state
+            std::visit([&](auto &&target) {
+                using T = std::decay_t<decltype(target)>;
+                if constexpr (std::is_same_v<T, NFA::DFATarget>) {
+                    if (target.id != NFA::NULL_STATE) {
+                        target.id += state_offset;
+                    }
+                } else if constexpr (std::is_same_v<T, NFA::ActionTarget>) {
+                    if (target.id != NFA::NULL_STATE) {
+                        target.id += action_offset;
+                    }
+                } else if constexpr (std::is_same_v<T, NFA::SemanticTarget>) {
+                    if (target.id != NFA::NULL_STATE) {
+                        target.id += semantic_offset;
+                    }
+                }
+            }, semantic.next_state);
+        }
 
         first_semantic.insert(
             first_semantic.end(),
-            second_semantic.begin(),
-            second_semantic.end()
+            std::make_move_iterator(second_semantic.begin()),
+            std::make_move_iterator(second_semantic.end())
         );
     }
 }
@@ -141,14 +182,14 @@ auto DFA::mergeNFAS(
     NFA merged = nfas[0];
 
     if (merged.getStates().empty()) {
-        merged.build(true); // WAS: merged.build(false);
+        merged.build(true);
     }
 
     std::size_t max_registers_count = merged.getRegistersCount();
     for (std::size_t i = 1; i < nfas.size(); ++i) {
         NFA next = nfas[i];
         if (next.getStates().empty()) {
-            next.build(true); // WAS: unbuilt or second.build(false)
+            next.build(true);
         }
 
         mergeTwoNFA(

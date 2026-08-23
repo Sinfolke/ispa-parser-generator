@@ -13,10 +13,24 @@ void DFA::Closure::epsilonClosure(const stdu::vector<std::size_t> &source) {
 
         const auto &epsilons = nfa.getStates().at(current_id).epsilon_transitions;
 
-        for (auto target_state : epsilons) {
-            if (!new_closure.contains(target_state.next)) {
-                new_closure.insert(target_state.next);
-                work.push(target_state.next);
+        for (const auto &edge : epsilons) {
+            std::size_t target = edge.next;
+
+            if (edge.table_type == NFA::TableType::Action) {
+                fired.push_back({edge.table_type, edge.next});
+                target = nfa.getActionTable().at(edge.next).next_nfa_state;
+            } else if (edge.table_type == NFA::TableType::Semantic) {
+                fired.push_back({edge.table_type, edge.next});
+                continue; // Semantic epsilon edges only occur via markAccept on accept
+                // states; there's no NFA-space continuation field for them.
+            }
+
+            if (target == NFA::NULL_STATE)
+                continue;
+
+            if (!new_closure.contains(target)) {
+                new_closure.insert(target);
+                work.push(target);
             }
         }
     }
@@ -58,4 +72,8 @@ DFA::Closure::Closure(const NFA &nfa, const stdu::vector<std::size_t> &current, 
     epsilonClosure(closure);
     std::sort(closure.begin(), closure.end());
     closure.erase(std::unique(closure.begin(), closure.end()), closure.end());
+}
+
+auto DFA::Closure::contains(std::size_t state) const -> bool {
+    return std::binary_search(closure.begin(), closure.end(), state);
 }

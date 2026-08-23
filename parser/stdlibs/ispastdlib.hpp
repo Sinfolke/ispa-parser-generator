@@ -296,7 +296,7 @@ namespace DFA::API {
     template<std::size_t States>
     using AcceptTable = std::array<std::size_t, States>;
     template<std::size_t States>
-    using LRTable = std::array<State<3>, States>;
+    using LRTable = std::array<State<2>, States>;
     enum class Action {
         UNDEF, BEGIN, END, PUSH, FAIL
     };
@@ -322,12 +322,14 @@ namespace DFA {
     ) -> Token {
         std::size_t state = 0;
         std::size_t registers_allocated = 0;
-        // debug table
+
+        // Debug table print (uses isolated counter variable)
+        std::size_t dbg_state = 0;
         for (const auto &s : table) {
-            std::cout << "state " << state++ << ": ";
+            std::cout << "state " << dbg_state++ << ": ";
             std::size_t cls = 0;
             for (const auto &transition : s) {
-                std::cout << "\t" << cls++ << "{";
+                std::cout << "\t" << cls++ << " "  << transition << "{";
                 if (transition < table.size()) {
                     std::cout << "REG " << transition;
                 } else if (transition == DFA::API::null_state) {
@@ -340,24 +342,37 @@ namespace DFA {
                 std::cout << "}\n";
             }
         }
-        state = 0;
-        while (true) {
-            std::size_t cls = class_table[static_cast<unsigned char>(*pos)];
-            std::size_t next = table[state][cls];
-            std::cout << "char " << *pos << " class " << cls << " state " << state << " next " << next << std::endl;
 
-            if (next < table.size()) {
-                // Regular state transition
-                state = next;
-            } else if (next == DFA::API::null_state) {
+        while (true) {
+            if (state == API::null_state)
                 break;
-            } else if (next < table.size() + lr_table.size()) {
+
+            std::cout << "State " << state << " char '" << *pos << "'" << std::endl;
+
+            if (state < table.size()) {
+                std::size_t cls = class_table[static_cast<unsigned char>(*pos)];
+                std::size_t next = table[state][cls];
+                std::cout << "Transitioning to " << next << std::endl;
+
+                if (next == API::null_state) {
+                    break;
+                }
+
+                state = next;
+                // Only consume character if transitioning to a DFA state or LR action edge.
+                // Fallback SEMANTIC actions (>= table.size() + lr_table.size()) must NOT consume *pos.
+                if (next < table.size() + lr_table.size()) {
+                    ++pos;
+                }
+            } else if (state < table.size() + lr_table.size()) {
                 // LR action state
-                auto lr_action = lr_table[next - table.size()];
+                auto lr_action = lr_table[state - table.size()];
+                std::cout << "executing LR action " << lr_action[0] << std::endl;
                 switch (static_cast<API::Action>(lr_action[0])) {
                     case API::Action::UNDEF:
                         throw std::runtime_error("DFA: undefined action; Report this error to github");
                     case API::Action::BEGIN:
+                        std::cout << "Begin of value on character " << *pos << std::endl;
                         registers[registers_allocated++] = pos;
                         break;
                     case API::Action::END:
@@ -370,6 +385,7 @@ namespace DFA {
                         registers_allocated--;
                         break;
                     case API::Action::PUSH:
+                        std::cout << "Pushing value " << std::string(registers[registers_allocated - 1], pos - registers[registers_allocated - 1]) << std::endl;
                         if (pos - registers[registers_allocated - 1] == 1) {
                             vec_values.back().push_back(*registers[registers_allocated - 1]);
                         } else {
@@ -383,13 +399,12 @@ namespace DFA {
             } else {
                 std::cout << "Calling semantic action " << state - table.size() - lr_table.size() << std::endl;
 
-                std::pair<int, Token> t = semantic(next - table.size() - lr_table.size(), values, vec_values);
+                std::pair<int, Token> t = semantic(state - table.size() - lr_table.size(), values, vec_values);
                 if (!std::holds_alternative<std::monostate>(t.second)) {
                     values.push_back(std::move(t.second));
                 }
                 state = t.first;
             }
-            ++pos;
         }
 
         if (!values.empty() && !std::holds_alternative<Token>(values.front())) {
@@ -548,6 +563,7 @@ public:
             throw Lexer_No_Input_exception();
         const char* pos = _in;
         while (*pos != '\0')
+
             push(makeToken(pos));
         push(Token{});
         return tokens;

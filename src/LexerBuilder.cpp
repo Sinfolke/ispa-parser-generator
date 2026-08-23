@@ -45,19 +45,9 @@ void LexerBuilder::build() {
     auto dfa_meta = DFA::build(ast, nfas);
     dfa = std::get<0>(dfa_meta);
     lr_table = std::get<1>(dfa_meta);
-    auto semantic_table_abstract = std::get<2>(dfa_meta);
+    semantic_table = std::get<2>(dfa_meta);
     max_registers_count = std::get<3>(dfa_meta);
-    // change semantic table to raw Statements
-    for (const auto semantic_state : semantic_table_abstract) {
-        LangAPI::Statements statements = semantic_state.statements;
-        statements.push_back(
-            LangAPI::Return::createStatement(LangAPI::Return {.value = LangAPI::MakeTuple::createExpression(LangAPI::MakeTuple {.args = {
-                LangAPI::Int::createExpression(LangAPI::Int {.value = static_cast<long long>(semantic_state.next_state)}),
-                LangAPI::Inheritance::createExpression(semantic_state.instance_value)
-            }}
-        )}));
-        semantic_table.push_back(std::move(statements));
-    }
+
 }
 auto LexerBuilder::getDataBlocks() const -> LLIR::DataBlockList {
     LLIR::DataBlockList list;

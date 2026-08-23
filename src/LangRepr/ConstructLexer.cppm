@@ -33,7 +33,7 @@ export namespace LangRepr {
             const stdu::vector<NFA::ActionState>& states,
             std::size_t state_count
         ) -> std::pair<std::shared_ptr<LangAPI::Declaration>, LangAPI::Visibility>;
-        auto makeSemanticSwitchFunction(const stdu::vector<LangAPI::Statements> semantic_table) -> LangAPI::Function;
+        auto makeSemanticSwitchFunction(const stdu::vector<NFA::SemanticState> semantic_table) -> LangAPI::Function;
         auto constructLexer() -> void;
         ConstructLexer(Holder &holder, LexerBuilder &lexer_builder, LLIR::IR &ir) : ConstructBase(holder, lexer_builder, ir) {}
     };
