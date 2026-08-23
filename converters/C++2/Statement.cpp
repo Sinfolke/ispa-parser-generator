@@ -60,6 +60,10 @@ auto Cpp::Statement::createExpression(const LangAPI::Expression &expression) -> 
     Core::output->writeln("{};", Core::convertExpression(expression));
 }
 
+auto Cpp::Statement::createThrow(const LangAPI::Throw &t) -> void {
+    Core::output->writeln("throw {};", Core::convertExpression(t.throw_value));
+}
+
 Converter::Writer &Cpp::Statement::getWriter() {
     return Core::h_file;
 }

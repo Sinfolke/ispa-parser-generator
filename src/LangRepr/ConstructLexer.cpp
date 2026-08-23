@@ -288,6 +288,18 @@ namespace LangRepr {
             switch_.cases.emplace_back(LangAPI::Int::createRValue(LangAPI::Int {.value = state++}), ensureTypesNs(statements));
         }
         fun.statements = LangAPI::Switch::createStatements(switch_);
+        fun.statements.push_back(
+            LangAPI::Throw::createStatement(
+                LangAPI::Throw {
+                .throw_value =
+                    LangAPI::IspaLibFunctionCall::createExpression(
+                        LangAPI::IspaLibFunctionCall {
+                        .symbol = LangAPI::StdlibExports::Error,
+                        .args = {LangAPI::String::createExpression(LangAPI::String {.value = "Out of bound semantic action"})}
+                    })
+                }
+            )
+        );
         return fun;
     }
     auto ConstructLexer::constructLexer() -> void {

@@ -104,7 +104,7 @@ export namespace LangAPI {
     enum class StdlibExports {
         Node, MatchResult, Lexer, Parser, LexerMakeTokenParameter,
         DfaState, DfaTable, DfaClassTable, DfaAcceptTable, DfaLRTable, DfaNullState,
-        ParserFunctionParameter,
+        ParserFunctionParameter, Error
     };
 
 
@@ -1516,8 +1516,21 @@ export namespace LangAPI {
             return std::tie(expression, cases);
         }
     };
+    struct Throw : StatementLevel {
+        friend bool operator==(const Throw &a, const Throw &b);
+        friend bool operator!=(const Throw &a, const Throw &b) { return !(a == b); }
+        friend bool operator<(const Throw &a, const Throw &b);
+        friend auto operator<<(std::ostream& os, const Throw &c) -> std::ostream&;
+        Expression throw_value;
+
+    private:
+        friend struct ::uhash;
+        auto members() const {
+            return std::tie(throw_value);
+        }
+    };
     struct Statement : StatementsLevel {
-        std::variant<std::monostate, Variable, If, While, DoWhile, Switch, Expression> value;
+        std::variant<std::monostate, Variable, If, While, DoWhile, Switch, Expression, Throw> value;
         Statement() = default;
         template<typename T>
         requires std::is_constructible_v<decltype(value), std::decay_t<T>>
@@ -1534,6 +1547,7 @@ export namespace LangAPI {
         bool isDoWhile() const { return std::holds_alternative<DoWhile>(value); }
         bool isSwitch() const { return std::holds_alternative<Switch>(value); }
         bool isExpression() const { return std::holds_alternative<Expression>(value); }
+        bool isThrow() const { return std::holds_alternative<Throw>(value); }
 
         // ======= getXXX functions =======
         Variable& getVariable() { return std::get<Variable>(value); }
@@ -1543,6 +1557,7 @@ export namespace LangAPI {
         ConditionalElement &getWhileOrDoWhile() { return std::holds_alternative<While>(value) ? static_cast<ConditionalElement &>(std::get<While>(value)) : static_cast<ConditionalElement &>(std::get<DoWhile>(value)); }
         Switch& getSwitch() { return std::get<Switch>(value); }
         Expression& getExpression() { return std::get<Expression>(value); }
+        Throw& getThrow() { return std::get<Throw>(value); }
         // ======= const versions =======
         const Variable& getVariable() const { return std::get<Variable>(value); }
         const If& getIf() const { return std::get<If>(value); }
@@ -1551,6 +1566,7 @@ export namespace LangAPI {
         const ConditionalElement& getWhileOrDoWhile() const { return std::holds_alternative<While>(value) ? static_cast<const ConditionalElement &>(std::get<While>(value)) : static_cast<const ConditionalElement &>(std::get<DoWhile>(value)); }
         const Switch& getSwitch() const { return std::get<Switch>(value); }
         const Expression& getExpression() const { return std::get<Expression>(value); }
+        const Throw& getThrow() const { return std::get<Throw>(value); }
 
         static auto createStatements(const RValue &value) -> stdu::vector<Statement>;
 

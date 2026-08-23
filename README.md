@@ -1,91 +1,94 @@
 # ISPA Parser Generator
 
-**ISPA Parser** is a high-performance, infrastructure-level parser generator written from scratch in modern C++ (C++20/C++23). It enables high-level declarative grammar specifications using ISPA Syntax Containers (`.isc`), features automatic Abstract Syntax Tree (AST) synthesis, and employs Common Language Logic (CLL) to keep grammar definitions language-agnostic.
+**ISPA Parser** is a high-performance, 
+infrastructure-level parser generator written from scratch 
+in modern C++ (C++20/C++23). It provide fully automatic AST generation,
+Advanced, feature-rich lexer and extensible parser
 
 ---
 
 ## 🚀 Current State
-
-- **Language Support**: Currently targets native **C++17 and upper**.
-- **Parsing Algorithms**:
-  - **LL(*) / Custom LL Engines**: It's core is implemented and highly tested. It's just needed to switch to LL(*) algorithm for DFA-based predictions
-  - **LR(1) / LALR / LR(*)**: Core theory and initial algorithmic pass completed and passing preliminary unit tests. Currently need some refinement over new IRs
-- **Lexing**: Deterministic Finite Automata (DFA) based tokenization layer with custom lexer generation.
-- **AST Generation**: Fully automatic AST construction with field mapping and typed captures (primitives, arrays, objects).
+- Core backend and frontend is implemented and the executable can be compiled on both **Windows** and **Linux**
+- Output can be compiled and run
+- Lexer is under heavy tests
+- Parser (LL*) is mostly correct; Needs some changes and tests
+- Provide the way to generate output to any language with **LangAPI** IR; **C++17** is the only target right now
 ---
 
-## ✨ Features
-- **Declarative AST Mapping**: Automatically capture tokens and sub-rules using `@` and map captured fields directly into structural tree representations via `@{field1, field2, ...}`.
-- **Nested Rules & Encapsulation**: Declare sub-rules, nested tokens (`#subrule`), and local context rules directly within parent rules.
----
+## Lexer Capabilities
+- Match tokens with quick DFA table
+- Build AST-like tokens natively during lexing. **You can capture only whatever you need**
+- Include semantic actions right into lexer. Context-sensitive lexing is possible [needs to throw further grammar with Advanced Rules]
+- Match tokens inside other tokens without structure loss. Capture these tokens preserving their data type
+- Match non-terminals right inside terminals (rules inside tokens) during lexing, separately from parsing. [needs implementation]
+## Parser Capabilities
+- Generate LL(\*) or LR(\*) parser [**LL(*) is the only aim to be stable right now**]
+- Build automatic, fully typed and easy to traverse AST during parsing. No post-parsing or callback functions required.
 
-## 📝 Syntax & Usage (Documentation)
-
-### 1. Basic Rule Structure & Captures (`@` and `@{...}`)
-
-Captures (`@`) specify which matched elements should be stored in the AST node. The binding construct `@{...}` maps captured items to named properties in the node output.
-
+## Both have
+- Semantic actions with in-grammar python pseudocode with advanced rules
+- Error messages and custom context-sensitive recovery strategies in fail blocks
+- Nested rules, where one rule may encapsulate another rule
+## Syntax example
 ```ispa
-condition:
-    'if' '(' @ expr ')' @ stmt 'else' @ stmt
-    @{expression, true_stmt, false_stmt}
-    ;
-```
-
-### 2. Sub-Rules & Nested Rules (`#rule`)
-
-Rules can contain encapsulated nested rules (`#name`) to prevent global namespace pollution:
-
-```ispa
-expr:
-    #logical
-    
-    #logical:
-        @ compare (@ LOGICAL_OP @ compare)*
-        @{left, op, right}
-        ;
-    #compare:
-        @ arithmetic (@ COMPARE_OP @ arithmetic)*
-        @{first, operators, sequence}
-        ;
-    ;
-```
-
-### 3. Alternative Choices & Values
-
-```ispa
-stmt:
-    ( '{' @ #value '}' )
-    | @ #value
+  STRING:
+    '"'
+        (@ '\\"' | @ [^"] | '${' @ expr '}')*  
+    '"'
     {@}
-    ;
+  ;
+  NUMBER:
+    @ [0-9]+ ('.' @ [0-9]+)?
+    @{decimal, floating}
+  ;
+  ID:
+    @ ([a-zA-Z_][a-zA-Z0-9_]*)
+    {@}
+  ;
+  expr:
+      @ #logical
+      {@}
+
+      #logical:
+          @ compare (@ LOGICAL_OP @ compare)*
+
+          @{left, op, right}
+      ;
+
+      #compare:
+          @ arithmetic (@ COMPARE_OP @ arithmetic)*
+
+          @{first, op, sequence}
+      ;
+
+      #arithmetic:
+          @ term (@ PLUS | MINUS @ term)*
+
+          @{first, op, sequence}
+      ;
+
+      #term:
+          @ value (@ MULTIPLE | DIVIDE | MODULO @ value)*
+
+          @{first, op, sequence}
+      ;
+
+      #value:
+          @ STRING | NUMBER | ID
+          {@}
+      ;
+
+      #group:
+          '(' @ expr ')'
+          {@}
+      ;
+  ;
+  
 ```
-
-### 4. Grammar Inheritance & Templates
-
-Base rules can be extended or overridden, allowing grammar modularity:
-- Define reusable templates with slot placeholders.
-- Extend base grammars to produce customized syntaxes without re-writing entire rule trees.
----
-
-## 🔄 Recent Changes
-
-- Refined AST generation pipeline and field-mapping bindings.
-- Expanded C++20 module/header generation for cleaner compiled output.
-- Enhanced parser table generators and DFA lexer state machine optimizations.
----
-
-## ⚠️ Known Issues
-
-> *This section is intentionally left open for specific issue tracking.*
-
-- [ ] *Slow compilation by most major C++ compilers*
-
----
 
 ## 🔮 Future Roadmap
 
-- [ ] **PLL Algorithm**: Finalize custom Parallel/Polynomial LL algorithm to seamlessly resolve left-recursion in LL parsers while preserving structural parity with LR parsers.
+- [ ] **PLL Algorithm**: Finalize custom Predictive LL algorithm to seamlessly resolve left-recursion in LL parsers while preserving structural parity with LR parsers.
 - [ ] **Multi-Target Code Generation**:
   - [ ] Python target emitter
 - [ ] **Full LR Parser Stabilization**: Finalize integration and production readiness for LR(1), LALR, and LR(*) modes.

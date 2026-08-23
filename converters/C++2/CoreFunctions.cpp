@@ -167,6 +167,8 @@ auto Core::convertIspaLibSymbol(const LangAPI::IspaLibSymbol &symbol) -> std::st
             return "::ISPA_STD::DFA::API::CharToClass";
         case LangAPI::StdlibExports::DfaNullState:
             return "::ISPA_STD::DFA::API::null_state";
+        case LangAPI::StdlibExports::Error:
+            return "std::runtime_error";
         default:
             throw Error("Unknown IspaLibSymbol exports: {}", (int) symbol.exports);
     }

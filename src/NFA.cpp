@@ -177,7 +177,6 @@ void NFA::markAccept(
 
     std::reverse(state.instance_value.args.begin(), state.instance_value.args.end());
     state.next_state = DFATarget {nestedReduction ? next_state : NULL_STATE};
-
     semantic_table.push_back(state);
     const std::size_t reduce_idx = semantic_table.size() - 1;
 

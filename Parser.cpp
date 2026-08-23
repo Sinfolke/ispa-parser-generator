@@ -280,6 +280,7 @@ auto Parser::Lexer::semantic_action_exec (int state, std::vector<std::variant<st
 			break;
 		}
 	}
+	throw std::runtime_error("Out of bound semantic action");
 }
 auto Parser::Lexer::init () -> void{
 	return ;

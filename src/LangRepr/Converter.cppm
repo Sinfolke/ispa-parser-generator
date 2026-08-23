@@ -90,6 +90,8 @@ export namespace LangRepr {
                 stmts->createExpression(stmt.getExpression());
             } else if (stmt.isVariable()) {
                 stmts->createVariable(stmt.getVariable());
+            } else if (stmt.isThrow()) {
+                stmts->createThrow(stmt.getThrow());
             }
         }
         auto buildStatements(const LangAPI::Statements &statements) -> void {
