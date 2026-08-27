@@ -288,18 +288,7 @@ namespace LangRepr {
             switch_.cases.emplace_back(LangAPI::Int::createRValue(LangAPI::Int {.value = state++}), ensureTypesNs(statements));
         }
         fun.statements = LangAPI::Switch::createStatements(switch_);
-        fun.statements.push_back(
-            LangAPI::Throw::createStatement(
-                LangAPI::Throw {
-                .throw_value =
-                    LangAPI::IspaLibFunctionCall::createExpression(
-                        LangAPI::IspaLibFunctionCall {
-                        .symbol = LangAPI::StdlibExports::Error,
-                        .args = {LangAPI::String::createExpression(LangAPI::String {.value = "Out of bound semantic action"})}
-                    })
-                }
-            )
-        );
+        fun.statements.push_back(LangAPI::Throw::createStatement(LangAPI::Throw {.throw_value = LangAPI::IspaLibFunctionCall::createExpression(LangAPI::IspaLibFunctionCall {.symbol = LangAPI::IspaLibSymbol {.exports = LangAPI::StdlibExports::Error}, .args = {LangAPI::String::createExpression(LangAPI::String {.value = "Out of bound semantic action"})}})}));
         return fun;
     }
     auto ConstructLexer::constructLexer() -> void {
@@ -307,7 +296,6 @@ namespace LangRepr {
         Tlog::Branch b(logger, "LangRepr/ConstructLexer.log");
         auto lexer = createLexerClass();
 
-        // Single unified, classified DFA -- no per-token list, no FCDT.
         const auto &dfa = lexer_builder.getDFA();
         const auto &class_table = dfa.table;
         const auto &states = dfa.states.get();
@@ -319,6 +307,34 @@ namespace LangRepr {
         lexer.data.push_back(makeDfaTableDecl(states, state_count, class_count));
 
         lexer.data.push_back(makeLRTableDecl(lexer_builder.getLRTable(), state_count));
+
+        // Entry action: an Action/Semantic chain that fires once, before any
+        // character is consumed, when matching begins at state 0 -- e.g. a
+        // BEGIN register action for a rule whose captured value spans the
+        // ENTIRE token (like ID), as opposed to one that starts partway
+        // through a rule (like TEMPLATED_TYPE's op/type fields, which get
+        // discovered naturally by the normal per-symbol transition
+        // machinery once matching is already underway). Sentinel-encoded
+        // using the SAME scheme as dfa_table's Action/Semantic cells so the
+        // runtime dispatches it through the identical decode logic, just as
+        // the INITIAL value of `state` rather than as a transition target.
+        // Absent entry actions encode as 0 (state 0 itself), matching
+        // current behavior exactly -- a harmless no-op initializer.
+        long long entry_action_value = 0;
+        if (!states.empty() && states[0].entry_action.has_value()) {
+            std::visit([&](auto &&target) {
+                using T = std::decay_t<decltype(target)>;
+                if constexpr (std::is_same_v<T, NFA::ActionTarget>) {
+                    entry_action_value = static_cast<long long>(target.id + state_count);
+                } else if constexpr (std::is_same_v<T, NFA::SemanticTarget>) {
+                    entry_action_value = static_cast<long long>(
+                        target.id + state_count + lexer_builder.getLRTable().size()
+                    );
+                } else if constexpr (std::is_same_v<T, NFA::DFATarget>) {
+                    entry_action_value = static_cast<long long>(target.id);
+                }
+            }, *states[0].entry_action);
+        }
         lexer.data.push_back(std::make_pair(std::make_shared<LangAPI::Declaration>(LangAPI::Function::createDeclaration(makeSemanticSwitchFunction(lexer_builder.getSemanticTable()))), LangAPI::Visibility::Private));
         if (lexer_builder.getDFA().states.size() > 0) {
             lexer.data.push_back(std::make_pair(
@@ -378,6 +394,7 @@ namespace LangRepr {
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"dfa_table"}),
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"char_class_table"}),
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"lr_table"}),
+                                    LangAPI::Int::createExpression(LangAPI::Int {.value = entry_action_value}),
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"values"}),
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"vec_values"}),
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"registers"}),

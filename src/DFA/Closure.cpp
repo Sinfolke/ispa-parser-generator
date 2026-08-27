@@ -1,11 +1,17 @@
 module DFA.closure;
 import std;
 
-void DFA::Closure::epsilonClosure(const stdu::vector<std::size_t> &source) {
+void DFA::Closure::epsilonClosure(const std::vector<std::size_t> &source) {
     std::queue<std::size_t> work;
-    std::unordered_set<std::size_t> new_closure;
-    new_closure.insert(source.begin(), source.end());
-    for (std::size_t s : source) work.push(s);
+    std::unordered_set<std::size_t> visited;
+    std::vector<std::size_t> new_closure;
+
+    for (std::size_t s : source) {
+        if (visited.insert(s).second) {
+            work.push(s);
+            new_closure.push_back(s);
+        }
+    }
 
     while (!work.empty()) {
         std::size_t current_id = work.front();
@@ -17,24 +23,30 @@ void DFA::Closure::epsilonClosure(const stdu::vector<std::size_t> &source) {
             std::size_t target = edge.next;
 
             if (edge.table_type == NFA::TableType::Action) {
-                fired.push_back({edge.table_type, edge.next});
+                if (edge.next >= nfa.getActionTable().size()) continue;
                 target = nfa.getActionTable().at(edge.next).next_nfa_state;
+
+                // Record action ONLY when discovering a new, unvisited target state
+                if (target != NFA::NULL_STATE && !visited.contains(target)) {
+                    fired.push_back({edge.table_type, edge.next});
+                }
             } else if (edge.table_type == NFA::TableType::Semantic) {
-                fired.push_back({edge.table_type, edge.next});
-                continue; // Semantic epsilon edges only occur via markAccept on accept
-                // states; there's no NFA-space continuation field for them.
+                if (!visited.contains(edge.next)) {
+                    fired.push_back({edge.table_type, edge.next});
+                }
+                continue;
             }
 
             if (target == NFA::NULL_STATE)
                 continue;
 
-            if (!new_closure.contains(target)) {
-                new_closure.insert(target);
+            if (visited.insert(target).second) {
+                new_closure.push_back(target);
                 work.push(target);
             }
         }
     }
-    closure.assign(new_closure.begin(), new_closure.end());
+    closure = std::move(new_closure);
 }
 
 void DFA::Closure::move(const stdu::vector<std::size_t> &src, const NFA::TransitionKey &sym) {

@@ -67,16 +67,25 @@ void DFA::mergeTwoNFA(
         }
         new_state.epsilon_transitions = std::move(rebased_epsilon);
 
-        // Accept binding target state & rule rebasing
+        // Accept binding target state
         if (new_state.accept_binding.has_value()) {
             auto &binding = *new_state.accept_binding;
 
             if (binding.target_semantic_state.has_value() && *binding.target_semantic_state != NFA::NULL_STATE) {
                 *binding.target_semantic_state += semantic_offset;
             }
-            if (rule_idx != NFA::NULL_STATE) {
-                binding.reduce_rule_id = rule_idx;
-            }
+            // NOTE: reduce_rule_id is intentionally NOT touched here.
+            // DFA.cpp's "Resolve accept/reduce semantic states" section owns
+            // this field's entire lifecycle: it's gated on
+            // !binding->reduce_rule_id.has_value() to harvest the real
+            // END/PUSH action from the state's own closure, then converts
+            // that into a proper lr_table entry chained into the semantic
+            // reduce. reduce_rule_id and the merge-time rule_idx parameter
+            // are different number spaces (an action_table index vs. a
+            // sequential rule/NFA identifier) -- stamping rule_idx into this
+            // field here poisons that gate before DFA::build() ever runs,
+            // silently blocking the END/PUSH harvest for every token merged
+            // in as `second` (i.e. every token except nfas[0]).
         }
 
         first_states.emplace_back(std::move(new_state));
@@ -182,14 +191,14 @@ auto DFA::mergeNFAS(
     NFA merged = nfas[0];
 
     if (merged.getStates().empty()) {
-        merged.build(true);
+        merged.build(true); // WAS: merged.build(false);
     }
 
     std::size_t max_registers_count = merged.getRegistersCount();
     for (std::size_t i = 1; i < nfas.size(); ++i) {
         NFA next = nfas[i];
         if (next.getStates().empty()) {
-            next.build(true);
+            next.build(true); // WAS: unbuilt or second.build(false)
         }
 
         mergeTwoNFA(

@@ -247,3 +247,7 @@ public:
 
 export std::ostream& operator<<(std::ostream& os, const NFA::state& s);
 export std::ostream& operator<<(std::ostream& os, const NFA& states);
+export std::ostream& operator<<(std::ostream& os, const NFA::ActionState& states);
+export std::ostream& operator<<(std::ostream& os, const stdu::vector<NFA::ActionState>& states);
+export std::ostream& operator<<(std::ostream& os, const NFA::SemanticState& states);
+export std::ostream& operator<<(std::ostream& os, const stdu::vector<NFA::SemanticState>& states);

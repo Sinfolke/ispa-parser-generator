@@ -12,7 +12,7 @@ namespace LangRepr {
         return LangAPI::TypeAlias {.name = "Token", .type = variant_type};
     }
     auto ConstructBase::createLexerClass() -> LangAPI::Class {
-        LangAPI::IspaLibSymbol lexer_s {LangAPI::StdlibExports::Lexer};
+        LangAPI::IspaLibSymbol lexer_s {.exports = LangAPI::StdlibExports::Lexer};
         lexer_s.template_parameters.push_back(std::make_shared<LangAPI::Type>(LangAPI::Symbol {"Token"}));
         return LangAPI::Class {
             .name = "Lexer",

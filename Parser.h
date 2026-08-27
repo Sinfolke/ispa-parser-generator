@@ -607,8 +607,8 @@ namespace Parser {
 	using Token = std::variant<std::monostate, Types::__WHITESPACE, Types::AUTO_29, Types::AUTO_27, Types::AUTO_26, Types::AUTO_25, Types::AUTO_24, Types::AUTO_23, Types::AUTO_22, Types::AUTO_20, Types::AUTO_18, Types::AUTO_17, Types::AUTO_28, Types::AUTO_19, Types::AUTO_16, Types::AUTO_15, Types::AUTO_14, Types::AUTO_10, Types::AUTO_8, Types::AUTO_6, Types::rule::BIN, Types::rule::HEX, Types::rule::ESCAPED, Types::rule::NOSPACE, Types::BOOLEAN, Types::AUTO_1, Types::rule::CSEQUENCE::ESCAPE, Types::rule::CSEQUENCE::DIAPASON, Types::rule::CSEQUENCE::SYMBOL, Types::AUTO_12, Types::AUTO_9, Types::AUTO_13, Types::AUTO_30, Types::AUTO_3, Types::AUTO_7, Types::AUTO_21, Types::NUMBER, Types::ID, Types::cll::LOGICAL_NOT, Types::MODULO, Types::PLUS, Types::QUESTION_MARK, Types::rule::CSEQUENCE, Types::MULTIPLE, Types::AT, Types::AUTO_11, Types::DOT, Types::DIVIDE, Types::STRING, Types::SPACEMODE, Types::AUTO_4, Types::MINUS, Types::cll::ASSIGNMENT_OP, Types::cll::COMPARE_OP, Types::LINEAR_COMMENT, Types::rule::OP, Types::cll::LOGICAL_OR, Types::AUTO_0, Types::cll::LOGICAL_AND, Types::cll::LOGICAL_OP, Types::AUTO_2, Types::NAME, Types::AUTO_5>;
 	class Lexer : public ::ISPA_STD::Lexer_base<Tokens, Token> {
 		static ::ISPA_STD::DFA::API::CharToClass char_class_table;
-		static ::ISPA_STD::DFA::API::Table<186, 58> dfa_table;
-		static ::ISPA_STD::DFA::API::Table<394, 2> lr_table;
+		static ::ISPA_STD::DFA::API::Table<224, 58> dfa_table;
+		static ::ISPA_STD::DFA::API::Table<506, 2> lr_table;
 		static auto semantic_action_exec(int state, std::vector<std::variant<std::monostate, Token, char, std::string>>& values, std::vector<std::vector<std::variant<std::monostate, Token, char, std::string>>>& vec_values) -> std::pair<int, Token>;
 		bool init_done;
 		auto init() -> void override;

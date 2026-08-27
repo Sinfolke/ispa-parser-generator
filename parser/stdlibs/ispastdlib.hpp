@@ -288,21 +288,19 @@ template<class RULE_T, class DataStorageType>
 using Seq = std::vector<Node<RULE_T, DataStorageType>>;
 namespace DFA::API {
     inline auto null_state = std::numeric_limits<std::size_t>::max();
+    enum class Action {
+        UNDEF, BEGIN, END, PUSH, FAIL
+    };
     template<std::size_t Classes>
     using State = std::array<std::size_t, Classes>;
     template<std::size_t States, std::size_t Classes>
     using Table = std::array<State<Classes>, States>;
     using CharToClass = std::array<std::size_t, 256>;
     template<std::size_t States>
-    using AcceptTable = std::array<std::size_t, States>;
-    template<std::size_t States>
     using LRTable = std::array<State<2>, States>;
-    enum class Action {
-        UNDEF, BEGIN, END, PUSH, FAIL
-    };
 }
 namespace DFA {
-    template<
+template<
         typename Token,
         typename SemanticFunc,
         std::size_t table_classes,
@@ -315,12 +313,13 @@ namespace DFA {
         const API::Table<table_classes, table_states> &table,
         const API::CharToClass class_table,
         const API::LRTable<lr_table_states> lr_table,
+        std::size_t entry_action,
         std::vector<std::variant<std::monostate, Token, char, std::string>> &values,
         std::vector<std::vector<std::variant<std::monostate, Token, char, std::string>>> &vec_values,
         std::array<const char*, registers_count> registers,
         SemanticFunc semantic
     ) -> Token {
-        std::size_t state = 0;
+        std::size_t state = entry_action;
         std::size_t registers_allocated = 0;
 
         // Debug table print (uses isolated counter variable)
@@ -361,7 +360,7 @@ namespace DFA {
                 state = next;
                 // Only consume character if transitioning to a DFA state or LR action edge.
                 // Fallback SEMANTIC actions (>= table.size() + lr_table.size()) must NOT consume *pos.
-                if (next < table.size() + lr_table.size()) {
+                if (next < table.size() + lr_table.size() && *pos != '\0') {
                     ++pos;
                 }
             } else if (state < table.size() + lr_table.size()) {
@@ -454,6 +453,7 @@ protected:
         const DFA::API::Table<table_classes, table_states> &table,
         const DFA::API::CharToClass class_table,
         const DFA::API::LRTable<lr_table_states> lr_table,
+        std::size_t entry_action,
         std::vector<std::variant<std::monostate, Token, char, std::string>> &values,
         std::vector<std::vector<std::variant<std::monostate, Token, char, std::string>>> &vec_values,
         std::array<const char*, registers_count> registers,
@@ -462,7 +462,7 @@ protected:
     ) {
         if (*pos == '\0')
             return Token {};
-        Token result = DFA::scan(pos, table, class_table, lr_table, values, vec_values, registers, semantic);
+        Token result = DFA::scan(pos, table, class_table, lr_table, entry_action, values, vec_values, registers, semantic);
         return result;
     }
 

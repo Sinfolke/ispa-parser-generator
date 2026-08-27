@@ -11,6 +11,7 @@ import NFA;
 import DFA.API;
 import DFA.functionality;
 import DFA;
+import Dump;
 import logging;
 import constants;
 import cpuf.printf;
@@ -37,6 +38,18 @@ void LexerBuilder::build() {
         // token here
         NFA nfa(ast, name, &rule.data_block, rule.rule_members, name == constants::whitespace, true, &accept_index);
         nfa.build(true);
+        if (dumper.shouldDump("NFA")) {
+            std::ofstream dumpNFAFile(dumper.makeDumpPath("NFA"), std::ios::app);
+            if (!dumpNFAFile.is_open())
+                throw Error("failed to open DFA for dump");
+            dumpNFAFile << "token: " << corelib::text::join(name, "::") << "\n";
+            dumpNFAFile << nfa;
+            dumpNFAFile << "Action Table: \n";
+            dumpNFAFile << nfa.getActionTable() << '\n';
+            dumpNFAFile << "Semantic Table: " << '\n';
+            dumpNFAFile << nfa.getSemanticTable() << '\n';
+            dumpNFAFile.close();
+        }
         nfas.push_back(nfa);
     }
     if (nfas.empty()) {

@@ -11,7 +11,7 @@ import std;
 
 namespace LangRepr {
     auto ConstructParser::createParserClass(std::string main_node) -> LangAPI::Class {
-        LangAPI::IspaLibSymbol parser_s {LangAPI::StdlibExports::Parser};
+        LangAPI::IspaLibSymbol parser_s {.exports = LangAPI::StdlibExports::Parser};
         parser_s.template_parameters.push_back(std::make_shared<LangAPI::Type>(LangAPI::Symbol {"Types", main_node}));
         parser_s.template_parameters.push_back(std::make_shared<LangAPI::Type>(LangAPI::Symbol {"Token"}));
         return LangAPI::Class {

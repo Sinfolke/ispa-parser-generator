@@ -169,6 +169,14 @@ auto Core::convertIspaLibSymbol(const LangAPI::IspaLibSymbol &symbol) -> std::st
             return "::ISPA_STD::DFA::API::null_state";
         case LangAPI::StdlibExports::Error:
             return "std::runtime_error";
+        case LangAPI::StdlibExports::ActionUNDEF:
+            return "::ISPA_STD::DFA::API::Action::UNDEF";
+        case LangAPI::StdlibExports::ActionBEGIN:
+            return "::ISPA_STD::DFA::API::Action::BEGIN";
+        case LangAPI::StdlibExports::ActionEND:
+            return "::ISPA_STD::DFA::API::Action::BEGIN";
+        case LangAPI::StdlibExports::ActionPUSH:
+            return "::ISPA_STD::DFA::API::Action::BEGIN";
         default:
             throw Error("Unknown IspaLibSymbol exports: {}", (int) symbol.exports);
     }

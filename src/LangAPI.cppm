@@ -104,7 +104,8 @@ export namespace LangAPI {
     enum class StdlibExports {
         Node, MatchResult, Lexer, Parser, LexerMakeTokenParameter,
         DfaState, DfaTable, DfaClassTable, DfaAcceptTable, DfaLRTable, DfaNullState,
-        ParserFunctionParameter, Error
+        ParserFunctionParameter, Error,
+        ActionUNDEF, ActionBEGIN, ActionEND, ActionPUSH
     };
 
 
@@ -382,7 +383,7 @@ export namespace LangAPI {
         friend struct ::uhash;
         auto members() const;
     };
-    struct IspaLibSymbol {
+    struct IspaLibSymbol : RValueLevel {
         StdlibExports exports;
         stdu::vector<std::variant<std::shared_ptr<Type>, std::shared_ptr<RValue>>> template_parameters;
         bool Const = false;
