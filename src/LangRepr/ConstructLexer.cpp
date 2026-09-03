@@ -88,7 +88,7 @@ namespace LangRepr {
     // no per-transition metadata struct, since acceptance now lives
     // entirely in the numeric value rather than needing its own field.
     auto ConstructLexer::makeDfaTableDecl(
-        const stdu::vector<DFA::State<stdu::vector<DFA::TransitionValue>>> &states,
+        const stdu::vector<DFA::State<DFA::ClassTransitions>> &states,
         std::size_t state_count,
         std::size_t class_count
     ) -> std::pair<std::shared_ptr<LangAPI::Declaration>, LangAPI::Visibility> {
@@ -105,13 +105,13 @@ namespace LangRepr {
 
                 if (cls < state.transitions.size()) {
                     const auto &t = state.transitions[cls];
-                    if (t.table_type == NFA::TableType::DFA) {
-                        if (t.next == NFA::NULL_STATE) {
+                    if (std::holds_alternative<NFA::DFATarget>(t)) {
+                        if (std::get<NFA::DFATarget>(t).id == NFA::NULL_STATE) {
                             encoded = LangAPI::RValue {LangAPI::IspaLibSymbol {.exports = LangAPI::StdlibExports::DfaNullState}};
                         } else {
-                            encoded = LangAPI::Int::createRValue(LangAPI::Int {.value = static_cast<long long>(t.next)});
+                            encoded = LangAPI::Int::createRValue(LangAPI::Int {.value = static_cast<long long>(std::get<NFA::DFATarget>(t).id)});
                         }
-                    } else if (t.table_type == NFA::TableType::Action) {
+                    } else if (std::holds_alternative<NFA::ActionTarget>(t)) {
                         // t.next is final_st -- the DFA state to continue to
                         // AFTER this action/semantic chain resolves -- NOT the
                         // index of which lr_table entry to invoke. That real
@@ -129,12 +129,12 @@ namespace LangRepr {
                         // arbitrary DFA-state-sized number in the slot the
                         // runtime treats as an action-table index, indexing
                         // clean off the end of the real (much smaller) table.
-                        encoded = LangAPI::Int::createRValue(LangAPI::Int {.value = static_cast<long long>(t.accept_index + state_count)});
-                    } else if (t.table_type == NFA::TableType::Semantic) {
+                        encoded = LangAPI::Int::createRValue(LangAPI::Int {.value = static_cast<long long>(std::get<NFA::ActionTarget>(t).id + state_count)});
+                    } else if (std::holds_alternative<NFA::SemanticTarget>(t)) {
                         // Same fix, mirrored for semantic_table.
-                        encoded = LangAPI::Int::createRValue(LangAPI::Int {.value = static_cast<long long>(t.accept_index + state_count + lexer_builder.getLRTable().size())});
+                        encoded = LangAPI::Int::createRValue(LangAPI::Int {.value = static_cast<long long>(std::get<NFA::SemanticTarget>(t).id + state_count + lexer_builder.getLRTable().size())});
                     } else {
-                        throw Error("Unknown table type {}", (int) t.table_type);
+                        throw Error("Unknown table type {}", t.index());
                     }
                 }
                 row.push_back(LangAPI::Int::createExpression(encoded));
@@ -169,7 +169,7 @@ namespace LangRepr {
     ) -> std::pair<std::shared_ptr<LangAPI::Declaration>, LangAPI::Visibility> {
         (void)state_count;
 
-        constexpr std::size_t lr_columns = 2;
+        constexpr std::size_t lr_columns = 3;
         const auto lr_state_count = states.size();
 
         stdu::vector<LangAPI::Expression> rows;
@@ -182,6 +182,12 @@ namespace LangRepr {
             row.push_back(LangAPI::Int::createExpression(LangAPI::Int {
                 .value = static_cast<long long>(state.action)
             }));
+            if (state.snapshot_id == NFA::NULL_STATE) {
+                row.push_back(LangAPI::RValue::createExpression(LangAPI::RValue {LangAPI::IspaLibSymbol {.exports = LangAPI::StdlibExports::DfaNullState}}));
+            } else {
+                row.push_back(LangAPI::Int::createExpression(LangAPI::Int {.value = static_cast<long long>(state.snapshot_id)}));
+            }
+            std::cout << "Snapshot ID: " << state.snapshot_id << std::endl;
             std::visit([&](const auto &target) {
                 using T = std::decay_t<decltype(target)>;
                 if (std::is_same_v<T, NFA::DFATarget>) {
@@ -307,34 +313,6 @@ namespace LangRepr {
         lexer.data.push_back(makeDfaTableDecl(states, state_count, class_count));
 
         lexer.data.push_back(makeLRTableDecl(lexer_builder.getLRTable(), state_count));
-
-        // Entry action: an Action/Semantic chain that fires once, before any
-        // character is consumed, when matching begins at state 0 -- e.g. a
-        // BEGIN register action for a rule whose captured value spans the
-        // ENTIRE token (like ID), as opposed to one that starts partway
-        // through a rule (like TEMPLATED_TYPE's op/type fields, which get
-        // discovered naturally by the normal per-symbol transition
-        // machinery once matching is already underway). Sentinel-encoded
-        // using the SAME scheme as dfa_table's Action/Semantic cells so the
-        // runtime dispatches it through the identical decode logic, just as
-        // the INITIAL value of `state` rather than as a transition target.
-        // Absent entry actions encode as 0 (state 0 itself), matching
-        // current behavior exactly -- a harmless no-op initializer.
-        long long entry_action_value = 0;
-        if (!states.empty() && states[0].entry_action.has_value()) {
-            std::visit([&](auto &&target) {
-                using T = std::decay_t<decltype(target)>;
-                if constexpr (std::is_same_v<T, NFA::ActionTarget>) {
-                    entry_action_value = static_cast<long long>(target.id + state_count);
-                } else if constexpr (std::is_same_v<T, NFA::SemanticTarget>) {
-                    entry_action_value = static_cast<long long>(
-                        target.id + state_count + lexer_builder.getLRTable().size()
-                    );
-                } else if constexpr (std::is_same_v<T, NFA::DFATarget>) {
-                    entry_action_value = static_cast<long long>(target.id);
-                }
-            }, *states[0].entry_action);
-        }
         lexer.data.push_back(std::make_pair(std::make_shared<LangAPI::Declaration>(LangAPI::Function::createDeclaration(makeSemanticSwitchFunction(lexer_builder.getSemanticTable()))), LangAPI::Visibility::Private));
         if (lexer_builder.getDFA().states.size() > 0) {
             lexer.data.push_back(std::make_pair(
@@ -394,7 +372,6 @@ namespace LangRepr {
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"dfa_table"}),
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"char_class_table"}),
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"lr_table"}),
-                                    LangAPI::Int::createExpression(LangAPI::Int {.value = entry_action_value}),
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"values"}),
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"vec_values"}),
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"registers"}),

@@ -67,6 +67,10 @@ export namespace LangRepr {
             if (stmt.isIf()) {
                 stmts->createIf(stmt.getIf().expr);
                 buildStatements(stmt.getIf().stmt);
+                if (!stmt.getIf().else_stmt.empty()) {
+                    stmts->openElse();
+                    buildStatements(stmt.getIf().else_stmt);
+                }
                 stmts->closeIf();
             } else if (stmt.isWhile()) {
                 stmts->createWhile(stmt.getWhile().expr);

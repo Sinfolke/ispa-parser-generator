@@ -8,7 +8,7 @@ def find_std_variant(root_dir):
                 try:
                     with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                         for lineno, line in enumerate(f, 1):
-                            if 'Got char table' in line:
+                            if 'cpuf::printf' in line:
                                 print(f"{file_path}:{lineno}: {line.strip()}")
                 except Exception as e:
                     print(f"Error reading {file_path}: {e}")

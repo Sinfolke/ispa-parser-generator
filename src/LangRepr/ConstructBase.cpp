@@ -1,4 +1,5 @@
 module ConstructBase;
+import cpuf.printf;
 import LLIR.Builder.Base;
 namespace LangRepr {
     auto ConstructBase::createTypeToken() -> LangAPI::TypeAlias {
@@ -20,12 +21,6 @@ namespace LangRepr {
             .default_visibility = LangAPI::Visibility::Private
         };
     }
-    auto ConstructBase::getTransitionCount(const std::variant<DFA::FullCharTable, DFA::SortedTransitions> &transitions) -> std::size_t {
-        return std::holds_alternative<DFA::FullCharTable>(transitions) ?
-            static_cast<int>(std::get<DFA::FullCharTable>(transitions).size())
-            :
-            static_cast<int>(std::get<DFA::SortedTransitions>(transitions).size());
-    }
 
     auto ConstructBase::makeIntRValue(int v) -> std::shared_ptr<LangAPI::RValue> {
         return std::make_shared<LangAPI::RValue>(
@@ -33,10 +28,18 @@ namespace LangRepr {
         );
     };
     auto ConstructBase::ensureTypesNs(LangAPI::Type t) -> LangAPI::Type {
-        if (t.isSymbol())
-            if (std::get<std::string>(t.getSymbol().path.front()) != "Types") {
+        if (t.isSymbol()) {
+            const auto &sym_path = t.getSymbol().path;
+            stdu::vector<std::string> path;
+            for (const auto &part : sym_path) {
+                if (std::holds_alternative<std::string>(part)) {
+                    path.push_back(std::get<std::string>(part));
+                } else return t;
+            }
+            if (tree.contains(path) && std::get<std::string>(t.getSymbol().path.front()) != "Types") {
                 t.getSymbol().path.insert(t.getSymbol().path.begin(), "Types");
             }
+        }
         if (!t.template_parameters.empty()) {
             for (auto &p : t.template_parameters) p = ensureTypesNs(std::get<LangAPI::Type>(p));
         }
@@ -45,16 +48,17 @@ namespace LangRepr {
     // 1. Symbol Traversal
     auto ConstructBase::ensureTypesNs(LangAPI::Symbol s) -> LangAPI::Symbol {
         bool was_fun_call = false;
+        stdu::vector<std::string> path;
         for (auto &part : s.path) {
             if (std::holds_alternative<LangAPI::FunctionCall>(part)) {
                 part = ensureTypesNs(std::get<LangAPI::FunctionCall>(part));
                 was_fun_call = true;
+            } else {
+                path.push_back(std::get<std::string>(part));
             }
         }
-        if (!was_fun_call) {
-            if (std::get<std::string>(s.path.front()) != "Types") {
-                s.path.insert(s.path.begin(), "Types");
-            }
+        if (tree.contains(path) && !was_fun_call && std::get<std::string>(s.path.front()) != "Types") {
+            s.path.insert(s.path.begin(), "Types");
         }
         return s;
     }

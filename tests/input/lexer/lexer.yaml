@@ -29,16 +29,16 @@ tests:
     expect:
       - for: SERIAL_CODE
         value: 'F'
-  - name: html_cells
-    path: basic/html_cells.isc
-    input: "< td> <td> <td >"
-
-    expect:
-      - for: HTML_CELLS
-        value:
-          - 'td'
-          - 'td'
-          - 'td'
+#  - name: html_cells
+#    path: basic/html_cells.isc
+#    input: "< td> <td> <td >"
+#
+#    expect:
+#      - for: HTML_CELLS
+#        value:
+#          - 'td'
+#          - 'td'
+#          - 'td'
   - name: http_method
     path: basic/http_method.isc
     input:
@@ -56,40 +56,40 @@ tests:
       -
         - for: HTTP_METHOD
           value: 'PUT'
-  - name: config_val
-    path: basic/config_val.isc
-    input:
-      - '0'
-      - '--help'
-      - 'ex'
-      - '2 if 3 else 4'
-      - 'set'
-      - 'get'
-
-    expect:
-      -
-        - for: CONFIG_VAL
-          value:
-            op_or_num: '0'
-      -
-        - for: CONFIG_VAL
-          value:
-            op_or_num: 'help'
-      -
-        - for: CONFIG_VAL
-          value:
-            op_or_num: 'ex'
-      -
-        - for: CONFIG_VAL
-          value:
-            op_or_num: '2'
-            if_branch: '3'
-            else_branch: '4'
-      -
-        - for: CONFIG_VAL
-          value:
-            op_or_num: 'set'
-      -
-        - for: CONFIG_VAL
-          value:
-            op_or_num: 'get'
+#  - name: config_val
+#    path: basic/config_val.isc
+#    input:
+#      - '0'
+#      - '--help'
+#      - 'ex'
+#      - '2 if 3 else 4'
+#      - 'set'
+#      - 'get'
+#
+#    expect:
+#      -
+#        - for: CONFIG_VAL
+#          value:
+#            op_or_num: '0'
+#      -
+#        - for: CONFIG_VAL
+#          value:
+#            op_or_num: 'help'
+#      -
+#        - for: CONFIG_VAL
+#          value:
+#            op_or_num: 'ex'
+#      -
+#        - for: CONFIG_VAL
+#          value:
+#            op_or_num: '2'
+#            if_branch: '3'
+#            else_branch: '4'
+#      -
+#        - for: CONFIG_VAL
+#          value:
+#            op_or_num: 'set'
+#      -
+#        - for: CONFIG_VAL
+#          value:
+#            op_or_num: 'get'

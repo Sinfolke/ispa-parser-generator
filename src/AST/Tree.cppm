@@ -103,5 +103,8 @@ export namespace AST {
         auto operator[](const stdu::vector<std::string> &name) const -> const Rule& {
             return tree_map.at(name);
         }
+        auto contains(const stdu::vector<std::string> &name) const -> bool {
+            return tree_map.contains(name);
+        }
     };
 };

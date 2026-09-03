@@ -483,6 +483,14 @@ namespace LangAPI {
         os << "get<" << obj.type << ">(" << obj.sym << ")";
         return os;
     }
+    auto operator<<(std::ostream &os, const CheckVariant &obj) -> std::ostream& {
+        os << "holds_alternative<" << obj.type << ">(" << obj.sym << ")";
+        return os;
+    }
+    auto operator<<(std::ostream &os, const CharToStringConstructor &obj) -> std::ostream& {
+        os << "std::string(1, '" << obj.what << "')";
+        return os;
+    }
     auto operator<<(std::ostream &os, const IspaLibDfaSpan &obj) -> std::ostream& {
         os << "Span<" << obj.type << "> {" << obj.assing_name << "}";
         return os;
@@ -565,6 +573,19 @@ namespace LangAPI {
     bool operator<(const GetVariant &a, const GetVariant &b) {
         if (a.type != b.type) return a.type < b.type;
         return a.sym < b.sym;
+    }
+    bool operator==(const CheckVariant &a, const CheckVariant &b) {
+        return a.type == b.type && a.sym == b.sym;
+    }
+    bool operator<(const CheckVariant &a, const CheckVariant &b) {
+        if (a.type != b.type) return a.type < b.type;
+        return a.sym < b.sym;
+    }
+    bool operator==(const CharToStringConstructor &a, const CharToStringConstructor &b) {
+        return a.what == b.what;
+    }
+    bool operator<(const CharToStringConstructor &a, const CharToStringConstructor &b) {
+        return a.what < b.what;
     }
     auto operator<<(std::ostream &os, const Namespace &obj) -> std::ostream& {
         os << "namespace " << obj.name << "{\n";

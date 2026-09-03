@@ -11,16 +11,9 @@ export namespace DFA {
         const NFA *nfa = nullptr;
         stdu::vector<State> states;
         auto leadToEmptyState(std::size_t current, std::unordered_set<std::size_t> &visited) const -> std::size_t;
-        auto leadToEmptyStateDfa(const std::size_t current, std::unordered_set<std::size_t> &visited) -> std::size_t;
     public:
         States(const NFA *nfa) : nfa(nfa) {}
         States(const NFA *nfa, stdu::vector<State> states) : nfa(nfa), states(states) {}
-
-        auto leadToEmptyState(std::size_t current) const -> std::size_t;
-        auto leadToEmptyStateDfa(const std::size_t current) -> std::size_t;
-        auto canBeEndState(const std::size_t current) -> std::size_t;
-        auto includesWhitespace(const State &state) const -> bool;
-        auto isTerminateState(const State &state) const -> bool;
 
         auto &get() const { return states; }
         auto &get()       { return states; }

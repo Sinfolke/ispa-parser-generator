@@ -12,6 +12,7 @@ export namespace Cpp {
         Statement(Converter::Writer &output);
 
         auto createIf(const LangAPI::Expression &expression)-> void override;
+        auto openElse()-> void override;
         auto closeIf() -> void override;
         auto createWhile(const LangAPI::Expression &expression) -> void override;
         auto closeWhile() -> void override;

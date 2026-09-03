@@ -191,7 +191,7 @@ int main(int argc, char** argv) {
             dumpDFAFile.close();
         }
 
-        auto repr = LangRepr::Construct::construct(std::move(lexer_data), std::move(IR), args.language, name);
+        auto repr = LangRepr::Construct::construct(std::move(lexer_data), std::move(IR), ast, args.language, name);
         LangRepr::Converter converter(repr, args.language_str, name);
         converter.build();
         output_path.replace_extension(".h");

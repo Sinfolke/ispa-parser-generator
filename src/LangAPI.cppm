@@ -85,14 +85,14 @@ export namespace LangAPI {
         Undef, Void, Char, Int, Bool, Float, String, NonOwnedString, Array, FixedSizeArray, Map, Symbol, StorageSymbol, Inheritance, Token, Rule, TokenResult, RuleResult, Span, Variant, Box, Any, Const, Reference, Tuple
     };
     enum class RValueType {
-        Undef, Char, Int, Bool, Float, String, Array, FixedSizeArray, Map, Pos, Symbol, IspaLibSymbol, StorageSymbol, Inheritance, IspaLibDfaTransition, IspaLibDfaSpanCharState, IspaLibDfaSpanMultiTableState, IspaLibDfaEmptyState, IspaLibDfaSpan, Reference, Span, MakeTuple, GetVariant
+        Undef, Char, Int, Bool, Float, String, Array, FixedSizeArray, Map, Pos, Symbol, IspaLibSymbol, StorageSymbol, Inheritance, IspaLibDfaTransition, IspaLibDfaSpanCharState, IspaLibDfaSpanMultiTableState, IspaLibDfaEmptyState, IspaLibDfaSpan, Reference, Span, MakeTuple, GetVariant, CheckVariant, CharToStringConstructor
     };
     enum class ExpressionValueType {
         Empty, EmptyInitializer, RValue, ExpressionElement, FunctionCall, IspaLibFunctionCall, StringCompare, Return, Break, Continue, VariableAssignment, CounterIncreament, CounterIncreamentByLength,
         ResetPosCounter, PushPosCounter, PopPosCounter, SkipSpaces, DfaLookup, ReportError, Lambda
     };
     enum class ArrayMethods {
-        Push, Pop
+        Push, Pop, Size
     };
     enum class Visibility {
         Private, Public
@@ -707,9 +707,9 @@ export namespace LangAPI {
     };
     struct MakeTuple : RValueLevel {
         stdu::vector<Expression> args;
-        bool operator==(const MakeTuple&) const { return true; }
-        bool operator!=(const MakeTuple&) const { return false; }
-        bool operator<(const MakeTuple&) const { return false; }
+        friend bool operator==(const MakeTuple &a, const MakeTuple& other);
+        friend bool operator!=(const MakeTuple &a, const MakeTuple& other);
+        friend bool operator<(const MakeTuple &a, const MakeTuple& other);
         friend auto operator<<(std::ostream& os, const MakeTuple &c) -> std::ostream&;
     private:
         friend struct ::uhash;
@@ -720,9 +720,9 @@ export namespace LangAPI {
     struct GetVariant : RValueLevel {
         std::shared_ptr<Type> type;
         Expression sym;
-        bool operator==(const GetVariant&) const { return true; }
-        bool operator!=(const GetVariant&) const { return false; }
-        bool operator<(const GetVariant&) const { return false; }
+        friend bool operator==(const GetVariant &a, const GetVariant& other);
+        friend bool operator!=(const GetVariant &a, const GetVariant& other) { return a != other; }
+        friend bool operator<(const GetVariant &a, const GetVariant& other);
         friend auto operator<<(std::ostream& os, const GetVariant &c) -> std::ostream&;
     private:
         friend struct ::uhash;
@@ -730,8 +730,33 @@ export namespace LangAPI {
             return std::tie(type, sym);
         }
     };
+    struct CheckVariant : RValueLevel {
+        std::shared_ptr<Type> type;
+        Expression sym;
+        friend bool operator==(const CheckVariant &a, const CheckVariant& other);
+        friend bool operator!=(const CheckVariant &a, const CheckVariant& other) { return a != other; }
+        friend bool operator<(const CheckVariant &a, const CheckVariant& other);
+        friend auto operator<<(std::ostream& os, const CheckVariant &c) -> std::ostream&;
+    private:
+        friend struct ::uhash;
+        auto members() const {
+            return std::tie(type, sym);
+        }
+    };
+    struct CharToStringConstructor : RValueLevel {
+        Expression what;
+        friend bool operator==(const CharToStringConstructor &a, const CharToStringConstructor& other);
+        friend bool operator!=(const CharToStringConstructor &a, const CharToStringConstructor& other) { return a != other; }
+        friend bool operator<(const CharToStringConstructor &a, const CharToStringConstructor& other);
+        friend auto operator<<(std::ostream& os, const CharToStringConstructor &c) -> std::ostream&;
+    private:
+        friend struct ::uhash;
+        auto members() const {
+            return std::tie(what);
+        }
+    };
     class RValue : public ExpressionValueLevel {
-        std::variant<std::monostate, Char, Int, Bool, Float, String, Array, FixedSizeArray, Map, Pos, Symbol, IspaLibSymbol, StorageSymbol, Inheritance, IspaLibDfaTransition, IspaLibDfaSpanCharState, IspaLibDfaSpanMultiTableState, IspaLibDfaEmptyState, IspaLibDfaSpan, Reference, Span, MakeTuple, GetVariant> value;
+        std::variant<std::monostate, Char, Int, Bool, Float, String, Array, FixedSizeArray, Map, Pos, Symbol, IspaLibSymbol, StorageSymbol, Inheritance, IspaLibDfaTransition, IspaLibDfaSpanCharState, IspaLibDfaSpanMultiTableState, IspaLibDfaEmptyState, IspaLibDfaSpan, Reference, Span, MakeTuple, GetVariant, CheckVariant, CharToStringConstructor> value;
         friend struct ::uhash;
         auto members() const {
             return std::tie(value);
@@ -779,6 +804,8 @@ export namespace LangAPI {
         bool isSpan()  const { return std::holds_alternative<Span>(value); }
         bool isMakeTuple()  const { return std::holds_alternative<MakeTuple>(value); }
         bool isGetVariant()  const { return std::holds_alternative<GetVariant>(value); }
+        bool isCheckVariant()  const { return std::holds_alternative<CheckVariant>(value); }
+        bool isCharToStringConstructor()  const { return std::holds_alternative<CharToStringConstructor>(value); }
         bool isUndef() const { return std::holds_alternative<std::monostate>(value); }
         bool empty() const { return std::holds_alternative<std::monostate>(value); }
 
@@ -805,6 +832,8 @@ export namespace LangAPI {
         Span&  getSpan()  { return std::get<Span>(value); }
         MakeTuple&  getMakeTuple()  { return std::get<MakeTuple>(value); }
         GetVariant&  getVariantCast()  { return std::get<GetVariant>(value); }
+        CharToStringConstructor&  getCharToStringConstructor()  { return std::get<CharToStringConstructor>(value); }
+        CheckVariant&  CheckVariantCast()  { return std::get<CheckVariant>(value); }
 
         const Char&           getChar()   const { return std::get<Char>(value); }
         const Int&            getInt()    const { return std::get<Int>(value); }
@@ -829,6 +858,8 @@ export namespace LangAPI {
         const Span&  getSpan() const  { return std::get<Span>(value); }
         const MakeTuple&  getMakeTuple() const { return std::get<MakeTuple>(value); }
         const GetVariant&  getVariantCast() const { return std::get<GetVariant>(value); }
+        const CharToStringConstructor&  getCharToStringConstructor() const { return std::get<CharToStringConstructor>(value); }
+        const CheckVariant&  CheckVariantCast() const { return std::get<CheckVariant>(value); }
 
         auto type() const -> RValueType { return static_cast<RValueType>(value.index()); }
         auto get() const { return value; }
@@ -904,13 +935,9 @@ export namespace LangAPI {
             for (std::size_t i = 0; i < templ1.size(); ++i) {
                 if (templ1[i].index() != templ2[i].index()) return false;
                 if (std::holds_alternative<Type>(templ1[i])) {
-                    const auto &first = std::get<Type>(templ1[i]);
-                    const auto &second = std::get<Type>(templ2[i]);
-                    return first == second;
+                    if (std::get<Type>(templ1[i]) != std::get<Type>(templ2[i])) return false;
                 } else {
-                    const auto &first = std::get<RValue>(templ1[i]);
-                    const auto &second = std::get<RValue>(templ2[i]);
-                    return first == second;
+                    if (std::get<RValue>(templ1[i]) != std::get<RValue>(templ2[i])) return false;
                 }
             }
             return true;

@@ -19,6 +19,11 @@ auto Cpp::Statement::createIf(const LangAPI::Expression &expression) -> void {
     Core::output->writeln("if ({}) {", Core::convertExpression(expression));
     Core::output->increaseIndentation();
 }
+auto Cpp::Statement::openElse() -> void {
+    Core::output->decreaseIndentation();
+    Core::output->writeln("} else {");
+    Core::output->increaseIndentation();
+}
 auto Cpp::Statement::closeIf() -> void {
     Core::output->decreaseIndentation();
     Core::output->writeln("}");

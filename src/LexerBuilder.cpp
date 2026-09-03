@@ -44,10 +44,6 @@ void LexerBuilder::build() {
                 throw Error("failed to open DFA for dump");
             dumpNFAFile << "token: " << corelib::text::join(name, "::") << "\n";
             dumpNFAFile << nfa;
-            dumpNFAFile << "Action Table: \n";
-            dumpNFAFile << nfa.getActionTable() << '\n';
-            dumpNFAFile << "Semantic Table: " << '\n';
-            dumpNFAFile << nfa.getSemanticTable() << '\n';
             dumpNFAFile.close();
         }
         nfas.push_back(nfa);
@@ -76,17 +72,19 @@ auto LexerBuilder::getDataBlocks() const -> LLIR::DataBlockList {
                 continue;
             members.push_back(&member);
         }
-        if (members.size() == 1) {
-            dtb.value = std::make_pair(LangAPI::Expression {}, LLIR::BuilderBase::deduceVarTypeByRuleMember(*members[0]));
-        } else if (!rule.data_block.empty()){
-            LLIR::inclosed_map inclosed_map;
-            std::size_t member_counter = 0;
-            LLIR::BuilderData bd(ast, nullptr);
-            LLIR::BuilderDataWrapper bdw(bd);
-            for (const auto &name : rule.data_block.getTemplatedDataBlock().names) {
-                inclosed_map.emplace(name, std::make_pair(LangAPI::Expression {}, LLIR::BuilderBase::deduceVarTypeByRuleMember(*rule.rule_members[member_counter++])));
+        if (members.size() > 0) {
+            if (rule.data_block.isRegularDataBlock()) {
+                dtb.value = std::make_pair(LangAPI::Expression {}, LLIR::BuilderBase::deduceVarTypeByRuleMember(*members[0]));
+            } else if (!rule.data_block.empty()){
+                LLIR::inclosed_map inclosed_map;
+                std::size_t member_counter = 0;
+                LLIR::BuilderData bd(ast, nullptr);
+                LLIR::BuilderDataWrapper bdw(bd);
+                for (const auto &name : rule.data_block.getTemplatedDataBlock().names) {
+                    inclosed_map.emplace(name, std::make_pair(LangAPI::Expression {}, LLIR::BuilderBase::deduceVarTypeByRuleMember(*rule.rule_members[member_counter++])));
+                }
+                dtb.value = inclosed_map;
             }
-            dtb.value = inclosed_map;
         }
         list.emplace(name, dtb);
     }

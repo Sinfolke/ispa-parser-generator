@@ -624,8 +624,8 @@ auto LLIR::BuilderBase::deduceVarTypeByRuleMember(const AST::RuleMember &mem) ->
     } else if (mem.isName()) {
         LangAPI::Symbol sym {mem.getName().name};
         type = { corelib::text::isUpper(mem.getName().name.back()) ? LangAPI::ValueType::Token : LangAPI::ValueType::Rule, LangAPI::Type { sym }};
-    } else if (mem.isString() && mem.getString().value.size() == 1 || mem.isAny() || (mem.isCsequence() && (mem.quantifier == '?' || mem.quantifier == '\0'))) {
-        return LangAPI::ValueType::Char;
+    } else if (mem.isString() && mem.getString().value.size() == 1 || mem.isAny() || (mem.isCsequence() && (mem.quantifier == '\0' || mem.quantifier == '?'))) {
+        type = LangAPI::ValueType::Char;
     }
     return type;
 }

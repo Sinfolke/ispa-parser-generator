@@ -29,7 +29,7 @@ namespace LangRepr {
     }
 
     auto Construct::constructLexer() -> void {
-        ConstructLexer construct_lexer(holder, lexer_builder, ir);
+        ConstructLexer construct_lexer(holder, lexer_builder, ir, tree);
         construct_lexer.constructLexer();
 
     }
@@ -50,8 +50,8 @@ namespace LangRepr {
         holder.push(ns);
         return holder;
     }
-    auto Construct::construct(LexerBuilder &&lexer_builder, LLIR::IR &&ir, LangAPI::Language lang, const std::string &namespace_name) -> Holder {
-        Construct construct(std::move(lexer_builder), std::move(ir), lang, namespace_name);
+    auto Construct::construct(LexerBuilder &&lexer_builder, LLIR::IR &&ir, AST::Tree &tree, LangAPI::Language lang, const std::string &namespace_name) -> Holder {
+        Construct construct(std::move(lexer_builder), std::move(ir), tree,  lang, namespace_name);
         return construct.construct();
     }
 }

@@ -3,6 +3,7 @@ import LangRepr.Holder;
 import LexerBuilder;
 import LLIR.IR;
 import LangAPI;
+import AST.Tree;
 import NFA;
 import DFA.API;
 
@@ -13,7 +14,7 @@ export namespace LangRepr {
         Holder &holder;
         LexerBuilder &lexer_builder;
         LLIR::IR &ir;
-
+        AST::Tree &tree;
         LangAPI::Symbol Token;
         auto makeIntRValue(int v) -> std::shared_ptr<LangAPI::RValue>;
         auto ensureTypesNs(LangAPI::Type s) -> LangAPI::Type;
@@ -37,7 +38,6 @@ export namespace LangRepr {
         auto extractRawSymbol(const LangAPI::Type &t) -> stdu::vector<LangAPI::Type>;
         auto createTypeToken() -> LangAPI::TypeAlias;
         auto createLexerClass() -> LangAPI::Class;
-        auto getTransitionCount(const std::variant<DFA::FullCharTable, DFA::SortedTransitions> &transition) -> std::size_t;
         auto getStateType(DFA::DfaType state_type) -> LangAPI::IspaLibSymbol;
         auto buildLambdaContent(
             LangAPI::Symbol builder_sym,
@@ -45,7 +45,7 @@ export namespace LangRepr {
             long long N
         ) -> LangAPI::StorageSymbol;
         auto makeEmptyStateLambda(const stdu::vector<std::string> &name, const stdu::vector<std::string> &clear_name) -> LangAPI::Lambda;
-        ConstructBase(Holder &holder, LexerBuilder &lexer_builder, LLIR::IR &ir) : holder(holder), lexer_builder(lexer_builder), ir(ir) {}
+        ConstructBase(Holder &holder, LexerBuilder &lexer_builder, LLIR::IR &ir, AST::Tree &tree) : holder(holder), lexer_builder(lexer_builder), ir(ir), tree(tree) {}
 
         ~ConstructBase() {}
     private:

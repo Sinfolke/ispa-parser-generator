@@ -14,7 +14,7 @@ export namespace DFA {
     };
     struct TransitionValue {
         std::size_t next = NULL_STATE;
-        NFA::TableType table_type = NFA::TableType::DFA;
+        stdu::vector<std::variant<NFA::ActionState, NFA::SemanticState>> actions;
         std::size_t accept_index = NULL_STATE;
         bool operator==(const TransitionValue &other) const = default;
     private:
@@ -23,7 +23,22 @@ export namespace DFA {
             return std::tie(next, accept_index);
         }
     };
-
+    struct ActionSequence {
+        NFA::ActionChain actions;
+        std::size_t terminal_dfa_target;
+        auto operator==(const ActionSequence &other) const -> bool = default;
+        auto operator<(const ActionSequence &other) const -> bool {
+            if (actions != other.actions) {
+                return actions < other.actions;
+            }
+            return terminal_dfa_target < other.terminal_dfa_target;
+        };
+    private:
+        friend struct ::uhash;
+        auto members() const {
+            return std::tie(actions, terminal_dfa_target);
+        }
+    };
     struct TransitionKeyExt {
         NFA::TransitionKey symbol;
 
@@ -87,12 +102,29 @@ export namespace DFA {
             );
         }
     };
+    using RawAction = std::variant<NFA::ActionState, NFA::SemanticState>;
+    using NextTarget = std::variant<NFA::DFATarget, ActionSequence>;
     using TransitionTarget = std::variant<NFA::DFATarget, NFA::ActionTarget, NFA::SemanticTarget>;
-    template<typename Transition>
+    using TransitionTargetWithActions = std::variant<NFA::DFATarget, ActionSequence>;
+    using Transitions = utype::unordered_map<NFA::TransitionKey, TransitionTarget>;
+    using TransitionsWithActions = utype::unordered_map<NFA::TransitionKey, TransitionTargetWithActions>;
+    struct StateWithActions {
+        std::unordered_set<std::size_t> nfa_states;
+        TransitionsWithActions transitions;
+        std::optional<ActionSequence> accept_action;
+        std::optional<NFA::TokenBinding> accept_binding = std::nullopt;
+        bool operator==(const StateWithActions &other) const = default;
+    private:
+        friend struct ::uhash;
+        auto members() const {
+            return std::tie(nfa_states, transitions);
+        }
+    };
+    template<typename TransitionType = Transitions>
     struct State {
         std::unordered_set<std::size_t> nfa_states;
-        Transition transitions;
-        std::optional<TransitionTarget> entry_action = std::nullopt;
+        TransitionType transitions;
+        std::optional<ActionSequence> accept_action;
         std::optional<NFA::TokenBinding> accept_binding = std::nullopt;
         bool operator==(const State &other) const = default;
     private:
@@ -139,13 +171,6 @@ export namespace DFA {
         std::size_t action_size_;
     };
     using FullCharTable = std::array<TransitionValue, std::numeric_limits<unsigned char>::max() + 1>;
-
-    using Transitions = utype::unordered_map<NFA::TransitionKey, std::variant<NFA::DFATarget, NFA::ActionTarget, NFA::SemanticTarget>>;
-    using SortedTransitions = stdu::vector<std::pair<NFA::TransitionKey, TransitionValue>>;
-    using SingleState = State<Transitions>;
-    using CharMachineStateVariant = std::variant<FullCharTable, SortedTransitions>;
-    using CharMachineState = State<CharMachineStateVariant>;
-    using SortedState = State<SortedTransitions>;
     using SeenSymbol = utype::unordered_map<stdu::vector<std::size_t>, std::size_t>;
     using WalkedState = utype::unordered_map<std::size_t, std::size_t>;
     using DfaEmptyStateMap = std::unordered_map<std::size_t, std::size_t>;
@@ -162,6 +187,6 @@ export namespace DFA {
 
     // Per-state transition array, indexed by class id instead of by raw
     // char. Size == CharClassTable::num_classes, not 256.
-    using ClassTransitions = std::vector<TransitionValue>;
+    using ClassTransitions = std::vector<TransitionTarget>;
 
 }

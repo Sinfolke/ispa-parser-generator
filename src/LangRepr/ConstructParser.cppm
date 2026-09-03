@@ -6,6 +6,7 @@ import AST.API;
 import LangRepr.Holder;
 import ConstructBase;
 import LexerBuilder;
+import AST.Tree;
 import LangAPI;
 import logging;
 import dstd;
@@ -20,7 +21,7 @@ export namespace LangRepr {
         auto constructTokenMachineDFA(LangAPI::Class &parser_class) -> void;
 
         auto constructParser() -> void;
-        ConstructParser(Holder &holder, LexerBuilder &lexer_builder, LLIR::IR &ir) : ConstructBase(holder, lexer_builder, ir) {}
+        ConstructParser(Holder &holder, LexerBuilder &lexer_builder, LLIR::IR &ir, AST::Tree &tree) : ConstructBase(holder, lexer_builder, ir, tree) {}
 
         ~ConstructParser() {}
     private:

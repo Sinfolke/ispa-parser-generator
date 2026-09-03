@@ -10,8 +10,7 @@ import std;
 
 void DFA::mergeTwoNFA(
     NFA &first,
-    NFA &second,
-    std::size_t rule_idx
+    NFA &second
 ) {
     if (second.getStates().empty()) {
         second.build(true);
@@ -22,70 +21,71 @@ void DFA::mergeTwoNFA(
     }
 
     const std::size_t state_offset = first.getStates().size();
-    const std::size_t action_offset = first.getActionTable().size();
-    const std::size_t semantic_offset = first.getSemanticTable().size();
 
     auto &first_states = first.getStates();
     const auto &second_states = second.getStates();
 
     /*
      * ------------------------------------------------------------
-     * Copy states with table-type aware rebasing
+     * Copy states with rebasing (Transitions, Actions & Bindings)
      * ------------------------------------------------------------
      */
     for (const auto &state : second_states) {
         auto new_state = state;
 
-        // Symbol transitions: Rebase depending on target table type
+        // Symbol transitions: Rebase target state IDs
         for (auto &[symbol, target_ids] : new_state.transitions) {
             for (auto &target : target_ids) {
                 if (target.next != NFA::NULL_STATE) {
-                    if (target.table_type == NFA::TableType::Action) {
-                        target.next += action_offset;
-                    } else if (target.table_type == NFA::TableType::Semantic) {
-                        target.next += semantic_offset;
-                    } else {
-                        target.next += state_offset;
-                    }
+                    target.next += state_offset;
                 }
             }
         }
 
-        // Epsilon transitions: Rebase depending on target table type
+        // Epsilon transitions: Rebase target state IDs
         utype::unordered_set<NFA::TransitionValue> rebased_epsilon;
         for (auto target : new_state.epsilon_transitions) {
             if (target.next != NFA::NULL_STATE) {
-                if (target.table_type == NFA::TableType::Action) {
-                    target.next += action_offset;
-                } else if (target.table_type == NFA::TableType::Semantic) {
-                    target.next += semantic_offset;
-                } else {
-                    target.next += state_offset;
-                }
+                target.next += state_offset;
             }
             rebased_epsilon.insert(target);
         }
         new_state.epsilon_transitions = std::move(rebased_epsilon);
 
-        // Accept binding target state
+        // Actions: Rebase any embedded NFA state target references
+        for (auto &act_var : new_state.actions) {
+            std::visit([&](auto &act) {
+                using T = std::decay_t<decltype(act)>;
+                if constexpr (std::is_same_v<T, NFA::ActionState>) {
+                    if (act.next_nfa_state != NFA::NULL_STATE) {
+                        act.next_nfa_state += state_offset;
+                    }
+                    if (std::holds_alternative<NFA::DFATarget>(act.next_state)) {
+                        auto &target = std::get<NFA::DFATarget>(act.next_state);
+                        if (target.id != NFA::NULL_STATE) {
+                            target.id += state_offset;
+                        }
+                    }
+                } else if constexpr (std::is_same_v<T, NFA::SemanticState>) {
+                    if (act.nfa_index != NFA::NULL_STATE) {
+                        act.nfa_index += state_offset;
+                    }
+                    if (std::holds_alternative<NFA::DFATarget>(act.next_state)) {
+                        auto &target = std::get<NFA::DFATarget>(act.next_state);
+                        if (target.id != NFA::NULL_STATE) {
+                            target.id += state_offset;
+                        }
+                    }
+                }
+            }, act_var);
+        }
+
+        // Accept binding target state rebase
         if (new_state.accept_binding.has_value()) {
             auto &binding = *new_state.accept_binding;
-
             if (binding.target_semantic_state.has_value() && *binding.target_semantic_state != NFA::NULL_STATE) {
-                *binding.target_semantic_state += semantic_offset;
+                *binding.target_semantic_state += state_offset;
             }
-            // NOTE: reduce_rule_id is intentionally NOT touched here.
-            // DFA.cpp's "Resolve accept/reduce semantic states" section owns
-            // this field's entire lifecycle: it's gated on
-            // !binding->reduce_rule_id.has_value() to harvest the real
-            // END/PUSH action from the state's own closure, then converts
-            // that into a proper lr_table entry chained into the semantic
-            // reduce. reduce_rule_id and the merge-time rule_idx parameter
-            // are different number spaces (an action_table index vs. a
-            // sequential rule/NFA identifier) -- stamping rule_idx into this
-            // field here poisons that gate before DFA::build() ever runs,
-            // silently blocking the END/PUSH harvest for every token merged
-            // in as `second` (i.e. every token except nfas[0]).
         }
 
         first_states.emplace_back(std::move(new_state));
@@ -93,124 +93,132 @@ void DFA::mergeTwoNFA(
 
     /*
      * ------------------------------------------------------------
-     * Merge start states (State 0 -> state_offset via Epsilon)
+     * Attach the second NFA to the synthetic root (State 0).
      * ------------------------------------------------------------
      */
-    first_states[0].epsilon_transitions.insert({
-        state_offset,
-        NFA::TableType::DFA
-    });
-
-    /*
-     * ------------------------------------------------------------
-     * Merge LR / Action table
-     * ------------------------------------------------------------
-     */
-    {
-        auto &first_actions = first.getActionTable();
-        auto second_actions = second.getActionTable();
-
-        for (auto &action : second_actions) {
-            // Rebase next NFA state reference
-            if (action.next_nfa_state != NFA::NULL_STATE) {
-                action.next_nfa_state += state_offset;
-            }
-
-            // Rebase variant target state
-            std::visit([&](auto &&target) {
-                using T = std::decay_t<decltype(target)>;
-                if constexpr (std::is_same_v<T, NFA::DFATarget>) {
-                    if (target.id != NFA::NULL_STATE) {
-                        target.id += state_offset;
-                    }
-                } else if constexpr (std::is_same_v<T, NFA::ActionTarget>) {
-                    if (target.id != NFA::NULL_STATE) {
-                        target.id += action_offset;
-                    }
-                } else if constexpr (std::is_same_v<T, NFA::SemanticTarget>) {
-                    if (target.id != NFA::NULL_STATE) {
-                        target.id += semantic_offset;
-                    }
-                }
-            }, action.next_state);
-        }
-
-        first_actions.insert(
-            first_actions.end(),
-            std::make_move_iterator(second_actions.begin()),
-            std::make_move_iterator(second_actions.end())
-        );
-    }
-
-    /*
-     * ------------------------------------------------------------
-     * Merge Semantic table
-     * ------------------------------------------------------------
-     */
-    {
-        auto &first_semantic = first.getSemanticTable();
-        auto second_semantic = second.getSemanticTable();
-
-        for (auto &semantic : second_semantic) {
-            // Rebase NFA index reference
-            if (semantic.nfa_index != NFA::NULL_STATE) {
-                semantic.nfa_index += state_offset;
-            }
-
-            // Rebase variant target state
-            std::visit([&](auto &&target) {
-                using T = std::decay_t<decltype(target)>;
-                if constexpr (std::is_same_v<T, NFA::DFATarget>) {
-                    if (target.id != NFA::NULL_STATE) {
-                        target.id += state_offset;
-                    }
-                } else if constexpr (std::is_same_v<T, NFA::ActionTarget>) {
-                    if (target.id != NFA::NULL_STATE) {
-                        target.id += action_offset;
-                    }
-                } else if constexpr (std::is_same_v<T, NFA::SemanticTarget>) {
-                    if (target.id != NFA::NULL_STATE) {
-                        target.id += semantic_offset;
-                    }
-                }
-            }, semantic.next_state);
-        }
-
-        first_semantic.insert(
-            first_semantic.end(),
-            std::make_move_iterator(second_semantic.begin()),
-            std::make_move_iterator(second_semantic.end())
-        );
-    }
+    first_states[0].epsilon_transitions.insert(NFA::TransitionValue{ .next = state_offset });
 }
 
-// functionality_2.cpp in DFA::mergeNFAS
 auto DFA::mergeNFAS(
     const stdu::vector<NFA> &nfas
 ) -> std::pair<NFA, std::size_t> {
     NFA merged = nfas[0];
 
     if (merged.getStates().empty()) {
-        merged.build(true); // WAS: merged.build(false);
+        merged.build(true);
+    }
+
+    // ------------------------------------------------------------
+    // The merged NFA needs a genuinely synthetic start state.
+    //
+    // The old implementation used NFA #0's state 0 as the common root
+    // and added epsilon edges from it to every later NFA.  That is wrong
+    // when state 0 owns actions: those actions become a shared prefix of
+    // every terminal in the merged automaton.  In a multi-terminal lexer
+    // this makes the first terminal's BEGIN/PUSH/etc. leak into all other
+    // terminals and corrupts capture boundaries.
+    //
+    // Make state 0 a pure dispatcher instead:
+    //
+    //       synthetic root
+    //          /  |  \
+    //         v   v   v
+    //        NFA0 NFA1 NFA2
+    //
+    // Rebase the original NFA #0 by one state so all of its embedded NFA
+    // references remain valid.
+    // ------------------------------------------------------------
+    {
+        auto &states = merged.getStates();
+
+        states.insert(states.begin(), NFA::state{});
+
+        for (std::size_t old_id = states.size(); old_id-- > 1;) {
+            auto &state = states[old_id];
+
+            for (auto &[symbol, targets] : state.transitions) {
+                for (auto &target : targets) {
+                    if (target.next != NFA::NULL_STATE)
+                        ++target.next;
+                }
+            }
+
+            utype::unordered_set<NFA::TransitionValue> rebased_epsilon;
+            for (auto target : state.epsilon_transitions) {
+                if (target.next != NFA::NULL_STATE)
+                    ++target.next;
+                rebased_epsilon.insert(target);
+            }
+            state.epsilon_transitions =
+                std::move(rebased_epsilon);
+
+            for (auto &act_var : state.actions) {
+                std::visit([&](auto &act) {
+                    using T = std::decay_t<decltype(act)>;
+
+                    if constexpr (std::is_same_v<T, NFA::ActionState>) {
+                        if (act.next_nfa_state != NFA::NULL_STATE)
+                            ++act.next_nfa_state;
+
+                        if (std::holds_alternative<NFA::DFATarget>(
+                                act.next_state)) {
+                            auto &target =
+                                std::get<NFA::DFATarget>(act.next_state);
+
+                            if (target.id != NFA::NULL_STATE)
+                                ++target.id;
+                        }
+                    }
+                    else if constexpr (
+                        std::is_same_v<T, NFA::SemanticState>) {
+                        if (act.nfa_index != NFA::NULL_STATE)
+                            ++act.nfa_index;
+
+                        if (std::holds_alternative<NFA::DFATarget>(
+                                act.next_state)) {
+                            auto &target =
+                                std::get<NFA::DFATarget>(act.next_state);
+
+                            if (target.id != NFA::NULL_STATE)
+                                ++target.id;
+                        }
+                    }
+                }, act_var);
+            }
+
+            if (state.accept_binding.has_value()) {
+                auto &binding = *state.accept_binding;
+
+                if (binding.target_semantic_state.has_value() &&
+                    *binding.target_semantic_state != NFA::NULL_STATE) {
+                    ++*binding.target_semantic_state;
+                }
+            }
+        }
+
+        // The original NFA #0 starts at old state 0, now state 1.
+        states[0].epsilon_transitions.insert(
+            NFA::TransitionValue{.next = 1}
+        );
     }
 
     std::size_t max_registers_count = merged.getRegistersCount();
     for (std::size_t i = 1; i < nfas.size(); ++i) {
         NFA next = nfas[i];
         if (next.getStates().empty()) {
-            next.build(true); // WAS: unbuilt or second.build(false)
+            next.build(true);
         }
 
         mergeTwoNFA(
             merged,
-            next,
-            i
+            next
         );
         max_registers_count = std::max(max_registers_count, next.getRegistersCount());
     }
     merged.buildAcceptMap();
     return std::make_pair(merged, max_registers_count);
 }
+
 auto DFA::build(const AST::Tree &ast, const NFA &nfa) -> DFA {
     auto mutable_nfa = nfa;
     DFA dfa(&mutable_nfa);
@@ -218,33 +226,19 @@ auto DFA::build(const AST::Tree &ast, const NFA &nfa) -> DFA {
     dfa.minimize();
     return dfa;
 }
+
 auto DFA::build(const AST::Tree &ast, const stdu::vector<NFA> &nfa_collection) -> std::tuple<ClassifiedDFA, stdu::vector<NFA::ActionState>, stdu::vector<NFA::SemanticState>, std::size_t> {
     auto [mergedNFA, max_registers_count] = mergeNFAS(nfa_collection);
-    // construct tables
     auto dfa = DFA(&mergedNFA);
 
     Tlog::Branch b(logger, "DFA-build.log");
-    // All state-local accept bindings have now been rebased.
-    // Reconstruct the global accept map from them.
-    logger.log(
-        "Merged NFA action table: {}",
-        mergedNFA.getActionTable().size()
-    );
 
-    for (std::size_t i = 0;
-         i < mergedNFA.getActionTable().size();
-         ++i) {
-
-        const auto &action =
-            mergedNFA.getActionTable()[i];
-
-        logger.log(
-            "  action[{}]: {} {}",
-            i,
-            static_cast<int>(action.action),
-            action.variable.name
-        );
-         }
+    for (std::size_t i = 0; i < mergedNFA.getStates().size(); ++i) {
+        const auto &st = mergedNFA.getStates()[i];
+        if (!st.actions.empty()) {
+            logger.log("  state[{}]: {} state-hosted action(s)", i, st.actions.size());
+        }
+    }
 
     dfa.build();
     dfa.minimize();

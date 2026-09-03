@@ -9,15 +9,23 @@ export class NFA {
 public:
     static constexpr auto NULL_STATE = std::numeric_limits<std::size_t>::max();
     using TransitionKey = std::variant<stdu::vector<std::string>, char>;
-
     enum class StoreCstNode {
         CST_NODE, CST_GROUP, CST_CONDITION
     };
     enum class TableType {
-        DFA, Action, Semantic
+        // Snapshot / SnapshotEnd are DFA-construction-internal identity
+        // tags for FiredAction (see DFA.cpp step D / Closure.cpp) - they
+        // mark a synthetic SNAPSHOT_APPLY / SNAPSHOT_APPLY_END boundary
+        // action so it isn't confused with real NFA-state-owned actions,
+        // or with each other, during epsilon-closure path comparison.
+        // They never reach the runtime-facing action_table format.
+        DFA, Action, Semantic, Snapshot, SnapshotEnd
     };
     enum class Action {
-        UNDEF, BEGIN, END, PUSH, FAIL
+        UNDEF, BEGIN, END, PUSH, SNAPSHOT, SNAPSHOT_APPLY, SNAPSHOT_APPLY_END
+        // NOTE: SNAPSHOT_APPLY_END is added by the runtime side (see
+        // DFA.API::scan()) to mark where a SNAPSHOT_APPLY-deferred run
+        // ends and the saved position should be restored.
     };
     enum class SemanticAction {
         UNDEF, REDUCE
@@ -87,12 +95,11 @@ public:
     // Internal NFA transition used during graph construction
     struct TransitionValue {
         std::size_t next = NULL_STATE;
-        TableType table_type = TableType::DFA;
         auto operator==(const TransitionValue &other) const -> bool = default;
     private:
         friend struct ::uhash;
         auto members() const {
-            return std::tie(next, table_type);
+            return std::tie(next);
         }
     };
     struct ActionState {
@@ -100,6 +107,8 @@ public:
         LangAPI::Variable variable{};
         std::size_t next_nfa_state = NULL_STATE;
         std::variant<DFATarget, ActionTarget, SemanticTarget> next_state;
+        Action wrapped_action;
+        std::size_t snapshot_id = NULL_STATE;
         auto operator==(const ActionState &other) const -> bool = default;
         auto operator<(const ActionState &other) const -> bool {
             if (action != other.action) {
@@ -135,22 +144,22 @@ public:
             return std::tie(instance_value, next_state);
         }
     };
-
+    using ActionChain = stdu::vector<std::variant<ActionState, SemanticState>>;
     using TemplatedDataBlock = utype::unordered_map<std::string, TemplatedDataBlockValue>;
     using DataBlock = std::variant<std::monostate, TemplatedDataBlock, TemplatedDataBlockValue>;
     using ActionTable = stdu::vector<ActionState>;
     using SemanticTable = stdu::vector<SemanticState>;
     struct state {
         utype::unordered_map<TransitionKey, stdu::vector<TransitionValue>> transitions;
+        ActionChain actions;
         // Replaced raw accept_index with the new detailed binding
         std::optional<TokenBinding> accept_binding = std::nullopt;
         utype::unordered_set<TransitionValue> epsilon_transitions;
-        stdu::vector<std::string> rule_name;
         auto operator==(const state &other) const -> bool = default;
     private:
         friend struct ::uhash;
         auto members() const {
-            return std::tie(transitions, accept_binding, epsilon_transitions, rule_name);
+            return std::tie(transitions, actions, accept_binding, epsilon_transitions);
         }
     };
 
@@ -189,8 +198,6 @@ private:
     std::unordered_map<std::size_t, TokenBinding> accept_map;
     stdu::vector<LangAPI::Type> value_types;
     std::size_t registers_count = 0;
-    ActionTable action_table;
-    SemanticTable semantic_table;
 
     // Build methods
     auto applyQuantifierAndActions(
@@ -216,7 +223,9 @@ private:
     std::size_t state_id,
     std::size_t next_state,
     const AST::RuleMember &member,
-    bool nestedReduction);
+    bool nestedReduction,
+    bool is_repeating
+    );
     void acceptMapVisitState(std::size_t index, std::optional<TokenBinding> current_binding, std::unordered_set<std::size_t>& visited);
     void getStatesToPropagate(std::size_t state_id, std::unordered_set<std::size_t> &result);
     auto getStatesToPropagate(std::size_t id) -> std::unordered_set<std::size_t>;
@@ -235,10 +244,6 @@ public:
     auto getRegistersCount() { return registers_count; }
     auto& getStates() { return states; }
     auto& getStates() const { return states; }
-    auto& getActionTable() { return action_table; }
-    auto& getActionTable() const { return action_table; }
-    auto& getSemanticTable() { return semantic_table; }
-    auto& getSemanticTable() const { return semantic_table; }
     auto &getAcceptMap() const { return accept_map; }
     auto &isCharNfa() const { return is_char_table; }
     auto &getName() const { return name_; }

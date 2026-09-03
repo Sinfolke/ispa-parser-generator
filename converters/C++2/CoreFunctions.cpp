@@ -70,6 +70,7 @@ auto Core::convertType(const LangAPI::Type &type) -> std::string {
 }
 
 auto Core::convertTemplates(const decltype(LangAPI::Type::template_parameters) &template_parameters) -> std::string {
+    if (template_parameters.empty()) return "";
     std::string res;
     for (const auto &param : template_parameters) {
         if (std::holds_alternative<LangAPI::Type>(param)) {
@@ -82,6 +83,7 @@ auto Core::convertTemplates(const decltype(LangAPI::Type::template_parameters) &
     return res.substr(0, res.size() - 2);
 }
 auto Core::convertTemplates(const stdu::vector<std::variant<std::shared_ptr<LangAPI::Type>, std::shared_ptr<LangAPI::RValue>>> &template_parameters) -> std::string {
+    if (template_parameters.empty()) return "";
     std::string res;
     for (const auto &param : template_parameters) {
         if (std::holds_alternative<std::shared_ptr<LangAPI::Type>>(param)) {
@@ -95,6 +97,7 @@ auto Core::convertTemplates(const stdu::vector<std::variant<std::shared_ptr<Lang
 }
 
 auto Core::convertSymbol(const LangAPI::Symbol &symbol) -> std::string {
+    if (symbol.path.empty()) return "";
     std::string res;
     for (const auto &part : symbol.path) {
         if (std::holds_alternative<std::string>(part)) {
@@ -127,6 +130,11 @@ auto Core::convertStorageSymbol(const LangAPI::StorageSymbol &symbol) -> std::st
                 case LangAPI::ArrayMethods::Pop:
                     res += "pop_back";
                     break;
+                case LangAPI::ArrayMethods::Size:
+                    res += "size";
+                    break;
+                default:
+                    throw Error("Unknown array method");
             }
             res += "(";
             bool first = true;
@@ -444,6 +452,7 @@ auto Core::convertMakeTuple(const LangAPI::MakeTuple &make_tuple) -> std::string
     return tuple;
 }
 auto Core::convertGetVariant(const LangAPI::GetVariant &get_variant) -> std::string {
+    std::cout << "ss: " << get_variant.sym << ", " << convertExpression(get_variant.sym) << std::endl;
     return std::string("std::get<") + convertType(*get_variant.type) + ">(" + convertExpression(get_variant.sym) + ")";
 }
 auto Core::convertRValue(const LangAPI::RValue &rvalue) -> std::string {
@@ -632,6 +641,10 @@ auto Core::convertRValue(const LangAPI::RValue &rvalue) -> std::string {
             return convertMakeTuple(rvalue.getMakeTuple());
         case LangAPI::RValueType::GetVariant:
             return convertGetVariant(rvalue.getVariantCast());
+        case LangAPI::RValueType::CheckVariant:
+            return "std::holds_alternative<" + convertType(*rvalue.CheckVariantCast().type) + ">(" + convertExpression(rvalue.CheckVariantCast().sym) + ")";
+        case LangAPI::RValueType::CharToStringConstructor:
+            return "std::string(1, " + convertExpression(rvalue.getCharToStringConstructor().what) + ")";
         default:
             throw Error("Unknown RValue type: {}", (int) rvalue.type());
     }

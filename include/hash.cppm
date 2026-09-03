@@ -102,6 +102,11 @@ export struct uhash {
         static_assert(sizeof(T) == 0, "uhash: cannot hash type: not default hashable, not container and does not provide members method");
         return 0;
     }
+    template<typename T>
+    std::size_t operator()(const std::shared_ptr<T>& ptr) const {
+        if (!ptr) return 0;
+        return uhash{}(*ptr);
+    }
 };
 export template<typename T>
 bool operator==(std::unordered_set<T> a, std::unordered_set<T> b) {

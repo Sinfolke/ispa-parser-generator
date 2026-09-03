@@ -9,6 +9,7 @@ export namespace Converter {
         Writer &output;
     public:
         virtual auto createIf(const LangAPI::Expression &expression) -> void = 0;
+        virtual auto openElse() -> void = 0;
         virtual auto closeIf() -> void = 0;
         virtual auto createWhile(const LangAPI::Expression &expression) -> void = 0;
         virtual auto closeWhile() -> void = 0;

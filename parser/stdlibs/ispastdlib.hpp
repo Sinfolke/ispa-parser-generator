@@ -289,7 +289,7 @@ using Seq = std::vector<Node<RULE_T, DataStorageType>>;
 namespace DFA::API {
     inline auto null_state = std::numeric_limits<std::size_t>::max();
     enum class Action {
-        UNDEF, BEGIN, END, PUSH, FAIL
+        UNDEF, BEGIN, END, PUSH, SNAPSHOT, SNAPSHOT_APPLY, SNAPSHOT_APPLY_END
     };
     template<std::size_t Classes>
     using State = std::array<std::size_t, Classes>;
@@ -297,10 +297,11 @@ namespace DFA::API {
     using Table = std::array<State<Classes>, States>;
     using CharToClass = std::array<std::size_t, 256>;
     template<std::size_t States>
-    using LRTable = std::array<State<2>, States>;
+    using LRTable = std::array<State<3>, States>;
 }
 namespace DFA {
-template<
+
+    template<
         typename Token,
         typename SemanticFunc,
         std::size_t table_classes,
@@ -313,34 +314,59 @@ template<
         const API::Table<table_classes, table_states> &table,
         const API::CharToClass class_table,
         const API::LRTable<lr_table_states> lr_table,
-        std::size_t entry_action,
         std::vector<std::variant<std::monostate, Token, char, std::string>> &values,
         std::vector<std::vector<std::variant<std::monostate, Token, char, std::string>>> &vec_values,
         std::array<const char*, registers_count> registers,
         SemanticFunc semantic
     ) -> Token {
-        std::size_t state = entry_action;
+
+        std::size_t state = 0;
         std::size_t registers_allocated = 0;
 
-        // Debug table print (uses isolated counter variable)
-        std::size_t dbg_state = 0;
-        for (const auto &s : table) {
-            std::cout << "state " << dbg_state++ << ": ";
-            std::size_t cls = 0;
-            for (const auto &transition : s) {
-                std::cout << "\t" << cls++ << " "  << transition << "{";
-                if (transition < table.size()) {
-                    std::cout << "REG " << transition;
-                } else if (transition == DFA::API::null_state) {
-                    std::cout << "ACCEPTING";
-                } else if (transition < table.size() + lr_table.size()) {
-                    std::cout << "LR " << transition - table.size();
-                } else {
-                    std::cout << "SEMANTIC " << transition - table.size() - lr_table.size();
-                }
-                std::cout << "}\n";
-            }
-        }
+        // Snapshot id -> input boundary.
+        //
+        // A snapshot records the position AFTER the transition which
+        // led to the SNAPSHOT action. No input transition is undone.
+        std::unordered_map<std::size_t, const char*> snapshot_map;
+
+        // When SNAPSHOT_ACCEPT temporarily rewinds `pos`, this contains
+        // the position to which scanning must resume after the deferred
+        // action chain has finished.
+        const char* resume_pos = nullptr;
+        std::size_t snapshots_opened = 0;
+        bool immediate_action = false;
+        // ------------------------------------------------------------
+        // Debug table print
+        // ------------------------------------------------------------
+
+        // std::size_t dbg_state = 0;
+        //
+        // for (const auto &s : table) {
+        //     std::cout << "state " << dbg_state++ << ": ";
+        //     std::size_t cls = 0;
+        //
+        //     for (const auto &transition : s) {
+        //         std::cout << "\t" << cls++ << " " << transition << "{";
+        //
+        //         if (transition < table.size()) {
+        //             std::cout << "REG " << transition;
+        //         } else if (transition == DFA::API::null_state) {
+        //             std::cout << "ACCEPTING";
+        //         } else if (transition < table.size() + lr_table.size()) {
+        //             std::cout << "LR " << transition - table.size()
+        //                       << '[' << lr_table[transition - table.size()][0]
+        //                       << ',' << lr_table[transition - table.size()][1] << ']';
+        //         } else {
+        //             std::cout << "SEMANTIC " << transition - table.size() - lr_table.size();
+        //         }
+        //
+        //         std::cout << "}\n";
+        //     }
+        // }
+
+        // ------------------------------------------------------------
+        // Main machine
+        // ------------------------------------------------------------
 
         while (true) {
             if (state == API::null_state)
@@ -348,71 +374,233 @@ template<
 
             std::cout << "State " << state << " char '" << *pos << "'" << std::endl;
 
+            // ========================================================
+            // DFA STATE
+            // ========================================================
+
             if (state < table.size()) {
-                std::size_t cls = class_table[static_cast<unsigned char>(*pos)];
-                std::size_t next = table[state][cls];
-                std::cout << "Transitioning to " << next << std::endl;
-
-                if (next == API::null_state) {
-                    break;
-                }
-
-                state = next;
-                // Only consume character if transitioning to a DFA state or LR action edge.
-                // Fallback SEMANTIC actions (>= table.size() + lr_table.size()) must NOT consume *pos.
-                if (next < table.size() + lr_table.size() && *pos != '\0') {
+                if (immediate_action) {
+                    immediate_action = false;
                     ++pos;
                 }
+                const std::size_t cls = class_table[static_cast<unsigned char>(*pos)];
+                const std::size_t next = table[state][cls];
+
+                std::cout << "Transitioning to " << next << std::endl;
+
+                if (next == API::null_state)
+                    break;
+
+                state = next;
+
+                // ----------------------------------------------------
+                // Consume the character only when the transition
+                // enters another DFA
+                //
+                // A semantic state does not consume input.
+                // ----------------------------------------------------
+
+                if (next < table.size() && *pos != '\0') {
+                    ++pos;
+                } else {
+                    immediate_action = true;
+                }
+
+            // ========================================================
+            // LR ACTION STATE
+            // ========================================================
+
             } else if (state < table.size() + lr_table.size()) {
-                // LR action state
-                auto lr_action = lr_table[state - table.size()];
+                const auto lr_action = lr_table[state - table.size()];
+
                 std::cout << "executing LR action " << lr_action[0] << std::endl;
+
                 switch (static_cast<API::Action>(lr_action[0])) {
-                    case API::Action::UNDEF:
-                        throw std::runtime_error("DFA: undefined action; Report this error to github");
-                    case API::Action::BEGIN:
+
+                    // ------------------------------------------------
+                    // BEGIN
+                    // ------------------------------------------------
+
+                    case API::Action::BEGIN: {
                         std::cout << "Begin of value on character " << *pos << std::endl;
+
+                        if (registers_allocated >= registers.size()) {
+                            throw std::runtime_error("DFA: register allocation overflow");
+                        }
+
                         registers[registers_allocated++] = pos;
                         break;
-                    case API::Action::END:
-                        std::cout << "Value accumulated " << std::string(registers[registers_allocated - 1], pos - registers[registers_allocated - 1]) << std::endl;
-                        if (pos - registers[registers_allocated - 1] == 1) {
-                            values.push_back(*registers[registers_allocated - 1]);
-                        } else {
-                            values.push_back(std::string(registers[registers_allocated - 1], pos - registers[registers_allocated - 1]));
-                        }
-                        registers_allocated--;
-                        break;
-                    case API::Action::PUSH:
-                        std::cout << "Pushing value " << std::string(registers[registers_allocated - 1], pos - registers[registers_allocated - 1]) << std::endl;
-                        if (pos - registers[registers_allocated - 1] == 1) {
-                            vec_values.back().push_back(*registers[registers_allocated - 1]);
-                        } else {
-                            vec_values.back().push_back(std::string(registers[registers_allocated - 1], pos - registers[registers_allocated - 1]));
-                        }
-                        break;
-                    default:
-                        throw std::runtime_error("DFA: Out of bound, non-enum action; Report this error to github");
-                }
-                state = lr_action[1];
-            } else {
-                std::cout << "Calling semantic action " << state - table.size() - lr_table.size() << std::endl;
+                    }
 
-                std::pair<int, Token> t = semantic(state - table.size() - lr_table.size(), values, vec_values);
+                    // ------------------------------------------------
+                    // END
+                    // ------------------------------------------------
+
+                    case API::Action::END: {
+                        if (registers_allocated == 0) {
+                            throw std::runtime_error("DFA: END without matching BEGIN");
+                        }
+
+                        const char *begin = registers[registers_allocated - 1];
+
+                        std::cout << "Value accumulated "
+                                  << std::string(begin, pos - begin)
+                                  << std::endl;
+
+                        if (pos - begin <= 1) {
+                            values.push_back(*begin);
+                        } else {
+                            values.push_back(std::string(begin, pos - begin));
+                        }
+
+                        --registers_allocated;
+                        break;
+                    }
+
+                    // ------------------------------------------------
+                    // PUSH
+                    // ------------------------------------------------
+
+                    case API::Action::PUSH: {
+                        if (registers_allocated == 0) {
+                            throw std::runtime_error("DFA: PUSH without matching BEGIN");
+                        }
+
+                        const char *begin = registers[registers_allocated - 1];
+
+                        std::cout << "Pushing value "
+                                  << std::string(begin, pos - begin)
+                                  << std::endl;
+
+                        vec_values.emplace_back();
+                        if (pos - begin <= 1) {
+                            vec_values.back().push_back(*begin);
+                        } else {
+                            vec_values.back().push_back(std::string(begin, pos - begin));
+                        }
+
+                        break;
+                    }
+
+                    // ------------------------------------------------
+                    // SNAPSHOT
+                    //
+                    // Save the CURRENT input boundary.
+                    //
+                    // The character transition that brought us here
+                    // has already happened and remains consumed.
+                    // ------------------------------------------------
+
+                    case API::Action::SNAPSHOT: {
+                        snapshot_map[lr_action[1]] = pos;
+
+                        std::cout << "Snapshot " << lr_action[1] << " = "
+                                  << static_cast<const void*>(pos) << std::endl;
+
+                        break;
+                    }
+
+                    // ------------------------------------------------
+                    // SNAPSHOT_ACCEPT
+                    //
+                    // Temporarily execute the following action chain
+                    // against the saved input boundary.
+                    //
+                    // We remember the CURRENT position first.
+                    //
+                    // Example:
+                    //
+                    //     current pos = P
+                    //
+                    //     SNAPSHOT_ACCEPT(S)
+                    //         |
+                    //         +--> pos = snapshot[S]
+                    //         |
+                    //         +--> deferred actions
+                    //         |
+                    //         +--> semantic
+                    //         |
+                    //         +--> DFA state
+                    //                 |
+                    //                 +--> restore P
+                    //
+                    // The consumed transitions are NOT undone.
+                    // ------------------------------------------------
+
+                    case API::Action::SNAPSHOT_APPLY: {
+                        const auto snapshot_it = snapshot_map.find(lr_action[1]);
+
+                        if (snapshot_it == snapshot_map.end()) {
+                            throw std::runtime_error("DFA: SNAPSHOT_ACCEPT references an unknown snapshot");
+                        }
+
+                        // Save the position at which the deferred action was requested.
+                        resume_pos = pos;
+                        ++snapshots_opened;
+                        immediate_action = false;
+
+                        // Execute the deferred actions at the snapshot boundary.
+                        pos = snapshot_it->second;
+
+                        std::cout << "Applying snapshot " << lr_action[1] << " at "
+                                  << static_cast<const void*>(pos) << ", resume at "
+                                  << static_cast<const void*>(resume_pos) << std::endl;
+
+                        break;
+                    }
+
+                    case API::Action::SNAPSHOT_APPLY_END: {
+                        if (--snapshots_opened <= 0) {
+                            snapshots_opened = 0;
+                            pos = resume_pos;
+                        }
+                        break;
+                    }
+
+                    default:
+                        throw std::runtime_error(
+                            "DFA: Out of bound, non-enum action; Report this error to github"
+                        );
+                }
+
+                state = lr_action[2];
+
+            // ========================================================
+            // SEMANTIC STATE
+            // ========================================================
+
+            } else {
+                const std::size_t semantic_index = state - table.size() - lr_table.size();
+
+                std::cout << "Calling semantic action " << semantic_index << std::endl;
+
+                std::pair<int, Token> t = semantic(
+                    semantic_index,
+                    values,
+                    vec_values
+                );
+
                 if (!std::holds_alternative<std::monostate>(t.second)) {
                     values.push_back(std::move(t.second));
                 }
+
                 state = t.first;
             }
         }
 
+        // ------------------------------------------------------------
+        // Final result
+        // ------------------------------------------------------------
+
         if (!values.empty() && !std::holds_alternative<Token>(values.front())) {
-            std::cout << "Warning [DFA]: Returned non-token result; Report this error to github" << std::endl;
+            std::cout << "Warning [DFA]: Returned non-token result; Report this error to github"
+                      << std::endl;
         }
 
         return std::get<Token>(values.front());
     }
-}
+
+} // namespace DFA
 template<class TOKEN_T, typename Token>
 class Lexer_base {
 protected:
@@ -453,7 +641,6 @@ protected:
         const DFA::API::Table<table_classes, table_states> &table,
         const DFA::API::CharToClass class_table,
         const DFA::API::LRTable<lr_table_states> lr_table,
-        std::size_t entry_action,
         std::vector<std::variant<std::monostate, Token, char, std::string>> &values,
         std::vector<std::vector<std::variant<std::monostate, Token, char, std::string>>> &vec_values,
         std::array<const char*, registers_count> registers,
@@ -462,7 +649,8 @@ protected:
     ) {
         if (*pos == '\0')
             return Token {};
-        Token result = DFA::scan(pos, table, class_table, lr_table, entry_action, values, vec_values, registers, semantic);
+        Token result = DFA::scan(pos, table, class_table, lr_table, values, vec_values, registers, semantic);
+        values.clear();
         return result;
     }
 
