@@ -229,6 +229,7 @@ auto DFA::build(const AST::Tree &ast, const NFA &nfa) -> DFA {
 
 auto DFA::build(const AST::Tree &ast, const stdu::vector<NFA> &nfa_collection) -> std::tuple<ClassifiedDFA, stdu::vector<NFA::ActionState>, stdu::vector<NFA::SemanticState>, std::size_t> {
     auto [mergedNFA, max_registers_count] = mergeNFAS(nfa_collection);
+    std::cout << "Merged NFA contains " << mergedNFA.getStates().size() << " states and " << max_registers_count << " registers." << std::endl;
     auto dfa = DFA(&mergedNFA);
 
     Tlog::Branch b(logger, "DFA-build.log");
@@ -242,5 +243,6 @@ auto DFA::build(const AST::Tree &ast, const stdu::vector<NFA> &nfa_collection) -
 
     dfa.build();
     dfa.minimize();
+    std::cout << "DFA contains " << dfa.get().size() << " states, " << dfa.getLR().size() << " LR items, and " << dfa.getSemantic().size() << " semantic states." << std::endl;
     return std::make_tuple(dfa.classify(), dfa.getLR(), dfa.getSemantic(), max_registers_count);
 }

@@ -78,8 +78,92 @@ auto NFA::applyQuantifierAndActions(
 
     const std::size_t exit_target = (end_action_state != NULL_STATE) ? end_action_state : end;
     const std::size_t loop_target = (loop_action_state != NULL_STATE) ? loop_action_state : body.start;
+
+    // ----------------------------------------------------------------
+    // A captured zero-width body is special.  The ordinary `*` NFA has
+    // both an epsilon bypass and an epsilon loop:
+    //
+    //     start -> end                 (zero iterations)
+    //     body.end -> loop_target      (another iteration)
+    //     body.end -> exit_target      (finish)
+    //
+    // When the body consumes no character at all, those edges describe
+    // two different semantic histories at exactly the same input
+    // position: no capture vs. an empty capture.  Worse, the loop can
+    // repeat forever without consuming input.
+    //
+    // For a CAPTURED, PURELY ZERO-WIDTH body we define one empty
+    // occurrence as the deterministic result.  This is important because
+    // an empty capture is a real value and must reach `values` through the
+    // normal BEGIN/PUSH(or END) machinery.  We therefore keep the normal
+    // body -> exit path, but remove the zero-iteration bypass and the
+    // zero-width loop.
+    //
+    // A nullable body which ALSO has consuming transitions is deliberately
+    // left alone: it still needs the normal repetition graph because a
+    // later iteration may consume input.
+    // ----------------------------------------------------------------
+    bool nullable_body = false;
+
+    if (has_store && is_repeating) {
+        // Determine whether body.end can be reached from body.start without
+        // consuming a character.  We deliberately do NOT require the entire
+        // body to be epsilon-only: a nested token may have both consuming and
+        // nullable alternatives.
+        std::vector<std::size_t> pending{body.start};
+        std::unordered_set<std::size_t> visited;
+        visited.reserve(states.size());
+
+        while (!pending.empty()) {
+            const std::size_t current = pending.back();
+            pending.pop_back();
+
+            if (!visited.insert(current).second)
+                continue;
+
+            if (current == body.end) {
+                nullable_body = true;
+                break;
+            }
+
+            for (const auto &epsilon : states[current].epsilon_transitions) {
+                if (epsilon.next != NULL_STATE)
+                    pending.push_back(epsilon.next);
+            }
+        }
+    }
+
     // 4. Handle Quantifier Repetition and Optional Bypasses
-    switch (member.quantifier) {
+    if (nullable_body) {
+        // A captured nullable repetition must not have a zero-iteration
+        // bypass competing with its empty iteration.  The first epsilon
+        // iteration is the empty value and must be materialized by BEGIN/PUSH
+        // (or BEGIN/END for the non-looping form).
+        //
+        // Keep the loop so a consuming alternative can still repeat.  The
+        // closure path guard prevents the same epsilon-only action cycle from
+        // being traversed indefinitely; therefore exactly one zero-width
+        // occurrence is retained while consuming iterations remain possible.
+        switch (member.quantifier) {
+        case '*':
+            // No zero-iteration bypass.
+            states[body.end].epsilon_transitions.insert({loop_target});
+            states[body.end].epsilon_transitions.insert({exit_target});
+            break;
+
+        case '+':
+            // `+` already requires one iteration.  Its existing loop/exit
+            // edges are exactly what we need.
+            states[body.end].epsilon_transitions.insert({loop_target});
+            states[body.end].epsilon_transitions.insert({exit_target});
+            break;
+
+        default:
+            states[body.end].epsilon_transitions.insert({exit_target});
+            break;
+        }
+    } else {
+        switch (member.quantifier) {
         case '?':
             // Optional bypass jumps straight to 'end' (skips BEGIN and END)
             states[start].epsilon_transitions.insert({end});
@@ -97,9 +181,10 @@ auto NFA::applyQuantifierAndActions(
             states[body.end].epsilon_transitions.insert({loop_target});
             states[body.end].epsilon_transitions.insert({exit_target});
             break;
-        default:
-            states[body.end].epsilon_transitions.insert({exit_target});
-            break;
+            default:
+                states[body.end].epsilon_transitions.insert({exit_target});
+                break;
+        }
     }
 
     // Last Member / Accept Marking
@@ -184,7 +269,7 @@ void NFA::markAccept(
             .name = name,
             .type = t
         });
-        if (member.isCsequence() && (member.quantifier == '+' || member.quantifier == '*')) {
+        if (member.isCsequence() && (member.quantifier == '+' || member.quantifier == '*') || t.isValueType() && t.getValueType() == LangAPI::ValueType::Variant) {
             if (t.getValueType() == LangAPI::ValueType::String) {
                 std::cout << "ss: " << ss << std::endl;
                 LangAPI::If type_check {LangAPI::CheckVariant::createExpression(LangAPI::CheckVariant {.type = std::make_shared<LangAPI::Type>(LangAPI::ValueType::Char), .sym = LangAPI::StorageSymbol::createExpression(ss)})};
@@ -300,23 +385,115 @@ void NFA::handleTerminal(const AST::RuleMember &member, const stdu::vector<std::
     NFA called_terminal_nfa(tree, name, &called_terminal.data_block, called_terminal.rule_members, name == constants::whitespace, is_char_table, accept_index);
     called_terminal_nfa.build();
     auto &called_terminal_nfa_states = called_terminal_nfa.getStates();
-    // merge nfas
-    states[body_start].epsilon_transitions.insert({states.size()});
-    for (auto &state : called_terminal_nfa_states) {
-        NFA::state new_state;
-        for (auto transition : state.transitions) {
-            for (auto &tv : transition.second) {
-                tv.next += states.size();
+
+    if (called_terminal_nfa_states.empty()) {
+        states[body_start].epsilon_transitions.insert({body_end});
+        applyQuantifierAndActions(member, start, end, {body_start, body_end}, isLastMember, addStoreActions, false);
+        return;
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * Nested token support: embed the referenced terminal's own NFA
+     * fragment inside this one.
+     *
+     * Every copied state must be rebased into THIS NFA's index space
+     * (mirrors DFA::mergeTwoNFA in functionality.cpp). The previous
+     * version computed a rebased copy (`new_state`) and then threw it
+     * away, appending the UN-rebased `called_terminal_nfa_states`
+     * instead. Those states' transitions/epsilon edges still pointed
+     * at the called terminal's own local (0-based) state numbers,
+     * which collided with unrelated states already present earlier in
+     * the outer NFA. That fabricated extra epsilon paths into those
+     * unrelated states carrying unrelated action sequences - exactly
+     * the divergence DFA::build() rejects with "NFA destination state
+     * has multiple epsilon paths with different action sequences".
+     * ------------------------------------------------------------
+     */
+    const std::size_t offset = states.size();
+    std::vector<std::size_t> exit_states;
+
+    for (std::size_t i = 0; i < called_terminal_nfa_states.size(); ++i) {
+        NFA::state new_state = called_terminal_nfa_states[i];
+
+        for (auto &[symbol, targets] : new_state.transitions) {
+            for (auto &target : targets) {
+                if (target.next != NULL_STATE) {
+                    target.next += offset;
+                }
             }
-            new_state.transitions[transition.first] = transition.second;
         }
-        for (auto e : state.epsilon_transitions) {
-            new_state.epsilon_transitions.insert({e.next + states.size()});
+
+        decltype(new_state.epsilon_transitions) rebased_epsilon;
+        for (auto target : new_state.epsilon_transitions) {
+            if (target.next != NULL_STATE) {
+                target.next += offset;
+            }
+            rebased_epsilon.insert(target);
+        }
+        new_state.epsilon_transitions = std::move(rebased_epsilon);
+
+        for (auto &act_var : new_state.actions) {
+            std::visit([&](auto &act) {
+                using T = std::decay_t<decltype(act)>;
+                if constexpr (std::is_same_v<T, ActionState>) {
+                    if (act.next_nfa_state != NULL_STATE) {
+                        act.next_nfa_state += offset;
+                    }
+                    if (std::holds_alternative<DFATarget>(act.next_state)) {
+                        auto &t = std::get<DFATarget>(act.next_state);
+                        if (t.id != NULL_STATE) {
+                            t.id += offset;
+                        }
+                    }
+                } else if constexpr (std::is_same_v<T, SemanticState>) {
+                    if (act.nfa_index != NULL_STATE) {
+                        act.nfa_index += offset;
+                    }
+                    if (std::holds_alternative<DFATarget>(act.next_state)) {
+                        auto &t = std::get<DFATarget>(act.next_state);
+                        if (t.id != NULL_STATE) {
+                            t.id += offset;
+                        }
+                    }
+                }
+            }, act_var);
+        }
+
+        /*
+         * The called terminal's own accept/REDUCE boundary must not
+         * survive as an independent acceptance point once embedded:
+         * this fragment only stands for "match this sub-pattern", not
+         * "the outer token is complete here". The real accept marker
+         * for THIS terminal is placed on `end` below, via
+         * applyQuantifierAndActions() -> markAccept(). Record which
+         * states used to be exits so the fragment can still be wired
+         * to `body_end`, then drop the binding so it can't be
+         * mistaken for a second, conflicting acceptance point.
+         */
+        if (new_state.accept_binding.has_value()) {
+            exit_states.push_back(offset + i);
+            new_state.accept_binding.reset();
+        }
+
+        states.emplace_back(std::move(new_state));
+    }
+
+    states[body_start].epsilon_transitions.insert({offset});
+
+    if (exit_states.empty()) {
+        // Defensive fallback: the referenced terminal produced no
+        // explicit accept marker (shouldn't normally happen for a
+        // terminal fragment). Wire the last appended state as the
+        // exit rather than silently dropping the connection to
+        // body_end and leaving this fragment a dead end.
+        states[offset + called_terminal_nfa_states.size() - 1].epsilon_transitions.insert({body_end});
+    } else {
+        for (const auto exit_state : exit_states) {
+            states[exit_state].epsilon_transitions.insert({body_end});
         }
     }
-    states[states.size() - 1].epsilon_transitions.insert({body_end});
-    // merge states
-    states.insert(states.end(), called_terminal_nfa_states.begin(), called_terminal_nfa_states.end());
+
     applyQuantifierAndActions(member, start, end, {body_start, body_end}, isLastMember, addStoreActions, false);
 }
 
@@ -457,15 +634,97 @@ auto NFA::buildStateFragment(const AST::RuleMember &member, bool isLastMember, b
         if ((is_char_table && tree.getTreeMap().contains(name.name)) || !name.isTerminal()) {
             auto it = fragment_cache.find(name.name);
             if (it != fragment_cache.end()) {
+                /*
+                 * ------------------------------------------------------------
+                 * Cache hit: do NOT hand back the cached state ids directly.
+                 *
+                 * The cache exists so a name doesn't need its AST walked
+                 * again, but the resulting NFA states must still be
+                 * INDEPENDENT per occurrence. Returning the same ids for
+                 * every reference means every repeated use of the same
+                 * name within one production collapses onto the identical
+                 * physical states. Two occurrences reached via different
+                 * preceding action histories (e.g. a rule referencing the
+                 * same terminal twice, such as `SYMBOL ... SYMBOL`) then
+                 * converge epsilon-wise on one state carrying two
+                 * incompatible action histories - exactly the ambiguity
+                 * DFA::build() rejects with "NFA destination state has
+                 * multiple epsilon paths with different action sequences".
+                 *
+                 * So: rebuild a fresh, rebased copy of the cached state
+                 * range on every hit (mirrors the rebasing DFA::mergeTwoNFA
+                 * does when merging separate NFAs), and wire/mark-accept
+                 * against the copy instead of the original.
+                 * ------------------------------------------------------------
+                 */
+                const std::size_t low  = it->second.start;
+                const std::size_t high = fragment_cache_extent.at(name.name);
+                const std::size_t dest_offset = states.size();
+
+                const auto in_range = [&](std::size_t id) {
+                    return id != NULL_STATE && id >= low && id <= high;
+                };
+                const auto rebase = [&](std::size_t id) {
+                    return in_range(id) ? (id - low + dest_offset) : id;
+                };
+
+                for (std::size_t src = low; src <= high; ++src) {
+                    NFA::state new_state = states[src];
+
+                    for (auto &[symbol, targets] : new_state.transitions) {
+                        for (auto &target : targets) {
+                            target.next = rebase(target.next);
+                        }
+                    }
+
+                    decltype(new_state.epsilon_transitions) rebased_epsilon;
+                    for (auto target : new_state.epsilon_transitions) {
+                        target.next = rebase(target.next);
+                        rebased_epsilon.insert(target);
+                    }
+                    new_state.epsilon_transitions = std::move(rebased_epsilon);
+
+                    for (auto &act_var : new_state.actions) {
+                        std::visit([&](auto &act) {
+                            using T = std::decay_t<decltype(act)>;
+                            if constexpr (std::is_same_v<T, ActionState>) {
+                                act.next_nfa_state = rebase(act.next_nfa_state);
+                                if (std::holds_alternative<DFATarget>(act.next_state)) {
+                                    auto &t = std::get<DFATarget>(act.next_state);
+                                    t.id = rebase(t.id);
+                                }
+                            } else if constexpr (std::is_same_v<T, SemanticState>) {
+                                act.nfa_index = rebase(act.nfa_index);
+                                if (std::holds_alternative<DFATarget>(act.next_state)) {
+                                    auto &t = std::get<DFATarget>(act.next_state);
+                                    t.id = rebase(t.id);
+                                }
+                            }
+                        }, act_var);
+                    }
+
+                    if (new_state.accept_binding.has_value()) {
+                        auto &binding = *new_state.accept_binding;
+                        if (binding.target_semantic_state.has_value()) {
+                            *binding.target_semantic_state = rebase(*binding.target_semantic_state);
+                        }
+                    }
+
+                    states.emplace_back(std::move(new_state));
+                }
+
+                const std::size_t copied_start = dest_offset;
+                const std::size_t copied_end   = rebase(it->second.end);
+
                 if (isLastMember) {
-                    // Bridge cached end to a distinct new state before marking accept
+                    // Bridge copied end to a distinct new state before marking accept
                     std::size_t accept_state = states.size();
                     states.emplace_back();
-                    states[it->second.end].epsilon_transitions.insert({accept_state});
+                    states[copied_end].epsilon_transitions.insert({accept_state});
                     markAccept(accept_state, accept_state, member, true, is_repeting);
-                    return {it->second.start, accept_state};
+                    return {copied_start, accept_state};
                 }
-                return {it->second.start, it->second.end};
+                return {copied_start, copied_end};
             }
 
             if (!processing.insert(name.name).second)
@@ -475,6 +734,7 @@ auto NFA::buildStateFragment(const AST::RuleMember &member, bool isLastMember, b
 
             processing.erase(name.name);
             fragment_cache[name.name] = {entry, end};
+            fragment_cache_extent[name.name] = states.size() - 1;
         } else {
             handleTerminal(member, name.name, start, end, isLastMember, addStoreActions);
         }

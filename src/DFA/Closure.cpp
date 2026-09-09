@@ -10,9 +10,27 @@ bool sameAction(
     const DFA::FiredAction &a,
     const DFA::FiredAction &b
 ) {
+    // Physical NFA owners are not semantic action identity. Nested-token
+    // cloning creates different NFA states for the same capture operation.
+    // For ordinary actions use the operation + variable as the identity so
+    // those clones collapse during epsilon-path exploration. Snapshot
+    // markers remain identified by their structural owner/index.
+    if (a.table_type != b.table_type)
+        return false;
+
+    if (a.table_type == NFA::TableType::Action) {
+        const auto &aa =
+            std::get<NFA::ActionState>(a.raw);
+        const auto &bb =
+            std::get<NFA::ActionState>(b.raw);
+
+        return
+            aa.action == bb.action &&
+            aa.variable == bb.variable;
+    }
+
     return
         a.owner == b.owner &&
-        a.table_type == b.table_type &&
         a.table_index == b.table_index;
 }
 
@@ -66,68 +84,31 @@ void DFA::Closure::epsilonClosure(
 void DFA::Closure::epsilonClosure(
     const std::vector<std::pair<std::size_t, std::vector<FiredAction>>> &seeded_source
 ) {
-    // ----------------------------------------------------------------
-    // Seeded epsilon closure.
-    //
-    // Each entry in `seeded_source` is (NFA state, initial action path).
-    // A non-empty initial path is how DFA::build() threads a deferred
-    // SNAPSHOT_APPLY obligation (see DFA.cpp step D) forward into the
-    // closure of the state that transition targets: the seed path is
-    // simply prepended to whatever epsilon-derived actions this state
-    // would already accumulate on its own.
-    //
-    // The plain epsilonClosure(source) overload above is exactly this
-    // with an empty seed path for every state, so all pre-existing
-    // behaviour is unchanged when no seed is supplied.
-    // ----------------------------------------------------------------
     closure.clear();
     paths.clear();
 
-    /*
-     * Queue contains:
-     *
-     *     (NFA state, action path)
-     *
-     * rather than merely an NFA state.
-     *
-     * This is the important difference from the old implementation.
-     */
     struct WorkItem {
         std::size_t state;
         ActionPath path;
+        std::vector<std::size_t> epsilon_stack;
     };
 
     std::queue<WorkItem> work;
 
-    /*
-     * We need to avoid infinite traversal through epsilon cycles.
-     *
-     * But the visited identity includes the ACTION PATH.
-     *
-     * Therefore:
-     *
-     *     X -> X
-     *
-     * doesn't loop forever, while
-     *
-     *     X -> BEGIN -> X
-     *
-     * is still treated as a different semantic path.
-     *
-     * Since actions are only attached to actual NFA states, and the
-     * NFA is finite, paths containing the same action-state identity
-     * repeatedly are not useful for deterministic transition
-     * construction.
-     *
-     * This termination is enforced below via `paths`: a (state, exact
-     * path) pair is only ever enqueued once — see the `containsPath`
-     * check against `paths[target]` right before `work.push()`. Once a
-     * state has recorded a given path, revisiting it with that same
-     * path is a no-op fixed point, not a new traversal.
-     */
+    // Each state's own action list never changes across visits — only the
+    // incoming `path` differs. Rebuilding it (and re-copying every
+    // ActionState/SemanticState inside it) on every visit was pure waste
+    // for states reached via several distinct paths. Memoize it once per
+    // closure computation instead.
+    std::unordered_map<std::size_t, ActionPath> own_actions_cache;
 
     auto makeOwnActions =
-        [&](std::size_t state_id) -> ActionPath {
+        [&](std::size_t state_id) -> const ActionPath & {
+
+        if (auto it = own_actions_cache.find(state_id);
+            it != own_actions_cache.end()) {
+            return it->second;
+        }
 
         const auto &state =
             nfa->getStates().at(state_id);
@@ -156,8 +137,11 @@ void DFA::Closure::epsilonClosure(
             );
         }
 
-        return result;
+        return own_actions_cache
+            .emplace(state_id, std::move(result))
+            .first->second;
     };
+
     auto containsAction =
         [](const ActionPath &path,
            const FiredAction &action) {
@@ -171,32 +155,20 @@ void DFA::Closure::epsilonClosure(
             );
     };
 
-    /*
-     * Each source state begins with its seeded path (empty, unless this
-     * closure was constructed to carry forward a deferred SNAPSHOT_APPLY
-     * obligation for that specific state — see DFA.cpp step D).
-     */
     for (const auto &[state, seed_path] : seeded_source) {
         if (state == NFA::NULL_STATE)
             continue;
 
         WorkItem item{
             .state = state,
-            .path = seed_path
+            .path = seed_path,
+            .epsilon_stack = {state}
         };
 
         work.push(std::move(item));
     }
 
-
-    /*
-     * We keep the state set separately from the path set.
-     *
-     * A state can therefore occur in the closure multiple times
-     * conceptually, each with a different path.
-     */
     std::unordered_set<std::size_t> closure_seen;
-
 
     while (!work.empty()) {
         WorkItem item = std::move(work.front());
@@ -206,15 +178,10 @@ void DFA::Closure::epsilonClosure(
 
         auto path = std::move(item.path);
 
-        /*
-         * Actions hosted by the state are executed when the epsilon
-         * traversal ENTERS that state.
-         *
-         * Therefore they are appended before traversing its outgoing
-         * epsilon edges.
-         */
-        const auto own_actions =
+        const auto &own_actions =
             makeOwnActions(state_id);
+
+        path.reserve(path.size() + own_actions.size());
 
         for (const auto &action : own_actions) {
 
@@ -224,69 +191,72 @@ void DFA::Closure::epsilonClosure(
             path.push_back(action);
         }
 
-
-        /*
-         * Record this particular path.
-         *
-         * Do not union it with another path.
-         */
         auto &state_paths = paths[state_id];
 
         if (!containsPath(state_paths, path)) {
             state_paths.push_back(path);
         }
 
-
-        /*
-         * The actual DFA closure contains the state only once.
-         */
         if (closure_seen.insert(state_id).second) {
             closure.push_back(state_id);
         }
 
-
         const auto &state =
             nfa->getStates().at(state_id);
 
-
-        /*
-         * Deterministic epsilon traversal order.
-         */
         std::vector<std::size_t> targets;
+        targets.reserve(state.epsilon_transitions.size());
 
-        targets.reserve(
-            state.epsilon_transitions.size()
-        );
-
-        for (const auto &edge :
-             state.epsilon_transitions) {
-
+        for (const auto &edge : state.epsilon_transitions) {
             if (edge.next != NFA::NULL_STATE)
                 targets.push_back(edge.next);
         }
 
-        std::sort(
-            targets.begin(),
-            targets.end()
-        );
+        std::sort(targets.begin(), targets.end());
 
+        // Split into "actually needs to be enqueued" vs. "already
+        // covered / cycle-closing", so the queue-push loop below knows
+        // in advance which target is last and can move `path` into it
+        // instead of copying.
+        std::vector<std::size_t> pending_targets;
+        pending_targets.reserve(targets.size());
 
         for (const std::size_t target : targets) {
 
-            /*
-             * If this exact action path reaches target already,
-             * there is nothing new to propagate.
-             */
-            const auto &target_paths =
-                paths[target];
+            const auto &target_paths = paths[target];
 
             if (containsPath(target_paths, path))
                 continue;
 
+            if (std::ranges::find(
+                    item.epsilon_stack,
+                    target
+                ) != item.epsilon_stack.end()) {
+
+                auto &cycle_paths = paths[target];
+
+                if (!containsPath(cycle_paths, path))
+                    cycle_paths.push_back(path);
+
+                continue;
+            }
+
+            pending_targets.push_back(target);
+        }
+
+        for (std::size_t k = 0; k < pending_targets.size(); ++k) {
+            const std::size_t target = pending_targets[k];
+
+            auto next_stack = item.epsilon_stack;
+            next_stack.push_back(target);
+
+            const bool is_last = (k + 1 == pending_targets.size());
+
             work.push(
                 WorkItem{
                     .state = target,
-                    .path = path
+                    .path = is_last ? std::move(path) : path,
+                    .epsilon_stack = std::move(next_stack)
                 }
             );
         }

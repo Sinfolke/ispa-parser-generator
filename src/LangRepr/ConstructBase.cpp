@@ -68,6 +68,14 @@ namespace LangRepr {
         }
         return t;
     }
+    auto ConstructBase::ensureTypesNs(LangAPI::GetVariant t) -> LangAPI::GetVariant {
+        *t.type = ensureTypesNs(*t.type);
+        return t;
+    }
+    auto ConstructBase::ensureTypesNs(LangAPI::CheckVariant t) -> LangAPI::CheckVariant {
+        *t.type = ensureTypesNs(*t.type);
+        return t;
+    }
     // 2. StorageSymbol Traversal
     auto ConstructBase::ensureTypesNs(LangAPI::StorageSymbol s) -> LangAPI::StorageSymbol {
         s.what = ensureTypesNs(s.what);
@@ -92,34 +100,12 @@ namespace LangRepr {
 
     // 4. RValue Traversal
     auto ConstructBase::ensureTypesNs(LangAPI::RValue r) -> LangAPI::RValue {
-        if (r.isStorageSymbol()) {
-            r.set(ensureTypesNs(r.getStorageSymbol()));
-        } else if (r.isInheritance()) {
-            r.set(ensureTypesNs(r.getInheritance()));
-        } else if (r.isArray()) {
-            auto &arr = r.getArray();
-            for (auto &val : arr.values) val = ensureTypesNs(val);
-            for (auto &param : arr.template_parameters) {
-                std::visit([&](auto &p) {
-                    using T = std::decay_t<decltype(p)>;
-                    if constexpr (std::is_same_v<T, std::shared_ptr<LangAPI::Type>>) {
-                        if (p) *p = ensureTypesNs(*p);
-                    } else if constexpr (std::is_same_v<T, LangAPI::RValue>) {
-                        p = ensureTypesNs(p);
-                    }
-                }, param);
+        std::visit([&](auto &val) {
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (requires { val = ensureTypesNs(val); }) {
+                val = ensureTypesNs(val);
             }
-        } else if (r.isMap()) {
-            auto &m = r.getMap();
-            for (auto &val : m.values) val = ensureTypesNs(val);
-        } else if (r.isSpan()) {
-            auto &span = r.getSpan();
-            if (span.type) *span.type = ensureTypesNs(*span.type);
-            span.sym = ensureTypesNs(span.sym);
-        } else if (r.isMakeTuple()) {
-            auto &mt = r.getMakeTuple();
-            mt = ensureTypesNs(mt);
-        }
+        }, r.get());
         return r;
     }
 
@@ -155,22 +141,16 @@ namespace LangRepr {
 
     // 7. ExpressionValue Traversal
     auto ConstructBase::ensureTypesNs(LangAPI::ExpressionValue ev) -> LangAPI::ExpressionValue {
-        std::visit([&](auto &val) {
-            using T = std::decay_t<decltype(val)>;
-            if constexpr (std::is_same_v<T, LangAPI::RValue>) {
+        std::visit([&](auto& val) {
+            if constexpr (requires { val = ensureTypesNs(val); }) {
                 val = ensureTypesNs(val);
-            } else if constexpr (std::is_same_v<T, LangAPI::FunctionCall>) {
-                val = ensureTypesNs(val);
-            } else if constexpr (std::is_same_v<T, LangAPI::Return>) {
+            } else if constexpr (requires { val.value = ensureTypesNs(val.value); }) {
                 val.value = ensureTypesNs(val.value);
-            } else if constexpr (std::is_same_v<T, LangAPI::VariableAssignment>) {
-                val.value = ensureTypesNs(val.value);
-            } else if constexpr (std::is_same_v<T, LangAPI::Lambda>) {
-                val = ensureTypesNs(val);
-            } else if constexpr (std::is_same_v<T, LangAPI::DfaLookup>) {
+            } else if constexpr (requires { val.return_type = ensureTypesNs(val.return_type); }) {
                 val.return_type = ensureTypesNs(val.return_type);
             }
         }, ev.value);
+
         return ev;
     }
 

@@ -20,6 +20,8 @@ export namespace LangRepr {
         auto ensureTypesNs(LangAPI::Type s) -> LangAPI::Type;
         auto ensureTypesNs(LangAPI::Symbol s) -> LangAPI::Symbol;
         auto ensureTypesNs(LangAPI::MakeTuple t) -> LangAPI::MakeTuple;
+        auto ensureTypesNs(LangAPI::GetVariant t) -> LangAPI::GetVariant;
+        auto ensureTypesNs(LangAPI::CheckVariant t) -> LangAPI::CheckVariant;
         auto ensureTypesNs(LangAPI::StorageSymbol s) -> LangAPI::StorageSymbol;
         auto ensureTypesNs(LangAPI::Inheritance s) -> LangAPI::Inheritance;
         auto ensureTypesNs(LangAPI::RValue r) -> LangAPI::RValue;

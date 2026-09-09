@@ -141,7 +141,7 @@ get_file_range(TEST_SOURCE_FILES EXCLUDE "tests/compile/" "tests/*.cpp")
 get_file_range(TEST_MODULE_FILES EXCLUDE "tests/compile/" "tests/*.cppm")
 
 add_executable(tests ${TEST_SOURCE_FILES})
-
+add_dependencies(tests ispa)
 target_sources(tests
         PUBLIC
         FILE_SET cxx_modules TYPE CXX_MODULES FILES

@@ -8,6 +8,7 @@ import cpuf.printf;
 import Dump;
 import NFA;
 import DFA.functionality;
+import DFA;
 import constants;
 import std;
 // helper functions
@@ -783,7 +784,7 @@ void LLIR::OpBuilder::build() {
         std::size_t accept_index = 0;
         NFA nfa(tree, fullname, nullptr, op, fullname == constants::whitespace, false, &accept_index);
         nfa.build(false);
-        auto dfa = DFA::build(tree, nfa);
+        auto dfa = DFA::DFA(&nfa);
         if (dfa.get().size() == 2) { // first state plus end state
             // optimize to single switch instead of DFA lookup
             LangAPI::Switch ss { .expression = LangAPI::Pos::createExpression(LangAPI::Pos {.dereference = true}) };

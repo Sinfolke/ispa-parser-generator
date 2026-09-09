@@ -862,7 +862,8 @@ export namespace LangAPI {
         const CheckVariant&  CheckVariantCast() const { return std::get<CheckVariant>(value); }
 
         auto type() const -> RValueType { return static_cast<RValueType>(value.index()); }
-        auto get() const { return value; }
+        auto &get() const { return value; }
+        auto &get() { return value; }
         bool operator<(const RValue& rhs) const {
             return std::visit([&](const auto &v1, const auto &v2) {
                 if constexpr (std::is_same_v<std::decay_t<decltype(v1)>, std::monostate>) {

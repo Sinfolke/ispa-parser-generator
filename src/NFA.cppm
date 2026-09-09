@@ -189,6 +189,14 @@ private:
     bool store_entire_group = false;
     utype::unordered_set<stdu::vector<std::string>> processing;
     utype::unordered_map<stdu::vector<std::string>, StateRange> fragment_cache;
+    // Highest state index that belonged to a cached fragment at the moment
+    // it was cached (inclusive). Construction is single-threaded recursive
+    // descent, so every state pushed between a name's `entry` allocation
+    // and its `fragment_cache[name] = {entry, end}` store belongs
+    // exclusively to that fragment - this lets a cache HIT rebuild an
+    // independent, rebased copy of exactly that state range instead of
+    // aliasing the original states (see buildStateFragment).
+    utype::unordered_map<stdu::vector<std::string>, std::size_t> fragment_cache_extent;
     std::size_t *accept_index;
     std::size_t nested_count = 0;
     std::size_t group_count = 0;
