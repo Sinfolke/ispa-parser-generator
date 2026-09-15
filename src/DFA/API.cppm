@@ -4,6 +4,7 @@ import NFA;
 import AST.Tree;
 import hash;
 import logging;
+import cpuf.op;
 import dstd;
 import std;
 
@@ -188,5 +189,13 @@ export namespace DFA {
     // Per-state transition array, indexed by class id instead of by raw
     // char. Size == CharClassTable::num_classes, not 256.
     using ClassTransitions = std::vector<TransitionTarget>;
+
+    auto operator<<(std::ostream &os, const TransitionValue &value) -> std::ostream &;
+    auto operator<<(std::ostream &os, const ActionSequence &sequence) -> std::ostream &;
+    auto operator<<(std::ostream &os, const TransitionKeyExt &key) -> std::ostream &;
+    auto operator<<(std::ostream &os, const StateWithActions &state) -> std::ostream &;
+    template<typename TransitionType>
+    auto operator<<(std::ostream &os, const State<TransitionType> &state) -> std::ostream &;
+    auto operator<<(std::ostream &os, const CharClassTable &table) -> std::ostream &;
 
 }

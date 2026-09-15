@@ -14,6 +14,7 @@ import DFA;
 import Dump;
 import logging;
 import constants;
+import cpuf.op;
 import cpuf.printf;
 import std;
 
@@ -28,11 +29,24 @@ void accumulateNestedNames(stdu::vector<std::shared_ptr<AST::RuleMember>> member
             names.push_back(mem.getName().name);
     }
 }
+bool LexerBuilder::isTopLevel(const stdu::vector<std::string> &name) {
+    auto &use_places = ast.getUsePlacesTable();
+    if (!use_places.contains(name))
+        return true;
+    bool used_in_non_terminal = false;
+    for (const auto &place : use_places.at(name)) {
+        if (corelib::text::isLower(place.back())) {
+            used_in_non_terminal = true;
+            break;
+        }
+    }
+    return used_in_non_terminal;
+}
 void LexerBuilder::build() {
     stdu::vector<NFA> nfas;
     std::size_t accept_index = 0;
     for (const auto &[name, rule] : ast) {
-        if (corelib::text::isLower(name.back())) {
+        if (corelib::text::isLower(name.back()) || !isTopLevel(name)) {
             continue;
         }
         // token here
@@ -51,11 +65,19 @@ void LexerBuilder::build() {
     if (nfas.empty()) {
         throw Error("Your grammar does not have any DFA-based token");
     }
-    auto dfa_meta = DFA::build(ast, nfas);
+    auto nfa = DFA::mergeNFAS(nfas);
+    if (dumper.shouldDump("NFA")) {
+        std::ofstream dumpNFAFile(dumper.makeDumpPath("NFA-merged"));
+        if (!dumpNFAFile.is_open())
+            throw Error("failed to open DFA for dump");
+        dumpNFAFile << nfa.first;
+        dumpNFAFile.close();
+    }
+    auto dfa_meta = DFA::build(ast, nfa.first);
     dfa = std::get<0>(dfa_meta);
     lr_table = std::get<1>(dfa_meta);
     semantic_table = std::get<2>(dfa_meta);
-    max_registers_count = std::get<3>(dfa_meta);
+    max_registers_count = nfa.second;
 
 }
 auto LexerBuilder::getDataBlocks() const -> LLIR::DataBlockList {
@@ -81,7 +103,8 @@ auto LexerBuilder::getDataBlocks() const -> LLIR::DataBlockList {
                 LLIR::BuilderData bd(ast, nullptr);
                 LLIR::BuilderDataWrapper bdw(bd);
                 for (const auto &name : rule.data_block.getTemplatedDataBlock().names) {
-                    inclosed_map.emplace(name, std::make_pair(LangAPI::Expression {}, LLIR::BuilderBase::deduceVarTypeByRuleMember(*rule.rule_members[member_counter++])));
+                    auto t = LLIR::BuilderBase::deduceVarTypeByRuleMember(*members[member_counter++]);
+                    inclosed_map.emplace(name, std::make_pair(LangAPI::Expression {}, t));
                 }
                 dtb.value = inclosed_map;
             }

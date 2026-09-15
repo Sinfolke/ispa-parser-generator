@@ -6,6 +6,7 @@ import NFA;
 import DFA.API;
 import LangAPI;
 import logging;
+import corelib;
 import std;
 
 // -----------------------------------------------------------------------
@@ -174,7 +175,7 @@ namespace LangRepr {
 
         stdu::vector<LangAPI::Expression> rows;
         rows.reserve(lr_state_count);
-
+        std::unordered_map<std::string, std::size_t> register_ids;
         for (const auto &state : states) {
             stdu::vector<LangAPI::Expression> row;
             row.reserve(lr_columns);
@@ -182,12 +183,9 @@ namespace LangRepr {
             row.push_back(LangAPI::Int::createExpression(LangAPI::Int {
                 .value = static_cast<long long>(state.action)
             }));
-            if (state.snapshot_id == NFA::NULL_STATE) {
-                row.push_back(LangAPI::RValue::createExpression(LangAPI::RValue {LangAPI::IspaLibSymbol {.exports = LangAPI::StdlibExports::DfaNullState}}));
-            } else {
-                row.push_back(LangAPI::Int::createExpression(LangAPI::Int {.value = static_cast<long long>(state.snapshot_id)}));
-            }
-            std::cout << "Snapshot ID: " << state.snapshot_id << std::endl;
+            if (!register_ids.contains(state.variable))
+                register_ids[state.variable] = register_ids.size();
+            row.push_back(LangAPI::RValue::createExpression(LangAPI::Int {.value = static_cast<long long>(register_ids[state.variable])}));
             std::visit([&](const auto &target) {
                 using T = std::decay_t<decltype(target)>;
                 if (std::is_same_v<T, NFA::DFATarget>) {
@@ -269,10 +267,29 @@ namespace LangRepr {
                 }
 
             }, semantic_state.next_state);
+            const auto &instance_symbol = std::get<LangAPI::Symbol>(semantic_state.instance_value.name);
+            LangAPI::Symbol tokens_enum_value;
+            tokens_enum_value.path.push_back("Tokens");
+            std::string acc;
+            for (const auto &str : instance_symbol.path) {
+                acc += std::get<std::string>(str) + "_";
+            }
+            acc.pop_back();
+            tokens_enum_value.path.push_back(acc);
             statements.push_back(
                 LangAPI::Return::createStatement(LangAPI::Return {.value = LangAPI::MakeTuple::createExpression(LangAPI::MakeTuple {.args = {
                     LangAPI::Int::createExpression(next_state),
-                    LangAPI::Inheritance::createExpression(semantic_state.instance_value)
+                    LangAPI::IspaLibFunctionCall::createExpression(LangAPI::IspaLibFunctionCall {
+                        .symbol = LangAPI::IspaLibSymbol {.exports = LangAPI::StdlibExports::TokenNodeConstruct, .template_parameters = {std::make_shared<LangAPI::Type>(std::get<LangAPI::Symbol>(semantic_state.instance_value.name))}},
+                        .args = {
+                            LangAPI::Symbol::createExpression(LangAPI::Symbol {"start_pos"}),
+                            LangAPI::Symbol::createExpression(LangAPI::Symbol {"start"}),
+                            LangAPI::Symbol::createExpression(LangAPI::Symbol {"length"}),
+                            LangAPI::Symbol::createExpression(LangAPI::Symbol {"line"}),
+                            LangAPI::Symbol::createExpression(tokens_enum_value),
+                            LangAPI::Inheritance::createExpression(semantic_state.instance_value)
+                        }
+                    })
                 }}
             )}));
             semantic_table_statements.push_back(std::move(statements));
@@ -282,6 +299,10 @@ namespace LangRepr {
             .name = "semantic_action_exec",
             .parameters = {
                 std::make_pair(LangAPI::Type {LangAPI::ValueType::Int}, "state"),
+                std::make_pair(LangAPI::Type {LangAPI::ValueType::Int}, "start_pos"),
+                std::make_pair(LangAPI::Type {LangAPI::ValueType::NonOwnedString}, "start"),
+                std::make_pair(LangAPI::Type {LangAPI::ValueType::Int}, "length"),
+                std::make_pair(LangAPI::Type {LangAPI::ValueType::Int}, "line"),
                 std::make_pair(LangAPI::Type {LangAPI::ValueType::Reference, LangAPI::Type { LangAPI::ValueType::Array, LangAPI::Type {LangAPI::ValueType::Variant, LangAPI::RValue {LangAPI::Symbol {"Token"}}, LangAPI::ValueType::Char, LangAPI::ValueType::String }}}, "values"),
                 std::make_pair(LangAPI::Type {LangAPI::ValueType::Reference, LangAPI::Type { LangAPI::ValueType::Array, LangAPI::Type {LangAPI::ValueType::Array, LangAPI::Type {LangAPI::ValueType::Variant, LangAPI::RValue {LangAPI::Symbol {"Token"}}, LangAPI::ValueType::Char, LangAPI::ValueType::String }}}}, "vec_values"),
             },
@@ -349,7 +370,15 @@ namespace LangRepr {
                     .type = LangAPI::Type { LangAPI::ValueType::FixedSizeArray, LangAPI::Type {LangAPI::ValueType::NonOwnedString}, LangAPI::Int::createRValue(LangAPI::Int {.value = static_cast<long long>(lexer_builder.getMaxRegistersCount())})}
                 })),
                 LangAPI::Visibility::Private
-            ));        }
+            ));
+            lexer.data.push_back(std::make_pair(
+                std::make_shared<LangAPI::Declaration>(LangAPI::Function::createDeclaration(LangAPI::Variable {
+                    .name = "register_ids",
+                    .type = LangAPI::Type { LangAPI::ValueType::FixedSizeArray, LangAPI::Type {LangAPI::ValueType::Int}, LangAPI::Int::createRValue(LangAPI::Int {.value = static_cast<long long>(lexer_builder.getMaxRegistersCount())})}
+                })),
+                LangAPI::Visibility::Private
+            ));
+        }
 
         lexer.data.push_back(
             std::make_pair(
@@ -375,6 +404,7 @@ namespace LangRepr {
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"values"}),
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"vec_values"}),
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"registers"}),
+                                    LangAPI::Symbol::createExpression(LangAPI::Symbol {"register_ids"}),
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"semantic_action_exec"}),
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"pos"}),
                                 }

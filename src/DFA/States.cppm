@@ -32,4 +32,7 @@ export namespace DFA {
         auto &operator[](const std::size_t index) { return states.at(index); }
         auto &operator[](const std::size_t index) const { return states.at(index); }
     };
+
+    template<typename StateType>
+    auto operator<<(std::ostream &os, const States<StateType> &states) -> std::ostream &;
 }

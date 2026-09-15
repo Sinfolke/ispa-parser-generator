@@ -276,6 +276,13 @@ public:
     auto name() const { return _name; }
     auto& data() { return static_cast<DataStorageType&>(*this); }
     const auto& data() const { return static_cast<const DataStorageType&>(*this); }
+    static auto create(const long long startpos, const char* start, const long long length, const long long line, EnumT enumv, DataStorageType t) {
+        std::size_t column = 0;
+        for (const char* count = start; start - count != startpos && *count != '\n'; --count) {
+            ++column;
+        }
+        return Node {(std::size_t) startpos, start, start + length, (std::size_t) length, (std::size_t) line, column, enumv, std::move(t)};
+    }
 };
 template<class EnumT, class DataStorageType>
 struct MatchResult {
@@ -311,15 +318,21 @@ namespace DFA {
     >
     auto scan(
         const char* &pos,
+        long long start_pos,
+        long long &scanning_line,
         const API::Table<table_classes, table_states> &table,
         const API::CharToClass class_table,
         const API::LRTable<lr_table_states> lr_table,
         std::vector<std::variant<std::monostate, Token, char, std::string>> &values,
         std::vector<std::vector<std::variant<std::monostate, Token, char, std::string>>> &vec_values,
         std::array<const char*, registers_count> registers,
+        std::array<long long, registers_count> register_ids,
         SemanticFunc semantic
     ) -> Token {
-
+        // ---------- for semantic function ---------------
+        const char* start = pos;
+        long long current_line = scanning_line;
+        // ------------------------------------------------
         std::size_t state = 0;
         std::size_t registers_allocated = 0;
 
@@ -381,7 +394,10 @@ namespace DFA {
             if (state < table.size()) {
                 if (immediate_action) {
                     immediate_action = false;
+                    if (*pos == '\n')
+                        scanning_line++;
                     ++pos;
+
                 }
                 const std::size_t cls = class_table[static_cast<unsigned char>(*pos)];
                 const std::size_t next = table[state][cls];
@@ -401,6 +417,8 @@ namespace DFA {
                 // ----------------------------------------------------
 
                 if (next < table.size() && *pos != '\0') {
+                    if (*pos == '\n')
+                        scanning_line++;
                     ++pos;
                 } else {
                     immediate_action = true;
@@ -413,7 +431,7 @@ namespace DFA {
             } else if (state < table.size() + lr_table.size()) {
                 const auto lr_action = lr_table[state - table.size()];
 
-                std::cout << "executing LR action " << lr_action[0] << std::endl;
+                std::cout << "executing LR action " << lr_action[0] << " with id " << lr_action[1] << std::endl;
 
                 switch (static_cast<API::Action>(lr_action[0])) {
 
@@ -422,13 +440,18 @@ namespace DFA {
                     // ------------------------------------------------
 
                     case API::Action::BEGIN: {
+                        if (registers_allocated > 0 && register_ids[registers_allocated - 1] == lr_action[1]) {
+                            break;
+                        }
                         std::cout << "Begin of value on character " << *pos << std::endl;
 
                         if (registers_allocated >= registers.size()) {
                             throw std::runtime_error("DFA: register allocation overflow");
                         }
 
-                        registers[registers_allocated++] = pos;
+                        registers[registers_allocated] = pos;
+                        register_ids[registers_allocated] = lr_action[1];
+                        ++registers_allocated;
                         break;
                     }
 
@@ -437,8 +460,8 @@ namespace DFA {
                     // ------------------------------------------------
 
                     case API::Action::END: {
-                        if (registers_allocated == 0) {
-                            throw std::runtime_error("DFA: END without matching BEGIN");
+                        if (registers_allocated == 0 || register_ids[registers_allocated - 1] != lr_action[1]) {
+                            break;
                         }
 
                         const char *begin = registers[registers_allocated - 1];
@@ -462,8 +485,8 @@ namespace DFA {
                     // ------------------------------------------------
 
                     case API::Action::PUSH: {
-                        if (registers_allocated == 0) {
-                            throw std::runtime_error("DFA: PUSH without matching BEGIN");
+                        if (registers_allocated == 0 || register_ids[registers_allocated - 1] != lr_action[1]) {
+                            break;
                         }
 
                         const char *begin = registers[registers_allocated - 1];
@@ -479,81 +502,6 @@ namespace DFA {
                             vec_values.back().push_back(std::string(begin, pos - begin));
                         }
 
-                        break;
-                    }
-
-                    // ------------------------------------------------
-                    // SNAPSHOT
-                    //
-                    // Save the CURRENT input boundary.
-                    //
-                    // The character transition that brought us here
-                    // has already happened and remains consumed.
-                    // ------------------------------------------------
-
-                    case API::Action::SNAPSHOT: {
-                        snapshot_map[lr_action[1]] = pos;
-
-                        std::cout << "Snapshot " << lr_action[1] << " = "
-                                  << static_cast<const void*>(pos) << std::endl;
-
-                        break;
-                    }
-
-                    // ------------------------------------------------
-                    // SNAPSHOT_ACCEPT
-                    //
-                    // Temporarily execute the following action chain
-                    // against the saved input boundary.
-                    //
-                    // We remember the CURRENT position first.
-                    //
-                    // Example:
-                    //
-                    //     current pos = P
-                    //
-                    //     SNAPSHOT_ACCEPT(S)
-                    //         |
-                    //         +--> pos = snapshot[S]
-                    //         |
-                    //         +--> deferred actions
-                    //         |
-                    //         +--> semantic
-                    //         |
-                    //         +--> DFA state
-                    //                 |
-                    //                 +--> restore P
-                    //
-                    // The consumed transitions are NOT undone.
-                    // ------------------------------------------------
-
-                    case API::Action::SNAPSHOT_APPLY: {
-                        const auto snapshot_it = snapshot_map.find(lr_action[1]);
-
-                        if (snapshot_it == snapshot_map.end()) {
-                            throw std::runtime_error("DFA: SNAPSHOT_ACCEPT references an unknown snapshot");
-                        }
-
-                        // Save the position at which the deferred action was requested.
-                        resume_pos = pos;
-                        ++snapshots_opened;
-                        immediate_action = false;
-
-                        // Execute the deferred actions at the snapshot boundary.
-                        pos = snapshot_it->second;
-
-                        std::cout << "Applying snapshot " << lr_action[1] << " at "
-                                  << static_cast<const void*>(pos) << ", resume at "
-                                  << static_cast<const void*>(resume_pos) << std::endl;
-
-                        break;
-                    }
-
-                    case API::Action::SNAPSHOT_APPLY_END: {
-                        if (--snapshots_opened <= 0) {
-                            snapshots_opened = 0;
-                            pos = resume_pos;
-                        }
                         break;
                     }
 
@@ -576,6 +524,10 @@ namespace DFA {
 
                 std::pair<int, Token> t = semantic(
                     semantic_index,
+                    start_pos,
+                    start,
+                    pos - start,
+                    current_line,
                     values,
                     vec_values
                 );
@@ -607,6 +559,7 @@ protected:
     const char* _in = nullptr;
     std::string _owned_input;
     TokenFlow<TOKEN_T, Token> tokens;
+    long long line;
     std::size_t getCurrentPos(const char* pos) const {
         return pos - _in;
     }
@@ -644,12 +597,13 @@ protected:
         std::vector<std::variant<std::monostate, Token, char, std::string>> &values,
         std::vector<std::vector<std::variant<std::monostate, Token, char, std::string>>> &vec_values,
         std::array<const char*, registers_count> registers,
+        std::array<long long, registers_count> register_ids,
         SemanticFunc semantic,
         const char* &pos
     ) {
         if (*pos == '\0')
             return Token {};
-        Token result = DFA::scan(pos, table, class_table, lr_table, values, vec_values, registers, semantic);
+        Token result = DFA::scan(pos, getCurrentPos(pos), line, table, class_table, lr_table, values, vec_values, registers, register_ids, semantic);
         values.clear();
         return result;
     }

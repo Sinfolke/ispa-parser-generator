@@ -56,6 +56,9 @@ tests:
       -
         - for: HTTP_METHOD
           value: 'PUT'
+  - name: nested_tokens
+    path: nested_tokens.isc
+    input: "[abc\\]a-zA-Z]"
 #  - name: config_val
 #    path: basic/config_val.isc
 #    input:

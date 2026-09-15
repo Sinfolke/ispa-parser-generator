@@ -580,27 +580,31 @@ auto LLIR::BuilderBase::deduceVarTypeByRuleMember(const AST::RuleMember &mem) ->
         } else {
             stdu::vector<LangAPI::Type> types;
             utype::unordered_set<LangAPI::Type> meeted_types;
-            bool alL_string = true;
+            bool all_string = false;
+            bool all_char = true;
             for (auto i = 0; i < val.size(); i++) {
                 auto tmp_type = deduceVarTypeByRuleMember(*val[i]);
-                if (tmp_type != LangAPI::ValueType::String && tmp_type != LangAPI::ValueType::Char) {
-                    types.push_back(tmp_type);
-                    meeted_types.insert(tmp_type);
-                    alL_string = false;
+                meeted_types.insert(tmp_type);
+                if (tmp_type == LangAPI::ValueType::Char && all_char) {
+                    continue;
+                }
+                if (tmp_type == LangAPI::ValueType::String) {
+                    if (all_char) {
+                        all_string =  true;
+                        all_char = false;
+                    }
                 } else {
-                    types.push_back(LangAPI::ValueType::String);
-                    meeted_types.insert(tmp_type);
+                    all_string = false;
                 }
             }
-            if (alL_string) {
+            if (all_char) {
+                type = LangAPI::ValueType::Char;
+            } else if (all_string) {
                 type = LangAPI::ValueType::String;
             } else {
                 LangAPI::Type tuple = {LangAPI::ValueType::Tuple};
                 for (const auto &insert_type : types) {
-                    if (meeted_types.contains(insert_type)) {
-                        tuple.template_parameters.push_back(insert_type);
-                        meeted_types.erase(insert_type);
-                    }
+                    tuple.template_parameters.push_back(insert_type);
                 }
                 return tuple;
             }
@@ -626,6 +630,32 @@ auto LLIR::BuilderBase::deduceVarTypeByRuleMember(const AST::RuleMember &mem) ->
         type = { corelib::text::isUpper(mem.getName().name.back()) ? LangAPI::ValueType::Token : LangAPI::ValueType::Rule, LangAPI::Type { sym }};
     } else if (mem.isString() && mem.getString().value.size() == 1 || mem.isAny() || (mem.isCsequence() && (mem.quantifier == '\0' || mem.quantifier == '?'))) {
         type = LangAPI::ValueType::Char;
+    }
+    if (type.isValueType() && type.getValueType() == LangAPI::ValueType::Variant) {
+        utype::unordered_set<LangAPI::Type> new_types;
+        utype::unordered_map<LangAPI::ValueType, std::size_t> type_identity;
+        std::size_t i = 0;
+        for (const auto temp_param : type.template_parameters) {
+            if (std::holds_alternative<LangAPI::Type>(temp_param)) {
+                const auto &type = std::get<LangAPI::Type>(temp_param);
+                if (new_types.contains(type))
+                    continue;
+                if (type.isValueType()) {
+                    type_identity.emplace(type.getValueType(), i);
+                }
+                new_types.insert(type);
+            }
+            ++i;
+        }
+        if (type_identity.contains(LangAPI::ValueType::Char) && type_identity.contains(LangAPI::ValueType::String)) {
+            new_types.erase(LangAPI::ValueType::Char);
+        }
+        if (new_types.size() == 1) {
+            type = *new_types.begin();
+        } else {
+            type = LangAPI::Type {LangAPI::ValueType::Variant};
+            type.template_parameters = {new_types.begin(), new_types.end()};
+        }
     }
     return type;
 }

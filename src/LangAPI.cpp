@@ -20,10 +20,10 @@ namespace LangAPI {
     inline void printExpressionArgs(std::ostream &os, stdu::vector<Expression> args) {
         bool first = true;
         for (const auto &arg : args) {
-            os << arg;
             if (!first) {
                 os << ", ";
             }
+            os << arg;
             first = false;
         }
     }
@@ -342,10 +342,10 @@ namespace LangAPI {
     auto operator<<(std::ostream &os, const Symbol &obj) -> std::ostream& {
         bool first = true;
         for (const auto &part : obj.path) {
-            std::visit([&os](const auto &v) { os << v; }, part);
             if (!first)
                 os << "::";
             first = false;
+            std::visit([&os](const auto &v) { os << v; }, part);
         }
         return os;
     }
@@ -409,7 +409,9 @@ namespace LangAPI {
         std::visit([&](const auto &el) {
             os << el;
         }, obj.name);
+        os << '(';
         printExpressionArgs(os, obj.args);
+        os << ')';
         return os;
     }
 

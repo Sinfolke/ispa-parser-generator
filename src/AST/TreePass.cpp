@@ -97,7 +97,7 @@ void AST::TreePass::literalsToToken(AST::Tree &ast) {
     stdu::vector<std::pair<std::shared_ptr<AST::RuleMember>, std::shared_ptr<AST::RuleMember>>> generated;
     stdu::vector<std::pair<stdu::vector<std::string>, AST::Rule>> toInsert;
     auto &treeMap = ast.getTreeMap();
-    AST::TreePass pass(ast, true);
+    AST::TreePass pass(ast);
     for (auto &[name, value] : treeMap) {
         if (corelib::text::isLower(name.back())) {
             pass.literalsToToken(value.rule_members, count, toInsert, generated);
@@ -252,7 +252,7 @@ bool AST::TreePass::prioritySort(const AST::Tree& ast, const AST::RuleMember &fi
     }, first.value, second.value);
 }
 void AST::TreePass::sortByPriority(AST::Tree &ast, AST::RuleMemberOp& options) {
-    AST::TreePass pass(ast, true);
+    AST::TreePass pass(ast);
     std::sort(options.options.begin(), options.options.end(), [&](std::shared_ptr<AST::RuleMember> &first, std::shared_ptr<AST::RuleMember> &second) {
         return pass.prioritySort(ast, *first, *second);
     });
@@ -275,10 +275,12 @@ void AST::TreePass::sortByPriority(AST::Tree &ast, stdu::vector<std::shared_ptr<
 }
 void AST::TreePass::sortByPriority(AST::Tree &ast) {
     for (auto &[name, value] : ast.getTreeMap()) {
+        if (corelib::text::isUpper(name.back()))
+            continue; // No sense for terminals -> NFA + DFA does not depend on ordering
         if (value.rule_members.empty()) {
             throw Error("Empty rule");
         }
-        AST::TreePass pass(ast, true);
+        AST::TreePass pass(ast);
         pass.sortByPriority(ast, value.rule_members);
     }
 }

@@ -16,8 +16,11 @@ export namespace LangRepr {
         LLIR::IR &ir;
         AST::Tree &tree;
         LangAPI::Symbol Token;
+        std::size_t insideTypeCount = 0; // needed by ensureTypesNS to distinguish which symbol require namespace
         auto makeIntRValue(int v) -> std::shared_ptr<LangAPI::RValue>;
         auto ensureTypesNs(LangAPI::Type s) -> LangAPI::Type;
+        auto ensureTypesNs(LangAPI::IspaLibSymbol s) -> LangAPI::IspaLibSymbol;
+        auto ensureTypesNs(LangAPI::IspaLibFunctionCall s) -> LangAPI::IspaLibFunctionCall;
         auto ensureTypesNs(LangAPI::Symbol s) -> LangAPI::Symbol;
         auto ensureTypesNs(LangAPI::MakeTuple t) -> LangAPI::MakeTuple;
         auto ensureTypesNs(LangAPI::GetVariant t) -> LangAPI::GetVariant;

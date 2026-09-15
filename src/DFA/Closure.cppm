@@ -3,11 +3,20 @@ export module DFA.closure;
 import NFA;
 
 import hash;
+import cpuf.op;
 import dstd;
 import std;
 
 export namespace DFA {
 
+    // A single tag-firing occurrence: the BEGIN/END/PUSH/REDUCE owned by
+    // one NFA state, encountered while walking a (now unique) epsilon
+    // route through the closure. This is the direct analogue of a
+    // Laurikari/TDFA "tag" -- a register-set operation attached to an
+    // NFA transition. Nothing about this struct changes from the
+    // backtracking version: what changes is that a Closure now keeps
+    // AT MOST ONE of these paths per NFA state, chosen deterministically
+    // by priority, rather than every path that happens to exist.
     struct FiredAction {
         // NFA state which owns the action.
         std::size_t owner;
@@ -46,47 +55,45 @@ export namespace DFA {
         }
     };
 
-    struct TransitionPath {
-        std::size_t target;
-        std::vector<FiredAction> actions;
-
-        auto operator==(const TransitionPath &other) const -> bool = default;
-    };
+    using ActionPath = std::vector<FiredAction>;
 
     class Closure {
         const NFA *nfa;
 
-        // The actual epsilon-closure.
+        // The actual epsilon-closure: the NFA states reachable from the
+        // seed(s) purely via epsilon edges.
         stdu::vector<std::size_t> closure;
+        std::set<std::size_t> sorted_unique_closure;
 
         /*
-         * For each state in the closure, keep the ACTION PATHS by which
-         * that state can be reached.
+         * TDFA core.
          *
-         * Do NOT merge these paths into one action set.
+         * For each state in the closure, the SINGLE tag path by which
+         * it is reached.
          *
-         * Example:
+         * Under a Thompson construction every pair of epsilon edges
+         * leaving the same state already carries (or can carry) a
+         * priority: which alternative is preferred, which side of a
+         * loop is preferred, etc. epsilonClosure() below performs a
+         * priority-ordered DFS and commits a state's tag path the
+         * FIRST time that state is reached. Any later, lower-priority
+         * route to the same state is simply discarded.
          *
-         *     A -> BEGIN -> X
-         *     A ------------> X
-         *
-         * X has two paths:
-         *
-         *     []
-         *     [BEGIN]
-         *
-         * They are different semantic paths.
+         * That is the entire disambiguation mechanism. There is no
+         * runtime component: by the time subset construction reads
+         * this map, ambiguity has already been resolved. Two epsilon
+         * routes to the same NFA state are never "genuinely different
+         * and both valid" here -- one is preferred by construction,
+         * exactly as a backtracking regex engine would try alternatives
+         * in order and commit to the first match.
          */
-        std::unordered_map<
-            std::size_t,
-            std::vector<std::vector<FiredAction>>
-        > paths;
+        std::unordered_map<std::size_t, ActionPath> actions_for;
 
         void epsilonClosure(
             const stdu::vector<std::size_t> &source
         );
         void epsilonClosure(
-            const std::vector<std::pair<std::size_t, std::vector<FiredAction>>> &seeded_source
+            const std::vector<std::pair<std::size_t, ActionPath>> &seeded_source
         );
         void move(
             const stdu::vector<std::size_t> &src,
@@ -110,10 +117,21 @@ export namespace DFA {
             const NFA *nfa,
             const stdu::vector<std::size_t> &current
         );
+
+        // Seed several NFA states at once, each carrying a pre-existing
+        // tag path (e.g. the tail of a path threaded across a
+        // subroutine/nested-token call boundary). Seeds are listed in
+        // PRIORITY ORDER: if two seeds name the same NFA state, the
+        // earlier one wins -- same convention as everywhere else in
+        // this codebase where insertion order encodes preference.
+        //
+        // This is no longer used to defer "divergent" action sequences
+        // (see migration notes) -- there is nothing left to defer.
         Closure(
             const NFA *nfa,
-            const std::vector<std::pair<std::size_t, std::vector<FiredAction>>> &seeded_current
+            const std::vector<std::pair<std::size_t, ActionPath>> &seeded_current
         );
+
         Closure(
             const NFA *nfa,
             const stdu::vector<std::size_t> &current,
@@ -138,29 +156,23 @@ export namespace DFA {
         auto empty() const {
             return closure.empty();
         }
-
         auto contains(std::size_t state) const -> bool;
-        auto getPaths() { return paths; }
-        /*
-         * All distinct epsilon paths reaching `state`.
-         *
-         * This is deliberately NOT a single merged action sequence.
-         */
-        auto getPathsForState(
-            std::size_t state
-        ) const -> const std::vector<std::vector<FiredAction>>&;
 
         /*
-         * Return the unique action path reaching `state`.
+         * The single, deterministic tag path by which `state` is
+         * reached in this closure. Empty (not an error) if `state`
+         * fires no actions on its winning route, or is not part of
+         * the closure at all.
          *
-         * Throws if the NFA has genuinely conflicting action paths.
-         *
-         * This is useful when a transition requires exactly one
-         * deterministic action sequence.
+         * There is deliberately no "getPathsForState" (plural) and no
+         * throwing "getUniquePathForState" any more: under priority-
+         * ordered construction there is exactly one path, always, so
+         * an API shaped around "maybe several, maybe throw" no longer
+         * matches reality.
          */
-        auto getUniquePathForState(
+        auto getActionsForState(
             std::size_t state
-        ) const -> const std::vector<FiredAction>&;
+        ) const -> const ActionPath &;
 
         auto operator==(const Closure &other) const {
             return closure == other.closure;

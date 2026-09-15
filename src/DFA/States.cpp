@@ -1,4 +1,5 @@
 module DFA.States;
+import cpuf.op;
 import DFA.API;
 import constants;
 import std;
@@ -45,6 +46,15 @@ auto DFA::States<State>::clear() -> void {
     states.clear();
 }
 
+template<typename StateType>
+auto DFA::operator<<(std::ostream &os, const States<StateType> &states) -> std::ostream & {
+    os << states.get();
+    return os;
+}
+
 template class DFA::States<DFA::StateWithActions>;
 template class DFA::States<DFA::State<>>;
 template class DFA::States<DFA::State<DFA::ClassTransitions>>;
+template auto DFA::operator<<(std::ostream &os, const DFA::States<DFA::StateWithActions> &states) -> std::ostream &;
+template auto DFA::operator<<(std::ostream &os, const DFA::States<DFA::State<>> &states) -> std::ostream &;
+template auto DFA::operator<<(std::ostream &os, const DFA::States<DFA::State<DFA::ClassTransitions>> &states) -> std::ostream &;

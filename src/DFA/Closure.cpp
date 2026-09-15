@@ -4,61 +4,67 @@ import std;
 
 namespace {
 
-using ActionPath = std::vector<DFA::FiredAction>;
-
+// Transition actions are now the source of truth.  An action belongs to
+// the edge that was selected, not to the state that happens to follow it.
+//
+// Ordinary actions are identified by operation + variable so cloned NFA
+// fragments do not make the same capture operation fire twice along one
+// path.  Semantic actions keep their structural transition identity.
 bool sameAction(
     const DFA::FiredAction &a,
     const DFA::FiredAction &b
 ) {
-    // Physical NFA owners are not semantic action identity. Nested-token
-    // cloning creates different NFA states for the same capture operation.
-    // For ordinary actions use the operation + variable as the identity so
-    // those clones collapse during epsilon-path exploration. Snapshot
-    // markers remain identified by their structural owner/index.
     if (a.table_type != b.table_type)
         return false;
 
     if (a.table_type == NFA::TableType::Action) {
-        const auto &aa =
-            std::get<NFA::ActionState>(a.raw);
-        const auto &bb =
-            std::get<NFA::ActionState>(b.raw);
+        const auto &aa = std::get<NFA::ActionState>(a.raw);
+        const auto &bb = std::get<NFA::ActionState>(b.raw);
 
-        return
-            aa.action == bb.action &&
-            aa.variable == bb.variable;
+        return aa.action == bb.action &&
+               aa.variable == bb.variable;
     }
 
-    return
-        a.owner == b.owner &&
-        a.table_index == b.table_index;
+    return a.owner == b.owner &&
+           a.table_index == b.table_index;
 }
 
-bool samePath(
-    const ActionPath &a,
-    const ActionPath &b
+DFA::ActionPath transitionActions(
+    std::size_t owner,
+    const NFA::TransitionValue &edge
 ) {
-    if (a.size() != b.size())
-        return false;
+    DFA::ActionPath result;
+    result.reserve(edge.actions.size());
 
-    for (std::size_t i = 0; i < a.size(); ++i) {
-        if (!sameAction(a[i], b[i]))
-            return false;
+    for (std::size_t i = 0; i < edge.actions.size(); ++i) {
+        const auto &raw = edge.actions[i];
+
+        const NFA::TableType type =
+            std::holds_alternative<NFA::ActionState>(raw)
+                ? NFA::TableType::Action
+                : NFA::TableType::Semantic;
+
+        result.push_back(
+            DFA::FiredAction{
+                .owner = owner,
+                .table_type = type,
+                .table_index = i,
+                .raw = raw
+            }
+        );
     }
 
-    return true;
+    return result;
 }
 
-bool containsPath(
-    const std::vector<ActionPath> &paths,
-    const ActionPath &path
+void appendActions(
+    DFA::ActionPath &path,
+    const DFA::ActionPath &actions
 ) {
-    return std::ranges::any_of(
-        paths,
-        [&](const ActionPath &existing) {
-            return samePath(existing, path);
-        }
-    );
+    // TDFA actions are an ordered program.  Never deduplicate them:
+    // repeated BEGIN/END/PUSH/REDUCE operations may be semantically
+    // meaningful, especially across repetitions.
+    path.insert(path.end(), actions.begin(), actions.end());
 }
 
 } // namespace
@@ -67,200 +73,98 @@ bool containsPath(
 void DFA::Closure::epsilonClosure(
     const std::vector<std::size_t> &source
 ) {
-    // Plain entry point: every source state starts with an empty pending
-    // action path. This is the historical behaviour, kept as a thin
-    // wrapper around the seeded overload below so existing call sites
-    // don't need to change.
     std::vector<std::pair<std::size_t, ActionPath>> seeded_source;
     seeded_source.reserve(source.size());
 
-    for (const std::size_t state : source) {
+    for (const std::size_t state : source)
         seeded_source.emplace_back(state, ActionPath{});
-    }
 
     epsilonClosure(seeded_source);
 }
 
+
 void DFA::Closure::epsilonClosure(
-    const std::vector<std::pair<std::size_t, std::vector<FiredAction>>> &seeded_source
+    const std::vector<std::pair<std::size_t, ActionPath>> &seeded_source
 ) {
     closure.clear();
-    paths.clear();
+    sorted_unique_closure.clear();
+    actions_for.clear();
 
-    struct WorkItem {
-        std::size_t state;
+    struct Frame {
+        std::size_t state = NFA::NULL_STATE;
         ActionPath path;
-        std::vector<std::size_t> epsilon_stack;
+        std::vector<NFA::TransitionValue> edges;
+        std::size_t next = 0;
     };
 
-    std::queue<WorkItem> work;
+    std::vector<Frame> stack;
+    std::unordered_set<std::size_t> visited;
 
-    // Each state's own action list never changes across visits — only the
-    // incoming `path` differs. Rebuilding it (and re-copying every
-    // ActionState/SemanticState inside it) on every visit was pure waste
-    // for states reached via several distinct paths. Memoize it once per
-    // closure computation instead.
-    std::unordered_map<std::size_t, ActionPath> own_actions_cache;
+    auto commit = [&](std::size_t state_id, ActionPath incoming) {
+        if (state_id == NFA::NULL_STATE)
+            return;
 
-    auto makeOwnActions =
-        [&](std::size_t state_id) -> const ActionPath & {
+        // First route wins.  This is the TDFA priority decision.
+        if (!visited.insert(state_id).second)
+            return;
 
-        if (auto it = own_actions_cache.find(state_id);
-            it != own_actions_cache.end()) {
-            return it->second;
-        }
+        actions_for.emplace(state_id, incoming);
+        sorted_unique_closure.insert(state_id);
 
-        const auto &state =
-            nfa->getStates().at(state_id);
+        const auto &state = nfa->getStates().at(state_id);
 
-        ActionPath result;
-        result.reserve(state.actions.size());
+        std::vector<NFA::TransitionValue> edges(
+            state.epsilon_transitions.begin(),
+            state.epsilon_transitions.end()
+        );
 
-        for (std::size_t i = 0;
-             i < state.actions.size();
-             ++i) {
-
-            const auto &raw = state.actions[i];
-
-            const NFA::TableType type =
-                std::holds_alternative<NFA::ActionState>(raw)
-                    ? NFA::TableType::Action
-                    : NFA::TableType::Semantic;
-
-            result.push_back(
-                FiredAction{
-                    .owner = state_id,
-                    .table_type = type,
-                    .table_index = i,
-                    .raw = raw
-                }
-            );
-        }
-
-        return own_actions_cache
-            .emplace(state_id, std::move(result))
-            .first->second;
-    };
-
-    auto containsAction =
-        [](const ActionPath &path,
-           const FiredAction &action) {
-
-            return std::any_of(
-                path.begin(),
-                path.end(),
-                [&](const FiredAction &existing) {
-                    return sameAction(existing, action);
-                }
-            );
-    };
-
-    for (const auto &[state, seed_path] : seeded_source) {
-        if (state == NFA::NULL_STATE)
-            continue;
-
-        WorkItem item{
-            .state = state,
-            .path = seed_path,
-            .epsilon_stack = {state}
-        };
-
-        work.push(std::move(item));
-    }
-
-    std::unordered_set<std::size_t> closure_seen;
-
-    while (!work.empty()) {
-        WorkItem item = std::move(work.front());
-        work.pop();
-
-        const std::size_t state_id = item.state;
-
-        auto path = std::move(item.path);
-
-        const auto &own_actions =
-            makeOwnActions(state_id);
-
-        path.reserve(path.size() + own_actions.size());
-
-        for (const auto &action : own_actions) {
-
-            if (containsAction(path, action))
-                continue;
-
-            path.push_back(action);
-        }
-
-        auto &state_paths = paths[state_id];
-
-        if (!containsPath(state_paths, path)) {
-            state_paths.push_back(path);
-        }
-
-        if (closure_seen.insert(state_id).second) {
-            closure.push_back(state_id);
-        }
-
-        const auto &state =
-            nfa->getStates().at(state_id);
-
-        std::vector<std::size_t> targets;
-        targets.reserve(state.epsilon_transitions.size());
-
-        for (const auto &edge : state.epsilon_transitions) {
-            if (edge.next != NFA::NULL_STATE)
-                targets.push_back(edge.next);
-        }
-
-        std::sort(targets.begin(), targets.end());
-
-        // Split into "actually needs to be enqueued" vs. "already
-        // covered / cycle-closing", so the queue-push loop below knows
-        // in advance which target is last and can move `path` into it
-        // instead of copying.
-        std::vector<std::size_t> pending_targets;
-        pending_targets.reserve(targets.size());
-
-        for (const std::size_t target : targets) {
-
-            const auto &target_paths = paths[target];
-
-            if (containsPath(target_paths, path))
-                continue;
-
-            if (std::ranges::find(
-                    item.epsilon_stack,
-                    target
-                ) != item.epsilon_stack.end()) {
-
-                auto &cycle_paths = paths[target];
-
-                if (!containsPath(cycle_paths, path))
-                    cycle_paths.push_back(path);
-
-                continue;
+        std::ranges::stable_sort(
+            edges,
+            [](const auto &a, const auto &b) {
+                return a.priority < b.priority;
             }
+        );
 
-            pending_targets.push_back(target);
+        stack.push_back(
+            Frame{
+                .state = state_id,
+                .path = std::move(incoming),
+                .edges = std::move(edges)
+            }
+        );
+    };
+
+    // Seed order is already priority order.  This matters when the same
+    // NFA state occurs in more than one initial subset member.
+    for (const auto &[state, path] : seeded_source)
+        commit(state, path);
+
+    while (!stack.empty()) {
+        const std::size_t frame_index = stack.size() - 1;
+        auto &frame = stack[frame_index];
+
+        if (frame.next >= frame.edges.size()) {
+            stack.pop_back();
+            continue;
         }
 
-        for (std::size_t k = 0; k < pending_targets.size(); ++k) {
-            const std::size_t target = pending_targets[k];
+        // Copy before commit(): pushing a frame may reallocate `stack`.
+        const NFA::TransitionValue edge = frame.edges[frame.next++];
+        ActionPath next_path = frame.path;
 
-            auto next_stack = item.epsilon_stack;
-            next_stack.push_back(target);
+        // IMPORTANT: actions live on the selected epsilon edge now.
+        // They must be appended before entering the target state.
+        const ActionPath edge_actions =
+            transitionActions(frame.state, edge);
 
-            const bool is_last = (k + 1 == pending_targets.size());
-
-            work.push(
-                WorkItem{
-                    .state = target,
-                    .path = is_last ? std::move(path) : path,
-                    .epsilon_stack = std::move(next_stack)
-                }
-            );
-        }
+        appendActions(next_path, edge_actions);
+        commit(edge.next, std::move(next_path));
     }
+
+    closure.assign(
+        sorted_unique_closure.begin(),
+        sorted_unique_closure.end()
+    );
 }
 
 
@@ -268,29 +172,25 @@ void DFA::Closure::move(
     const stdu::vector<std::size_t> &src,
     const NFA::TransitionKey &sym
 ) {
-    std::unordered_set<std::size_t> result;
+    sorted_unique_closure.clear();
+    closure.clear();
 
     for (const auto state_id : src) {
+        const auto &state = nfa->getStates().at(state_id);
 
-        const auto &state =
-            nfa->getStates().at(state_id);
-
-        const auto it =
-            state.transitions.find(sym);
-
+        const auto it = state.transitions.find(sym);
         if (it == state.transitions.end())
             continue;
 
         for (const auto &next : it->second) {
-
             if (next.next != NFA::NULL_STATE)
-                result.insert(next.next);
+                sorted_unique_closure.insert(next.next);
         }
     }
 
     closure.assign(
-        result.begin(),
-        result.end()
+        sorted_unique_closure.begin(),
+        sorted_unique_closure.end()
     );
 }
 
@@ -305,19 +205,6 @@ DFA::Closure::Closure(
         return;
 
     epsilonClosure(*current);
-
-    std::sort(
-        closure.begin(),
-        closure.end()
-    );
-
-    closure.erase(
-        std::unique(
-            closure.begin(),
-            closure.end()
-        ),
-        closure.end()
-    );
 }
 
 
@@ -328,50 +215,18 @@ DFA::Closure::Closure(
     : nfa(nfa)
 {
     epsilonClosure(current);
-
-    std::sort(
-        closure.begin(),
-        closure.end()
-    );
-
-    closure.erase(
-        std::unique(
-            closure.begin(),
-            closure.end()
-        ),
-        closure.end()
-    );
 }
 
 
 DFA::Closure::Closure(
     const NFA *nfa,
-    const std::vector<std::pair<std::size_t, std::vector<FiredAction>>> &seeded_current
+    const std::vector<std::pair<std::size_t, ActionPath>> &seeded_current
 )
     : nfa(nfa)
 {
-    // See DFA.cpp step D: used when a DFA transition is reached through
-    // NFA paths with disagreeing action sequences. Each kernel state is
-    // seeded with its own (SNAPSHOT_APPLY-wrapped) deferred tail instead
-    // of starting from an empty path, so the correct actions surface
-    // later — attached to whichever future transition/accept actually
-    // consumes that specific NFA state — without ever being dropped or
-    // fired against the wrong position.
     epsilonClosure(seeded_current);
-
-    std::sort(
-        closure.begin(),
-        closure.end()
-    );
-
-    closure.erase(
-        std::unique(
-            closure.begin(),
-            closure.end()
-        ),
-        closure.end()
-    );
 }
+
 
 DFA::Closure::Closure(
     const NFA *nfa,
@@ -380,81 +235,64 @@ DFA::Closure::Closure(
 )
     : nfa(nfa)
 {
-    move(current, symbol);
+    // A symbol transition may itself carry TDFA actions.  Therefore the
+    // result of `move` cannot be represented only as a vector of states:
+    // every destination has a potentially different incoming tag path.
+    // Seed epsilon-closure directly with the actions of the selected
+    // symbol edge.
+    std::vector<std::pair<std::size_t, ActionPath>> seeded;
 
-    /*
-     * The transition itself has already consumed `symbol`.
-     *
-     * Therefore the actions discovered here belong to the state
-     * AFTER the transition, not to the transition itself.
-     */
-    epsilonClosure(closure);
+    for (const std::size_t state_id : current) {
+        const auto &state = nfa->getStates().at(state_id);
+        const auto it = state.transitions.find(symbol);
 
-    std::sort(
-        closure.begin(),
-        closure.end()
-    );
+        if (it == state.transitions.end())
+            continue;
 
-    closure.erase(
-        std::unique(
-            closure.begin(),
-            closure.end()
-        ),
-        closure.end()
-    );
+        std::vector<NFA::TransitionValue> edges(
+            it->second.begin(),
+            it->second.end()
+        );
+
+        // If several transitions consume the same symbol, preserve their
+        // explicit transition priority before entering the epsilon graph.
+        std::ranges::stable_sort(
+            edges,
+            [](const auto &a, const auto &b) {
+                return a.priority < b.priority;
+            }
+        );
+
+        for (const auto &edge : edges) {
+            if (edge.next == NFA::NULL_STATE)
+                continue;
+
+            seeded.emplace_back(
+                edge.next,
+                transitionActions(state_id, edge)
+            );
+        }
+    }
+
+    epsilonClosure(seeded);
 }
 
 
 auto DFA::Closure::contains(
     std::size_t state
 ) const -> bool {
-    return std::binary_search(
-        closure.begin(),
-        closure.end(),
-        state
-    );
+    return sorted_unique_closure.contains(state);
 }
 
 
-auto DFA::Closure::getPathsForState(
+auto DFA::Closure::getActionsForState(
     std::size_t state
-) const
-    -> const std::vector<std::vector<FiredAction>> &
-{
-    static const std::vector<std::vector<FiredAction>> empty;
+) const -> const ActionPath & {
+    static const ActionPath empty;
 
-    const auto it = paths.find(state);
-
-    if (it == paths.end())
+    const auto it = actions_for.find(state);
+    if (it == actions_for.end())
         return empty;
 
     return it->second;
-}
-
-
-auto DFA::Closure::getUniquePathForState(
-    std::size_t state
-) const
-    -> const std::vector<FiredAction> &
-{
-    const auto &state_paths =
-        getPathsForState(state);
-
-    if (state_paths.empty()) {
-
-        static const std::vector<FiredAction> empty;
-
-        return empty;
-    }
-
-    if (state_paths.size() != 1) {
-
-        throw Error(
-            "NFA state {} has {} distinct action paths",
-            state,
-            state_paths.size()
-        );
-    }
-
-    return state_paths.front();
 }

@@ -119,6 +119,7 @@ int main(int argc, char** argv) {
         TREE CHANGES BELOW
     */
     AST::TreePass pass(ast);
+    pass.work();
     for (const auto &[name, value] : ast.getInitialItemSet()) {
         initialItemSet << "name<" << corelib::text::join(name, "_") << "> : " << value;
     }

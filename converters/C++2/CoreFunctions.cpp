@@ -25,7 +25,7 @@ auto Core::convertType(const LangAPI::Type &type) -> std::string {
             case LangAPI::ValueType::Char:
                 return "char";
             case LangAPI::ValueType::Int:
-                return "int";
+                return "long long";
             case LangAPI::ValueType::Float:
                 return "double";
             case LangAPI::ValueType::Bool:
@@ -185,6 +185,10 @@ auto Core::convertIspaLibSymbol(const LangAPI::IspaLibSymbol &symbol) -> std::st
             return "::ISPA_STD::DFA::API::Action::BEGIN";
         case LangAPI::StdlibExports::ActionPUSH:
             return "::ISPA_STD::DFA::API::Action::BEGIN";
+        case LangAPI::StdlibExports::TokenNodeConstruct:
+            return "::ISPA_STD::Node<Tokens, " + convertTemplates(symbol.template_parameters) + ">::create";
+        case LangAPI::StdlibExports::ParserNodeConstructor:
+            return "::ISPA_STD::Node<Rules, " + convertTemplates(symbol.template_parameters) + ">::create";
         default:
             throw Error("Unknown IspaLibSymbol exports: {}", (int) symbol.exports);
     }

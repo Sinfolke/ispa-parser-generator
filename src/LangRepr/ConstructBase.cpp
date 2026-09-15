@@ -7,7 +7,7 @@ namespace LangRepr {
         for (const auto &[name, dtb] : lexer_builder.getDataBlocks()) {
             LangAPI::Symbol tn = name;
             tn.path.insert(tn.path.begin(), "Types");
-            variant_type.template_parameters.push_back(LangAPI::Type {tn});
+            variant_type.template_parameters.push_back(LangAPI::Type {LangAPI::ValueType::Token, LangAPI::Type {tn}});
         }
         Token = LangAPI::Symbol { "Token" };
         return LangAPI::TypeAlias {.name = "Token", .type = variant_type};
@@ -28,6 +28,7 @@ namespace LangRepr {
         );
     };
     auto ConstructBase::ensureTypesNs(LangAPI::Type t) -> LangAPI::Type {
+        insideTypeCount++;
         if (t.isSymbol()) {
             const auto &sym_path = t.getSymbol().path;
             stdu::vector<std::string> path;
@@ -43,6 +44,7 @@ namespace LangRepr {
         if (!t.template_parameters.empty()) {
             for (auto &p : t.template_parameters) p = ensureTypesNs(std::get<LangAPI::Type>(p));
         }
+        insideTypeCount--;
         return t;
     };
     // 1. Symbol Traversal
@@ -57,8 +59,26 @@ namespace LangRepr {
                 path.push_back(std::get<std::string>(part));
             }
         }
-        if (tree.contains(path) && !was_fun_call && std::get<std::string>(s.path.front()) != "Types") {
+        if (insideTypeCount > 0 && tree.contains(path) && !was_fun_call && std::get<std::string>(s.path.front()) != "Types") {
             s.path.insert(s.path.begin(), "Types");
+        }
+        return s;
+    }
+    auto ConstructBase::ensureTypesNs(LangAPI::IspaLibSymbol s) -> LangAPI::IspaLibSymbol {
+        for (auto &temp : s.template_parameters) {
+            if (std::holds_alternative<std::shared_ptr<LangAPI::Type>>(temp)) {
+                auto    &type_ptr = std::get<std::shared_ptr<LangAPI::Type>>(temp);
+                insideTypeCount++;
+                *type_ptr = ensureTypesNs(*type_ptr);
+                insideTypeCount--;
+            }
+        }
+        return s;
+    }
+    auto ConstructBase::ensureTypesNs(LangAPI::IspaLibFunctionCall s) -> LangAPI::IspaLibFunctionCall {
+        s.symbol = ensureTypesNs(s.symbol);
+        for (auto &arg : s.args) {
+            arg = ensureTypesNs(arg);
         }
         return s;
     }
@@ -69,20 +89,32 @@ namespace LangRepr {
         return t;
     }
     auto ConstructBase::ensureTypesNs(LangAPI::GetVariant t) -> LangAPI::GetVariant {
+        insideTypeCount++;
         *t.type = ensureTypesNs(*t.type);
+        insideTypeCount--;
         return t;
     }
     auto ConstructBase::ensureTypesNs(LangAPI::CheckVariant t) -> LangAPI::CheckVariant {
+        insideTypeCount++;
         *t.type = ensureTypesNs(*t.type);
+        insideTypeCount--;
         return t;
     }
     // 2. StorageSymbol Traversal
     auto ConstructBase::ensureTypesNs(LangAPI::StorageSymbol s) -> LangAPI::StorageSymbol {
         s.what = ensureTypesNs(s.what);
+        stdu::vector<std::string> str_only_path;
+        bool non_string = false;
         for (auto &part : s.path) {
-            if (std::holds_alternative<LangAPI::FunctionCall>(part)) {
-                part = ensureTypesNs(std::get<LangAPI::FunctionCall>(part));
+            if (std::holds_alternative<std::string>(part)) {
+                str_only_path.push_back(std::get<std::string>(part));
+            } else {
+                non_string = true;
+                break;
             }
+        }
+        if (insideTypeCount > 0 && tree.contains(str_only_path) && !non_string && std::get<std::string>(s.path.front()) != "Types") {
+            s.path.insert(s.path.begin(), "Types");
         }
         return s;
     }
@@ -90,7 +122,9 @@ namespace LangRepr {
     // 3. Inheritance Traversal
     auto ConstructBase::ensureTypesNs(LangAPI::Inheritance s) -> LangAPI::Inheritance {
         if (std::holds_alternative<LangAPI::Symbol>(s.name)) {
+            insideTypeCount++;
             s.name = ensureTypesNs(std::get<LangAPI::Symbol>(s.name));
+            insideTypeCount--;
         }
         for (auto &arg : s.args) {
             arg = ensureTypesNs(arg);
@@ -112,13 +146,17 @@ namespace LangRepr {
     // 5. FunctionCall Traversal
     auto ConstructBase::ensureTypesNs(LangAPI::FunctionCall s) -> LangAPI::FunctionCall {
         if (std::holds_alternative<std::shared_ptr<LangAPI::Symbol>>(s.name)) {
+            insideTypeCount++;
             s.name = std::make_shared<LangAPI::Symbol>(ensureTypesNs(*std::get<std::shared_ptr<LangAPI::Symbol>>(s.name)));
+            insideTypeCount--;
         }
         for (auto &p : s.template_parameters) {
             std::visit([&](auto &param) {
                 using T = std::decay_t<decltype(param)>;
                 if constexpr (std::is_same_v<T, LangAPI::Type>) {
+                    insideTypeCount++;
                     param = ensureTypesNs(param);
+                    insideTypeCount--;
                 } else if constexpr (std::is_same_v<T, LangAPI::RValue>) {
                     param = ensureTypesNs(param);
                 }
@@ -133,7 +171,9 @@ namespace LangRepr {
     // 6. Lambda Traversal
     auto ConstructBase::ensureTypesNs(LangAPI::Lambda l) -> LangAPI::Lambda {
         for (auto &[type, param_name] : l.parameters) {
+            insideTypeCount++;
             type = ensureTypesNs(type);
+            insideTypeCount--;
         }
         l.statements = ensureTypesNs(l.statements);
         return l;
@@ -164,7 +204,9 @@ namespace LangRepr {
 
     // 9. Variable Traversal
     auto ConstructBase::ensureTypesNs(LangAPI::Variable v) -> LangAPI::Variable {
+        insideTypeCount++;
         v.type = ensureTypesNs(v.type);
+        insideTypeCount--;
         v.value = ensureTypesNs(v.value);
         return v;
     }

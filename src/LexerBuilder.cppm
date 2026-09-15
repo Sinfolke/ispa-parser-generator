@@ -34,6 +34,7 @@ private:
     stdu::vector<NFA::ActionState> lr_table;
     stdu::vector<NFA::SemanticState> semantic_table;
     std::size_t max_registers_count = 0;
+    bool isTopLevel(const stdu::vector<std::string> &name);
 public:
     LexerBuilder(AST::Tree &ast) : ast(ast) {};
     void build();

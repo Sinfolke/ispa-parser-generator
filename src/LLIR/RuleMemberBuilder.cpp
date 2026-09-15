@@ -782,8 +782,8 @@ void LLIR::OpBuilder::build() {
     statements.push_back(LangAPI::Variable::createStatement(svar));
     if (corelib::text::isLower(fullname.back())) {
         std::size_t accept_index = 0;
-        NFA nfa(tree, fullname, nullptr, op, fullname == constants::whitespace, false, &accept_index);
-        nfa.build(false);
+        std::size_t priority_counter = 0;
+        NFA nfa(tree, fullname, nullptr, op, fullname == constants::whitespace, false, &accept_index, &priority_counter);
         auto dfa = DFA::DFA(&nfa);
         if (dfa.get().size() == 2) { // first state plus end state
             // optimize to single switch instead of DFA lookup

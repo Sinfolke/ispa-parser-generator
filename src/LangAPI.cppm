@@ -105,7 +105,8 @@ export namespace LangAPI {
         Node, MatchResult, Lexer, Parser, LexerMakeTokenParameter,
         DfaState, DfaTable, DfaClassTable, DfaAcceptTable, DfaLRTable, DfaNullState,
         ParserFunctionParameter, Error,
-        ActionUNDEF, ActionBEGIN, ActionEND, ActionPUSH
+        ActionUNDEF, ActionBEGIN, ActionEND, ActionPUSH,
+        TokenNodeConstruct, ParserNodeConstructor
     };
 
 

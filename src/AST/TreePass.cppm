@@ -29,13 +29,6 @@ export namespace AST {
 
         static auto inlineGroup(AST::RuleMemberGroup group, stdu::vector<std::shared_ptr<AST::RuleMember>> &members, stdu::vector<std::shared_ptr<AST::RuleMember>>::iterator toInsert)
              -> stdu::vector<std::shared_ptr<AST::RuleMember>>::iterator;
-        void constructor() {
-            removeEmptyRule();
-            inlineSingleGroups();
-            sortByPriority();
-            literalsToToken();
-            addSpaceToken();
-        }
         enum class Types {
             string, Rule_escaped, Rule_csequence, Rule_bin, Rule_hex, Rule_any, cll, name, group, nospace, op, empty
         };
@@ -53,10 +46,7 @@ export namespace AST {
         static Types getTypes(const AST::RuleMemberOp&) { return Types::op; }
         static Types getTypes(const std::monostate&) { return Types::empty; }
     public:
-        explicit TreePass(Tree &ast, bool rawAssign = false) : ast(&ast) {
-            if (!rawAssign)
-                constructor();
-        }
+        explicit TreePass(Tree &ast) : ast(&ast) {}
         // sort by priority functions
         static bool prioritySort(const AST::Tree& ast, const AST::String &first, const AST::String &second);
         static bool prioritySort(const AST::Tree& ast, const AST::RuleMemberBin &first, const AST::RuleMemberBin &second);
@@ -79,6 +69,12 @@ export namespace AST {
         void literalsToToken();
         void sortByPriority();
         void addSpaceToken();
-
+        void work() {
+            removeEmptyRule();
+            inlineSingleGroups();
+            sortByPriority();
+            literalsToToken();
+            addSpaceToken();
+        }
     };
 }
