@@ -6,7 +6,7 @@ import cpuf.hex;
 import cpuf.op;
 import cpuf.printf;
 import Dump;
-import NFA;
+import NFA_OLD;
 import DFA.functionality;
 import DFA;
 import constants;
@@ -783,7 +783,7 @@ void LLIR::OpBuilder::build() {
     if (corelib::text::isLower(fullname.back())) {
         std::size_t accept_index = 0;
         std::size_t priority_counter = 0;
-        NFA nfa(tree, fullname, nullptr, op, fullname == constants::whitespace, false, &accept_index, &priority_counter);
+        NFA::NFA nfa(tree, fullname, nullptr, op, fullname == constants::whitespace, false, &accept_index, &priority_counter);
         auto dfa = DFA::DFA(&nfa);
         if (dfa.get().size() == 2) { // first state plus end state
             // optimize to single switch instead of DFA lookup

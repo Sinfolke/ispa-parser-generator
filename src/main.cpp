@@ -120,9 +120,6 @@ int main(int argc, char** argv) {
     */
     AST::TreePass pass(ast);
     pass.work();
-    for (const auto &[name, value] : ast.getInitialItemSet()) {
-        initialItemSet << "name<" << corelib::text::join(name, "_") << "> : " << value;
-    }
     initialItemSet.close();
     if (dumper.shouldDump("first"))
         ast.printFirstSet(dumper.makeDumpPath("first"));

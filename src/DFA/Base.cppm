@@ -1,7 +1,7 @@
 export module DFA.Base;
 
 import LangAPI;
-import NFA;
+import NFA_OLD;
 import DFA.API;
 import DFA.States;
 import hash;

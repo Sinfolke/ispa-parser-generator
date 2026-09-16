@@ -11,6 +11,239 @@ import cpuf.printf;
 import constants;
 import std;
 
+namespace {
+    class AstInputGenerator {
+        AST::InitialItemSet& itemSet;
+
+        static auto cartesianProduct(const std::vector<std::vector<std::string>>& choices) -> std::vector<std::string> {
+            std::vector<std::string> result = {""};
+            for (const auto& choice : choices) {
+                if (choice.empty()) continue;
+                std::vector<std::string> next_result;
+                next_result.reserve(result.size() * choice.size());
+                for (const auto& res : result) {
+                    for (const auto& c : choice) {
+                        next_result.push_back(res + c);
+                    }
+                }
+                result = std::move(next_result);
+            }
+            return result;
+        }
+
+        auto resolveRuleKey(const stdu::vector<std::string>& currentScope,
+                            const stdu::vector<std::string>& refName) const -> std::optional<stdu::vector<std::string>> {
+            // 1. Direct match
+            if (itemSet.find(refName) != itemSet.end()) return refName;
+
+            // Strip/add '#' from refName segments
+            stdu::vector<std::string> cleanRef = refName;
+            stdu::vector<std::string> hashedRef = refName;
+            for (auto &s : cleanRef) {
+                if (!s.empty() && s.front() == '#') s = s.substr(1);
+            }
+            if (!hashedRef.empty() && (hashedRef.back().empty() || hashedRef.back().front() != '#')) {
+                hashedRef.back() = "#" + hashedRef.back();
+            }
+
+            if (itemSet.find(cleanRef) != itemSet.end()) return cleanRef;
+            if (itemSet.find(hashedRef) != itemSet.end()) return hashedRef;
+
+            // 2. Relative match appended to currentScope
+            for (const auto &ref : {refName, cleanRef, hashedRef}) {
+                stdu::vector<std::string> scoped = currentScope;
+                scoped.insert(scoped.end(), ref.begin(), ref.end());
+                if (itemSet.find(scoped) != itemSet.end()) return scoped;
+            }
+
+            // 3. Search backwards through parent scope prefixes
+            for (std::size_t i = currentScope.size(); i > 0; --i) {
+                stdu::vector<std::string> scopePrefix(currentScope.begin(), currentScope.begin() + i);
+
+                for (const auto &ref : {refName, cleanRef, hashedRef}) {
+                    stdu::vector<std::string> c = scopePrefix;
+                    c.insert(c.end(), ref.begin(), ref.end());
+                    if (itemSet.find(c) != itemSet.end()) return c;
+                }
+            }
+
+            // 4. Fallback search by trailing segment name
+            if (!cleanRef.empty()) {
+                const auto &target = cleanRef.back();
+                for (const auto &[key, _] : itemSet) {
+                    if (!key.empty()) {
+                        std::string kLast = key.back();
+                        if (!kLast.empty() && kLast.front() == '#') kLast = kLast.substr(1);
+                        if (kLast == target) return key;
+                    }
+                }
+            }
+
+            return std::nullopt;
+        }
+
+        auto expandCsequence(const AST::RuleMemberCsequence& cs) -> std::vector<std::string> {
+            std::set<std::string> chars;
+            for (char c : cs.characters) chars.insert(std::string(1, c));
+            for (char c : cs.escaped) chars.insert(std::string(1, c));
+
+            for (const auto& range : cs.diapasons) {
+                chars.insert(std::string(1, range.first));
+                chars.insert(std::string(1, range.second));
+                if (range.second > range.first + 1) {
+                    chars.insert(std::string(1, static_cast<char>((range.first + range.second) / 2)));
+                }
+            }
+            if (chars.empty()) chars.insert("a");
+            return {chars.begin(), chars.end()};
+        }
+
+        auto expandMemberBase(const AST::RuleMember& member,
+                             const stdu::vector<std::string>& currentScope,
+                             std::size_t depth,
+                             std::size_t maxDepth) -> std::vector<std::string> {
+            if (member.isNospace()) return {""};
+            if (member.isString()) return {member.getString().value};
+            if (member.isEscaped()) return {std::string(1, member.getEscaped().c)};
+            if (member.isHex()) {
+                const auto& hex = member.getHex().hex_chars;
+                if (hex.empty()) return {"0x0"};
+                return {std::string(1, hex.front()), std::string(1, hex.back())};
+            }
+            if (member.isBin()) {
+                const auto& bin = member.getBin().bin_chars;
+                if (bin.empty()) return {"0b0"};
+                return {std::string(1, bin.front()), std::string(1, bin.back())};
+            }
+            if (member.isAny()) return {"a", "1", "_"};
+            if (member.isCsequence()) return expandCsequence(member.getCsequence());
+
+            if (member.isGroup()) {
+                std::vector<std::vector<std::string>> groupChoices;
+                for (const auto &sub : member.getGroup().values) {
+                    // Do NOT increment depth for internal grouping
+                    groupChoices.push_back(expandMemberRecursive(*sub, currentScope, depth, maxDepth));
+                }
+                return cartesianProduct(groupChoices);
+            }
+
+            if (member.isOp()) {
+                std::set<std::string> opResults;
+                for (const auto &picked : member.getOp().options) {
+                    // Do NOT increment depth for op choices
+                    auto res = expandMemberRecursive(*picked, currentScope, depth, maxDepth);
+                    opResults.insert(res.begin(), res.end());
+                }
+                return {opResults.begin(), opResults.end()};
+            }
+
+            if (member.isName()) {
+                const auto &name = member.getName().name;
+                // Increment depth ONLY when entering a non-terminal rule reference
+                return expandRule(name, currentScope, depth + 1, maxDepth);
+            }
+
+            return {""};
+        }
+
+        auto expandMemberRecursive(const AST::RuleMember& member,
+                                   const stdu::vector<std::string>& currentScope,
+                                   std::size_t depth,
+                                   std::size_t maxDepth) -> std::vector<std::string> {
+            auto base = expandMemberBase(member, currentScope, depth, maxDepth);
+            if (member.quantifier == '\0') return base;
+
+            std::set<std::string> results;
+            // 0 repetitions
+            if (member.quantifier == '?' || member.quantifier == '*') {
+                results.insert("");
+            }
+            // 1 repetition
+            if (member.quantifier == '?' || member.quantifier == '*' || member.quantifier == '+') {
+                for (const auto& b : base) results.insert(b);
+            }
+            // 2 repetitions
+            if (member.quantifier == '*' || member.quantifier == '+') {
+                for (const auto& b1 : base) {
+                    for (const auto& b2 : base) {
+                        results.insert(b1 + b2);
+                    }
+                }
+            }
+            return {results.begin(), results.end()};
+        }
+
+        auto expandRule(const stdu::vector<std::string>& ruleName,
+                        const stdu::vector<std::string>& currentScope,
+                        std::size_t depth,
+                        std::size_t maxDepth) -> std::vector<std::string> {
+            if (depth >= maxDepth) return {""};
+
+            auto keyOpt = resolveRuleKey(currentScope, ruleName);
+            if (!keyOpt.has_value()) return {"a"}; // Fallback char if rule is non-recursive primitive
+
+            const auto &key = *keyOpt;
+            auto it = itemSet.find(key);
+            if (it == itemSet.end() || it->second.empty()) return {"a"};
+
+            const auto &rules = it->second;
+            std::set<std::string> variants;
+
+            for (const auto &rule : rules) {
+                std::vector<std::vector<std::string>> memberChoices;
+                for (const auto &member_ptr : rule.rule_members) {
+                    memberChoices.push_back(expandMemberRecursive(*member_ptr, key, depth, maxDepth));
+                }
+                auto product = cartesianProduct(memberChoices);
+                variants.insert(product.begin(), product.end());
+            }
+
+            return {variants.begin(), variants.end()};
+        }
+
+    public:
+        explicit AstInputGenerator(AST::InitialItemSet& itemSetRef) : itemSet(itemSetRef) {}
+
+        auto generateTokenSamples(std::size_t maxDepth = 2) -> utype::unordered_map<stdu::vector<std::string>, stdu::vector<std::string>> {
+            utype::unordered_map<stdu::vector<std::string>, stdu::vector<std::string>> out;
+            for (const auto &[name, rules] : itemSet) {
+                if (name.empty() || !corelib::text::isUpper(name.back())) continue;
+
+                auto samples = expandRule(name, name, 0, maxDepth);
+                out[name] = stdu::vector<std::string>{samples.begin(), samples.end()};
+            }
+            return out;
+        }
+
+        auto generateOneStepRuleSamples() -> std::unordered_map<std::string, stdu::vector<std::string>> {
+            std::unordered_map<std::string, stdu::vector<std::string>> out;
+            for (const auto &[name, rules] : itemSet) {
+                if (name.empty() || !corelib::text::isLower(name.back()) || rules.empty()) continue;
+                auto key = corelib::text::join(name, "_");
+
+                std::set<std::string> ruleVariants;
+                for (const auto &rule : rules) {
+                    std::vector<std::vector<std::string>> memberChoices;
+                    for (const auto &member_ptr : rule.rule_members) {
+                        const auto &member = *member_ptr;
+                        if (member.isName()) {
+                            const auto &ref = member.getName().name;
+                            memberChoices.push_back(expandRule(ref, name, 0, 1));
+                        } else {
+                            memberChoices.push_back(expandMemberRecursive(member, name, 0, 1));
+                        }
+                    }
+                    auto product = cartesianProduct(memberChoices);
+                    ruleVariants.insert(product.begin(), product.end());
+                }
+
+                out[key] = stdu::vector<std::string>{ruleVariants.begin(), ruleVariants.end()};
+            }
+            return out;
+        }
+    };
+}
+
 auto AST::Tree::getTerminals() const -> stdu::vector<stdu::vector<std::string>> {
     stdu::vector<stdu::vector<std::string>> set;
     for (const auto &[name, value] : tree_map) {
@@ -735,4 +968,10 @@ void AST::Tree::printFollowSet(const std::string &fileName) {
 }
 auto AST::Tree::getCodeForLexer() -> std::pair<LangAPI::Statements, LangAPI::Variable> {
     return {};
+}
+
+auto AST::Tree::generateRandomTokenInputs(std::size_t maxDepth) -> utype::unordered_map<stdu::vector<std::string>, stdu::vector<std::string>> {
+    createInitialItemSet();
+    AstInputGenerator generator(initial_item_set);
+    return generator.generateTokenSamples(maxDepth);
 }

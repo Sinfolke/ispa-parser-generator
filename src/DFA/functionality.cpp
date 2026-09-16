@@ -9,8 +9,8 @@ import hash;
 import std;
 
 auto DFA::mergeTwoNFA(
-    NFA &first,
-    NFA &second
+    NFA::NFA &first,
+    NFA::NFA &second
 ) -> void {
     if (second.getStates().empty()) {
     second.build(true);
@@ -181,8 +181,8 @@ auto DFA::mergeTwoNFA(
 }
 
 auto DFA::mergeNFAS(
-    const stdu::vector<NFA> &nfas
-) -> std::pair<NFA, std::size_t> {
+    const stdu::vector<NFA::NFA> &nfas
+) -> std::pair<NFA::NFA, std::size_t> {
     if (nfas.empty())
     throw Error("Cannot merge an empty collection of NFAs.");
 
@@ -193,11 +193,11 @@ auto DFA::mergeNFAS(
      * Build every NFA first. This makes their local priority spaces
      * explicit before we start assigning global priority ranges.
      */
-    stdu::vector<NFA> built_nfas;
+    stdu::vector<NFA::NFA> built_nfas;
     built_nfas.reserve(nfas.size());
 
     for (const auto &source : nfas) {
-        NFA copy = source;
+        NFA::NFA copy = source;
 
         if (copy.getStates().empty())
             copy.build(true);
@@ -211,7 +211,7 @@ auto DFA::mergeNFAS(
      * This avoids inheriting state 0, actions, bindings or priorities
      * from any particular lexer rule.
      */
-    NFA merged = built_nfas[0];
+    NFA::NFA merged = built_nfas[0];
 
     /*
      * ------------------------------------------------------------
@@ -297,21 +297,21 @@ auto DFA::mergeNFAS(
 
 }
 
-auto DFA::buildTokenDFA(const AST::Tree &ast, const NFA &nfa) -> DFA {
+auto DFA::buildTokenDFA(const AST::Tree &ast, const NFA::NFA &nfa) -> DFA {
     auto mutable_nfa = nfa;
     DFA dfa(&mutable_nfa);
     dfa.build();
     dfa.minimize();
     return dfa;
 }
-auto DFA::build(const AST::Tree &ast, NFA &nfa) -> std::tuple<ClassifiedDFA, stdu::vector<NFA::ActionState>, stdu::vector<NFA::SemanticState>, std::size_t> {
+auto DFA::build(const AST::Tree &ast, NFA::NFA &nfa) -> std::tuple<ClassifiedDFA, stdu::vector<NFA::ActionState>, stdu::vector<NFA::SemanticState>, std::size_t> {
     auto dfa = DFA(&nfa);
     dfa.build();
     dfa.minimize();
     std::cout << "DFA contains " << dfa.get().size() << " states, " << dfa.getLR().size() << " LR items, and " << dfa.getSemantic().size() << " semantic states." << std::endl;
     return std::make_tuple(dfa.classify(), dfa.getLR(), dfa.getSemantic(), nfa.getRegistersCount());
 }
-auto DFA::build(const AST::Tree &ast, const stdu::vector<NFA> &nfa_collection) -> std::tuple<ClassifiedDFA, stdu::vector<NFA::ActionState>, stdu::vector<NFA::SemanticState>, std::size_t> {
+auto DFA::build(const AST::Tree &ast, const stdu::vector<NFA::NFA> &nfa_collection) -> std::tuple<ClassifiedDFA, stdu::vector<NFA::ActionState>, stdu::vector<NFA::SemanticState>, std::size_t> {
     auto [mergedNFA, max_registers_count] = mergeNFAS(nfa_collection);
     std::cout << "Merged NFA contains " << mergedNFA.getStates().size() << " states and " << max_registers_count << " registers." << std::endl;
     auto dfa = DFA(&mergedNFA);

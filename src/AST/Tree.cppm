@@ -94,7 +94,7 @@ export namespace AST {
         auto getInitialItemSet() -> InitialItemSet&;
         auto getTerminals() const -> stdu::vector<stdu::vector<std::string>>;
         auto getNonTerminals() const -> stdu::vector<stdu::vector<std::string>>;
-
+        auto generateRandomTokenInputs(std::size_t maxDepth) -> utype::unordered_map<stdu::vector<std::string>, stdu::vector<std::string>>;
         void printFirstSet(const std::string &fileName);
         void printFollowSet(const std::string &fileName);
         void buildNameToIndexMap();

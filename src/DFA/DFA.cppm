@@ -1,6 +1,6 @@
 export module DFA;
 
-import NFA;
+import NFA_OLD;
 
 import DFA.API;
 import DFA.States;
@@ -28,7 +28,7 @@ struct ClassifiedDFA {
 class DFA {
   States<State<>> states;
   States<StateWithActions> states_with_actions;
-  NFA &nfa;
+  NFA::NFA &nfa;
   stdu::vector<NFA::ActionState> action_table;
   stdu::vector<NFA::SemanticState> semantic_table;
   void bindBeforeActions();
@@ -44,7 +44,7 @@ class DFA {
   auto check_dfa() -> void;
 
 public:
-  DFA(NFA *nfa) : nfa(*nfa), states(nfa), states_with_actions(nfa) {}
+  DFA(NFA::NFA *nfa) : nfa(*nfa), states(nfa), states_with_actions(nfa) {}
   auto build() -> const States<StateWithActions> &;
   auto minimize() -> States<State<>>;
   auto classify() -> ClassifiedDFA;

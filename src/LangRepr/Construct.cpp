@@ -3,7 +3,7 @@ module LangRepr.Construct;
 import Dump;
 
 import LLIR.API;
-import NFA;
+import NFA_OLD;
 import DFA.API;
 
 import constants;

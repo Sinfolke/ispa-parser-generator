@@ -1,6 +1,6 @@
 export module DFA.API;
 
-import NFA;
+import NFA_OLD;
 import AST.Tree;
 import hash;
 import logging;

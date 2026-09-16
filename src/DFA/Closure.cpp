@@ -196,7 +196,7 @@ void DFA::Closure::move(
 
 
 DFA::Closure::Closure(
-    const NFA *nfa,
+    const NFA::NFA *nfa,
     const stdu::vector<std::size_t> *current
 )
     : nfa(nfa)
@@ -209,7 +209,7 @@ DFA::Closure::Closure(
 
 
 DFA::Closure::Closure(
-    const NFA *nfa,
+    const NFA::NFA *nfa,
     const stdu::vector<std::size_t> &current
 )
     : nfa(nfa)
@@ -219,7 +219,7 @@ DFA::Closure::Closure(
 
 
 DFA::Closure::Closure(
-    const NFA *nfa,
+    const NFA::NFA *nfa,
     const std::vector<std::pair<std::size_t, ActionPath>> &seeded_current
 )
     : nfa(nfa)
@@ -229,7 +229,7 @@ DFA::Closure::Closure(
 
 
 DFA::Closure::Closure(
-    const NFA *nfa,
+    const NFA::NFA *nfa,
     const stdu::vector<std::size_t> &current,
     const NFA::TransitionKey &symbol
 )

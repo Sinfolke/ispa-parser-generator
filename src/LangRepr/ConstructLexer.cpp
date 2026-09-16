@@ -2,7 +2,7 @@ module LangRepr.ConstructLexer;
 
 import LLIR.Builder.Base;
 import cpuf.printf;
-import NFA;
+import NFA_OLD;
 import DFA.API;
 import LangAPI;
 import logging;

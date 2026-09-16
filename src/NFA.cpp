@@ -1,4 +1,4 @@
-module NFA;
+module NFA_OLD;
 import logging;
 import corelib;
 import cpuf.op;
@@ -21,7 +21,7 @@ namespace {
     );
 }
 
-auto NFA::applyQuantifierAndActions(
+auto NFA::NFA::applyQuantifierAndActions(
     const AST::RuleMember &member,
     std::size_t start,
     std::size_t end,
@@ -258,7 +258,7 @@ auto NFA::applyQuantifierAndActions(
     return {start, end};
 }
 
-void NFA::markAccept(
+void NFA::NFA::markAccept(
     std::size_t state_id,
     std::size_t next_state,
     const AST::RuleMember &member,
@@ -1067,7 +1067,7 @@ void NFA::markAccept(
     value_types.clear();
 }
 
-void NFA::handleTerminal(
+void NFA::NFA::handleTerminal(
     const AST::RuleMember &member,
     const stdu::vector<std::string> &name,
     const std::size_t &start,
@@ -1297,7 +1297,7 @@ void NFA::handleTerminal(
     );
 }
 
-void NFA::handleGroup(
+void NFA::NFA::handleGroup(
     const AST::RuleMember &member,
     const stdu::vector<std::shared_ptr<AST::RuleMember>> &group,
     const std::size_t &start,
@@ -1369,7 +1369,7 @@ void NFA::handleGroup(
     );
 }
 
-void NFA::handleString(
+void NFA::NFA::handleString(
     const AST::RuleMember &member,
     const std::string &str,
     const std::size_t &start,
@@ -1410,7 +1410,7 @@ void NFA::handleString(
     );
 }
 
-void NFA::handleCsequence(
+void NFA::NFA::handleCsequence(
     const AST::RuleMember &member,
     const AST::RuleMemberCsequence &csequence,
     const std::size_t &start,
@@ -1508,7 +1508,7 @@ void NFA::handleCsequence(
         nestedReduction
     );
 }
-void NFA::handleAny(
+void NFA::NFA::handleAny(
     const AST::RuleMember &member,
     const std::size_t &start,
     const std::size_t &end,
@@ -1550,7 +1550,7 @@ void NFA::handleAny(
         nestedReduction
     );
 }
-auto NFA::buildStateFragment(
+auto NFA::NFA::buildStateFragment(
     const AST::RuleMember &member,
     bool isLastMember,
     bool addStoreActions,
@@ -1791,7 +1791,7 @@ auto NFA::buildStateFragment(
     };
 }
 
-void NFA::build(bool addStoreActions) {
+void NFA::NFA::build(bool addStoreActions) {
     if (isWhitespaceToken)
         addStoreActions = false;
 
@@ -1909,7 +1909,7 @@ void NFA::build(bool addStoreActions) {
     (*accept_index)++;
 }
 
-void NFA::getStatesToPropagate(
+void NFA::NFA::getStatesToPropagate(
     std::size_t state_id,
     std::unordered_set<std::size_t> &result
 ) {
@@ -1938,7 +1938,7 @@ void NFA::getStatesToPropagate(
     }
 }
 
-auto NFA::getStatesToPropagate(
+auto NFA::NFA::getStatesToPropagate(
     std::size_t id
 ) -> std::unordered_set<std::size_t> {
     std::unordered_set<std::size_t> result;
@@ -1951,7 +1951,7 @@ auto NFA::getStatesToPropagate(
     return result;
 }
 
-auto NFA::investigateHasNext(
+auto NFA::NFA::investigateHasNext(
     std::size_t place,
     char c,
     std::unordered_set<std::size_t> &visited
@@ -1992,7 +1992,7 @@ auto NFA::investigateHasNext(
     );
 }
 
-auto NFA::investigateHasNext(
+auto NFA::NFA::investigateHasNext(
     std::size_t place,
     const stdu::vector<std::string> &name,
     std::unordered_set<std::size_t> &visited
@@ -2037,7 +2037,7 @@ auto NFA::investigateHasNext(
     );
 }
 
-void NFA::addSpaceSkip() {
+void NFA::NFA::addSpaceSkip() {
     for (const auto place :
          add_space_skip_places) {
 
@@ -2115,7 +2115,7 @@ void NFA::addSpaceSkip() {
     }
 }
 
-void NFA::acceptMapVisitState(
+void NFA::NFA::acceptMapVisitState(
     std::size_t index,
     std::optional<TokenBinding> current_binding,
     std::unordered_set<std::size_t>& visited
@@ -2149,7 +2149,7 @@ void NFA::acceptMapVisitState(
     }
 }
 
-void NFA::buildAcceptMap() {
+void NFA::NFA::buildAcceptMap() {
     accept_map.clear();
 
     for (
@@ -2172,7 +2172,7 @@ void NFA::buildAcceptMap() {
     }
 }
 
-void NFA::generateTemplatedDataBlockFromSingleRule(
+void NFA::NFA::generateTemplatedDataBlockFromSingleRule(
     const AST::RuleMember &mem,
     TemplatedDataBlock &templated_data_block,
     std::size_t &prefix_index,
@@ -2304,7 +2304,7 @@ void NFA::generateTemplatedDataBlockFromSingleRule(
     }
 }
 
-void NFA::generateTemplatedDataBlockFromRules(
+void NFA::NFA::generateTemplatedDataBlockFromRules(
     const stdu::vector<
         std::shared_ptr<AST::RuleMember>
     > &rules,
@@ -2324,7 +2324,7 @@ void NFA::generateTemplatedDataBlockFromRules(
     }
 }
 
-void NFA::generateSingleDataBlockFromRules(
+void NFA::NFA::generateSingleDataBlockFromRules(
     const stdu::vector<
         std::shared_ptr<AST::RuleMember>
     > &rules,
@@ -2810,7 +2810,7 @@ std::ostream& operator<<(
 
 std::ostream& operator<<(
     std::ostream& os,
-    const NFA& nfa
+    const NFA::NFA& nfa
 ) {
     const auto& states =
         nfa.getStates();

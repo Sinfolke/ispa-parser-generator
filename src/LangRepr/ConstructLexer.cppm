@@ -1,5 +1,5 @@
 export module LangRepr.ConstructLexer;
-import NFA;
+import NFA_OLD;
 import DFA.API;
 import LLIR.IR;
 import AST.API;

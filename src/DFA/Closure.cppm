@@ -1,6 +1,6 @@
 export module DFA.closure;
 
-import NFA;
+import NFA_OLD;
 
 import hash;
 import cpuf.op;
@@ -58,7 +58,7 @@ export namespace DFA {
     using ActionPath = std::vector<FiredAction>;
 
     class Closure {
-        const NFA *nfa;
+        const NFA::NFA *nfa;
 
         // The actual epsilon-closure: the NFA states reachable from the
         // seed(s) purely via epsilon edges.
@@ -109,12 +109,12 @@ export namespace DFA {
 
     public:
         Closure(
-            const NFA *nfa,
+            const NFA::NFA *nfa,
             const stdu::vector<std::size_t> *current = nullptr
         );
 
         Closure(
-            const NFA *nfa,
+            const NFA::NFA *nfa,
             const stdu::vector<std::size_t> &current
         );
 
@@ -128,12 +128,12 @@ export namespace DFA {
         // This is no longer used to defer "divergent" action sequences
         // (see migration notes) -- there is nothing left to defer.
         Closure(
-            const NFA *nfa,
+            const NFA::NFA *nfa,
             const std::vector<std::pair<std::size_t, ActionPath>> &seeded_current
         );
 
         Closure(
-            const NFA *nfa,
+            const NFA::NFA *nfa,
             const stdu::vector<std::size_t> &current,
             const NFA::TransitionKey &symbol
         );

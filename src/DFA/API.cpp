@@ -1,6 +1,7 @@
 module DFA.API;
 import AST.API;
 import AST.Pass;
+import NFA_OLD;
 import logging;
 import cpuf.op;
 import std;
@@ -35,46 +36,46 @@ auto DFA::Comparator::operator()(const std::pair<NFA::TransitionKey, TransitionV
 }
 
 auto DFA::operator<<(std::ostream &os, const TransitionValue &value) -> std::ostream & {
-    os << "{next: " << value.next << ", accept_index: " << value.accept_index << ", actions: " << value.actions << "}";
+    // os << "{next: " << value.next << ", accept_index: " << value.accept_index << ", actions: " << value.actions << "}";
     return os;
 }
 
 auto DFA::operator<<(std::ostream &os, const ActionSequence &sequence) -> std::ostream & {
-    os << "{actions: " << sequence.actions << ", terminal_dfa_target: " << sequence.terminal_dfa_target << "}";
+    // os << "{actions: " << sequence.actions << ", terminal_dfa_target: " << sequence.terminal_dfa_target << "}";
     return os;
 }
 
 auto DFA::operator<<(std::ostream &os, const TransitionKeyExt &key) -> std::ostream & {
-    os << "{symbol: " << key.symbol
-       << ", table_type: " << key.table_type
-       << ", action: " << key.action
-       << ", action_id: " << key.action_id
-       << ", target_partition: " << key.target_partition
-       << "}";
+    // os << "{symbol: " << key.symbol
+    //    << ", table_type: " << key.table_type
+    //    << ", action: " << key.action
+    //    << ", action_id: " << key.action_id
+    //    << ", target_partition: " << key.target_partition
+    //    << "}";
     return os;
 }
 
 auto DFA::operator<<(std::ostream &os, const StateWithActions &state) -> std::ostream & {
-    os << "{nfa_states: " << state.nfa_states
-       << ", transitions: " << state.transitions
-       << ", accept_action: " << state.accept_action
-       << ", accept_binding: " << state.accept_binding
-       << "}";
+    // os << "{nfa_states: " << state.nfa_states
+    //    << ", transitions: " << state.transitions
+    //    << ", accept_action: " << state.accept_action
+    //    << ", accept_binding: " << state.accept_binding
+    //    << "}";
     return os;
 }
 
 auto DFA::operator<<(std::ostream &os, const CharClassTable &table) -> std::ostream & {
-    os << "{num_classes: " << table.num_classes << ", char_to_class: " << table.char_to_class << "}";
+    // os << "{num_classes: " << table.num_classes << ", char_to_class: " << table.char_to_class << "}";
     return os;
 }
 
 template<typename TransitionType>
 auto DFA::operator<<(std::ostream &os, const State<TransitionType> &state) -> std::ostream & {
-    os << "{nfa_states: " << state.nfa_states
-       << ", transitions: " << state.transitions
-       << ", accept_action: " << state.accept_action
-       << ", accept_binding: " << state.accept_binding
-       << "}";
+    // os << "{nfa_states: " << state.nfa_states
+    //    << ", transitions: " << state.transitions
+    //    << ", accept_action: " << state.accept_action
+    //    << ", accept_binding: " << state.accept_binding
+    //    << "}";
     return os;
 }
 

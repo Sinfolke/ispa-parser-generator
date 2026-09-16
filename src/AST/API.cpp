@@ -2,6 +2,11 @@ module AST.API;
 import std;
 
 namespace AST {
+    template <typename T>
+    static std::ostream& print_shared_ptr(std::ostream& os, const std::shared_ptr<T>& ptr) {
+        if (!ptr) return os << "null";
+        return os << *ptr;
+    }
     std::size_t String::count_strlen(const std::string &str) {
         std::size_t count = 0;
         for (auto it = str.begin(); it != str.end(); it++) {
@@ -656,30 +661,75 @@ namespace AST {
         return os;
     }
 
+    namespace {
+        auto print_grammar_string(std::ostream& os, std::string_view value) -> std::ostream& {
+            os << '"';
+            for (const unsigned char c : value) {
+                switch (c) {
+                    case '\\': os << "\\\\"; break;
+                    case '"': os << "\\\""; break;
+                    case '\n': os << "\\n"; break;
+                    case '\r': os << "\\r"; break;
+                    case '\t': os << "\\t"; break;
+                    default:
+                        if (c < 0x20 || c == 0x7f) {
+                            os << "\\x" << std::hex << std::uppercase << static_cast<int>(c) << std::dec << std::nouppercase;
+                        } else {
+                            os << static_cast<char>(c);
+                        }
+                        break;
+                }
+            }
+            return os << '"';
+        }
+
+        auto print_grammar_csequence(std::ostream& os, const RuleMemberCsequence& cs) -> std::ostream& {
+            os << (cs.negative ? "[^" : "[");
+            auto emit_char = [&](char c) {
+                switch (c) {
+                    case '\\': os << "\\\\"; break;
+                    case ']': os << "\\]"; break;
+                    case '^': os << "\\^"; break;
+                    case '-': os << "\\-"; break;
+                    default: os << c; break;
+                }
+            };
+            for (char c : cs.characters) emit_char(c);
+            for (char e : cs.escaped) {
+                os << "\\";
+                emit_char(e);
+            }
+            for (const auto &[from, to] : cs.diapasons) {
+                emit_char(from);
+                os << '-';
+                emit_char(to);
+            }
+            return os << ']';
+        }
+    }
+
     std::ostream& operator<<(std::ostream& os, const RuleMemberName& n) {
-        os << "Name(";
         for (std::size_t i = 0; i < n.name.size(); ++i) {
             os << n.name[i];
             if (i + 1 < n.name.size()) os << "::";
         }
-        os << ")";
         return os;
     }
 
     std::ostream& operator<<(std::ostream& os, const RuleMemberGroup& g) {
-        os << "Group(";
+        os << "(";
         for (std::size_t i = 0; i < g.values.size(); ++i) {
-            os << g.values[i];
-            if (i + 1 < g.values.size()) os << ", ";
+            print_shared_ptr(os, g.values[i]);
+            if (i + 1 < g.values.size()) os << ' ';
         }
         os << ")";
         return os;
     }
 
     std::ostream& operator<<(std::ostream& os, const RuleMemberOp& o) {
-        os << "Op(";
+        os << "(";
         for (std::size_t i = 0; i < o.options.size(); ++i) {
-            os << o.options[i];
+            print_shared_ptr(os, o.options[i]);
             if (i + 1 < o.options.size()) os << " | ";
         }
         os << ")";
@@ -687,45 +737,30 @@ namespace AST {
     }
 
     std::ostream& operator<<(std::ostream& os, const RuleMemberCsequence& cs) {
-        os << (cs.negative ? "!" : "") << "Cseq([";
-        for (char c : cs.characters) os << c;
-        os << "]";
-        if (!cs.escaped.empty()) {
-            os << ", Escaped:[";
-            for (char e : cs.escaped) os << "\\" << e;
-            os << "]";
-        }
-        if (!cs.diapasons.empty()) {
-            os << ", Diapasons:[";
-            for (auto [a, b] : cs.diapasons) os << a << "-" << b << " ";
-            os << "]";
-        }
-        os << ")";
-        return os;
+        return print_grammar_csequence(os, cs);
     }
 
     std::ostream& operator<<(std::ostream& os, const RuleMemberAny&) {
-        return os << "Any";
+        return os << '.';
     }
 
     std::ostream& operator<<(std::ostream& os, const RuleMemberNospace&) {
-        return os << "NoSpace";
+        return os << "\\s0";
     }
 
     std::ostream& operator<<(std::ostream& os, const RuleMemberEscaped& e) {
-        return os << "Escaped(\\" << e.c << ")";
+        return os << '\\' << e.c;
     }
 
     std::ostream& operator<<(std::ostream& os, const RuleMemberHex& h) {
-        return os << "Hex(" << h.hex_chars << ")";
+        return os << "0x" << h.hex_chars;
     }
 
     std::ostream& operator<<(std::ostream& os, const RuleMemberBin& b) {
-        return os << "Bin(" << b.bin_chars << ")";
+        return os << "0b" << b.bin_chars;
     }
     std::ostream& operator<<(std::ostream& os, const String& str) {
-        os << "String (" << str.value << ")";
-        return os;
+        return print_grammar_string(os, str.value);
     }
     std::ostream& operator<<(std::ostream& os, const Cll& str) {
         os << "<CLL>";
@@ -784,7 +819,7 @@ namespace AST {
     std::ostream& operator<<(std::ostream& os, const Rule& r) {
         os << "Rule {\n";
         for (const auto& m : r.rule_members)
-            os << "  " << m << "\n";
+            os << "  ", print_shared_ptr(os, m), os << "\n";
         os << "  Data: " << r.data_block << "\n";
         os << "}";
         return os;

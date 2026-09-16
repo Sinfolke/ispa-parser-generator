@@ -8,7 +8,7 @@ import LangAPI;
 import LLIR.API;
 import LLIR.IR;
 import AST.Tree;
-import NFA;
+import NFA_OLD;
 import DFA;
 import hash;
 import dstd;
