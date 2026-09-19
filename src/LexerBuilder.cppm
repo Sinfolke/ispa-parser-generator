@@ -8,7 +8,7 @@ import LangAPI;
 import LLIR.API;
 import LLIR.IR;
 import AST.Tree;
-import NFA_OLD;
+import NFA.TNFA.API;
 import DFA;
 import hash;
 import dstd;
@@ -31,8 +31,8 @@ private:
     std::vector<std::size_t> token_type;
     std::size_t highest_states_count = 0;
     std::size_t highest_transition_count = 0;
-    stdu::vector<NFA::ActionState> lr_table;
-    stdu::vector<NFA::SemanticState> semantic_table;
+    stdu::vector<NFA::TNFA::ActionState> lr_table;
+    stdu::vector<NFA::TNFA::SemanticState> semantic_table;
     std::size_t max_registers_count = 0;
     bool isTopLevel(const stdu::vector<std::string> &name);
 public:

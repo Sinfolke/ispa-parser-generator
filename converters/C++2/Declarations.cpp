@@ -170,6 +170,7 @@ namespace Cpp {
     }
     auto Declarations::createVariable(const LangAPI::Variable &v) -> void {
         Core::output->write("{}{} {}", v.is_static ? "static " : "", Core::convertType(v.type), v.name);
+        bool nested_array_type = v.nested_array_type || Core::isNestedArrayType(v.type);
         if (v.is_static) {
             if (!v.set.empty()) {
                 for (const auto &expr : v.set) {
@@ -179,10 +180,11 @@ namespace Cpp {
             if (!v.value.empty()) {
                 auto cpp_sym_path = Core::symbol_path;
                 cpp_sym_path.erase(cpp_sym_path.begin());
-                Core::cpp_file.writeln("{} {}::{} = {};", Core::convertType(v.type), corelib::text::join(cpp_sym_path, "::"), v.name, Core::convertExpression(v.value));
+                Core::cpp_file.writeln("{} {}::{} = {}{}{};", Core::convertType(v.type), corelib::text::join(cpp_sym_path, "::"), v.name, nested_array_type ? "{" : "", Core::convertExpression(v.value), nested_array_type ? "}" : "");
             }
         }
         Core::output->dwriteln(";");
+        Core::inside_array = false;
     }
 
     Converter::Writer &Declarations::getWriter() {

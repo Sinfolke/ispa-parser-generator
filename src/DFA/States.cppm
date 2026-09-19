@@ -1,19 +1,19 @@
 export module DFA.States;
 
 import DFA.API;
-import NFA_OLD;
+import NFA.TNFA;
 import dstd;
 import std;
 
 export namespace DFA {
     template<typename State>
     class States {
-        const NFA::NFA *nfa = nullptr;
+        const NFA::TNFA::TNFABuilder *nfa = nullptr;
         stdu::vector<State> states;
         auto leadToEmptyState(std::size_t current, std::unordered_set<std::size_t> &visited) const -> std::size_t;
     public:
-        States(const NFA::NFA *nfa) : nfa(nfa) {}
-        States(const NFA::NFA *nfa, stdu::vector<State> states) : nfa(nfa), states(states) {}
+        States(const NFA::TNFA::TNFABuilder *nfa) : nfa(nfa) {}
+        States(const NFA::TNFA::TNFABuilder *nfa, stdu::vector<State> states) : nfa(nfa), states(states) {}
 
         auto &get() const { return states; }
         auto &get()       { return states; }

@@ -1,37 +1,42 @@
 module DFA.API;
 import AST.API;
 import AST.Pass;
-import NFA_OLD;
+import NFA.IR.API;
+import NFA.TNFA.API;
 import logging;
 import cpuf.op;
 import std;
 
 
-auto DFA::Comparator::compareNameWithCharacter(const stdu::vector<std::string> &name, const char c) const -> bool {
-    AST::RuleMember ast_name_as_member {.value = AST::RuleMemberName {name} };
-    AST::RuleMember ast_char_as_member {.value = AST::String {std::string(1, c)} };
-    return AST::TreePass::prioritySort(tree, ast_name_as_member, ast_char_as_member);
-}
-auto DFA::Comparator::compareNameWithName(const stdu::vector<std::string> &first_name, const stdu::vector<std::string> &second_name) const -> bool {
-    AST::RuleMemberName ast_first_name_as_member(AST::RuleMemberName {first_name});
-    AST::RuleMemberName ast_second_name_as_member(AST::RuleMemberName {second_name});
-    return AST::TreePass::prioritySort(tree, ast_first_name_as_member, ast_second_name_as_member);
+// Priority ordering by real grammar position, read off whichever
+// SourceLink carries a live AST::RuleMember. This replaces the old
+// compareNameWithCharacter/compareNameWithName pair, which had to
+// *synthesize* a fake AST::RuleMember from the (char | name) key because
+// that was the only grammar information a NFA_OLD transition key carried.
+// Now the real AST::RuleMember travels with the transition itself (as
+// debug provenance), so there is nothing left to reconstruct.
+auto DFA::Comparator::compareBySourceLink(const NFA::IR::TokenID &a, const NFA::IR::TokenID &b) const -> bool {
+    if (a.member.empty() || b.member.empty()) {
+        // No provenance on one (or both) sides - nothing grammar-shaped to
+        // compare. Fall back to token_name so the ordering is at least
+        // stable/deterministic.
+        return a.token_name < b.token_name;
+    }
+    return AST::TreePass::prioritySort(tree, a.member, b.member);
 }
 auto DFA::Comparator::operator()(const NFA::TransitionKey &a, const NFA::TransitionKey &b) const -> bool {
-    if (std::holds_alternative<char>(a) && std::holds_alternative<char>(b))
-        return 0;
-    if (std::holds_alternative<stdu::vector<std::string>>(a) && std::holds_alternative<char>(b)) {
-        return compareNameWithCharacter(std::get<stdu::vector<std::string>>(a), std::get<char>(b));
-    }
-    if (std::holds_alternative<char>(a) && std::holds_alternative<stdu::vector<std::string>>(b)) {
-        return compareNameWithCharacter(std::get<stdu::vector<std::string>>(b), std::get<char>(a));
-    }
-    if (std::holds_alternative<stdu::vector<std::string>>(a) && std::holds_alternative<stdu::vector<std::string>>(b)) {
-        return compareNameWithName(std::get<stdu::vector<std::string>>(a), std::get<stdu::vector<std::string>>(b));
-    }
-    throw Error("Undefined transition Key sort condition");
+    // NFA::TransitionKey is now a plain std::string label (see
+    // NFA.TNFA.API); it no longer distinguishes "char" from "nested
+    // name" the way NFA_OLD did, so there is no key-shape dispatch left
+    // to do here. Kept only for callers that still need *some* ordering
+    // over bare keys with no transition context available.
+    return a < b;
 }
 auto DFA::Comparator::operator()(const std::pair<NFA::TransitionKey, TransitionValue> &a, const std::pair<NFA::TransitionKey, TransitionValue> &b) const -> bool {
+    // Prefer real grammar-site ordering when both sides carry debug
+    // provenance; otherwise fall back to plain key ordering.
+    if (!a.second.debug.empty() && !b.second.debug.empty())
+        return compareBySourceLink(a.second.debug.front(), b.second.debug.front());
     return operator()(a.first, b.first);
 }
 

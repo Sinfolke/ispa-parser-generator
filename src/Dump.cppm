@@ -13,6 +13,9 @@ public:
     auto makeDumpPath(const std::string &s) const {
         return args->dump_dir + "/" + s + ".txt";
     }
+    bool isNfaDebug() const {
+        return args->nfa_debug;
+    }
     void initDumpDirectory() const;
     void setArgsPointer(const Args *args) {
         this->args = args;

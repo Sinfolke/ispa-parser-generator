@@ -5,22 +5,49 @@ import hash;
 import dstd;
 import std;
 
-export namespace NFA::InitialAPI {
+export namespace NFA::IR {
     inline constexpr auto NULL_STATE = std::numeric_limits<std::size_t>::max();
-    struct TokenID {
-        AST::RuleMember *member = nullptr;
+    struct Capture {
+        AST::RuleMember member;
         stdu::vector<std::string> token_name;
-        std::size_t position_in_token;
+        std::size_t position_in_token = NULL_STATE;
         std::size_t call = NULL_STATE;
         std::size_t group = NULL_STATE;
-        bool operator==(const TokenID &other) const = default;
-        bool operator<(const TokenID &other) const {
-            return std::tie(member, token_name, position_in_token) < std::tie(other.member, other.token_name, other.position_in_token);
+        bool operator==(const Capture &other) const = default;
+        bool operator<(const Capture &other) const {
+            if (member == other.member) {
+                return std::tie(token_name, position_in_token, call, group) <
+       std::tie(other.token_name, other.position_in_token, other.call, other.group);
+            } else {
+                return &member < &other.member;
+            }
+
         }
     private:
         friend struct ::uhash;
         auto members() const {
-            return std::tie(member, token_name, position_in_token);
+            return std::tie(member, token_name, position_in_token, call, group);
+        }
+    };
+    struct TokenID {
+        AST::RuleMember member;
+        stdu::vector<std::string> token_name;
+        std::size_t position_in_token;
+        std::size_t call = NULL_STATE;
+        std::size_t group = NULL_STATE;
+        stdu::vector<TokenID*> capture;
+        bool operator==(const TokenID &other) const = default;
+        bool operator<(const TokenID &other) const {
+            if (member == other.member) {
+                return std::tie(token_name, position_in_token, call, group) < std::tie(other.token_name, other.position_in_token, other.call, other.group);
+            } else {
+                return &member < &other.member;
+            }
+        }
+    private:
+        friend struct ::uhash;
+        auto members() const {
+            return std::tie(member, token_name, position_in_token, call, group, capture);
         }
     };
     using TransitionValue = TokenID;
@@ -29,6 +56,7 @@ export namespace NFA::InitialAPI {
     struct Token {
         stdu::vector<std::string> name;
         Transitions transitions;
+        const AST::DataBlock *data_block;
         bool top_level;
 
         bool operator==(const Token &) const = default;

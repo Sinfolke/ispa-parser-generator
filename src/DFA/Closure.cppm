@@ -1,11 +1,17 @@
 export module DFA.closure;
 
-import NFA_OLD;
-
+import NFA.TNFA.API;
+import NFA.TNFA;
 import hash;
 import cpuf.op;
 import dstd;
 import std;
+
+// Same bridge as DFA.API: keep every `NFA::Foo` spelling in this file and
+// its implementation working against the new NFA::TNFA namespace.
+export namespace NFA {
+    using namespace NFA::TNFA;
+}
 
 export namespace DFA {
 
@@ -58,13 +64,14 @@ export namespace DFA {
     using ActionPath = std::vector<FiredAction>;
 
     class Closure {
-        const NFA::NFA *nfa;
+        const NFA::TNFA::TNFABuilder *nfa;
 
         // The actual epsilon-closure: the NFA states reachable from the
         // seed(s) purely via epsilon edges.
         stdu::vector<std::size_t> closure;
         std::set<std::size_t> sorted_unique_closure;
-
+        ActionPath transition_actions;
+        std::unordered_map<std::size_t,ActionPath> terminal_actions_for;
         /*
          * TDFA core.
          *
@@ -109,12 +116,12 @@ export namespace DFA {
 
     public:
         Closure(
-            const NFA::NFA *nfa,
+            const NFA::TNFA::TNFABuilder *nfa,
             const stdu::vector<std::size_t> *current = nullptr
         );
 
         Closure(
-            const NFA::NFA *nfa,
+            const NFA::TNFA::TNFABuilder *nfa,
             const stdu::vector<std::size_t> &current
         );
 
@@ -128,12 +135,12 @@ export namespace DFA {
         // This is no longer used to defer "divergent" action sequences
         // (see migration notes) -- there is nothing left to defer.
         Closure(
-            const NFA::NFA *nfa,
+            const NFA::TNFA::TNFABuilder *nfa,
             const std::vector<std::pair<std::size_t, ActionPath>> &seeded_current
         );
 
         Closure(
-            const NFA::NFA *nfa,
+            const NFA::TNFA::TNFABuilder *nfa,
             const stdu::vector<std::size_t> &current,
             const NFA::TransitionKey &symbol
         );
@@ -177,5 +184,7 @@ export namespace DFA {
         auto operator==(const Closure &other) const {
             return closure == other.closure;
         }
+        auto getTransitionActions() const -> const ActionPath &;
+        auto getTerminalActionsForState(std::size_t state) const -> const ActionPath &;
     };
 }

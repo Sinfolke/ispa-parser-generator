@@ -43,13 +43,6 @@ export namespace LangRepr {
         auto extractRawSymbol(const LangAPI::Type &t) -> stdu::vector<LangAPI::Type>;
         auto createTypeToken() -> LangAPI::TypeAlias;
         auto createLexerClass() -> LangAPI::Class;
-        auto getStateType(DFA::DfaType state_type) -> LangAPI::IspaLibSymbol;
-        auto buildLambdaContent(
-            LangAPI::Symbol builder_sym,
-            const NFA::TemplatedDataBlockValue &data_block,
-            long long N
-        ) -> LangAPI::StorageSymbol;
-        auto makeEmptyStateLambda(const stdu::vector<std::string> &name, const stdu::vector<std::string> &clear_name) -> LangAPI::Lambda;
         ConstructBase(Holder &holder, LexerBuilder &lexer_builder, LLIR::IR &ir, AST::Tree &tree) : holder(holder), lexer_builder(lexer_builder), ir(ir), tree(tree) {}
 
         ~ConstructBase() {}

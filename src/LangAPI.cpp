@@ -746,6 +746,62 @@ namespace LangAPI {
         os << "}\n";
         return os;
     }
+    bool operator==(const DFADebug &a, const DFADebug &b) {
+        return a.member == b.member &&
+            a.token_name == b.token_name &&
+            a.group == b.group &&
+            a.call == b.call &&
+            a.rule_run == b.rule_run &&
+            a.offset == b.offset &&
+            a.length == b.length &&
+            a.ch == b.ch;
+     }
+    bool operator<(const DFADebug &a, const DFADebug &b) {
+        return std::tie(a.member,
+                        a.token_name,
+                        a.position_in_token,
+                        a.call,
+                        a.group,
+                        a.rule_run,
+                        a.offset,
+                        a.length,
+                        a.ch) < std::tie(b.member,
+                                        b.token_name,
+                                        b.position_in_token,
+                                        b.call,
+                                        b.group,
+                                        b.rule_run,
+                                        b.offset,
+                                        b.length,
+                                        b.ch);
+    }
+    std::ostream &operator<<(std::ostream &os, const DFADebug &obj) {
+        os << "DFADebug{ "
+           << "member: " << obj.member << ", "
+           << "token_name: [";
+
+        for (std::size_t i = 0; i < obj.token_name.size(); ++i) {
+            os << '"' << obj.token_name[i] << '"' << (i + 1 < obj.token_name.size() ? ", " : "");
+        }
+
+        os << "], "
+           << "position_in_token: " << obj.position_in_token << ", "
+           << "call: " << obj.call << ", "
+           << "group: " << obj.group << ", "
+           << "rule_run: " << obj.rule_run << ", "
+           << "offset: " << obj.offset << ", "
+           << "length: " << obj.length << ", "
+           << "ch: ";
+
+        // Print printable characters clearly or non-printable chars as escaped numerical values
+        if (std::isprint(static_cast<unsigned char>(obj.ch))) {
+            os << '\'' << obj.ch << '\'';
+        } else {
+            os << "'\\x" << std::hex << (static_cast<int>(obj.ch) & 0xFF) << std::dec << "'";
+        }
+
+        return os << " }";
+    }
 
     auto operator<<(std::ostream &os, const ExpressionValue &obj) -> std::ostream& {
         std::visit([&os](const auto &v) { os << v; }, obj.value);

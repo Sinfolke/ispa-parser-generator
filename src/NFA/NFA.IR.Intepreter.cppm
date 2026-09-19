@@ -57,26 +57,26 @@ struct ParseResult {
 };
 
 class IRInterpreter {
-    InitialAPI::Token main_token;
+    IR::Token main_token;
 
     struct TraceStep {
-        InitialAPI::TokenID state;
+        IR::TokenID state;
         std::size_t pos = 0;
         std::string matched_text;
     };
 
-    static auto matchMember(const AST::RuleMember *member, std::string_view input, std::size_t pos) -> std::size_t;
+    static auto matchMember(const AST::RuleMember &member, std::string_view input, std::size_t pos) -> std::size_t;
 
     static auto buildASTFromTrace(const std::vector<TraceStep> &trace) -> stdu::vector<ParsedASTNode>;
 
-    auto dfs(const InitialAPI::TokenID &curr_state,
+    auto dfs(const IR::TokenID &curr_state,
              std::string_view input,
              std::size_t pos,
              std::vector<TraceStep> &current_trace,
-             utype::unordered_set<std::pair<NFA::InitialAPI::TokenID, std::size_t>> &visited) const -> std::optional<std::vector<TraceStep>>;
+             utype::unordered_set<std::pair<NFA::IR::TokenID, std::size_t>> &visited) const -> std::optional<std::vector<TraceStep>>;
 
 public:
-    explicit IRInterpreter(NFA::InitialAPI::Token token) : main_token(std::move(token)) {}
+    explicit IRInterpreter(NFA::IR::Token token) : main_token(std::move(token)) {}
 
     auto parse(std::string_view input) const -> ParseResult;
 

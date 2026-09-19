@@ -2,11 +2,25 @@ module Cpp.CoreFunctions;
 
 import corelib;
 import logging;
+import AST.API;
 import Cpp.Statement;
 import Cpp.Declarations;
+import constants;
 
 import dstd;
-
+auto Core::isNestedArrayType(const LangAPI::Type &t) -> bool {
+    if (t.isValueType() && (t.getValueType() == LangAPI::ValueType::Array || t.getValueType() == LangAPI::ValueType::FixedSizeArray)) {
+        for (const auto &param : t.template_parameters) {
+            if (std::holds_alternative<LangAPI::Type>(param)) {
+                const auto &type = std::get<LangAPI::Type>(param);
+                if (type.isValueType() && (type.getValueType() == LangAPI::ValueType::Array || type.getValueType() == LangAPI::ValueType::FixedSizeArray)) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
 auto Core::convertType(const LangAPI::Type &type) -> std::string {
     if (type.isValueType()) {
         switch (type.getValueType()) {
@@ -189,6 +203,8 @@ auto Core::convertIspaLibSymbol(const LangAPI::IspaLibSymbol &symbol) -> std::st
             return "::ISPA_STD::Node<Tokens, " + convertTemplates(symbol.template_parameters) + ">::create";
         case LangAPI::StdlibExports::ParserNodeConstructor:
             return "::ISPA_STD::Node<Rules, " + convertTemplates(symbol.template_parameters) + ">::create";
+        case LangAPI::StdlibExports::DFADebug:
+            return "::ISPA_STD::DFA::API::DFADebug";
         default:
             throw Error("Unknown IspaLibSymbol exports: {}", (int) symbol.exports);
     }
@@ -292,6 +308,9 @@ auto Core::convertExpression(const LangAPI::Expression &expression) -> std::stri
                 break;
             case LangAPI::ExpressionValueType::IspaLibFunctionCall:
                 out << convertIspaLibFunctionCall(expr.getIspaLibFunctionCall());
+                break;
+            case LangAPI::ExpressionValueType::DFADebug:
+                out << convertDFADebug(expr.getDFADebug());
                 break;
             default:
                 throw Error("Unknown expression type");
@@ -459,6 +478,41 @@ auto Core::convertGetVariant(const LangAPI::GetVariant &get_variant) -> std::str
     std::cout << "ss: " << get_variant.sym << ", " << convertExpression(get_variant.sym) << std::endl;
     return std::string("std::get<") + convertType(*get_variant.type) + ">(" + convertExpression(get_variant.sym) + ")";
 }
+auto Core::convertDFADebug(const LangAPI::DFADebug &dfa_debug) -> std::string {
+    std::stringstream ss;
+    ss << "::ISPA_STD::DFA::API::DFADebug {";
+    if (!dfa_debug.member.empty()) {
+        if (dfa_debug.member.isString()) {
+            ss << '"' << dfa_debug.member.getString().value << '"';
+        } else if (dfa_debug.member.isCsequence()) {
+            const auto &csequence = dfa_debug.member.getCsequence();
+            ss << "\"[";
+            for (const auto &c : csequence.characters)
+                ss << c;
+            for (const auto c : csequence.escaped) {
+                ss << "\\\\" << c;
+            }
+            for (const auto &c : csequence.diapasons) {
+                ss << c.first << '-' << c.second;
+            }
+            ss << "]\"";
+        } else {
+            ss << '"' << dfa_debug.member << '"';
+        }
+    } else
+        ss << '"' << "<Undefined>" << '"';
+    ss
+        << ", " << '"' << corelib::text::join(dfa_debug.token_name, ".") << '"'
+        << ", " << dfa_debug.position_in_token
+        << ", " << (dfa_debug.call == constants::NULL_STATE ? "-1" : std::to_string(dfa_debug.call))
+        << ", " << (dfa_debug.group == constants::NULL_STATE ? "-1" : std::to_string(dfa_debug.group))
+        << ", " << (dfa_debug.rule_run == constants::NULL_STATE ? "-1" : std::to_string(dfa_debug.rule_run))
+        << ", " << dfa_debug.offset
+        << ", " << dfa_debug.length
+        << ", " << "'" << corelib::text::getCharFromEscapedAsStr(dfa_debug.ch, false) << "'"
+    << "}";
+    return ss.str();
+}
 auto Core::convertRValue(const LangAPI::RValue &rvalue) -> std::string {
     switch (rvalue.type()) {
         case LangAPI::RValueType::Undef:
@@ -483,14 +537,20 @@ auto Core::convertRValue(const LangAPI::RValue &rvalue) -> std::string {
                 // For empty arrays (including std::array with N=0), emit a simple empty initializer
                 res += "{}";
             } else {
-                res += "{{";
+                if (inside_array) {
+                    res += "{";
+                }
+                res += "{";
                 for (const auto &el : rvalue.getArray().values) {
                     res += convertExpression(el) + ", ";
                 }
                 // Remove the trailing comma+space and close braces
                 res.pop_back();
                 res.pop_back();
-                res += "}}";
+                if (inside_array) {
+                    res += "}";
+                }
+                res += "}";
             }
             return res;
         }
@@ -504,15 +564,20 @@ auto Core::convertRValue(const LangAPI::RValue &rvalue) -> std::string {
                 // For empty std::array initializers print just {}
                 res += "{}";
             } else {
-                res += ";";
-                res += "{{";
+                if (inside_array) {
+                    res += "{";
+                }
+                res += "{";
                 for (const auto &el : array.values) {
                     res += convertExpression(el) + ", ";
                 }
                 // Remove the trailing comma+space and close braces
                 res.pop_back();
                 res.pop_back();
-                res += "}}";
+                if (inside_array) {
+                    res += "{";
+                }
+                res += "{";
             }
             return res;
         }

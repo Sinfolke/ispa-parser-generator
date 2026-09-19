@@ -285,19 +285,114 @@ void AST::TreePass::sortByPriority(AST::Tree &ast) {
     }
 }
 void AST::TreePass::addSpaceToken(AST::Tree &ast) {
-    // either was already added, or a user specified a custom one
-    // do not add in this case
-    if (ast.getTreeMap().contains(constants::whitespace))
-        return;
-    AST::Rule spaceTokenRule;
-    AST::RuleMemberCsequence csequence;
-    csequence.escaped = {'t', 'n', 'r', 'v', 'f'};
-    csequence.characters = {' '};
-    spaceTokenRule.rule_members = { 
-        std::make_shared<AST::RuleMember>(AST::RuleMember { .value = AST::RuleMemberNospace {} }), 
-        std::make_shared<AST::RuleMember>(AST::RuleMember { .quantifier = '+', .value = csequence }) 
+    // 1. Ensure 'whitespace' rule exists without overwriting user definitions
+    if (!ast.getTreeMap().contains(constants::whitespace)) {
+        AST::Rule spaceTokenRule;
+        AST::RuleMemberCsequence csequence;
+        csequence.escaped = {'t', 'n', 'r', 'v', 'f'};
+        csequence.characters = {' '};
+        spaceTokenRule.rule_members = {
+            std::make_shared<AST::RuleMember>(AST::RuleMember{ .quantifier = '*', .value = csequence })
+        };
+        ast.getTreeMap()[constants::whitespace] = spaceTokenRule;
+    }
+    if (!ast.getTreeMap().contains(constants::whitespace_token)) {
+        AST::Rule spaceForTokensRule;
+        AST::RuleMemberCsequence csequence;
+        csequence.escaped = {'t', 'n', 'r', 'v', 'f'};
+        csequence.characters = {' '};
+        spaceForTokensRule.rule_members = {
+            std::make_shared<AST::RuleMember>(AST::RuleMember{ .quantifier = '+', .value = csequence })
+        };
+        ast.getTreeMap()[constants::whitespace_token] = spaceForTokensRule;
+    }
+    auto createsExplicitWhitespace = [](auto self, const std::shared_ptr<RuleMember> &mem) -> bool {
+        if (!mem) return false;
+        if (mem->isNospace() || mem->isAny()) return true;
+
+        if (mem->isGroup()) {
+            const auto &vals = mem->getGroup().values;
+            if (vals.empty()) return false;
+            return self(self, vals.front()) || self(self, vals.back());
+        }
+
+        if (mem->isOp()) {
+            const auto &opts = mem->getOp().options;
+            for (const auto &opt : opts) {
+                if (self(self, opt)) return true;
+            }
+            return false;
+        }
+
+        if (mem->isString()) {
+            const auto &str = mem->getString().value;
+            if (str.empty()) return false;
+            auto is_ws = [](char c) {
+                return std::find(constants::whitespace_chars.begin(), constants::whitespace_chars.end(), c) != constants::whitespace_chars.end();
+            };
+            return is_ws(str.front()) || is_ws(str.back());
+        }
+
+        if (mem->isCsequence()) {
+            const auto &cs = mem->getCsequence();
+            if (std::find(cs.characters.begin(), cs.characters.end(), ' ') != cs.characters.end()) return true;
+            for (char esc : cs.escaped) {
+                if (std::find(constants::whitespace_chars.begin(), constants::whitespace_chars.end(), esc) != constants::whitespace_chars.end()) {
+                    return true;
+                }
+            }
+        }
+
+        if (mem->isEscaped()) {
+            char decoded = corelib::text::getCharFromEscaped(mem->getEscaped().c);
+            if (std::find(constants::whitespace_chars.begin(), constants::whitespace_chars.end(), decoded) != constants::whitespace_chars.end()) {
+                return true;
+            }
+        }
+        return false;
     };
-    ast.getTreeMap()[constants::whitespace] = spaceTokenRule;
+
+    auto processMembers = [&](auto self, stdu::vector<std::shared_ptr<RuleMember>> &rule_members, bool token) -> void {
+        stdu::vector<std::shared_ptr<RuleMember>> updated_members;
+        updated_members.reserve(rule_members.size() * 2);
+
+        for (std::size_t i = 0; i < rule_members.size(); ++i) {
+            auto mem = rule_members[i];
+
+            // Process nested groups recursively
+            if (mem->isGroup()) {
+                self(self, mem->getGroup().values, token);
+            } else if (mem->isOp()) {
+                for (auto &opt : mem->getOp().options) {
+                    if (opt->isGroup()) {
+                        self(self, opt->getGroup().values, token);
+                    }
+                }
+            }
+
+            // Check if either the current member or the preceding member suppresses whitespace
+            bool skip_space = createsExplicitWhitespace(createsExplicitWhitespace, mem) ||
+                             (i > 0 && createsExplicitWhitespace(createsExplicitWhitespace, rule_members[i - 1]));
+
+            if (i > 0 && !skip_space) {
+                auto ws_ref = std::make_shared<AST::RuleMember>(AST::RuleMember{
+                    .value = AST::RuleMemberName{.name = {token ? constants::whitespace_token : constants::whitespace}}
+                });
+                updated_members.push_back(ws_ref);
+            }
+
+            updated_members.push_back(mem);
+        }
+
+        rule_members = std::move(updated_members);
+    };
+
+    // 2. Apply pass to all rules except reserved whitespace rules
+    for (auto &[name, rule] : ast.getTreeMap()) {
+        if (name == constants::whitespace || name == constants::whitespace_rule || name == constants::whitespace_token)
+            continue;
+        processMembers(processMembers, rule.rule_members, corelib::text::isUpper(name.back()));
+    }
 }
 void AST::TreePass::removeEmptyRule() {
     removeEmptyRule(*ast);

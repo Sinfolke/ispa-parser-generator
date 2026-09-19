@@ -9,11 +9,13 @@ import LLIR.RuleBuilder;
 import LLIR.CllBuilder;
 import NFA.IR;
 import NFA.IR.Interpreter;
+import NFA.TNFA;
+import NFA.TNFA.Interpreter;
 import NFA_OLD;
 import DFA.API;
-import DFA.functionality;
 import DFA;
 import Dump;
+import args;
 import logging;
 import constants;
 import cpuf.op;
@@ -75,41 +77,45 @@ void LexerBuilder::build() {
             throw Error("failed to open NFA-IR for dump");
         dumpNFAFile << initial_nfa;
     }
-    // stdu::vector<NFA> nfas;
-    // std::size_t accept_index = 0;
-    // for (const auto &[name, rule] : ast) {
-    //     if (corelib::text::isLower(name.back()) || !isTopLevel(name)) {
-    //         continue;
-    //     }
-    //     // token here
-    //     NFA nfa(ast, name, &rule.data_block, rule.rule_members, name == constants::whitespace, true, &accept_index);
-    //     nfa.build(true);
-    //     if (dumper.shouldDump("NFA")) {
-    //         std::ofstream dumpNFAFile(dumper.makeDumpPath("NFA"), std::ios::app);
-    //         if (!dumpNFAFile.is_open())
-    //             throw Error("failed to open DFA for dump");
-    //         dumpNFAFile << "token: " << corelib::text::join(name, "::") << "\n";
-    //         dumpNFAFile << nfa;
-    //         dumpNFAFile.close();
-    //     }
-    //     nfas.push_back(nfa);
-    // }
-    // if (nfas.empty()) {
-    //     throw Error("Your grammar does not have any DFA-based token");
-    // }
-    // auto nfa = DFA::mergeNFAS(nfas);
-    // if (dumper.shouldDump("NFA")) {
-    //     std::ofstream dumpNFAFile(dumper.makeDumpPath("NFA-merged"));
-    //     if (!dumpNFAFile.is_open())
-    //         throw Error("failed to open DFA for dump");
-    //     dumpNFAFile << nfa.first;
-    //     dumpNFAFile.close();
-    // }
-    // auto dfa_meta = DFA::build(ast, nfa.first);
-    // dfa = std::get<0>(dfa_meta);
-    // lr_table = std::get<1>(dfa_meta);
-    // semantic_table = std::get<2>(dfa_meta);
-    // max_registers_count = nfa.second;
+
+    // build actual NFA from NFA IR
+    NFA::TNFA::TNFABuilder builder(initial_nfa, dumper.isNfaDebug());
+    builder.build();
+    if (dumper.shouldDump("NFA")) {
+        std::ofstream dumpNFAFile(dumper.makeDumpPath("NFA"));
+        if (!dumpNFAFile.is_open())
+            throw Error("failed to open NFA for dump");
+        dumpNFAFile << builder;
+    }
+    // 1. Instantiate interpreter ONCE outside the loop to avoid copying state vectors repeatedly
+    NFA::Interpreter::TNFAInterpreter interpreter(builder.getStates());
+
+    for (const auto &[rule_name, samples]: test_cases) {
+        auto entry = builder.getEntry(rule_name);
+        if (!entry.has_value()) {
+            continue;
+        }
+
+        // 3. Avoid nested subdirectories in filenames unless directories are created explicitly
+        const std::string sanitize_rule = corelib::text::join(rule_name, "_");
+        Tlog::Branch b(logger, "TNFA-TEST/" + sanitize_rule + ".log");
+
+        for (const auto &sample: samples) {
+            logger.log("sample {}", sample);
+
+            // 4. Pass 'sample' directly: sample.c_str() forces an unnecessary O(N) strlen calculation
+            auto result = interpreter.run(entry.value(), sample);
+            logger.log("result: {}", result);
+        }
+    }
+    DFA::DFA dfa(&builder);
+    dfa.build();
+    dfa.minimize();
+    auto classified = dfa.classify();
+    this->dfa = std::move(classified);
+    lr_table = dfa.getLR();
+    semantic_table = dfa.getSemantic();
+    max_registers_count = 10;
 
 }
 auto LexerBuilder::getDataBlocks() const -> LLIR::DataBlockList {

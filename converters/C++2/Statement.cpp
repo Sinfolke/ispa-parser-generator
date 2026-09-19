@@ -11,7 +11,8 @@ Cpp::Statement::Statement(Converter::Writer &output) : Converter::Statement(outp
 auto Cpp::Statement::createVariable(const LangAPI::Variable &v) -> void {
     Core::output->write("{} {}", Core::convertType(v.type), v.name);
     if (!v.value.empty()) {
-        Core::output->dwrite(" = {}", Core::convertExpression(v.value));
+        bool nested_array_type = v.nested_array_type || Core::isNestedArrayType(v.type);
+        Core::output->dwrite(" = {}{}{}", Core::convertExpression(v.value), nested_array_type ? "{" : "", nested_array_type ? "}" : "");
     }
     Core::output->dwriteln(";");
 }

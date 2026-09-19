@@ -117,6 +117,69 @@ bool operator==(std::unordered_set<T> a, std::unordered_set<T> b) {
     }
     return true;
 }
+template<typename T>
+concept EqualityComparable = requires(const T& a, const T& b) {
+    { a == b } -> std::convertible_to<bool>;
+};
+
+template<typename T>
+concept LessThanComparable = requires(const T& a, const T& b) {
+    { a < b } -> std::convertible_to<bool>;
+};
+export namespace std {
+    template<EqualityComparable T>
+    bool operator==(const std::shared_ptr<T>& a,
+                    const std::shared_ptr<T>& b)
+    {
+        if (&(*a) == &(*b))
+            return true;
+
+        if (!a || !b)
+            return false;
+
+        return *a == *b;
+    }
+    template<LessThanComparable T>
+    bool operator<(const std::shared_ptr<T>& a,
+               const std::shared_ptr<T>& b)
+    {
+        if (!a || !b)
+            return a.get() < b.get();
+
+        return *a < *b;
+    }
+    template<typename T>
+    requires requires(const T& a, const T& b) {
+        { a == b } -> std::convertible_to<bool>;
+    }
+    bool operator==(const std::unordered_set<T>& a,
+                    const std::unordered_set<T>& b)
+    {
+        if (a.size() != b.size())
+            return false;
+
+        for (const auto& x : a) {
+            if (!b.contains(x))
+                return false;
+        }
+
+        return true;
+    }
+    template<typename Key, typename Value, typename Hash>
+    bool operator<(const std::unordered_map<Key, Value, Hash>& a,
+                    const std::unordered_map<Key, Value, Hash>& b)
+    {
+        if (a.size() != b.size())
+            return false;
+
+        for (const auto &[key, value] : a) {
+            if (!b.contains(key) || !(value == b.at(key)))
+                return false;
+        }
+
+        return true;
+    }
+}
 export struct uequal {
     template<typename T>
     bool operator()(const T& a, const T& b) const {

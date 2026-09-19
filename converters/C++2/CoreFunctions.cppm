@@ -23,7 +23,12 @@ export namespace Core {
     bool forward_declared = false;
     bool templated = false;
     bool is_directed_to_source = false;
+    bool inside_array = false;
     std::stringstream init_content;
+
+    // helper
+    auto isNestedArrayType(const LangAPI::Type &t) -> bool;
+
     // type
     auto convertType(const LangAPI::Type &type) -> std::string;
     auto convertTemplates(const decltype(LangAPI::Type::template_parameters) &template_parameters) -> std::string;
@@ -44,6 +49,7 @@ export namespace Core {
     auto convertIspaLibFunctionCall(const LangAPI::IspaLibFunctionCall &call) -> std::string;
     auto convertMakeTuple(const LangAPI::MakeTuple &make_tuple) -> std::string;
     auto convertGetVariant(const LangAPI::GetVariant &make_tuple) -> std::string;
+    auto convertDFADebug(const LangAPI::DFADebug &dfa_debug) -> std::string;
     // rvalue
     auto convertRValue(const LangAPI::RValue &rvalue) -> std::string;
 

@@ -8,7 +8,7 @@ auto CppParser::generate() -> int {
     return utils::command("{} -a LL -o {} --lang cpp {} --ddall --dd TestDumps", std::filesystem::path(BINARY_DIR) / "ispa", temp_directory / "Parser", File::getGrammarFile(name));
 }
 auto CppParser::compile(std::string bootloader_name, std::string clang) -> int {
-    return utils::command("{} {} {} -I {} -I {} -ferror-limit=1 -o {} -g -O2",
+    return utils::command("{} {} {} -I {} -I {} -ferror-limit=1 -o {} -g",
         clang,
         std::filesystem::path(TEST_ROOT_DIR) / "compile" / (bootloader_name + ".cpp"),
         parserSourcePath(),

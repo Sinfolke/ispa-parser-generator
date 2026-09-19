@@ -8,6 +8,7 @@ import LLIR.Builder.DataWrapper;
 import LLIR.Rule.MemberBuilder;
 import LLIR.Builder.Data;
 import cpuf.printf;
+import cpuf.op;
 import constants;
 import std;
 
@@ -15,16 +16,27 @@ namespace {
     class AstInputGenerator {
         AST::InitialItemSet& itemSet;
 
-        static auto cartesianProduct(const std::vector<std::vector<std::string>>& choices) -> std::vector<std::string> {
+        static auto isWhitespaceName(const stdu::vector<std::string>& name) -> bool {
+            if (name.empty()) return false;
+            return name == constants::whitespace ||
+                   name == constants::whitespace_token ||
+                   name == constants::whitespace_rule
+            ;
+        }
+
+        static auto cartesianProduct(const std::vector<std::vector<std::string>>& choices, std::size_t maxLimit = 16) -> std::vector<std::string> {
             std::vector<std::string> result = {""};
             for (const auto& choice : choices) {
                 if (choice.empty()) continue;
                 std::vector<std::string> next_result;
-                next_result.reserve(result.size() * choice.size());
+                next_result.reserve(std::min(result.size() * choice.size(), maxLimit));
+
                 for (const auto& res : result) {
                     for (const auto& c : choice) {
                         next_result.push_back(res + c);
+                        if (next_result.size() >= maxLimit) break;
                     }
+                    if (next_result.size() >= maxLimit) break;
                 }
                 result = std::move(next_result);
             }
@@ -99,9 +111,9 @@ namespace {
         }
 
         auto expandMemberBase(const AST::RuleMember& member,
-                             const stdu::vector<std::string>& currentScope,
-                             std::size_t depth,
-                             std::size_t maxDepth) -> std::vector<std::string> {
+                              const stdu::vector<std::string>& currentScope,
+                              std::size_t depth,
+                              std::size_t maxDepth) -> std::vector<std::string> {
             if (member.isNospace()) return {""};
             if (member.isString()) return {member.getString().value};
             if (member.isEscaped()) return {std::string(1, member.getEscaped().c)};
@@ -121,7 +133,6 @@ namespace {
             if (member.isGroup()) {
                 std::vector<std::vector<std::string>> groupChoices;
                 for (const auto &sub : member.getGroup().values) {
-                    // Do NOT increment depth for internal grouping
                     groupChoices.push_back(expandMemberRecursive(*sub, currentScope, depth, maxDepth));
                 }
                 return cartesianProduct(groupChoices);
@@ -130,16 +141,18 @@ namespace {
             if (member.isOp()) {
                 std::set<std::string> opResults;
                 for (const auto &picked : member.getOp().options) {
-                    // Do NOT increment depth for op choices
                     auto res = expandMemberRecursive(*picked, currentScope, depth, maxDepth);
                     opResults.insert(res.begin(), res.end());
+                    if (opResults.size() >= 8) break; // Limit op variant count
                 }
                 return {opResults.begin(), opResults.end()};
             }
 
             if (member.isName()) {
                 const auto &name = member.getName().name;
-                // Increment depth ONLY when entering a non-terminal rule reference
+                if (isWhitespaceName(name)) {
+                    return {"", " "}; // Canonical whitespace samples
+                }
                 return expandRule(name, currentScope, depth + 1, maxDepth);
             }
 
@@ -160,14 +173,20 @@ namespace {
             }
             // 1 repetition
             if (member.quantifier == '?' || member.quantifier == '*' || member.quantifier == '+') {
-                for (const auto& b : base) results.insert(b);
+                for (const auto& b : base) {
+                    results.insert(b);
+                    if (results.size() >= 8) break;
+                }
             }
-            // 2 repetitions
+            // 2 repetitions (bounded to avoid explosion)
             if (member.quantifier == '*' || member.quantifier == '+') {
+                std::size_t count = 0;
                 for (const auto& b1 : base) {
                     for (const auto& b2 : base) {
                         results.insert(b1 + b2);
+                        if (++count >= 4) break;
                     }
+                    if (count >= 4) break;
                 }
             }
             return {results.begin(), results.end()};
@@ -177,10 +196,13 @@ namespace {
                         const stdu::vector<std::string>& currentScope,
                         std::size_t depth,
                         std::size_t maxDepth) -> std::vector<std::string> {
+            if (isWhitespaceName(ruleName)) {
+                return {"", " "};
+            }
             if (depth >= maxDepth) return {""};
 
             auto keyOpt = resolveRuleKey(currentScope, ruleName);
-            if (!keyOpt.has_value()) return {"a"}; // Fallback char if rule is non-recursive primitive
+            if (!keyOpt.has_value()) return {"a"};
 
             const auto &key = *keyOpt;
             auto it = itemSet.find(key);
@@ -196,6 +218,7 @@ namespace {
                 }
                 auto product = cartesianProduct(memberChoices);
                 variants.insert(product.begin(), product.end());
+                if (variants.size() >= 16) break;
             }
 
             return {variants.begin(), variants.end()};
@@ -207,7 +230,7 @@ namespace {
         auto generateTokenSamples(std::size_t maxDepth = 2) -> utype::unordered_map<stdu::vector<std::string>, stdu::vector<std::string>> {
             utype::unordered_map<stdu::vector<std::string>, stdu::vector<std::string>> out;
             for (const auto &[name, rules] : itemSet) {
-                if (name.empty() || !corelib::text::isUpper(name.back())) continue;
+                if (name.empty() || !corelib::text::isUpper(name.back()) || isWhitespaceName(name)) continue;
 
                 auto samples = expandRule(name, name, 0, maxDepth);
                 out[name] = stdu::vector<std::string>{samples.begin(), samples.end()};
@@ -218,7 +241,7 @@ namespace {
         auto generateOneStepRuleSamples() -> std::unordered_map<std::string, stdu::vector<std::string>> {
             std::unordered_map<std::string, stdu::vector<std::string>> out;
             for (const auto &[name, rules] : itemSet) {
-                if (name.empty() || !corelib::text::isLower(name.back()) || rules.empty()) continue;
+                if (name.empty() || !corelib::text::isLower(name.back()) || rules.empty() || isWhitespaceName(name)) continue;
                 auto key = corelib::text::join(name, "_");
 
                 std::set<std::string> ruleVariants;
@@ -235,6 +258,7 @@ namespace {
                     }
                     auto product = cartesianProduct(memberChoices);
                     ruleVariants.insert(product.begin(), product.end());
+                    if (ruleVariants.size() >= 16) break;
                 }
 
                 out[key] = stdu::vector<std::string>{ruleVariants.begin(), ruleVariants.end()};

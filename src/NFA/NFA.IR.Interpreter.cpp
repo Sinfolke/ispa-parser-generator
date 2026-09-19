@@ -1,24 +1,24 @@
 module NFA.IR.Interpreter;
 
 namespace NFA::Interpreter {
-    auto IRInterpreter::matchMember(const AST::RuleMember *member, std::string_view input, std::size_t pos) -> std::size_t {
-        if (!member || member->empty()) return 0;
+    auto IRInterpreter::matchMember(const AST::RuleMember &member, std::string_view input, std::size_t pos) -> std::size_t {
+        if (member.empty()) return 0;
 
-        if (member->isString()) {
-            const auto &str = member->getString().value;
+        if (member.isString()) {
+            const auto &str = member.getString().value;
             if (input.substr(pos).starts_with(str)) return str.size();
             return 0;
         }
 
-        if (member->isEscaped()) {
-            if (pos < input.size() && input[pos] == member->getEscaped().c) return 1;
+        if (member.isEscaped()) {
+            if (pos < input.size() && input[pos] == member.getEscaped().c) return 1;
             return 0;
         }
 
-        if (member->isCsequence()) {
+        if (member.isCsequence()) {
             if (pos >= input.size()) return 0;
             char ch = input[pos];
-            const auto &cs = member->getCsequence();
+            const auto &cs = member.getCsequence();
 
             bool found = false;
             for (char c : cs.characters) if (ch == c) { found = true; break; }
@@ -35,22 +35,22 @@ namespace NFA::Interpreter {
             return matched ? 1 : 0;
         }
 
-        if (member->isAny()) {
+        if (member.isAny()) {
             return (pos < input.size()) ? 1 : 0;
         }
 
-        if (member->isNospace()) {
+        if (member.isNospace()) {
             return 0; // Zero-width match
         }
 
-        if (member->isHex()) {
-            const auto &hex = member->getHex().hex_chars;
+        if (member.isHex()) {
+            const auto &hex = member.getHex().hex_chars;
             if (!hex.empty() && input.substr(pos).starts_with(hex)) return hex.size();
             return 0;
         }
 
-        if (member->isBin()) {
-            const auto &bin = member->getBin().bin_chars;
+        if (member.isBin()) {
+            const auto &bin = member.getBin().bin_chars;
             if (!bin.empty() && input.substr(pos).starts_with(bin)) return bin.size();
             return 0;
         }
@@ -65,7 +65,7 @@ namespace NFA::Interpreter {
         std::vector<ParsedASTNode *> node_stack;
 
         for (const auto &step : trace) {
-            if (step.matched_text.empty() && step.state.member == nullptr) {
+            if (step.matched_text.empty() && step.state.member.empty()) {
                 continue; // Skip structural/epsilon states with no text
             }
 
@@ -105,20 +105,20 @@ namespace NFA::Interpreter {
         return root_nodes;
     }
 
-    auto IRInterpreter::dfs(const NFA::InitialAPI::TokenID &curr_state,
+    auto IRInterpreter::dfs(const NFA::IR::TokenID &curr_state,
              std::string_view input,
              std::size_t pos,
              std::vector<TraceStep> &current_trace,
-             utype::unordered_set<std::pair<NFA::InitialAPI::TokenID, std::size_t>> &visited) const -> std::optional<std::vector<TraceStep>> {
+             utype::unordered_set<std::pair<NFA::IR::TokenID, std::size_t>> &visited) const -> std::optional<std::vector<TraceStep>> {
 
         auto state_key = std::make_pair(curr_state, pos);
         if (visited.contains(state_key)) return std::nullopt;
         visited.insert(state_key);
 
         std::size_t consumed = 0;
-        if (curr_state.member != nullptr) {
+        if (!curr_state.member.empty()) {
             consumed = matchMember(curr_state.member, input, pos);
-            if (consumed == 0 && !curr_state.member->isNospace() && !curr_state.member->empty()) {
+            if (consumed == 0 && !curr_state.member.isNospace() && !curr_state.member.empty()) {
                 return std::nullopt; // Terminal failed to match
             }
         }
@@ -152,7 +152,7 @@ namespace NFA::Interpreter {
         if (main_token.transitions.empty()) return result;
 
         // Find initial entry state (position_in_token == 0)
-        InitialAPI::TokenID start_state;
+        IR::TokenID start_state;
         bool found_start = false;
         for (const auto &[key, _] : main_token.transitions) {
             if (key.position_in_token == 0) {
@@ -167,7 +167,7 @@ namespace NFA::Interpreter {
         }
 
         std::vector<TraceStep> trace;
-        utype::unordered_set<std::pair<InitialAPI::TokenID, std::size_t>> visited;
+        utype::unordered_set<std::pair<IR::TokenID, std::size_t>> visited;
 
         auto final_trace = dfs(start_state, input, 0, trace, visited);
         if (final_trace.has_value()) {

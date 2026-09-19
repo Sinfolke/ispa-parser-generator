@@ -187,14 +187,14 @@ namespace corelib::text {
     // but does not prepend backslashes, for cases where the context is known
     std::string getCharFromEscapedAsStr(char in, bool stringContext) {
         switch (in) {
-            case '\n': return "n";
-            case '\r': return "r";
-            case '\t': return "t";
-            case '\a': return "a";
-            case '\b': return "b";
-            case '\f': return "f";
-            case '\v': return "v";
-            case '\0': return "0";
+            case '\n': return "\\n";
+            case '\r': return "\\r";
+            case '\t': return "\\t";
+            case '\a': return "\\a";
+            case '\b': return "\\b";
+            case '\f': return "\\f";
+            case '\v': return "\\v";
+            case '\0': return "\\0";
             case '\\': return "\\";
             case '"':
                 return stringContext ? "\\\"" : "\"";

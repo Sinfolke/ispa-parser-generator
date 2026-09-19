@@ -1,7 +1,8 @@
 export module DFA;
 
-import NFA_OLD;
-
+import NFA.IR.API;
+import NFA.TNFA.API;
+import NFA.TNFA;
 import DFA.API;
 import DFA.States;
 import DFA.closure;
@@ -28,23 +29,18 @@ struct ClassifiedDFA {
 class DFA {
   States<State<>> states;
   States<StateWithActions> states_with_actions;
-  NFA::NFA &nfa;
+  NFA::TNFA::TNFABuilder &nfa;
   stdu::vector<NFA::ActionState> action_table;
   stdu::vector<NFA::SemanticState> semantic_table;
-  void bindBeforeActions();
   auto sameAcceptBinding(const State<> &a, const State<> &b) -> bool;
   auto initialClass(const StateWithActions &s) -> std::size_t;
-  auto refinementKey(const State<> &s,
-                     const std::unordered_map<std::size_t, std::size_t> &partition_of)
-      -> std::vector<TransitionKeyExt>;
   void optimizeRegistersAndLRTable();
   void optimizeSemanticTable();
   auto clear() -> void;
-  auto getType() const -> DfaType;
   auto check_dfa() -> void;
 
 public:
-  DFA(NFA::NFA *nfa) : nfa(*nfa), states(nfa), states_with_actions(nfa) {}
+  DFA(NFA::TNFA::TNFABuilder *nfa) : nfa(*nfa), states(nfa), states_with_actions(nfa) {}
   auto build() -> const States<StateWithActions> &;
   auto minimize() -> States<State<>>;
   auto classify() -> ClassifiedDFA;
@@ -54,6 +50,14 @@ public:
   auto &getLR() const { return action_table; }
   auto &getSemantic() { return semantic_table; }
   auto &getSemantic() const { return semantic_table; }
+
+  auto operator=(const DFA &other) {
+    states = std::move(other.states);
+    states_with_actions = std::move(other.states_with_actions);
+    nfa = other.nfa;
+    action_table = std::move(other.action_table);
+    semantic_table = std::move(other.semantic_table);
+  };
 };
 
 auto operator<<(std::ostream &os, const DFA &dfa) -> std::ostream &;

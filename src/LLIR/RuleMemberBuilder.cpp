@@ -6,8 +6,8 @@ import cpuf.hex;
 import cpuf.op;
 import cpuf.printf;
 import Dump;
-import NFA_OLD;
-import DFA.functionality;
+import NFA.IR;
+import NFA.TNFA;
 import DFA;
 import constants;
 import std;
@@ -780,101 +780,106 @@ void LLIR::OpBuilder::build() {
     svar.value = LangAPI::Bool::createExpression(LangAPI::Bool {.value = true});;
     statements.push_back(LangAPI::Variable::createStatement(var));
     statements.push_back(LangAPI::Variable::createStatement(svar));
+    for (const auto &a : op) {
+        MemberBuilder builder(*this, *a);
+        builder.build();
+    }
     if (corelib::text::isLower(fullname.back())) {
         std::size_t accept_index = 0;
         std::size_t priority_counter = 0;
-        NFA::NFA nfa(tree, fullname, nullptr, op, fullname == constants::whitespace, false, &accept_index, &priority_counter);
-        auto dfa = DFA::DFA(&nfa);
-        if (dfa.get().size() == 2) { // first state plus end state
-            // optimize to single switch instead of DFA lookup
-            LangAPI::Switch ss { .expression = LangAPI::Pos::createExpression(LangAPI::Pos {.dereference = true}) };
-            auto state = dfa.get()[0];
-            statements.push_back(LangAPI::SkipSpaces::createStatement(LangAPI::SkipSpaces {.isToken = isToken}));
-            for (const auto &t : state.transitions) {
-                if (std::holds_alternative<stdu::vector<std::string>>(t.first) && std::get<stdu::vector<std::string>>(t.first) == constants::whitespace)
-                    continue;
-                auto target_state_opt = std::visit([](const auto &target) -> std::optional<std::size_t> {
-                    if constexpr (requires { target.dfa_state_id; }) {
-                        return target.dfa_state_id;
-                    }
-                    return std::nullopt;
-                }, t.second);
-                if (!target_state_opt.has_value())
-                    continue;
-                const auto target_state = target_state_opt.value();
-                if (std::holds_alternative<char>(t.first)) {
-                    auto c = std::get<char>(t.first);
-                    if (std::any_of(constants::whitespace_chars.begin(), constants::whitespace_chars.end(), [&](char _c) { return _c == c; }) && target_state == 0) {
-                        continue;
-                    }
-                }
-                ss.cases.emplace_back();
-                if (std::holds_alternative<stdu::vector<std::string>>(t.first)) {
-                    ss.cases.back().first = LangAPI::Symbol::createRValue(LangAPI::Symbol {{"Tokens", corelib::text::join(std::get<stdu::vector<std::string>>(t.first), "_")}});
-                } else {
-                    ss.cases.back().first = LangAPI::Char::createRValue(LangAPI::Char {.value = std::get<char>(t.first)});
-                }
-                Assert(target_state < dfa.get().size(), "DFA transition target is out of range");
-                const auto &target = dfa.get()[target_state];
-                Assert(target.accept_binding.has_value(), "NO_ACCEPT shouldn't be here");
-                Assert(target.accept_binding->token_id != NFA::NULL_STATE, "NO_ACCEPT shouldn't be here");
-                MemberBuilder builder(*this, *op[target.accept_binding->token_id]);
-                builder.build();
-                auto &ss_case = ss.cases.back();
-                ss_case.second = builder.getData();
-                ss_case.second.emplace_back(LangAPI::VariableAssignment::createStatement(LangAPI::VariableAssignment {
-                    .name = LangAPI::Symbol {var.name},
-                    .value = LangAPI::Symbol::createExpression(LangAPI::Symbol {
-                        builder.getReturnVars().back().uvar.name
-                    })
-                }));
-            }
-            statements.push_back(LangAPI::Switch::createStatement(ss));
-        } else {
-            auto dfa_index = dfas->size();
-            dfas->push_back(std::move(dfa));
-            auto dfa_call_result = createEmptyVariable("dfa_lookup_result" + generateVariableName());
-            dfa_call_result.type.type = LangAPI::ValueType::Int;
-            LangAPI::Type lookup = LangAPI::ValueType::Variant;
-            for (const auto &member_ptr : op) {
-                if (member_ptr->isName()) {
-                    lookup.template_parameters.push_back(LangAPI::Type {LangAPI::Symbol {member_ptr->getName().name}});
-                }
-            }
-            statements.push_back(LangAPI::Variable::createStatement(dfa_call_result));
-            statements.push_back(LangAPI::DfaLookup::createStatement(LangAPI::DfaLookup {.dfa_count = dfa_index, .return_type = lookup, .output_name = dfa_call_result.name}));
-            LangAPI::Switch ss {.expression = LangAPI::Symbol::createExpression(LangAPI::Symbol { dfa_call_result.name }) };
-            for (int i = 0; i < op.size(); ++i) {
-                ss.cases.emplace_back();
-                auto &cs = ss.cases.back();
-                cs.first = LangAPI::Int::createRValue(LangAPI::Int {.value = i});
-                if (op[i]->isName() && op[i]->getName().isTerminal()) {
-                    // insert variable assignment
-                    //cs.block.push_back(assignSvar(svar, var_assign_values::True));
-                    cs.second.emplace_back(LangAPI::VariableAssignment::createStatement(LangAPI::VariableAssignment {.name = LangAPI::Symbol {var.name}, .value = LangAPI::Pos::createExpression(LangAPI::Pos {.dereference = true})}));
-                } else if (op[i]->isName() && op[i]->getName().isNonterminal()) {
-                    const auto &nonterminal = op[i]->getName().name;
-                    cs.second.emplace_back(LangAPI::VariableAssignment::createStatement(
-                        LangAPI::VariableAssignment {
-                            .name = LangAPI::Symbol {var.name},
-                            .value = LangAPI::FunctionCall::createExpression(
-                                LangAPI::FunctionCall {
-                                    .name = std::make_shared<LangAPI::Symbol>(corelib::text::join(nonterminal, "_")),
-                                    .args = {
-                                        LangAPI::Pos::createExpression(LangAPI::Pos {.dereference = false})
-                                    }
-                                }
-                            )
-                        }
-                    ));
-                } else {
-                    MemberBuilder builder(*this, *op[i]);
-                    builder.build();
-                    cs.second = std::move(builder.getData());
-                }
-            }
-            statements.push_back(LangAPI::Switch::createStatement(ss));
-        }
+        // NFA::InitialNFA infa(tree);
+        // NFA::TNFA::TNFABuilder nfa(infa);
+        // DFA::DFA dfa(&nfa);
+        // if (dfa.get().size() == 2) { // first state plus end state
+        //     // optimize to single switch instead of DFA lookup
+        //     LangAPI::Switch ss { .expression = LangAPI::Pos::createExpression(LangAPI::Pos {.dereference = true}) };
+        //     auto state = dfa.get()[0];
+        //     statements.push_back(LangAPI::SkipSpaces::createStatement(LangAPI::SkipSpaces {.isToken = isToken}));
+        //     for (const auto &t : state.transitions) {
+        //         if (std::holds_alternative<stdu::vector<std::string>>(t.first) && std::get<stdu::vector<std::string>>(t.first) == constants::whitespace)
+        //             continue;
+        //         auto target_state_opt = std::visit([](const auto &target) -> std::optional<std::size_t> {
+        //             if constexpr (requires { target.dfa_state_id; }) {
+        //                 return target.dfa_state_id;
+        //             }
+        //             return std::nullopt;
+        //         }, t.second);
+        //         if (!target_state_opt.has_value())
+        //             continue;
+        //         const auto target_state = target_state_opt.value();
+        //         if (std::holds_alternative<char>(t.first)) {
+        //             auto c = std::get<char>(t.first);
+        //             if (std::any_of(constants::whitespace_chars.begin(), constants::whitespace_chars.end(), [&](char _c) { return _c == c; }) && target_state == 0) {
+        //                 continue;
+        //             }
+        //         }
+        //         ss.cases.emplace_back();
+        //         if (std::holds_alternative<stdu::vector<std::string>>(t.first)) {
+        //             ss.cases.back().first = LangAPI::Symbol::createRValue(LangAPI::Symbol {{"Tokens", corelib::text::join(std::get<stdu::vector<std::string>>(t.first), "_")}});
+        //         } else {
+        //             ss.cases.back().first = LangAPI::Char::createRValue(LangAPI::Char {.value = std::get<char>(t.first)});
+        //         }
+        //         Assert(target_state < dfa.get().size(), "DFA transition target is out of range");
+        //         const auto &target = dfa.get()[target_state];
+        //         Assert(target.accept_binding.has_value(), "NO_ACCEPT shouldn't be here");
+        //         Assert(target.accept_binding->token_id != NFA::NULL_STATE, "NO_ACCEPT shouldn't be here");
+        //         MemberBuilder builder(*this, *op[target.accept_binding->token_id]);
+        //         builder.build();
+        //         auto &ss_case = ss.cases.back();
+        //         ss_case.second = builder.getData();
+        //         ss_case.second.emplace_back(LangAPI::VariableAssignment::createStatement(LangAPI::VariableAssignment {
+        //             .name = LangAPI::Symbol {var.name},
+        //             .value = LangAPI::Symbol::createExpression(LangAPI::Symbol {
+        //                 builder.getReturnVars().back().uvar.name
+        //             })
+        //         }));
+        //     }
+        //     statements.push_back(LangAPI::Switch::createStatement(ss));
+        // } else {
+        //     auto dfa_index = dfas->size();
+        //     dfas->push_back(std::move(dfa));
+        //     auto dfa_call_result = createEmptyVariable("dfa_lookup_result" + generateVariableName());
+        //     dfa_call_result.type.type = LangAPI::ValueType::Int;
+        //     LangAPI::Type lookup = LangAPI::ValueType::Variant;
+        //     for (const auto &member_ptr : op) {
+        //         if (member_ptr->isName()) {
+        //             lookup.template_parameters.push_back(LangAPI::Type {LangAPI::Symbol {member_ptr->getName().name}});
+        //         }
+        //     }
+        //     statements.push_back(LangAPI::Variable::createStatement(dfa_call_result));
+        //     statements.push_back(LangAPI::DfaLookup::createStatement(LangAPI::DfaLookup {.dfa_count = dfa_index, .return_type = lookup, .output_name = dfa_call_result.name}));
+        //     LangAPI::Switch ss {.expression = LangAPI::Symbol::createExpression(LangAPI::Symbol { dfa_call_result.name }) };
+        //     for (int i = 0; i < op.size(); ++i) {
+        //         ss.cases.emplace_back();
+        //         auto &cs = ss.cases.back();
+        //         cs.first = LangAPI::Int::createRValue(LangAPI::Int {.value = i});
+        //         if (op[i]->isName() && op[i]->getName().isTerminal()) {
+        //             // insert variable assignment
+        //             //cs.block.push_back(assignSvar(svar, var_assign_values::True));
+        //             cs.second.emplace_back(LangAPI::VariableAssignment::createStatement(LangAPI::VariableAssignment {.name = LangAPI::Symbol {var.name}, .value = LangAPI::Pos::createExpression(LangAPI::Pos {.dereference = true})}));
+        //         } else if (op[i]->isName() && op[i]->getName().isNonterminal()) {
+        //             const auto &nonterminal = op[i]->getName().name;
+        //             cs.second.emplace_back(LangAPI::VariableAssignment::createStatement(
+        //                 LangAPI::VariableAssignment {
+        //                     .name = LangAPI::Symbol {var.name},
+        //                     .value = LangAPI::FunctionCall::createExpression(
+        //                         LangAPI::FunctionCall {
+        //                             .name = std::make_shared<LangAPI::Symbol>(corelib::text::join(nonterminal, "_")),
+        //                             .args = {
+        //                                 LangAPI::Pos::createExpression(LangAPI::Pos {.dereference = false})
+        //                             }
+        //                         }
+        //                     )
+        //                 }
+        //             ));
+        //         } else {
+        //             MemberBuilder builder(*this, *op[i]);
+        //             builder.build();
+        //             cs.second = std::move(builder.getData());
+        //         }
+        //     }
+        //     statements.push_back(LangAPI::Switch::createStatement(ss));
+        // }
     }
     pushConvResult(rule,  var, var, svar, {}, rule.quantifier);
 }

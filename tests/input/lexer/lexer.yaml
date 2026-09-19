@@ -6,7 +6,7 @@ tests:
 
   - name: templated_type
     path: basic/templated_type.isc
-    input: "template type == str"
+    input: "template  type == str"
 
     expect:
       - for: TEMPLATED_TYPE

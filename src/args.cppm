@@ -20,6 +20,12 @@ export struct Args {
     bool debug = false;
 #endif
     bool version = false;
+    // Toggles debug provenance tracking (TokenID / CharOrigin) inside the
+    // TNFA. On by default; turn off to build a leaner TNFA whose transitions
+    // carry no source-mapping information. The DFA compares this provenance
+    // unconditionally, so with it disabled every target simply carries an
+    // empty trail and the comparison degenerates cleanly.
+    bool nfa_debug = true;
     std::string output;
     std::unordered_set<std::string> dump;
     std::string dump_dir;

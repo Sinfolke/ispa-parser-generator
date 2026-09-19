@@ -10,531 +10,665 @@ import dstd;
 import std;
 
 namespace DFA {
-
 auto DFA::build() -> const States<StateWithActions> & {
-  Tlog::Branch b(logger, "DFA.log");
+    Tlog::Branch b(logger, "DFA.log");
 
-  // ================================================================
-  // Intermediate DFA representation
-  //
-  // IMPORTANT:
-  //   No ActionTable/SemanticTable indices are created here.
-  //
-  // A transition is either:
-  //
-  //     DFA state
-  //
-  // or:
-  //
-  //     ordered action sequence -> DFA state
-  //
-  // The sequence is kept intact until after minimization/classification.
-  // ================================================================
+    namespace TNFA = NFA::TNFA;
 
-  using RawAction = std::variant<NFA::ActionState, NFA::SemanticState>;
+    using RawAction = TNFA::RawAction;
+    using NextTarget = std::variant<
+        TNFA::DFATarget,
+        ActionSequence
+    >;
 
-  using ActionSequence = ActionSequence;
+    /*
+     * ------------------------------------------------------------------
+     * Helpers
+     * ------------------------------------------------------------------
+     */
 
-  using NextTarget = std::variant<NFA::DFATarget, ActionSequence>;
+    std::map<std::vector<std::size_t>, std::size_t> dfa_state_map;
+    std::queue<std::size_t> work_queue;
+    std::vector<Closure> dfa_closures;
 
-  // Use the vector of NFA states as the unique identity of a DFA
-  // state.
-  //
-  // std::map is deliberately used here:
-  //   - deterministic
-  //   - independent of Closure hashing/equality
-  //   - guarantees that equivalent subsets are represented by one
-  //     DFA state
-  //
-  // Earlier revisions also needed a second, richer key for DFA
-  // states reached through a "divergent" transition -- one whose
-  // action sequence had to be deferred and replayed at runtime
-  // via a SNAPSHOT_APPLY / SNAPSHOT_APPLY_END pair, because two
-  // NFA lineages disagreed on what actions applied. That case no
-  // longer exists: DFA.closure::Closure resolves every epsilon
-  // ambiguity by NFA transition priority AT CLOSURE TIME (see
-  // Closure::epsilonClosure), so every NFA state in every subset
-  // carries exactly one, already-decided tag path. A plain NFA
-  // subset is sufficient identity again.
-  std::map<std::vector<std::size_t>, std::size_t> dfa_state_map;
+    states_with_actions.clear();
+    action_table.clear();
+    semantic_table.clear();
 
-  std::queue<std::size_t> work_queue;
 
-  // DFA state ID -> corresponding epsilon closure.
-  std::vector<Closure> dfa_closures;
+    /*
+     * ------------------------------------------------------------------
+     * Debug provenance
+     * ------------------------------------------------------------------
+     */
 
-  states_with_actions.clear();
+    auto collect_debug_origins =
+        [](const std::vector<const NFA::IR::TokenID*> &sources)
+            -> TNFA::DebugOrigins {
 
-  // These tables MUST NOT be populated during subset construction.
-  //
-  // They will be materialized after minimization/classification.
-  action_table.clear();
-  semantic_table.clear();
+        TNFA::DebugOrigins out;
 
-  // ================================================================
-  // Helper: construct an intermediate action sequence.
-  //
-  // This deliberately does NOT:
-  //   - allocate ActionTable entries
-  //   - allocate SemanticTable entries
-  //   - create ActionTarget/SemanticTarget links
-  //   - sort actions
-  //   - deduplicate actions
-  //
-  // The exact order supplied by the NFA is preserved.
-  // ================================================================
+        for (const auto &source : sources) {
+            if (std::ranges::none_of(
+                    out,
+                    [&](const NFA::IR::TokenID &existing) {
+                        return existing == *source;
+                    })) {
 
-  auto make_action_sequence =
-      [](const stdu::vector<RawAction> &actions,
-         std::size_t terminal_dfa_target) -> NextTarget {
-    if (actions.empty())
-      return NFA::DFATarget{terminal_dfa_target};
-
-    return ActionSequence{.actions = actions,
-                          .terminal_dfa_target = terminal_dfa_target};
-  };
-
-  // ================================================================
-  // Helper: two FiredActions are the SAME CAPTURE, regardless of
-  // which physical NFA state/action-table entry owns them.
-  //
-  // Nested-token cloning (and, below, two NFA lineages that
-  // reconverge onto one merged DFA transition) can each carry
-  // their own physical copy of "the" BEGIN(x) / END(x) action.
-  // Those are not two different captures -- they are the same
-  // logical operation reached two different ways. This mirrors
-  // `sameAction` in Closure.cpp exactly; kept as a separate
-  // local copy here because it's used for a different purpose
-  // (see append_actions below), not because the rule is
-  // different.
-  // ================================================================
-
-  auto same_capture = [](const NFA::ActionState &a,
-                         const NFA::ActionState &b) -> bool {
-    return a.action == b.action && a.variable == b.variable;
-  };
-
-  // ================================================================
-  // Helper: flatten a set of ALREADY priority-ordered tag paths
-  // (highest priority first) into one RawAction sequence, firing
-  // each distinct capture exactly once.
-  //
-  // Two kinds of duplication are collapsed here, both
-  // deliberately, both by keeping the FIRST (i.e. highest
-  // priority) occurrence and discarding the rest:
-  //
-  //   - physical duplicates: the identical (owner, table_type,
-  //     table_index) FiredAction reachable via more than one
-  //     NFA lineage that both happen to be live right now (e.g.
-  //     a loop's "continue" and "exit" epsilon edges both having
-  //     already passed through the same earlier action).
-  //
-  //   - semantic duplicates: two DIFFERENT physical actions that
-  //     are the same logical capture (see same_capture above) --
-  //     this is what happens when two NFA lineages that diverged
-  //     earlier (different priorities, different physical clone)
-  //     reconverge on one merged DFA transition. Exactly one of
-  //     them should fire; priority order decides which, the same
-  //     way epsilonClosure() already decides between competing
-  //     epsilon routes within a single closure step. This
-  //     extends that same rule across the character-consuming
-  //     step where such lineages recombine.
-  // ================================================================
-
-  auto append_actions =
-      [](const std::vector<ActionPath> &priority_ordered_paths) {
-        stdu::vector<RawAction> out;
-
-        for (const auto &path : priority_ordered_paths) {
-          for (const auto &fa : path) {
-            const auto &raw = fa.raw;
-
-            if (std::holds_alternative<NFA::SemanticState>(raw)) {
-              const auto &semantic =
-                  std::get<NFA::SemanticState>(raw);
-
-              const bool already_present =
-                  std::ranges::any_of(
-                      out,
-                      [&](const RawAction &existing) {
-                          if (!std::holds_alternative<
-                                  NFA::SemanticState
-                              >(existing)) {
-                              return false;
-                          }
-
-                          return std::get<NFA::SemanticState>(
-                              existing
-                          ) == semantic;
-                      }
-                  );
-
-              if (already_present)
-                continue;
+                out.push_back(*source);
             }
-
-            out.push_back(raw);
-          }
         }
 
         return out;
-  };
-
-  // ================================================================
-  // 1. Start state
-  // ================================================================
-
-  Closure start_closure(&nfa, std::vector<std::size_t>{0});
-
-  std::vector<std::size_t> start_subset = start_closure.get();
-
-  const std::size_t start_idx = states_with_actions.makeNew();
-
-  dfa_state_map.emplace(start_subset, start_idx);
-  dfa_closures.push_back(std::move(start_closure));
-
-  work_queue.push(start_idx);
-
-  // NOTE: state 0's own actions (e.g. a leading BEGIN) are NOT
-  // seeded here as a special-cased entry_action. Closure::epsilonClosure
-  // already folds a state's own actions into its committed tag
-  // path, and the subset-construction loop below reads that same
-  // path via getActionsForState() for every outgoing transition
-  // and accept_action of the start state. Duplicating them here
-  // would fire state 0's actions (e.g. BEGIN) twice: once from
-  // this block, once from the closure-derived sequence below.
-
-  // ================================================================
-  // 2. Subset construction
-  // ================================================================
-
-  while (!work_queue.empty()) {
-    const std::size_t current_dfa_index = work_queue.front();
-    work_queue.pop();
-
-    // Copy, not reference: dfa_closures.push_back() below (new
-    // DFA states discovered from this one) can reallocate the
-    // vector this element lives in.
-    const Closure current_closure = dfa_closures.at(current_dfa_index);
-    logger.log("State {};", current_dfa_index);
-    for (const auto &nfa_index : current_closure.get()) {
-      const auto &state = nfa.getStates().at(nfa_index);
-    }
-    const std::vector<std::size_t> &current_subset = current_closure.get();
-
-    // ============================================================
-    // A. Resolve accepting binding
-    // ============================================================
-
-    std::optional<NFA::TokenBinding> best_binding;
-    std::size_t best_binding_nfa_index = NFA::NULL_STATE;
-    for (const std::size_t nfa_index : current_subset) {
-      const auto &nfa_state = nfa.getStates().at(nfa_index);
-
-      auto accept_it = nfa.getAcceptMap().find(nfa_index);
-
-      std::optional<NFA::TokenBinding> binding =
-          accept_it != nfa.getAcceptMap().end()
-              ? std::make_optional(accept_it->second)
-              : nfa_state.accept_binding;
-
-      if (!binding.has_value() || binding->token_id >= NFA::NESTED_REDUCE_ID_BASE)
-        continue;
-      const bool current_has_semantic =
-          binding->target_semantic_state.has_value();
-
-      const bool best_has_semantic =
-          best_binding.has_value() &&
-          best_binding->target_semantic_state.has_value();
-
-      if (!best_binding.has_value() || (current_has_semantic && !best_has_semantic) || (current_has_semantic == best_has_semantic && binding->token_id < best_binding->token_id)) {
-        std::cout << "Writing binding: " << binding->token_id << " over " << best_binding->token_id << std::endl;
-        best_binding = binding;
-        best_binding_nfa_index = nfa_index;
-      }
-    }
-
-    // ============================================================
-    // B. Preserve accepting action sequence
-    //
-    // Exactly one tag path reaches `best_binding_nfa_index` --
-    // it's read straight off the closure, no lookup helper,
-    // no ambiguity check needed.
-    // ============================================================
-
-    if (best_binding.has_value()) {
-
-      const auto &accept_path =
-          current_closure.getActionsForState(best_binding_nfa_index);
-
-      stdu::vector<RawAction> final_actions = append_actions({accept_path});
-
-      states_with_actions[current_dfa_index].accept_binding = best_binding;
-
-      if (!final_actions.empty()) {
-        states_with_actions[current_dfa_index].accept_action =
-            ActionSequence{.actions = std::move(final_actions),
-                           .terminal_dfa_target = NFA::NULL_STATE};
-      }
-    }
-
-    // ============================================================
-    // C. Compute transition candidates.
-    //
-    // Exactly one candidate per (source NFA state, symbol, raw
-    // NFA target) triple: current_closure.getActionsForState()
-    // already returns the single, priority-resolved tag path
-    // for that source state, so there is nothing left to
-    // enumerate per source.
-    // ============================================================
-
-    struct TransitionCandidate {
-      std::size_t priority;
-      ActionPath actions;
-      std::size_t target;
-      std::size_t source;
     };
 
-    std::map<NFA::TransitionKey, std::vector<TransitionCandidate>>
-        transition_candidates;
+    // Mirrors collect_debug_origins, but for the per-character grammar
+    // site (CharOrigin) rather than the owning TokenID. Kept as its own
+    // vector - same shape as ActionSequence::char_origin - so every
+    // contributing candidate's site survives folding, not just one.
+    auto collect_char_origins =
+        [](const std::vector<std::optional<TNFA::CharOrigin>> &sources)
+            -> stdu::vector<std::optional<TNFA::CharOrigin>> {
 
-    for (const std::size_t nfa_index : current_subset) {
+        stdu::vector<std::optional<TNFA::CharOrigin>> out;
 
-      const auto &nfa_state = nfa.getStates().at(nfa_index);
+        for (const auto &source : sources) {
+            if (std::ranges::none_of(
+                    out,
+                    [&](const std::optional<TNFA::CharOrigin> &existing) {
+                        return existing == source;
+                    })) {
 
-      const auto &actions = current_closure.getActionsForState(nfa_index);
-
-      for (const auto &[symbol, targets] : nfa_state.transitions) {
-        for (const auto &target : targets) {
-
-          transition_candidates[symbol].push_back(
-              TransitionCandidate{.priority = target.priority,
-                                  .actions = actions,
-                                  .target = target.next,
-                                  .source = nfa_index
-              });
-        }
-      }
-    }
-
-    // ============================================================
-    // D. Build each outgoing DFA transition.
-    //
-    // Several NFA source states inside the same DFA state can
-    // legitimately reach the SAME raw NFA target on the same
-    // symbol -- that's ordinary NFA nondeterminism collapsing
-    // under subset construction, not a tag conflict. Keep only
-    // the highest-priority candidate per raw target (mirrors
-    // epsilonClosure()'s "first/highest priority route wins"
-    // rule, applied here to non-epsilon edges).
-    //
-    // Different raw targets on the same symbol all survive
-    // into the same `kernel` -- a DFA can only have one
-    // transition per symbol, so every live NFA lineage that
-    // takes this symbol necessarily ends up in the same
-    // resulting DFA state, however many distinct NFA states
-    // that lineage set spans.
-    // ============================================================
-
-    for (auto &[symbol, candidates] : transition_candidates) {
-
-      if (candidates.empty())
-        continue;
-
-      std::map<std::size_t, const TransitionCandidate *> by_target;
-
-      for (const auto &candidate : candidates) {
-
-        auto [existing, inserted] =
-            by_target.emplace(candidate.target, &candidate);
-
-        if (!inserted && candidate.priority < existing->second->priority) {
-          existing->second = &candidate;
-        }
-      }
-
-      std::vector<std::size_t> kernel;
-      kernel.reserve(by_target.size());
-
-      for (const auto &[target, candidate] : by_target)
-        kernel.push_back(target);
-
-      Closure next_closure(&nfa, kernel);
-
-      std::vector<std::size_t> next_subset = next_closure.get();
-
-      if (next_subset.empty())
-        continue;
-      stdu::vector<std::size_t> semantic_states;
-
-      for (const std::size_t nfa_index : next_subset) {
-        const auto &nfa_state = nfa.getStates().at(nfa_index);
-
-        auto accept_it = nfa.getAcceptMap().find(nfa_index);
-
-        std::optional<NFA::TokenBinding> binding =
-        accept_it != nfa.getAcceptMap().end()
-        ? std::make_optional(accept_it->second)
-        : nfa_state.accept_binding;
-
-        if (binding.has_value() &&
-        binding->token_id >= NFA::NESTED_REDUCE_ID_BASE) {
-          semantic_states.push_back(nfa_index);
-        }
-      }
-      // --------------------------------------------------------
-      // Source-side actions: every surviving candidate's tag
-      // path, folded together in priority order.
-      //
-      // These are the actions belonging to the states being
-      // LEFT (the source NFA states that own this outgoing
-      // transition), fired the moment `symbol` is consumed.
-      //
-      // Destination-side actions are intentionally NOT
-      // folded in here: they belong to `next_closure`'s own
-      // states and are picked up on THAT DFA state's own
-      // turn through this loop (via getActionsForState() in
-      // step C/B above) -- exactly the same reasoning as the
-      // "NOTE" on state 0 at the top of this function. Doing
-      // it here as well would fire a destination action one
-      // transition too early, or twice.
-      // --------------------------------------------------------
-
-      std::vector<const TransitionCandidate *> ordered;
-      ordered.reserve(by_target.size());
-
-      for (const auto &[target, candidate] : by_target)
-        ordered.push_back(candidate);
-
-      std::ranges::sort(ordered, [](const auto *a, const auto *b) {
-        return a->priority < b->priority;
-      });
-
-      std::vector<ActionPath> priority_ordered_paths;
-      priority_ordered_paths.reserve(ordered.size());
-
-      for (const auto *candidate : ordered) {
-        priority_ordered_paths.push_back(candidate->actions);
-      }
-
-      stdu::vector<RawAction> actions =
-      append_actions(priority_ordered_paths);
-
-      for (const auto nfa_index : semantic_states) {
-        const auto &path = next_closure.getActionsForState(nfa_index);
-
-        for (const auto &action : path) {
-          if (action.table_type == NFA::TableType::Semantic) {
-            actions.push_back(action.raw);
-          }
-        }
-      }
-      // --------------------------------------------------------
-      // Get/create DFA state.
-      // --------------------------------------------------------
-
-      std::size_t target_dfa_index;
-      auto it = dfa_state_map.find(next_subset);
-
-      if (it == dfa_state_map.end()) {
-
-        target_dfa_index = states_with_actions.makeNew();
-
-        dfa_state_map.emplace(next_subset, target_dfa_index);
-
-        Assert(dfa_closures.size() == target_dfa_index,
-               "DFA closure/state index mismatch: "
-               "closure count {}, new DFA index {}",
-               dfa_closures.size(), target_dfa_index);
-
-        dfa_closures.push_back(std::move(next_closure));
-
-        work_queue.push(target_dfa_index);
-
-      } else {
-        target_dfa_index = it->second;
-      }
-      states_with_actions[current_dfa_index].transitions[symbol] =
-          make_action_sequence(actions, target_dfa_index);
-    }
-  }
-
-  // ================================================================
-  // 3. Basic validation
-  //
-  // There are deliberately NO ActionTable/SemanticTable index
-  // validations here. Those tables don't exist semantically yet.
-  // ================================================================
-
-  if (states_with_actions.empty())
-    throw Error("DFA cannot be empty");
-
-  // Validate DFA target indices in intermediate action sequences.
-  //
-  // NOTE: at this point in build(), the intermediate DFA lives in
-  // states_with_actions. The final `states` member is populated only
-  // later, by minimize(). Every bound check below therefore has to be
-  // against states_with_actions.size(), not states.size() (which may
-  // still hold a stale/empty result from a previous build).
-  for (std::size_t i = 0; i < states_with_actions.size(); ++i) {
-    const auto &state = states_with_actions[i];
-
-    // ------------------------------------------------------------
-    // Accept action sequence
-    // ------------------------------------------------------------
-
-    if (state.accept_action.has_value()) {
-      Assert(state.accept_action->terminal_dfa_target == NFA::NULL_STATE,
-             "DFA state {} accept action sequence "
-             "must terminate in NULL_STATE",
-             i);
-    }
-
-    // ------------------------------------------------------------
-    // Transitions
-    // ------------------------------------------------------------
-
-    for (const auto &[symbol, target] : state.transitions) {
-
-      std::visit(
-          [&](const auto &next) {
-            using T = std::decay_t<decltype(next)>;
-
-            if constexpr (std::is_same_v<T, NFA::DFATarget>) {
-              Assert(next.id < states_with_actions.size(),
-                     "DFA state {} transition has "
-                     "invalid DFA target {}",
-                     i, next.id);
-            } else if constexpr (std::is_same_v<T, ActionSequence>) {
-              Assert(next.terminal_dfa_target < states_with_actions.size(),
-                     "DFA state {} transition has "
-                     "invalid terminal DFA target {}",
-                     i, next.terminal_dfa_target);
-
-              // An action sequence must contain at least
-              // one action. Otherwise make_action_sequence()
-              // would have returned DFATarget directly.
-              Assert(!next.actions.empty(),
-                     "DFA state {} transition contains "
-                     "empty ActionSequence",
-                     i);
+                out.push_back(source);
             }
-          },
-          target);
+        }
+
+        return out;
+    };
+
+
+    /*
+     * ------------------------------------------------------------------
+     * Raw-action equality
+     * ------------------------------------------------------------------
+     *
+     * The complete TNFA action is significant.
+     *
+     * In particular ActionState::next_state is part of its identity.
+     */
+
+    auto append_unique_action =
+        [](stdu::vector<RawAction> &out,
+           const RawAction &raw) {
+
+        const bool exists =
+            std::ranges::any_of(
+                out,
+                [&](const RawAction &existing) {
+
+                    if (existing.index() != raw.index())
+                        return false;
+
+                    return std::visit(
+                        [&](const auto &lhs,
+                            const auto &rhs) -> bool {
+
+                            using L =
+                                std::decay_t<decltype(lhs)>;
+
+                            using R =
+                                std::decay_t<decltype(rhs)>;
+
+                            if constexpr (
+                                std::is_same_v<L, R>
+                            ) {
+                                return lhs == rhs;
+                            }
+
+                            return false;
+                        },
+                        existing,
+                        raw
+                    );
+                }
+            );
+
+        if (!exists)
+            out.push_back(raw);
+    };
+
+
+    /*
+     * ------------------------------------------------------------------
+     * Build ActionSequence
+     * ------------------------------------------------------------------
+     */
+
+    auto make_action_sequence =
+        [](const stdu::vector<RawAction> &actions,
+           const std::size_t terminal_dfa_target,
+           TNFA::DebugOrigins debug,
+           stdu::vector<std::optional<TNFA::CharOrigin>> char_origin) -> NextTarget {
+
+        /*
+         * A consuming transition always has a real DFA destination.
+         *
+         * NULL_STATE is reserved for accept_action, which has no
+         * following DFA state.
+         */
+        Assert(
+            terminal_dfa_target != TNFA::NULL_STATE,
+            "DFA::build: consuming transition has NULL target"
+        );
+
+        if (actions.empty()) {
+            return TNFA::DFATarget{
+                .id = terminal_dfa_target,
+                .debug = std::move(debug.back()),
+                .char_origin = char_origin.empty()
+                    ? std::nullopt
+                    : char_origin.back()
+            };
+        }
+
+        return ActionSequence{
+            .actions = actions,
+            .terminal_dfa_target = terminal_dfa_target,
+            .debug = std::move(debug),
+            .char_origin = std::move(char_origin)
+        };
+    };
+
+
+    /*
+     * ------------------------------------------------------------------
+     * Start DFA state
+     * ------------------------------------------------------------------
+     */
+
+    std::vector<std::size_t> entries;
+
+    for (const auto &[_, entry] : nfa.getTokenEntries())
+        entries.push_back(entry);
+
+    Closure start_closure(
+        &nfa,
+        entries
+    );
+
+    const std::vector<std::size_t> start_subset =
+        start_closure.get();
+
+    const std::size_t start_idx =
+        states_with_actions.makeNew();
+
+    dfa_state_map.emplace(
+        start_subset,
+        start_idx
+    );
+
+    dfa_closures.push_back(
+        std::move(start_closure)
+    );
+
+    work_queue.push(start_idx);
+
+
+    /*
+     * ------------------------------------------------------------------
+     * Subset construction
+     * ------------------------------------------------------------------
+     */
+
+    while (!work_queue.empty()) {
+        const std::size_t current_dfa_index =
+            work_queue.front();
+
+        work_queue.pop();
+
+        const Closure &current_closure =
+            dfa_closures.at(current_dfa_index);
+
+        const std::vector<std::size_t> &current_subset =
+            current_closure.get();
+
+
+        /*
+         * ==============================================================
+         * A. Resolve top-level accepting binding
+         * ==============================================================
+         * Therefore the binding only determines WHICH token wins.
+         */
+
+        std::optional<TNFA::TokenBinding> best_binding;
+        std::size_t best_binding_nfa_index =
+            TNFA::NULL_STATE;
+
+        for (const std::size_t nfa_index : current_subset) {
+            const auto &nfa_state =
+                nfa.getStates().at(nfa_index);
+
+            auto accept_it =
+                nfa.getAcceptMap().find(nfa_index);
+
+            std::optional<TNFA::TokenBinding> binding =
+                accept_it != nfa.getAcceptMap().end()
+                    ? std::make_optional(accept_it->second)
+                    : nfa_state.accept_binding;
+
+            if (!binding.has_value())
+                continue;
+
+            if (!best_binding.has_value() ||
+                binding->token_id >
+                    best_binding->token_id) {
+
+                best_binding = binding;
+                best_binding_nfa_index = nfa_index;
+            }
+        }
+
+
+        /*
+         * ==============================================================
+         * B. Accepting action sequence
+         * ==============================================================
+         *
+         * The complete epsilon closure path to the accepting NFA state
+         * already contains the SemanticState if one exists.
+         *
+         * No semantic table lookup is performed here.
+         */
+
+        if (best_binding.has_value()) {
+            states_with_actions[current_dfa_index].accept_binding =
+                best_binding;
+
+            const ActionPath &accept_path =
+                current_closure.getActionsForState(
+                    best_binding_nfa_index
+                );
+
+            const ActionPath &terminal_path =
+                current_closure.getTerminalActionsForState(
+                    best_binding_nfa_index
+                );
+
+            stdu::vector<RawAction> accept_actions;
+
+            for (const auto &fired : accept_path)
+                append_unique_action(
+                    accept_actions,
+                    fired.raw
+                );
+
+            for (const auto &fired : terminal_path)
+                append_unique_action(
+                    accept_actions,
+                    fired.raw
+                );
+
+            if (!accept_actions.empty()) {
+                states_with_actions[current_dfa_index]
+                    .accept_action =
+                    ActionSequence{
+                        .actions = std::move(accept_actions),
+                        .terminal_dfa_target =
+                            TNFA::NULL_STATE,
+                        .debug = {}
+                    };
+            }
+        }
+
+
+        /*
+         * ==============================================================
+         * C. Collect consuming transition candidates
+         * ==============================================================
+         */
+
+        struct TransitionCandidate {
+            std::size_t priority = 0;
+
+            std::size_t target = TNFA::NULL_STATE;
+            std::size_t source = TNFA::NULL_STATE;
+
+            const NFA::IR::TokenID* origin;
+            // The per-character grammar site this specific edge came
+            // from. Distinct from `origin` (the TokenID/rule the edge
+            // belongs to) - this is what lets a debugger point at the
+            // exact character literal, and it must survive subset
+            // construction the same way `origin` does.
+            std::optional<TNFA::CharOrigin> char_origin;
+        };
+
+
+        std::map<
+            TNFA::TransitionKey,
+            std::vector<TransitionCandidate>
+        > transition_candidates;
+
+
+        for (const std::size_t nfa_index : current_subset) {
+            const auto &nfa_state =
+                nfa.getStates().at(nfa_index);
+
+            /*
+             * Actions needed to reach nfa_index within the CURRENT
+             * DFA state already fired as part of the transition that
+             * produced this DFA state - they must not be re-added
+             * here. Only the consuming edge + everything epsilon-
+             * reachable after it (collected below via
+             * next_closure.getTransitionActions()) belongs to THIS
+             * transition.
+             */
+
+            for (const auto &[symbol, targets] :
+                 nfa_state.transitions) {
+
+                for (const auto &target : targets) {
+                    if (target.next == TNFA::NULL_STATE)
+                        continue;
+
+                    transition_candidates[symbol].push_back(
+                        TransitionCandidate{
+                            .priority = target.priority,
+                            .target = target.next,
+                            .source = nfa_index,
+                            .origin = &target.source,
+                            .char_origin = target.char_origin
+                        }
+                    );
+                }
+            }
+        }
+
+
+        /*
+         * ==============================================================
+         * D. Build DFA transitions
+         * ==============================================================
+         */
+
+        for (auto &[symbol, candidates] :
+             transition_candidates) {
+
+            if (candidates.empty())
+                continue;
+
+
+            /*
+             * ----------------------------------------------------------
+             * Priority
+             * ----------------------------------------------------------
+             */
+
+            std::ranges::stable_sort(
+                candidates,
+                [](const TransitionCandidate &a,
+                   const TransitionCandidate &b) {
+
+                    if (a.priority != b.priority)
+                        return a.priority < b.priority;
+
+                    return a.source < b.source;
+                }
+            );
+
+
+            /*
+             * ----------------------------------------------------------
+             * Construct destination closure
+             * ----------------------------------------------------------
+             *
+             * Closure is responsible for following:
+             *
+             *   consuming edge
+             *       ↓
+             *   epsilon transitions
+             *       ↓
+             *   ActionState
+             *       ↓
+             *   SemanticState
+             *       ↓
+             *   ...
+             *
+             * and recording that path in ActionPath.
+             */
+
+            Closure next_closure(
+                &nfa,
+                current_subset,
+                symbol
+            );
+
+            const std::vector<std::size_t> next_subset =
+                next_closure.get();
+
+            if (next_subset.empty())
+                continue;
+
+
+            /*
+             * ----------------------------------------------------------
+             * Destination DFA state
+             * ----------------------------------------------------------
+             */
+
+            std::size_t target_dfa_index;
+
+            auto dfa_it =
+                dfa_state_map.find(next_subset);
+
+            if (dfa_it == dfa_state_map.end()) {
+                target_dfa_index =
+                    states_with_actions.makeNew();
+
+                dfa_state_map.emplace(
+                    next_subset,
+                    target_dfa_index
+                );
+
+                Assert(
+                    dfa_closures.size() ==
+                        target_dfa_index,
+                    "DFA::build: closure/state index mismatch"
+                );
+
+                dfa_closures.push_back(
+                    std::move(next_closure)
+                );
+
+                work_queue.push(
+                    target_dfa_index
+                );
+            }
+            else {
+                target_dfa_index =
+                    dfa_it->second;
+            }
+
+
+            /*
+             * ----------------------------------------------------------
+             * Debug origins
+             * ----------------------------------------------------------
+             */
+            std::vector<const NFA::IR::TokenID*> origins;
+            origins.reserve(candidates.size());
+
+            std::vector<std::optional<TNFA::CharOrigin>> char_origins_raw;
+            char_origins_raw.reserve(candidates.size());
+
+            for (const auto &candidate : candidates) {
+                origins.push_back(candidate.origin);
+                char_origins_raw.push_back(candidate.char_origin);
+            }
+
+            const TNFA::DebugOrigins debug_origins =
+                collect_debug_origins(origins);
+
+            auto char_origins =
+                collect_char_origins(char_origins_raw);
+
+
+            /*
+             * ----------------------------------------------------------
+             * Construct transition action sequence
+             * ----------------------------------------------------------
+             *
+             * Closure owns action-path construction.
+             *
+             * next_closure.getTransitionActions() is the flat, in-
+             * order list of every action chain actually fired while
+             * building next_closure: the consuming edge's own
+             * actions, PLUS every epsilon-edge action reachable after
+             * it (nested ActionState / SemanticState included). Each
+             * edge in that DFS is traversed at most once, so this is
+             * already exactly-once per firing action - no manual
+             * per-target lookup, and no manual dedup needed.
+             *
+             * In particular:
+             *
+             *   - do not use candidate.target to look up actions;
+             *     candidate.target is the raw, pre-epsilon consuming
+             *     destination and getActionsForState() on it returns
+             *     only the bare consuming-edge action, dropping every
+             *     epsilon-chained action after it
+             *   - do not reorder
+             */
+
+            stdu::vector<RawAction> actions;
+
+            for (const auto &fired : next_closure.getTransitionActions())
+                actions.push_back(fired.raw);
+
+
+            /*
+             * ----------------------------------------------------------
+             * Emit transition
+             * ----------------------------------------------------------
+             */
+
+            Assert(
+                target_dfa_index != TNFA::NULL_STATE,
+                "DFA::build: NULL DFA target for consuming transition"
+            );
+
+            states_with_actions[current_dfa_index]
+                .transitions[symbol] =
+                    make_action_sequence(
+                        actions,
+                        target_dfa_index,
+                        debug_origins,
+                        std::move(char_origins)
+                    );
+        }
     }
-  }
-  std::cout << "DFA build complete: " << states_with_actions.size()
-            << " states; " << std::endl;
-  std::size_t actions = 0;
-  for (const auto &state : states_with_actions) {
-    for (const auto &trans : state.transitions) {
-      if (std::holds_alternative<ActionSequence>(trans.second)) {
-        actions += std::get<ActionSequence>(trans.second).actions.size();
-      }
+    utype::unordered_set<RawAction> seen;
+    for (const auto &state : states_with_actions) {
+        for (const auto [i, next] : state.transitions) {
+            if (std::holds_alternative<ActionSequence>(next)) {
+                auto seq = std::get<ActionSequence>(next);
+                for (const auto &act : seq.actions) {
+                    if (!seen.contains(act)) {
+                        seen.insert(act);
+                    }
+                }
+            }
+        }
     }
-  }
-  std::cout << "Total actions: " << actions << std::endl;
-  return states_with_actions;
+    std::cout << "Actions: " << seen.size() << " = " << seen << std::endl;
+    /*
+     * ------------------------------------------------------------------
+     * Validate DFA
+     * ------------------------------------------------------------------
+     */
+
+    for (std::size_t dfa_index = 0;
+         dfa_index < states_with_actions.size();
+         ++dfa_index) {
+
+        const auto &state =
+            states_with_actions.get().at(dfa_index);
+
+        for (const auto &[symbol, transition] :
+             state.transitions) {
+
+            std::visit(
+                [&](const auto &target) {
+
+                    using T =
+                        std::decay_t<decltype(target)>;
+
+                    if constexpr (
+                        std::is_same_v<
+                            T,
+                            TNFA::DFATarget
+                        >
+                    ) {
+                        Assert(
+                            target.id != TNFA::NULL_STATE,
+                            "DFA::build: NULL DFA target"
+                        );
+
+                        Assert(
+                            target.id <
+                                states_with_actions.size(),
+                            "DFA::build: DFA target out of range"
+                        );
+                    }
+                    else if constexpr (
+                        std::is_same_v<
+                            T,
+                            ActionSequence
+                        >
+                    ) {
+                        /*
+                         * A consuming ActionSequence must always have
+                         * a DFA target.
+                         */
+                        Assert(
+                            target.terminal_dfa_target !=
+                                TNFA::NULL_STATE,
+                            "DFA::build: consuming ActionSequence "
+                            "has NULL target"
+                        );
+
+                        Assert(
+                            target.terminal_dfa_target <
+                                states_with_actions.size(),
+                            "DFA::build: ActionSequence target "
+                            "out of range"
+                        );
+                    }
+
+                },
+                transition
+            );
+        }
+
+
+        /*
+         * accept_action is different:
+         *
+         * it executes after the token has been recognized and therefore
+         * intentionally has no DFA continuation.
+         */
+        if (state.accept_action.has_value()) {
+            const auto &accept =
+                *state.accept_action;
+
+            Assert(
+                accept.terminal_dfa_target ==
+                    TNFA::NULL_STATE,
+                "DFA::build: accepting action has DFA target"
+            );
+        }
+    }
+
+
+    return states_with_actions;
 }
 void DFA::optimizeRegistersAndLRTable() {
   std::cout << "optimizeRegistersAndLRTable: action_table.size(): "
@@ -823,7 +957,9 @@ auto DFA::minimize() -> States<State<>> {
     semantic_table.clear();
     return empty_result;
   }
-
+  auto extract_debug_origins = [&](const NFA::TNFA::DebugOrigins &debug) {
+      return debug.empty() ? NFA::IR::TokenID {} : debug.back();
+  };
   // ================================================================
   // Helper: hash one raw action.
   //
@@ -963,19 +1099,36 @@ auto DFA::minimize() -> States<State<>> {
     std::vector<std::size_t> action_identity;
 
     std::size_t target_partition = NFA::NULL_STATE;
-
+    // Debug provenance carried straight from the TNFA target (TokenID) and
+    // the per-character site (CharOrigin). This is compared UNCONDITIONALLY:
+    // when the TNFA was built without debug tracking these are empty/nullopt
+    // everywhere, so including them in the key has no discriminating effect -
+    // equivalent to branching on "is debug present". When present, two
+    // otherwise-identical transitions that came from different grammar sites
+    // are (correctly) kept distinct.
+    NFA::DebugOrigins debug;
+    // One entry per folded candidate, same shape as `debug` above -
+    // a plain DFATarget's single char_origin is wrapped into a
+    // one-element vector so both branches compare uniformly. Actually
+    // populated below now (was previously hardcoded to empty/nullopt,
+    // which meant char_origin never distinguished two otherwise-
+    // identical transitions during partition refinement).
+    std::vector<std::optional<NFA::TNFA::CharOrigin>> origin;
     bool operator<(const RefinedTransition &other) const {
       return std::tie(symbol, kind, action_hash, action_identity,
-                      target_partition) <
+                      target_partition, debug, origin) <
              std::tie(other.symbol, other.kind, other.action_hash,
-                      other.action_identity, other.target_partition);
+                      other.action_identity, other.target_partition,
+                      other.debug, other.origin);
     }
 
     bool operator==(const RefinedTransition &other) const {
       return symbol == other.symbol && kind == other.kind &&
              action_hash == other.action_hash &&
              action_identity == other.action_identity &&
-             target_partition == other.target_partition;
+             target_partition == other.target_partition &&
+             debug == other.debug &&
+             origin == other.origin;
     }
   };
 
@@ -1002,12 +1155,27 @@ auto DFA::minimize() -> States<State<>> {
                   arg.id == NFA::NULL_STATE ? NFA::NULL_STATE
                                             : partition_of.at(arg.id);
 
+              // A plain DFATarget only ever carries a single debug
+              // origin (arg.debug). Wrap it into a DebugOrigins of one
+              // element so it compares uniformly with the ActionSequence
+              // branch below: when TNFA was built without debug
+              // tracking, arg.debug is a default/empty TokenID on every
+              // transition, so this element is identical everywhere and
+              // has no discriminating effect - equivalent to leaving it
+              // out entirely. When debug tracking is on, transitions
+              // reached from different grammar sites are (correctly)
+              // kept in separate partitions instead of being merged.
+              NFA::DebugOrigins single_origin;
+              single_origin.push_back(arg.debug);
+
               key.push_back(
                   RefinedTransition{.symbol = symbol,
                                     .kind = 0,
                                     .action_hash = 0,
                                     .action_identity = {},
-                                    .target_partition = target_partition});
+                                    .target_partition = target_partition,
+                                    .debug = std::move(single_origin),
+                                    .origin = {arg.char_origin}});
             }
 
             // ------------------------------------------------
@@ -1065,12 +1233,21 @@ auto DFA::minimize() -> States<State<>> {
                       ? NFA::NULL_STATE
                       : partition_of.at(arg.terminal_dfa_target);
 
+              // arg.debug is already a full DebugOrigins list here (one
+              // origin per NFA transition candidate that fed this
+              // ActionSequence) - carry it straight through, same
+              // unconditional-by-emptiness reasoning as the DFATarget
+              // branch above: empty everywhere when debug tracking is
+              // off, so it changes nothing in that mode.
               key.push_back(RefinedTransition{
                   .symbol = symbol,
                   .kind = 1,
                   .action_hash = action_hash,
                   .action_identity = std::move(action_identity),
-                  .target_partition = target_partition});
+                  .target_partition = target_partition,
+                  .debug = arg.debug,
+                  .origin = std::vector<std::optional<NFA::TNFA::CharOrigin>>(
+                      arg.char_origin.begin(), arg.char_origin.end())});
             }
           },
           target);
@@ -1227,14 +1404,14 @@ auto DFA::minimize() -> States<State<>> {
             if constexpr (std::is_same_v<T, NFA::DFATarget>) {
               if (arg.id == NFA::NULL_STATE) {
                 destination.transitions[symbol] =
-                    NFA::DFATarget{NFA::NULL_STATE};
+                    NFA::DFATarget{.id = NFA::NULL_STATE, .debug = arg.debug, .char_origin = arg.char_origin};
                 return;
               }
 
               const std::size_t target_class = partition_of.at(arg.id);
 
               destination.transitions[symbol] =
-                  NFA::DFATarget{class_to_new_index.at(target_class)};
+                  NFA::DFATarget{.id = class_to_new_index.at(target_class), .debug = arg.debug, .char_origin = arg.char_origin};
             } else if constexpr (std::is_same_v<T, ActionSequence>) {
               ActionSequence sequence = arg;
 
@@ -1355,7 +1532,7 @@ auto DFA::minimize() -> States<State<>> {
               const auto mapped = state_remap[arg.id];
 
               if (mapped != NFA::NULL_STATE) {
-                destination.transitions[symbol] = NFA::DFATarget{mapped};
+                destination.transitions[symbol] = NFA::DFATarget{.id = mapped, .debug = arg.debug, .char_origin = arg.char_origin};
               }
             } else if constexpr (std::is_same_v<T, ActionSequence>) {
               ActionSequence sequence = arg;
@@ -1465,7 +1642,13 @@ auto DFA::minimize() -> States<State<>> {
           next = NFA::SemanticTarget{next_slot.index};
         }
       } else {
-        next = NFA::DFATarget{sequence.terminal_dfa_target};
+        next = NFA::DFATarget{
+            .id = sequence.terminal_dfa_target,
+            .debug = extract_debug_origins(sequence.debug),
+            .char_origin = sequence.char_origin.empty()
+                ? std::nullopt
+                : sequence.char_origin.back()
+        };
       }
 
       const auto &slot = slots[i];
@@ -1482,12 +1665,17 @@ auto DFA::minimize() -> States<State<>> {
     // Return the first table target.
     // ------------------------------------------------------------
 
+    // The head target IS this DFA transition, as far as a debugger is
+    // concerned - attach the transition's merged grammar provenance here
+    // (the individual table rows themselves record no SourceLink of
+    // their own; ActionState/SemanticState only carry a free-text
+    // debug_note).
     if (slots[0].table_type == NFA::TableType::Action) {
 
-      return NFA::ActionTarget{slots[0].index};
+      return NFA::ActionTarget{.id = slots[0].index, .debug = extract_debug_origins(sequence.debug)};
     }
 
-    return NFA::SemanticTarget{slots[0].index};
+    return NFA::SemanticTarget{.id = slots[0].index, .debug = extract_debug_origins(sequence.debug)};
   };
 
   // ================================================================
@@ -1646,80 +1834,98 @@ auto DFA::minimize() -> States<State<>> {
 }
 
 auto DFA::classify() -> ClassifiedDFA {
-  if (!nfa.isCharNfa()) {
-    throw Error(
-        "classify() only applies to character-keyed (CharMachineDFA) automata");
-  }
+    constexpr std::size_t ALPHABET_SIZE = 256;
+    const std::size_t n = states.size();
 
-  constexpr std::size_t ALPHABET_SIZE = 256;
-  const std::size_t n = states.size();
+    // Store the full TransitionTarget in the signature so that transitions
+    // with different debug info or char_origin get unique character classes.
+    using Signature = std::vector<TransitionTarget>;
 
-  using Signature = std::vector<std::pair<NFA::TableType, std::size_t>>;
+    std::unordered_map<Signature, std::size_t, uhash> class_of_signature;
+    CharClassTable table;
 
-  std::unordered_map<Signature, std::size_t, uhash> class_of_signature;
-  CharClassTable table;
+    // Helper to extract default/accepting transitions along with debug metadata
+    auto get_default_trans = [](const auto &state) -> TransitionTarget {
+        NFA::IR::TokenID debug_id{};
+        if (state.accept_action.has_value() && !state.accept_action->debug.empty()) {
+            debug_id = state.accept_action->debug.front();
+        } else if (!state.debug.empty()) {
+            debug_id = state.debug.front();
+        }
 
-  for (std::size_t c = 0; c < ALPHABET_SIZE; ++c) {
-    Signature sig;
-    sig.reserve(n);
-    NFA::TransitionKey key{static_cast<char>(c)};
+        if (state.accept_binding.has_value()) {
+            const auto &binding = *state.accept_binding;
+            if (binding.reduce_rule_id.has_value()) {
+                return NFA::ActionTarget{
+                    .id = *binding.reduce_rule_id,
+                    .debug = debug_id,
+                    .char_origin = std::nullopt
+                };
+            } else if (binding.target_semantic_state.has_value()) {
+                return NFA::SemanticTarget{
+                    .id = *binding.target_semantic_state,
+                    .debug = debug_id,
+                    .char_origin = std::nullopt
+                };
+            } else {
+                return NFA::DFATarget{
+                    .id = binding.token_id,
+                    .debug = debug_id,
+                    .char_origin = std::nullopt
+                };
+            }
+        }
+        return NFA::DFATarget{
+            .id = NULL_STATE,
+            .debug = debug_id,
+            .char_origin = std::nullopt
+        };
+    };
 
+    // Precompute default transitions for missing keys across all states
+    std::vector<TransitionTarget> default_transitions;
+    default_transitions.reserve(n);
     for (std::size_t i = 0; i < n; ++i) {
-      auto it = states[i].transitions.find(key);
-      if (it == states[i].transitions.end()) {
-        sig.emplace_back(NFA::TableType::DFA, NULL_STATE);
-      } else {
-        std::visit(
-            [&](auto &&target) {
-              using T = std::decay_t<decltype(target)>;
-              if constexpr (std::is_same_v<T, NFA::DFATarget>) {
-                sig.emplace_back(NFA::TableType::DFA, target.id);
-              } else if constexpr (std::is_same_v<T, NFA::ActionTarget>) {
-                sig.emplace_back(NFA::TableType::Action, target.id);
-              } else if constexpr (std::is_same_v<T, NFA::SemanticTarget>) {
-                sig.emplace_back(NFA::TableType::Semantic, target.id);
-              }
-            },
-            it->second);
-      }
-    }
-    auto [it, inserted] =
-        class_of_signature.try_emplace(sig, class_of_signature.size());
-    table.char_to_class[c] = it->second;
-  }
-  table.num_classes = class_of_signature.size();
-
-  States<State<ClassTransitions>> output(&nfa);
-  for (std::size_t i = 0; i < n; ++i) {
-    auto new_idx = output.makeNew();
-    output[new_idx].accept_binding = states[i].accept_binding;
-
-    // Default terminal transition when no character shift exists in state i
-    TransitionTarget default_trans{NFA::DFATarget{NULL_STATE}};
-    if (states[i].accept_binding.has_value()) {
-      const auto &binding = *states[i].accept_binding;
-      if (binding.reduce_rule_id.has_value()) {
-        default_trans = NFA::ActionTarget{*binding.reduce_rule_id};
-      } else if (binding.target_semantic_state.has_value()) {
-        default_trans = NFA::SemanticTarget{*binding.target_semantic_state};
-      } else {
-        default_trans = NFA::DFATarget{binding.token_id};
-      }
+        default_transitions.push_back(get_default_trans(states[i]));
     }
 
-    output[new_idx].transitions.assign(table.num_classes, default_trans);
+    // 1. Build character classes including debug/char_origin signatures
+    for (std::size_t c = 0; c < ALPHABET_SIZE; ++c) {
+        Signature sig;
+        sig.reserve(n);
+        NFA::TransitionKey key{static_cast<char>(c)};
 
-    for (const auto &[symbol, value] : states[i].transitions) {
-      if (!std::holds_alternative<char>(symbol))
-        continue;
-      unsigned char c = static_cast<unsigned char>(std::get<char>(symbol));
-      std::size_t cls = table.char_to_class[c];
+        for (std::size_t i = 0; i < n; ++i) {
+            auto it = states[i].transitions.find(key);
+            if (it == states[i].transitions.end()) {
+                sig.push_back(default_transitions[i]);
+            } else {
+                sig.push_back(it->second);
+            }
+        }
 
-      output[new_idx].transitions[cls] = value;
+        auto [it, inserted] = class_of_signature.try_emplace(sig, class_of_signature.size());
+        table.char_to_class[c] = it->second;
     }
-  }
+    table.num_classes = class_of_signature.size();
 
-  return ClassifiedDFA{std::move(table), std::move(output)};
+    // 2. Populate classified DFA output
+    States<State<ClassTransitions>> output(&nfa);
+    for (std::size_t i = 0; i < n; ++i) {
+        auto new_idx = output.makeNew();
+        output[new_idx].accept_binding = states[i].accept_binding;
+
+        output[new_idx].transitions.assign(table.num_classes, default_transitions[i]);
+
+        for (const auto &[symbol, value] : states[i].transitions) {
+            unsigned char c = symbol;
+            std::size_t cls = table.char_to_class[c];
+
+            output[new_idx].transitions[cls] = value;
+        }
+    }
+
+    return ClassifiedDFA{std::move(table), std::move(output)};
 }
 
 auto DFA::clear() -> void {
@@ -1728,19 +1934,11 @@ auto DFA::clear() -> void {
   semantic_table.clear();
 }
 
-auto DFA::getType() const -> DfaType {
-  return nfa.isCharNfa() ? DfaType::Char : DfaType::Token;
-}
-
 auto DFA::check_dfa() -> void {
   std::size_t index = 0;
   try {
     for (const auto &state : states) {
       for (const auto &[sym, transitions] : state.transitions) {
-        if (std::holds_alternative<stdu::vector<std::string>>(sym)) {
-          const auto &nested_name = std::get<stdu::vector<std::string>>(sym);
-          AssertNe(nested_name.empty(), "Empty nested_name in state {}", index);
-        }
         if (std::holds_alternative<NFA::DFATarget>(transitions)) {
           const auto next = std::get<NFA::DFATarget>(transitions).id;
           Assert(next == NFA::NULL_STATE || states.size() > next,
@@ -1774,7 +1972,7 @@ auto operator<<(std::ostream &os, const ClassifiedDFA &dfa) -> std::ostream & {
   for (std::size_t i = 0; i < dfa.table.num_classes; ++i) {
     os << "Class " << i << ": ";
     for (std::size_t j = 0; j < dfa.table.char_to_class.size(); ++j) {
-      if (dfa.table.char_to_class[j] != i)
+      if (dfa.table.char_to_class.at(j) != i)
         continue;
       if (std::isprint(static_cast<unsigned char>(j))) {
         os << static_cast<char>(j) << ' ';

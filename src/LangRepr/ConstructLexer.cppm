@@ -1,5 +1,5 @@
 export module LangRepr.ConstructLexer;
-import NFA_OLD;
+import NFA.TNFA.API;
 import DFA.API;
 import LLIR.IR;
 import AST.API;
@@ -21,20 +21,21 @@ export namespace LangRepr {
         };
         auto makeCharClassTableDecl(const DFA::CharClassTable &table)
             -> std::pair<std::shared_ptr<LangAPI::Declaration>, LangAPI::Visibility>;
+        auto makeDebugTable(
+            const stdu::vector<DFA::State<DFA::ClassTransitions>> &states,
+            std::size_t state_count,
+            std::size_t class_count
+        ) -> std::pair<LangAPI::Declaration, LangAPI::Declaration>;
         auto makeDfaTableDecl(
             const stdu::vector<DFA::State<DFA::ClassTransitions>> &states,
             std::size_t state_count,
             std::size_t class_count
         ) -> std::pair<std::shared_ptr<LangAPI::Declaration>, LangAPI::Visibility>;
-        auto makeAcceptTableDecl(const auto &states, std::size_t state_count)
-            -> std::pair<std::shared_ptr<LangAPI::Declaration>, LangAPI::Visibility>;
-        auto makeConstructTableDecl(const auto &states)
-            -> std::pair<std::shared_ptr<LangAPI::Declaration>, LangAPI::Visibility>;
         auto makeLRTableDecl(
-            const stdu::vector<NFA::ActionState>& states,
+            const stdu::vector<NFA::TNFA::ActionState>& states,
             std::size_t state_count
         ) -> std::pair<std::shared_ptr<LangAPI::Declaration>, LangAPI::Visibility>;
-        auto makeSemanticSwitchFunction(const stdu::vector<NFA::SemanticState> semantic_table) -> LangAPI::Function;
+        auto makeSemanticSwitchFunction(const stdu::vector<NFA::TNFA::SemanticState> semantic_table) -> LangAPI::Function;
         auto constructLexer() -> void;
         ConstructLexer(Holder &holder, LexerBuilder &lexer_builder, LLIR::IR &ir, AST::Tree &tree) : ConstructBase(holder, lexer_builder, ir, tree) {}
     };

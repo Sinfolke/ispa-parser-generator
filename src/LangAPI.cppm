@@ -1,4 +1,6 @@
 export module LangAPI;
+import AST.API;
+import constants;
 import hash;
 import dstd;
 import cpuf.printf;
@@ -89,7 +91,7 @@ export namespace LangAPI {
     };
     enum class ExpressionValueType {
         Empty, EmptyInitializer, RValue, ExpressionElement, FunctionCall, IspaLibFunctionCall, StringCompare, Return, Break, Continue, VariableAssignment, CounterIncreament, CounterIncreamentByLength,
-        ResetPosCounter, PushPosCounter, PopPosCounter, SkipSpaces, DfaLookup, ReportError, Lambda
+        ResetPosCounter, PushPosCounter, PopPosCounter, SkipSpaces, DfaLookup, ReportError, Lambda, DFADebug
     };
     enum class ArrayMethods {
         Push, Pop, Size
@@ -106,7 +108,8 @@ export namespace LangAPI {
         DfaState, DfaTable, DfaClassTable, DfaAcceptTable, DfaLRTable, DfaNullState,
         ParserFunctionParameter, Error,
         ActionUNDEF, ActionBEGIN, ActionEND, ActionPUSH,
-        TokenNodeConstruct, ParserNodeConstructor
+        TokenNodeConstruct, ParserNodeConstructor,
+        DFADebug
     };
 
 
@@ -1093,6 +1096,7 @@ export namespace LangAPI {
         Type type;
         Expression value;
         stdu::vector<Expression> set; // language agnostic way to produce static values in non-initializer
+        bool nested_array_type = false;
         bool is_static = false;
         friend bool operator==(const Variable &a, const Variable &b);
         bool operator!=(const Variable& other) const {
@@ -1353,6 +1357,27 @@ export namespace LangAPI {
             return std::tie(parameters, statements);
         }
     };
+    struct DFADebug : ExpressionValueLevel {
+        AST::RuleMember member;
+        stdu::vector<std::string> token_name;
+        std::size_t position_in_token;
+        std::size_t call = constants::NULL_STATE;
+        std::size_t group = constants::NULL_STATE;
+
+        std::size_t rule_run = constants::NULL_STATE;
+        std::size_t offset = 0;
+        std::size_t length = 1;
+        char ch = '\0';
+        friend bool operator==(const DFADebug &a, const DFADebug &b);
+        friend bool operator!=(const DFADebug &a, const DFADebug &b) { return !(a == b); }
+        friend bool operator<(const DFADebug &a, const DFADebug &b);
+        friend auto operator<<(std::ostream& os, const DFADebug &c) -> std::ostream&;
+    private:
+        friend struct ::uhash;
+        auto members() const {
+            return std::tie(member, token_name, position_in_token, call, group, rule_run, offset, length, ch);
+        }
+    };
     struct ExpressionValue : ExpressionLevel {
         std::variant<
             std::monostate,
@@ -1374,7 +1399,8 @@ export namespace LangAPI {
             SkipSpaces,
             DfaLookup,
             ReportError,
-            Lambda
+            Lambda,
+            DFADebug
         > value;
         ExpressionValue() {};
         template<typename T>
@@ -1422,6 +1448,7 @@ export namespace LangAPI {
         bool isDfaLookup() const { return std::holds_alternative<DfaLookup>(value); }
         bool isReportError() const { return std::holds_alternative<ReportError>(value); }
         bool isLambda() const { return std::holds_alternative<Lambda>(value); }
+        bool isDFADebug() const { return std::holds_alternative<DFADebug>(value); }
 
         // ======= getXXX functions =======
         RValue& getRValue() { return std::get<RValue>(value); }
@@ -1442,6 +1469,7 @@ export namespace LangAPI {
         DfaLookup& getDfaLookup() { return std::get<DfaLookup>(value); }
         ReportError& getReportError() { return std::get<ReportError>(value); }
         Lambda& getLambda() { return std::get<Lambda>(value); }
+        DFADebug& getDFADebug() { return std::get<DFADebug>(value); }
 
         // const versions
         const RValue& getRValue() const { return std::get<RValue>(value); }
@@ -1462,6 +1490,7 @@ export namespace LangAPI {
         const DfaLookup& getDfaLookup() const { return std::get<DfaLookup>(value); }
         const ReportError& getDfaReportError() const { return std::get<ReportError>(value); }
         const Lambda& getLambda() const { return std::get<Lambda>(value); }
+        const DFADebug& getDFADebug() const { return std::get<DFADebug>(value); }
 
         auto type() const { return static_cast<ExpressionValueType>(value.index()); }
 

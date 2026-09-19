@@ -16,6 +16,7 @@ Args parse_args(int argc, char** argv) {
     app.add_option("-l,--lang", args.language_str, "Set build language")->required();
     app.add_option("-a,--algorithm", algorithm, "Set one of algorithms: LL, LR(0), LR(1), LALR, LR(*)");
     app.add_option("--debug", args.debug, "Output debug logs into Logs directory");
+    app.add_flag("--nfa-debug,!--no-nfa-debug", args.nfa_debug, "Track debug provenance (TokenID/CharOrigin) inside the TNFA");
     app.add_option("--dump", args.dump, "Dump certain parts of program")->expected(0, -1);
     app.add_option("--ddall", args.dump_all, "Dump everything from program")->expected(0);
     app.add_option("--dd", args.dump_dir, "Directory where to dump");

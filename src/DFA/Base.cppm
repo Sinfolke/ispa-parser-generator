@@ -13,9 +13,6 @@ export namespace DFA {
     protected:
         std::size_t empty_state = NULL_STATE;
         bool merged = false;
-
-        template<typename StateType>
-        auto getType(const States<StateType> &states) const -> DfaType;
     public:
         Base() = default;
         Base(std::size_t empty_state, bool merged = false) : empty_state(empty_state), merged(merged) {}
@@ -27,9 +24,6 @@ export namespace DFA {
         auto hasOneEmptyState() -> bool;
         auto getEmptyStateByDfaId(std::size_t dfaIndex) -> std::size_t;
         auto isMerged() -> bool;
-        static auto getTransitionKeyType(const NFA::TransitionKey &transition_key) -> DfaType;
-        template<typename Transitions>
-        static auto getStateType(const Transitions &transitions) -> DfaType;
 
         template<typename DfaType>
         auto getDfaNames(const DfaType &dfa) -> stdu::vector<stdu::vector<std::string>> {

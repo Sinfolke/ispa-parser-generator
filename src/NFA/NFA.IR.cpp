@@ -4,6 +4,24 @@ import AST.API;
 import AST.types;
 import std;
 
+// -- capture-anchor storage -------------------------------------------------
+namespace {
+    std::deque<TokenID> capture_anchor_pool;
+
+    TokenID *makeCaptureAnchor(AST::RuleMember &member,
+                               const stdu::vector<std::string> &token_name,
+                               std::size_t position_in_token,
+                               std::size_t group = NULL_STATE) {
+        capture_anchor_pool.push_back(TokenID{
+            .member = member,
+            .token_name = token_name,
+            .position_in_token = position_in_token,
+            .group = group,
+        });
+        return &capture_anchor_pool.back();
+    }
+}
+
 bool isTopLevel(const AST::UsePlaceTable &use_table, const stdu::vector<std::string> &name) {
     if (!use_table.contains(name))
         return false;
@@ -14,18 +32,42 @@ bool isTopLevel(const AST::UsePlaceTable &use_table, const stdu::vector<std::str
     }
     return false;
 }
-auto tranfsformOP(const AST::RuleMemberOp member, const stdu::vector<std::string> &name, std::size_t i) -> stdu::vector<TransitionValue> {
-    stdu::vector<TransitionValue> transition_values;
-    for (const auto &option : member.options) {
-        TransitionValue transition_value{TokenID {.member = &*option, .token_name = name, .position_in_token = i}};
-        transition_values.push_back(transition_value);
-    }
-    return transition_values;
+
+auto NFA::captureOf(AST::RuleMember &member,
+                    const stdu::vector<std::string> &token_name,
+                    std::size_t position_in_token) -> stdu::vector<TokenID *> {
+    stdu::vector<TokenID *> captures;
+    if (!member.prefix.empty())
+        captures.push_back(makeCaptureAnchor(member, token_name, position_in_token));
+    return captures;
 }
+
 namespace NFA {
+    stdu::vector<TokenID> InitialNFA::statesAt(AST::RuleMember &member,
+                                               const stdu::vector<std::string> &name, std::size_t i) {
+        stdu::vector<TokenID> states;
+        if (!member.isOp()) {
+            states.push_back(TokenID{.member = member, .token_name = name, .position_in_token = i,
+                                     .capture = NFA::captureOf(member, name, i)});
+            return states;
+        }
+        for (const auto &option : member.getOp().options) {
+            const bool needs_prefix = option->prefix.empty() && !member.prefix.empty();
+            const bool needs_quantifier = option->quantifier == '\0' && member.quantifier != '\0';
+            AST::RuleMember *alt = (needs_prefix || needs_quantifier)
+                ? synthesize(*option,
+                             needs_prefix ? std::optional(member.prefix) : std::nullopt,
+                             needs_quantifier ? std::optional(member.quantifier) : std::nullopt)
+                : option.get();
+            states.push_back(TokenID{.member = *alt, .token_name = name, .position_in_token = i,
+                                     .capture = NFA::captureOf(*alt, name, i)});
+        }
+        return states;
+    }
+
     AST::RuleMember *InitialNFA::synthesize(const AST::RuleMember &base,
-                                             std::optional<AST::RulePrefix> prefix_override,
-                                             std::optional<char> quantifier_override) {
+                                            std::optional<AST::RulePrefix> prefix_override,
+                                            std::optional<char> quantifier_override) {
         auto copy = std::make_unique<AST::RuleMember>(base);
         if (prefix_override && copy->prefix.empty())
             copy->prefix = *prefix_override;
@@ -40,19 +82,17 @@ namespace NFA {
                                                    std::size_t position_in_token,
                                                    std::size_t &site_counter,
                                                    Token &token,
-                                                   const stdu::vector<TransitionValue> &next) {
+                                                   const stdu::vector<TransitionValue> &next,
+                                                   stdu::vector<TokenID *> active_captures) {
         if (member.quantifier != '\0') {
-            // Build the unquantified core once (quantifier stripped on a clone), then patch
-            // in loop-back / bypass behavior around it rather than guessing at compound semantics.
             auto core_copy = std::make_unique<AST::RuleMember>(member);
             core_copy->quantifier = '\0';
             synthesized_members.push_back(std::move(core_copy));
             AST::RuleMember *core = synthesized_members.back().get();
 
-            Fragment core_fragment = expandMember(*core, token_name, position_in_token, site_counter, token, next);
+            Fragment core_fragment = expandMember(*core, token_name, position_in_token, site_counter, token, next, active_captures);
 
             if (member.quantifier == '*' || member.quantifier == '+') {
-                // Loop back: finishing one repetition can start another.
                 for (const auto &tail : core_fragment.tails) {
                     auto &tail_values = token.transitions.at(tail);
                     for (const auto &e : core_fragment.entries) {
@@ -64,7 +104,6 @@ namespace NFA {
 
             Fragment result{core_fragment.entries, core_fragment.tails};
             if (member.quantifier == '*' || member.quantifier == '?') {
-                // Zero occurrences allowed: whoever reaches this slot can also skip straight past it.
                 result.entries.insert(result.entries.end(), next.begin(), next.end());
             }
             return result;
@@ -73,7 +112,11 @@ namespace NFA {
         if (member.isOp()) {
             Fragment result;
             for (const auto &option : member.getOp().options) {
-                Fragment sub = expandMember(*option, token_name, position_in_token, site_counter, token, next);
+                AST::RuleMember *alt = (option->prefix.empty() && !member.prefix.empty())
+                    ? synthesize(*option, member.prefix, std::nullopt)
+                    : option.get();
+                Fragment sub = expandMember(*alt, token_name, position_in_token, site_counter,
+                                            token, next, active_captures);
                 result.entries.insert(result.entries.end(), sub.entries.begin(), sub.entries.end());
                 result.tails.insert(result.tails.end(), sub.tails.begin(), sub.tails.end());
             }
@@ -84,39 +127,44 @@ namespace NFA {
             auto &group = member.getGroup();
 
             if (group.values.size() == 1) {
-                // Transparent wrapper: recurse into the sole child, carrying this group's own
-                // `@` prefix marker down if the child doesn't already have one.
                 AST::RuleMember *child = &*group.values[0];
                 if (child->prefix.empty() && !member.prefix.empty())
                     child = synthesize(*child, member.prefix, std::nullopt);
-                return expandMember(*child, token_name, position_in_token, site_counter, token, next);
+                return expandMember(*child, token_name, position_in_token, site_counter, token, next, active_captures);
             }
+            if (!member.prefix.empty())
+                active_captures.push_back(makeCaptureAnchor(member, token_name, position_in_token, site_counter));
 
-            // Real multi-member sequence: spell it out as a chain of individual states
-            // (member[0] -> member[1] -> ... -> member[n-1] -> next) instead of leaving
-            // the whole group as one opaque blob.
             stdu::vector<Fragment> parts(group.values.size());
             stdu::vector<TransitionValue> cursor_next = next;
             for (std::size_t i = group.values.size(); i-- > 0;) {
-                parts[i] = expandMember(*group.values[i], token_name, position_in_token, site_counter, token, cursor_next);
+                parts[i] = expandMember(*group.values[i], token_name, position_in_token, site_counter, token, cursor_next, active_captures);
                 cursor_next = parts[i].entries;
             }
             return Fragment{parts.front().entries, parts.back().tails};
         }
 
-        // True terminal: literal, char class, name reference, etc. -- a single leaf state,
-        // tagged with this call site so repeated unroll occurrences stay distinct.
-        TokenID leaf_id{&member, token_name, position_in_token, .group = site_counter++};
+        if (!member.prefix.empty())
+            active_captures.push_back(makeCaptureAnchor(member, token_name, position_in_token, site_counter));
+
+        TokenID leaf_id{
+            .member = member,
+            .token_name = token_name,
+            .position_in_token = position_in_token,
+            .group = site_counter++,
+            .capture = active_captures
+        };
         token.transitions[leaf_id] = next;
         return Fragment{{leaf_id}, {leaf_id}};
     }
+
     stdu::vector<AST::RuleMember *> InitialNFA::resolveTransparent(AST::RuleMember &member) {
         if (member.isGroup()) {
             auto &group = member.getGroup();
             if (group.values.size() != 1)
-                return {&member}; // real multi-member sequence group: left opaque for now
+                return {&member};
 
-            auto resolved = resolveTransparent(*group.values[0]); // recurse through nested transparent groups/alternations
+            auto resolved = resolveTransparent(*group.values[0]);
 
             stdu::vector<AST::RuleMember *> result;
             for (auto *leaf : resolved) {
@@ -133,9 +181,6 @@ namespace NFA {
         }
 
         if (member.isOp()) {
-            // An alternation reached while unwrapping a transparent group is not
-            // itself a single state — each option is its own leaf, same as if
-            // it had appeared directly as a group value. Mirrors tranfsformOP.
             stdu::vector<AST::RuleMember *> result;
             for (const auto &option : member.getOp().options) {
                 auto resolved = resolveTransparent(*option);
@@ -144,9 +189,13 @@ namespace NFA {
             return result;
         }
 
-        return {&member}; // true terminal: literal, char class, name reference, etc.
+        return {&member};
     }
+
     void InitialNFA::build(bool addStoreActions) {
+        // Reset static anchor storage arena per build run
+        capture_anchor_pool.clear();
+
         for (const auto &[name, rule] : *tree) {
             if (corelib::text::isLower(name.back())) {
                 continue;
@@ -154,28 +203,32 @@ namespace NFA {
             Token token;
             token.name = name;
             token.top_level = isTopLevel(tree->getUsePlacesTable(), name);
+            token.data_block = &rule.data_block;
+            stdu::vector<stdu::vector<TokenID>> states;
+            for (std::size_t i = 0; i < rule.rule_members.size(); ++i)
+                states.push_back(statesAt(*rule.rule_members[i], name, i));
 
-            for (std::size_t i = 1; i < rule.rule_members.size(); ++i) {
-                auto &prev_member = *rule.rule_members[i - 1];
-                auto &member = *rule.rule_members[i];
-                stdu::vector<TokenID> transition_symbols = prev_member.isOp() ?
-                    tranfsformOP(prev_member.getOp(), name, i - 1) : stdu::vector<TokenID>{TokenID{&prev_member, name, i - 1}};
-                stdu::vector<TokenID> transition_values = member.isOp() ?
-                    tranfsformOP(member.getOp(), name, i) : stdu::vector<TokenID>{TokenID{&member, name, i}};
-                for (const auto &transition_symbol : transition_symbols) {
-                    token.transitions[transition_symbol] = transition_values;
+            if (!states.empty()) {
+                // Inter-position transitions
+                for (std::size_t i = 1; i < states.size(); ++i) {
+                    for (const auto &from : states[i - 1]) {
+                        token.transitions[from] = states[i];
+                    }
+                }
+                // Terminal transitions for trailing states in the rule
+                TokenID terminal_marker{.token_name = name, .position_in_token = states.size()};
+                for (const auto &last : states.back()) {
+                    token.transitions[last] = {terminal_marker};
                 }
             }
-            auto &last_member = *rule.rule_members.back();
-            std::size_t i = rule.rule_members.size() - 1;
-            stdu::vector<TokenID> transition_symbols = last_member.isOp() ?
-                    tranfsformOP(last_member.getOp(), name, i) : stdu::vector<TokenID>{TokenID{&last_member, name, i}};
-            TransitionValue transition_value{TokenID {}};
-            for (const auto &sym : transition_symbols) {
-                token.transitions[sym].push_back(transition_value);
-            }
+
             tokens.emplace(name, token);
         }
+
+        // Execute structural unrolling passes
+        unrollGroups();
+        unrollQuantifiers();
+        unrollNestedTokens();
     }
 
     void InitialNFA::unrollGroups() {
@@ -187,14 +240,14 @@ namespace NFA {
             stdu::vector<Reference> references;
 
             for (const auto &[token_id, transition_values] : token.transitions) {
-                if (token_id.member != nullptr && token_id.member->isGroup())
+                if (!token_id.member.empty() && token_id.member.isGroup())
                     references.push_back(Reference{token_id, transition_values});
             }
 
             std::size_t site_counter = 0;
             for (auto &reference : references) {
-                Fragment fragment = expandMember(*reference.ref.member, name, reference.ref.position_in_token,
-                                                  site_counter, token, reference.continuation);
+                Fragment fragment = expandMember(reference.ref.member, name, reference.ref.position_in_token,
+                                                  site_counter, token, reference.continuation, {});
 
                 for (auto &[token_id, transition_values] : token.transitions) {
                     if (token_id == reference.ref)
@@ -217,16 +270,17 @@ namespace NFA {
             }
         }
     }
+
     void InitialNFA::unrollQuantifiers() {
         for (auto &[name, token] : tokens) {
             stdu::vector<TokenID> quantified;
             for (const auto &[token_id, transition_values] : token.transitions) {
-                if (token_id.member != nullptr && token_id.member->quantifier != '\0')
+                if (!token_id.member.empty() && token_id.member.quantifier != '\0')
                     quantified.push_back(token_id);
             }
 
             for (const auto &state : quantified) {
-                const char quantifier = state.member->quantifier;
+                const char quantifier = state.member.quantifier;
                 auto &own_transitions = token.transitions.at(state);
                 const auto continuation = own_transitions;
 
@@ -240,7 +294,6 @@ namespace NFA {
                 }
 
                 if (quantifier == '*' || quantifier == '?') {
-                    bool found_predecessor = false;
                     for (auto &[other_id, other_values] : token.transitions) {
                         if (other_id == state)
                             continue;
@@ -250,20 +303,12 @@ namespace NFA {
                             if (std::find(other_values.begin(), other_values.end(), c) == other_values.end())
                                 other_values.push_back(c);
                         }
-                        found_predecessor = true;
-                    }
-                    if (!found_predecessor) {
-                        // TODO: `state` has no in-token predecessor -> it's only
-                        // reachable as a start alternative (position 0). Bypassing
-                        // it means `continuation` needs to become a start
-                        // alternative too. I don't know how start states are
-                        // recorded/consumed downstream, so left unhandled rather
-                        // than guessed at.
                     }
                 }
             }
         }
     }
+
     void InitialNFA::unrollNestedTokens() {
         utype::unordered_set<stdu::vector<std::string>> unrolled_to_remove;
 
@@ -279,9 +324,9 @@ namespace NFA {
                 const Token *nested_token_ptr = nullptr;
 
                 for (const auto &[token_id, transition_values] : token.transitions) {
-                    if (token_id.member == nullptr)
+                    if (token_id.member.empty())
                         continue;
-                    const auto &member = *token_id.member;
+                    const auto &member = token_id.member;
                     if (!member.isName())
                         continue;
                     const auto nested_name = member.getName().name;
@@ -306,19 +351,16 @@ namespace NFA {
 
                 for (const auto &[nested_token_id, nested_transition_values] : nested_token.transitions) {
                     TokenID remapped_id = nested_token_id;
-                    // PRESERVE original rule_name (e.g., rule::CSEQUENCE::SYMBOL);
-                    // only attach the call site counter to disambiguate the instance.
                     remapped_id.call = site_counter;
 
                     stdu::vector<TransitionValue> remapped_values;
                     for (auto remapped_value : nested_transition_values) {
-                        if (remapped_value.member == nullptr) {
+                        if (remapped_value.member.empty()) {
                             remapped_values.insert(remapped_values.end(),
-                                                    continuation.begin(), continuation.end());
+                                                   continuation.begin(), continuation.end());
                             continue;
                         }
                         if (remapped_value.token_name == nested_token.name) {
-                            // PRESERVE original rule_name for internal transitions
                             remapped_value.call = site_counter;
                         }
                         remapped_values.push_back(remapped_value);
