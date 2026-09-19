@@ -27,12 +27,14 @@ export namespace NFA {
         };
 
         Fragment expandMember(AST::RuleMember &member,
+                                                       TokenID *prev_leaf,
                                                        const stdu::vector<std::string> &token_name,
                                                        std::size_t position_in_token,
                                                        std::size_t &site_counter,
                                                        Token &token,
                                                        const stdu::vector<TransitionValue> &next,
-                                                       stdu::vector<TokenID*> active_captures
+                                                       stdu::vector<TokenID*> active_captures,
+                                                       const stdu::vector<std::size_t> &alt_path
                                                        );
     public:
         InitialNFA(AST::Tree &tree) : tree(&tree) {}

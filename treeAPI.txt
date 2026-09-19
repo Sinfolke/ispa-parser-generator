@@ -1,13 +1,29 @@
-name<__WS> : Rule {
-   [ \t\n\r\v\f]*;
-  Data: EmptyDataBlock
-}name<main> : Rule {
-   ID
-  Data: EmptyDataBlock
-}name<__WSTOKEN> : Rule {
+name<__WSTOKEN> : Rule {
    [ \t\n\r\v\f]+;
   Data: EmptyDataBlock
-}name<ID> : Rule {
-  @  ( [a-zA-Z]  \s0  [_a-zA-Z0-9]*;)
+}name<CSEQUENCE_ESCAPE> : Rule {
+   "\\"
+   \s0
+  @  .
   Data: [RegularDataBlock: CllExpr]
+}name<__WS> : Rule {
+   [ \t\n\r\v\f]*;
+  Data: EmptyDataBlock
+}name<CSEQUENCE_DIAPASON> : Rule {
+  @  CSEQUENCE::SYMBOL
+   \s0
+   "-"
+   \s0
+  @  CSEQUENCE::SYMBOL
+  Data: TemplatedDataBlock(begin, end)
+}name<CSEQUENCE_SYMBOL> : Rule {
+  @  [^\]]
+  Data: [RegularDataBlock: CllExpr]
+}name<CSEQUENCE> : Rule {
+   "["
+   \s0
+  @  "^"?;
+  @  ( \s0  ( CSEQUENCE::DIAPASON |  CSEQUENCE::ESCAPE |  CSEQUENCE::SYMBOL))*;
+   "]"
+  Data: TemplatedDataBlock(_not, val)
 }

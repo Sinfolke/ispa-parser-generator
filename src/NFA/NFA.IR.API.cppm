@@ -35,11 +35,13 @@ export namespace NFA::IR {
         std::size_t position_in_token;
         std::size_t call = NULL_STATE;
         std::size_t group = NULL_STATE;
+        stdu::vector<std::size_t> alt;
         stdu::vector<TokenID*> capture;
+        TokenID *prev;
         bool operator==(const TokenID &other) const = default;
         bool operator<(const TokenID &other) const {
             if (member == other.member) {
-                return std::tie(token_name, position_in_token, call, group) < std::tie(other.token_name, other.position_in_token, other.call, other.group);
+                return std::tie(token_name, position_in_token, call, group, alt) < std::tie(other.token_name, other.position_in_token, other.call, other.group, other.alt);
             } else {
                 return &member < &other.member;
             }
@@ -47,7 +49,7 @@ export namespace NFA::IR {
     private:
         friend struct ::uhash;
         auto members() const {
-            return std::tie(member, token_name, position_in_token, call, group, capture);
+            return std::tie(member, token_name, position_in_token, call, group, capture, alt);
         }
     };
     using TransitionValue = TokenID;

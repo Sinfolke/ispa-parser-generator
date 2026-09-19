@@ -229,7 +229,7 @@ auto DFA::build() -> const States<StateWithActions> & {
         const Closure &current_closure =
             dfa_closures.at(current_dfa_index);
 
-        const std::vector<std::size_t> &current_subset =
+        const std::vector<std::size_t> current_subset =
             current_closure.get();
 
 

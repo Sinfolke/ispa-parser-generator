@@ -415,7 +415,7 @@ namespace DFA {
                                 auto range_begin = debug->member[i - 1];
                                 auto range_end = debug->member[i + 1];
                                 if (current_ch >= range_begin && current_ch <= range_end) {
-                                    std::cout << std::string(i - 1, ' ') << '^' << std::endl;
+                                    std::cout << std::string(i - 1, ' ') << '^';
                                     std::cout << ' ' << '^' << std::endl;
                                     break;
                                 }

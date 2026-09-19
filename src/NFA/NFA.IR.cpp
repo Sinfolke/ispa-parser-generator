@@ -78,19 +78,22 @@ namespace NFA {
     }
 
     InitialNFA::Fragment InitialNFA::expandMember(AST::RuleMember &member,
+                                                   TokenID *prev_leaf,
                                                    const stdu::vector<std::string> &token_name,
                                                    std::size_t position_in_token,
                                                    std::size_t &site_counter,
                                                    Token &token,
                                                    const stdu::vector<TransitionValue> &next,
-                                                   stdu::vector<TokenID *> active_captures) {
+                                                   stdu::vector<TokenID *> active_captures,
+                                                   const stdu::vector<std::size_t> &alt_path
+                                                   ) {
         if (member.quantifier != '\0') {
             auto core_copy = std::make_unique<AST::RuleMember>(member);
             core_copy->quantifier = '\0';
             synthesized_members.push_back(std::move(core_copy));
             AST::RuleMember *core = synthesized_members.back().get();
 
-            Fragment core_fragment = expandMember(*core, token_name, position_in_token, site_counter, token, next, active_captures);
+            Fragment core_fragment = expandMember(*core, prev_leaf, token_name, position_in_token, site_counter, token, next, active_captures, alt_path);
 
             if (member.quantifier == '*' || member.quantifier == '+') {
                 for (const auto &tail : core_fragment.tails) {
@@ -111,14 +114,21 @@ namespace NFA {
 
         if (member.isOp()) {
             Fragment result;
+            std::size_t alt_num = 0;
             for (const auto &option : member.getOp().options) {
                 AST::RuleMember *alt = (option->prefix.empty() && !member.prefix.empty())
                     ? synthesize(*option, member.prefix, std::nullopt)
                     : option.get();
-                Fragment sub = expandMember(*alt, token_name, position_in_token, site_counter,
-                                            token, next, active_captures);
+                // Every alternative gets its own path (outer path + its index) so
+                // the leaves it produces are distinct TokenID keys. Building the
+                // path once outside the loop pinned every alternative to index 0.
+                auto path = alt_path;
+                path.push_back(alt_num);
+                Fragment sub = expandMember(*alt, prev_leaf, token_name, position_in_token, site_counter,
+                                            token, next, active_captures, path);
                 result.entries.insert(result.entries.end(), sub.entries.begin(), sub.entries.end());
                 result.tails.insert(result.tails.end(), sub.tails.begin(), sub.tails.end());
+                ++alt_num;
             }
             return result;
         }
@@ -128,18 +138,41 @@ namespace NFA {
 
             if (group.values.size() == 1) {
                 AST::RuleMember *child = &*group.values[0];
-                if (child->prefix.empty() && !member.prefix.empty())
+                const bool group_captures = !member.prefix.empty();
+                const bool child_captures = !child->prefix.empty();
+
+                if (group_captures && !child_captures) {
+                    // Nothing distinguishes the group from its single child — fold
+                    // the group's prefix onto it instead of adding a boundary.
                     child = synthesize(*child, member.prefix, std::nullopt);
-                return expandMember(*child, token_name, position_in_token, site_counter, token, next, active_captures);
+                    return expandMember(*child, prev_leaf, token_name, position_in_token, site_counter, token, next, active_captures, alt_path);
+                }
+
+                stdu::vector<TokenID *> captures = active_captures;
+                if (group_captures) {
+                    // Group and child both capture independently — the group needs
+                    // its own boundary in addition to the child's.
+                    captures.push_back(makeCaptureAnchor(member, token_name, position_in_token, site_counter++));
+                }
+                return expandMember(*child, prev_leaf, token_name, position_in_token, site_counter, token, next, captures, alt_path);
             }
             if (!member.prefix.empty())
-                active_captures.push_back(makeCaptureAnchor(member, token_name, position_in_token, site_counter));
+                active_captures.push_back(makeCaptureAnchor(member, token_name, position_in_token, site_counter++));
 
             stdu::vector<Fragment> parts(group.values.size());
             stdu::vector<TransitionValue> cursor_next = next;
             for (std::size_t i = group.values.size(); i-- > 0;) {
-                parts[i] = expandMember(*group.values[i], token_name, position_in_token, site_counter, token, cursor_next, active_captures);
+                TokenID *element_prev = (i == 0) ? prev_leaf : nullptr; // filled in below for i > 0
+                parts[i] = expandMember(*group.values[i], element_prev, token_name, position_in_token, site_counter, token, cursor_next, active_captures, alt_path);
                 cursor_next = parts[i].entries;
+            }
+            // Now that every element's fragment exists, wire prev forward: element i's
+            // entries were built with prev_leaf = nullptr (except i == 0); patch them
+            // to point at element (i-1)'s tail(s).
+            for (std::size_t i = 1; i < parts.size(); ++i) {
+                for (auto &entry : parts[i].entries) {
+                    // needs to update entry.prev and reflect that in token.transitions' key
+                }
             }
             return Fragment{parts.front().entries, parts.back().tails};
         }
@@ -152,7 +185,9 @@ namespace NFA {
             .token_name = token_name,
             .position_in_token = position_in_token,
             .group = site_counter++,
-            .capture = active_captures
+            .alt = alt_path,
+            .capture = active_captures,
+            .prev = prev_leaf,
         };
         token.transitions[leaf_id] = next;
         return Fragment{{leaf_id}, {leaf_id}};
@@ -245,9 +280,10 @@ namespace NFA {
             }
 
             std::size_t site_counter = 0;
+            stdu::vector<std::size_t> alt_path;
             for (auto &reference : references) {
-                Fragment fragment = expandMember(reference.ref.member, name, reference.ref.position_in_token,
-                                                  site_counter, token, reference.continuation, {});
+                Fragment fragment = expandMember(reference.ref.member, reference.ref.prev, name, reference.ref.position_in_token,
+                                                  site_counter, token, reference.continuation, {}, alt_path);
 
                 for (auto &[token_id, transition_values] : token.transitions) {
                     if (token_id == reference.ref)

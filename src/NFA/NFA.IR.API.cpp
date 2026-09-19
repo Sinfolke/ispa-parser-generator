@@ -27,7 +27,13 @@ auto NFA::IR::operator<<(std::ostream &os, const TokenID &id) -> std::ostream & 
     }
     if (!id.capture.empty()) {
         for (const auto &cap : id.capture) {
-            os << "@cap[" << cap->member << "#" << corelib::text::join(cap->token_name, "::") << "{" << cap->position_in_token << "}]";
+            os << "@cap[";
+            if (cap->member.isGroup() || cap->member.isOp()) {
+                os << "Group[" << cap->group << "]";
+            } else {
+                os << cap->member;
+            }
+            os << "#" << corelib::text::join(cap->token_name, "::") << "{" << cap->position_in_token << "}]";
         }
     }
     return os;

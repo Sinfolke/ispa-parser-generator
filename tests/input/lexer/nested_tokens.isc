@@ -1,5 +1,5 @@
 CSEQUENCE:
-    '[' @ '^'? @ ( #DIAPASON | #ESCAPE | #SYMBOL )* ']'
+    '[' \s0 @ '^'? @ ( \s0 #DIAPASON | #ESCAPE | #SYMBOL )* ']'
     @{_not, val}
     #SYMBOL:
         @ [^\]]

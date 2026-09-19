@@ -483,7 +483,14 @@ auto Core::convertDFADebug(const LangAPI::DFADebug &dfa_debug) -> std::string {
     ss << "::ISPA_STD::DFA::API::DFADebug {";
     if (!dfa_debug.member.empty()) {
         if (dfa_debug.member.isString()) {
-            ss << '"' << dfa_debug.member.getString().value << '"';
+            ss << '"';
+            for (const auto c : dfa_debug.member.getString().value) {
+                if (c == '\\')
+                    ss << "\\\\";
+                else
+                    ss << c;
+            }
+            ss << '"';
         } else if (dfa_debug.member.isCsequence()) {
             const auto &csequence = dfa_debug.member.getCsequence();
             ss << "\"[";
@@ -509,7 +516,7 @@ auto Core::convertDFADebug(const LangAPI::DFADebug &dfa_debug) -> std::string {
         << ", " << (dfa_debug.rule_run == constants::NULL_STATE ? "-1" : std::to_string(dfa_debug.rule_run))
         << ", " << dfa_debug.offset
         << ", " << dfa_debug.length
-        << ", " << "'" << corelib::text::getCharFromEscapedAsStr(dfa_debug.ch, false) << "'"
+        << ", " << "'" << (dfa_debug.ch == '\\' ? "\\\\" : corelib::text::getCharFromEscapedAsStr(dfa_debug.ch, false)) << "'"
     << "}";
     return ss.str();
 }

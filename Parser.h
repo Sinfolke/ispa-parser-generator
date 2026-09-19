@@ -13,6 +13,7 @@ namespace Parser {
 	enum class Tokens {
 		NONE,
 		__WS,
+		AUTO_31,
 		AUTO_29,
 		AUTO_27,
 		AUTO_26,
@@ -140,23 +141,26 @@ namespace Parser {
 		struct cll_expr_arithmetic;
 		struct __WS {
 		};
+		struct AUTO_31 {
+			std::string value;
+		};
 		struct AUTO_29 {
 			std::string value;
 		};
 		struct AUTO_27 {
-			std::string value;
+			char value;
 		};
 		struct AUTO_26 {
 			char value;
 		};
 		struct AUTO_25 {
-			char value;
+			std::string value;
 		};
 		struct AUTO_24 {
 			std::string value;
 		};
 		struct AUTO_23 {
-			std::string value;
+			char value;
 		};
 		struct AUTO_22 {
 			char value;
@@ -384,10 +388,10 @@ namespace Parser {
 			::ISPA_STD::Node<Rules, std::unique_ptr<rule>> value;
 		};
 		struct cll__variable {
-			std::variant<std::monostate, ::ISPA_STD::Node<Tokens, AUTO_29>, ::ISPA_STD::Node<Tokens, AUTO_30>> pre;
+			std::variant<std::monostate, ::ISPA_STD::Node<Tokens, AUTO_30>, ::ISPA_STD::Node<Tokens, AUTO_31>> pre;
 			::ISPA_STD::Node<Tokens, ID> name;
 			::ISPA_STD::MatchResult<Rules, std::unique_ptr<cll_expr>> brace_expression;
-			std::variant<std::monostate, ::ISPA_STD::Node<Tokens, AUTO_29>, ::ISPA_STD::Node<Tokens, AUTO_30>> pos;
+			std::variant<std::monostate, ::ISPA_STD::Node<Tokens, AUTO_30>, ::ISPA_STD::Node<Tokens, AUTO_31>> pos;
 		};
 		struct cll_expr_logical {
 			::ISPA_STD::MatchResult<Rules, std::unique_ptr<cll_expr_compare>> left;
@@ -517,6 +521,7 @@ namespace Parser {
 		using AUTO_29 = FlatTypes::AUTO_29;
 		using AUTO_3 = FlatTypes::AUTO_3;
 		using AUTO_30 = FlatTypes::AUTO_30;
+		using AUTO_31 = FlatTypes::AUTO_31;
 		using AUTO_4 = FlatTypes::AUTO_4;
 		using AUTO_5 = FlatTypes::AUTO_5;
 		using AUTO_6 = FlatTypes::AUTO_6;
@@ -608,12 +613,20 @@ namespace Parser {
 		};
 		using rvalue = FlatTypes::rvalue;
 	}
-	using Token = std::variant<std::monostate, ::ISPA_STD::Node<Tokens, Types::__WS>, ::ISPA_STD::Node<Tokens, Types::AUTO_29>, ::ISPA_STD::Node<Tokens, Types::AUTO_27>, ::ISPA_STD::Node<Tokens, Types::AUTO_26>, ::ISPA_STD::Node<Tokens, Types::AUTO_25>, ::ISPA_STD::Node<Tokens, Types::AUTO_24>, ::ISPA_STD::Node<Tokens, Types::AUTO_23>, ::ISPA_STD::Node<Tokens, Types::AUTO_22>, ::ISPA_STD::Node<Tokens, Types::AUTO_20>, ::ISPA_STD::Node<Tokens, Types::AUTO_18>, ::ISPA_STD::Node<Tokens, Types::AUTO_17>, ::ISPA_STD::Node<Tokens, Types::AUTO_28>, ::ISPA_STD::Node<Tokens, Types::AUTO_19>, ::ISPA_STD::Node<Tokens, Types::AUTO_16>, ::ISPA_STD::Node<Tokens, Types::AUTO_15>, ::ISPA_STD::Node<Tokens, Types::AUTO_14>, ::ISPA_STD::Node<Tokens, Types::AUTO_10>, ::ISPA_STD::Node<Tokens, Types::AUTO_8>, ::ISPA_STD::Node<Tokens, Types::AUTO_6>, ::ISPA_STD::Node<Tokens, Types::rule::BIN>, ::ISPA_STD::Node<Tokens, Types::rule::HEX>, ::ISPA_STD::Node<Tokens, Types::rule::ESCAPED>, ::ISPA_STD::Node<Tokens, Types::rule::NOSPACE>, ::ISPA_STD::Node<Tokens, Types::BOOLEAN>, ::ISPA_STD::Node<Tokens, Types::AUTO_1>, ::ISPA_STD::Node<Tokens, Types::rule::CSEQUENCE::ESCAPE>, ::ISPA_STD::Node<Tokens, Types::rule::CSEQUENCE::DIAPASON>, ::ISPA_STD::Node<Tokens, Types::rule::CSEQUENCE::SYMBOL>, ::ISPA_STD::Node<Tokens, Types::AUTO_12>, ::ISPA_STD::Node<Tokens, Types::AUTO_9>, ::ISPA_STD::Node<Tokens, Types::AUTO_13>, ::ISPA_STD::Node<Tokens, Types::AUTO_30>, ::ISPA_STD::Node<Tokens, Types::AUTO_3>, ::ISPA_STD::Node<Tokens, Types::AUTO_7>, ::ISPA_STD::Node<Tokens, Types::AUTO_21>, ::ISPA_STD::Node<Tokens, Types::NUMBER>, ::ISPA_STD::Node<Tokens, Types::ID>, ::ISPA_STD::Node<Tokens, Types::cll::LOGICAL_NOT>, ::ISPA_STD::Node<Tokens, Types::__WSTOKEN>, ::ISPA_STD::Node<Tokens, Types::MODULO>, ::ISPA_STD::Node<Tokens, Types::PLUS>, ::ISPA_STD::Node<Tokens, Types::QUESTION_MARK>, ::ISPA_STD::Node<Tokens, Types::rule::CSEQUENCE>, ::ISPA_STD::Node<Tokens, Types::MULTIPLE>, ::ISPA_STD::Node<Tokens, Types::AT>, ::ISPA_STD::Node<Tokens, Types::AUTO_11>, ::ISPA_STD::Node<Tokens, Types::DOT>, ::ISPA_STD::Node<Tokens, Types::DIVIDE>, ::ISPA_STD::Node<Tokens, Types::STRING>, ::ISPA_STD::Node<Tokens, Types::SPACEMODE>, ::ISPA_STD::Node<Tokens, Types::AUTO_4>, ::ISPA_STD::Node<Tokens, Types::MINUS>, ::ISPA_STD::Node<Tokens, Types::cll::ASSIGNMENT_OP>, ::ISPA_STD::Node<Tokens, Types::cll::COMPARE_OP>, ::ISPA_STD::Node<Tokens, Types::LINEAR_COMMENT>, ::ISPA_STD::Node<Tokens, Types::rule::OP>, ::ISPA_STD::Node<Tokens, Types::cll::LOGICAL_OR>, ::ISPA_STD::Node<Tokens, Types::AUTO_0>, ::ISPA_STD::Node<Tokens, Types::cll::LOGICAL_AND>, ::ISPA_STD::Node<Tokens, Types::cll::LOGICAL_OP>, ::ISPA_STD::Node<Tokens, Types::AUTO_2>, ::ISPA_STD::Node<Tokens, Types::NAME>, ::ISPA_STD::Node<Tokens, Types::AUTO_5>>;
+	using Token = std::variant<std::monostate, ::ISPA_STD::Node<Tokens, Types::__WS>, ::ISPA_STD::Node<Tokens, Types::AUTO_31>, ::ISPA_STD::Node<Tokens, Types::AUTO_29>, ::ISPA_STD::Node<Tokens, Types::AUTO_27>, ::ISPA_STD::Node<Tokens, Types::AUTO_26>, ::ISPA_STD::Node<Tokens, Types::AUTO_25>, ::ISPA_STD::Node<Tokens, Types::AUTO_24>, ::ISPA_STD::Node<Tokens, Types::AUTO_23>, ::ISPA_STD::Node<Tokens, Types::AUTO_22>, ::ISPA_STD::Node<Tokens, Types::AUTO_20>, ::ISPA_STD::Node<Tokens, Types::AUTO_18>, ::ISPA_STD::Node<Tokens, Types::AUTO_17>, ::ISPA_STD::Node<Tokens, Types::AUTO_28>, ::ISPA_STD::Node<Tokens, Types::AUTO_19>, ::ISPA_STD::Node<Tokens, Types::AUTO_16>, ::ISPA_STD::Node<Tokens, Types::AUTO_15>, ::ISPA_STD::Node<Tokens, Types::AUTO_14>, ::ISPA_STD::Node<Tokens, Types::AUTO_10>, ::ISPA_STD::Node<Tokens, Types::AUTO_8>, ::ISPA_STD::Node<Tokens, Types::AUTO_6>, ::ISPA_STD::Node<Tokens, Types::rule::BIN>, ::ISPA_STD::Node<Tokens, Types::rule::HEX>, ::ISPA_STD::Node<Tokens, Types::rule::ESCAPED>, ::ISPA_STD::Node<Tokens, Types::rule::NOSPACE>, ::ISPA_STD::Node<Tokens, Types::BOOLEAN>, ::ISPA_STD::Node<Tokens, Types::AUTO_1>, ::ISPA_STD::Node<Tokens, Types::rule::CSEQUENCE::ESCAPE>, ::ISPA_STD::Node<Tokens, Types::rule::CSEQUENCE::DIAPASON>, ::ISPA_STD::Node<Tokens, Types::rule::CSEQUENCE::SYMBOL>, ::ISPA_STD::Node<Tokens, Types::AUTO_12>, ::ISPA_STD::Node<Tokens, Types::AUTO_9>, ::ISPA_STD::Node<Tokens, Types::AUTO_13>, ::ISPA_STD::Node<Tokens, Types::AUTO_30>, ::ISPA_STD::Node<Tokens, Types::AUTO_3>, ::ISPA_STD::Node<Tokens, Types::AUTO_7>, ::ISPA_STD::Node<Tokens, Types::AUTO_21>, ::ISPA_STD::Node<Tokens, Types::NUMBER>, ::ISPA_STD::Node<Tokens, Types::ID>, ::ISPA_STD::Node<Tokens, Types::cll::LOGICAL_NOT>, ::ISPA_STD::Node<Tokens, Types::__WSTOKEN>, ::ISPA_STD::Node<Tokens, Types::MODULO>, ::ISPA_STD::Node<Tokens, Types::PLUS>, ::ISPA_STD::Node<Tokens, Types::QUESTION_MARK>, ::ISPA_STD::Node<Tokens, Types::rule::CSEQUENCE>, ::ISPA_STD::Node<Tokens, Types::MULTIPLE>, ::ISPA_STD::Node<Tokens, Types::AT>, ::ISPA_STD::Node<Tokens, Types::AUTO_11>, ::ISPA_STD::Node<Tokens, Types::DOT>, ::ISPA_STD::Node<Tokens, Types::DIVIDE>, ::ISPA_STD::Node<Tokens, Types::STRING>, ::ISPA_STD::Node<Tokens, Types::SPACEMODE>, ::ISPA_STD::Node<Tokens, Types::AUTO_4>, ::ISPA_STD::Node<Tokens, Types::MINUS>, ::ISPA_STD::Node<Tokens, Types::cll::ASSIGNMENT_OP>, ::ISPA_STD::Node<Tokens, Types::cll::COMPARE_OP>, ::ISPA_STD::Node<Tokens, Types::LINEAR_COMMENT>, ::ISPA_STD::Node<Tokens, Types::rule::OP>, ::ISPA_STD::Node<Tokens, Types::cll::LOGICAL_OR>, ::ISPA_STD::Node<Tokens, Types::AUTO_0>, ::ISPA_STD::Node<Tokens, Types::cll::LOGICAL_AND>, ::ISPA_STD::Node<Tokens, Types::cll::LOGICAL_OP>, ::ISPA_STD::Node<Tokens, Types::AUTO_2>, ::ISPA_STD::Node<Tokens, Types::NAME>, ::ISPA_STD::Node<Tokens, Types::AUTO_5>>;
 	class Lexer : public ::ISPA_STD::Lexer_base<Tokens, Token> {
 		static ::ISPA_STD::DFA::API::CharToClass char_class_table;
-		static ::ISPA_STD::DFA::API::Table<0, 0> dfa_table;
-		static ::ISPA_STD::DFA::API::Table<0, 3> lr_table;
+		static ::ISPA_STD::DFA::API::Table<154, 129> dfa_table;
+		static ::ISPA_STD::DFA::API::Table<2471, 3> lr_table;
 		static auto semantic_action_exec(long long state, long long start_pos, const char* start, long long length, long long line, std::vector<std::variant<std::monostate, Token, char, std::string>>& values, std::vector<std::vector<std::variant<std::monostate, Token, char, std::string>>>& vec_values) -> std::pair<long long, Token>;
+		bool init_done;
+		auto init() -> void override;
+		std::vector<std::variant<std::monostate, Token, char, std::string>> values;
+		std::vector<std::vector<std::variant<std::monostate, Token, char, std::string>>> vec_values;
+		std::array<const char*, 10> registers;
+		std::array<long long, 10> register_ids;
+		static std::array<long long, 154> debug_array_state_to_offset;
+		static std::array<::ISPA_STD::DFA::API::DFADebug, 19866> debug_array;
 	public: 
 		auto makeToken(const char*& pos) -> Token override;
 	};

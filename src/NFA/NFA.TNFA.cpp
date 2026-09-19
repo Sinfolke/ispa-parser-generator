@@ -11,6 +11,15 @@ import std;
 using namespace NFA::IR;
 
 namespace NFA::TNFA {
+    // Appends one fresh state and returns its index. Every wire* helper uses
+    // this instead of "current_state + 1", so two members wired from the same
+    // state never share intermediate states.
+    template <typename States>
+    std::size_t allocStateIn(States &all_states) {
+        all_states.emplace_back();
+        return all_states.size() - 1;
+    }
+
     auto generateVariable(const TokenID &source) {
         std::ostringstream v;
         v << source.member << "#" << source.token_name;
@@ -19,6 +28,14 @@ namespace NFA::TNFA {
         }
         if (source.call != NULL_STATE) {
             v << "$call" << source.call;
+        }
+        if (!source.alt.empty()) {
+            v << "$alt[";
+            for (const auto &alt : source.alt) {
+                v << alt << ":";
+            }
+            v.seekp(-1, std::ios_base::cur); // Remove the trailing ':'
+            v << "]";
         }
         v << '{' << source.position_in_token << '}';
         return v.str();
@@ -38,24 +55,32 @@ namespace NFA::TNFA {
     auto generate_capture_boundaries(const Token &token) {
         std::unordered_map<std::string, CaptureBoundaries> result;
 
+        utype::unordered_set<TokenID> reachable;
         for (const auto &[sym, next_transitions] : token.transitions) {
-            bool has_token_successor = false;
+            for (const auto &next : next_transitions) {
+                if (!next.member.empty())
+                    reachable.insert(next);
+            }
+        }
+
+        for (const auto &[sym, next_transitions] : token.transitions) {
+            if (!reachable.contains(sym) && !sym.capture.empty()) {
+                auto &boundary = result[generateVariable(sym)];
+                for (const auto *cap : sym.capture) {
+                    boundary.events.push_back({
+                        .kind = CaptureBoundaries::Kind::Begin,
+                        .position = CaptureBoundaries::Position::Entry,
+                        .capture = *cap,
+                    });
+                }
+            }
 
             for (const auto &next : next_transitions) {
-                if (next.member.empty()) {
-                    continue; // ACCEPT / sentinel — handled below.
-                }
-                has_token_successor = true;
+                if (next.member.empty())
+                    continue; // ACCEPT: handled directly in visit(), not here.
 
                 auto &boundary = result[generateVariable(next)];
 
-                // Captures `sym` was inside that `next` is not: they close
-                // on this edge. `sym.capture` is outer-to-inner, so walk it
-                // in reverse (inner-to-outer) so nested ENDs fire
-                // innermost-first. This closes at `next`'s own ENTRY —
-                // the sym->next edge IS `next`'s first character — the
-                // same physical point any BEGINs below fire at, so both
-                // land in one ordered list for that entry.
                 for (auto it = sym.capture.rbegin(); it != sym.capture.rend(); ++it) {
                     if (!has_capture(next, *it)) {
                         boundary.events.push_back({
@@ -65,9 +90,6 @@ namespace NFA::TNFA {
                         });
                     }
                 }
-
-                // Captures `next` is inside that `sym` was not: they open
-                // on this edge, outer-to-inner, also at `next`'s ENTRY.
                 for (const auto *cap : next.capture) {
                     if (!has_capture(sym, cap)) {
                         boundary.events.push_back({
@@ -77,28 +99,6 @@ namespace NFA::TNFA {
                         });
                     }
                 }
-            }
-
-            // Captures still open when `sym` has no real successor
-            // terminate at ACCEPT. There is no `next` to carry them, so
-            // they're recorded on `sym` itself, innermost-first, and must
-            // attach at `sym`'s own EXIT (its last character) — the whole
-            // of `sym` has to be consumed before the capture can close.
-            if (!has_token_successor) {
-                auto &boundary = result[generateVariable(sym)];
-                for (auto it = sym.capture.rbegin(); it != sym.capture.rend(); ++it) {
-                    boundary.events.push_back({
-                        .kind = CaptureBoundaries::Kind::End,
-                        .position = CaptureBoundaries::Position::Exit,
-                        .capture = **it,
-                    });
-                }
-            }
-        }
-        for (const auto &[sym, boundary] : result) {
-            std::cout << sym << ": ";
-            for (const auto &event : boundary.events) {
-                std::cout << event.capture << " " << (event.kind == CaptureBoundaries::Kind::Begin ? "begin" : "end") << std::endl;
             }
         }
         return result;
@@ -129,7 +129,11 @@ namespace NFA::TNFA {
         const std::string &str = source.member.getString().value;
         std::size_t i = 0;
         for (const auto c : str) {
-            const std::size_t next = next_state(current_state);
+            // Always a FRESH state. Deriving it from current_state (+1) made
+            // every alternative that starts at the same state reuse the same
+            // physical states by depth ("int" / "str" / "bool" shared 18..20),
+            // which accepted cross-products like "itr".
+            const std::size_t next = allocStateIn(states);
 
             states[current_state].transitions[c].emplace_back(
                 TransitionValue{
@@ -150,16 +154,16 @@ namespace NFA::TNFA {
             ++i;
 
             current_state = next;
-            states.emplace_back();
         }
 
         return current_state;
     }
     auto TNFABuilder::wireAny(std::size_t current_state, const TokenID &source) -> std::size_t {
+        const std::size_t next = allocStateIn(states);
         for (int c = 0; c < ALPHABET_SIZE; ++c) {
             states[current_state].transitions[c].emplace_back(
                 TransitionValue{
-                    .next = next_state(current_state),
+                    .next = next,
                     .priority = next_priority(),
                     .source = source,
                     .char_origin = debug
@@ -174,7 +178,7 @@ namespace NFA::TNFA {
                 }
             );
         }
-        return next_state(current_state);
+        return next;
     }
     auto TNFABuilder::wireCsequence(std::size_t current_state, const TokenID &source) -> std::size_t {
         const auto &cseq = source.member.getCsequence();
@@ -192,11 +196,12 @@ namespace NFA::TNFA {
             }
         }
 
+        const std::size_t next = allocStateIn(states);
         for (int c = 0; c < ALPHABET_SIZE; ++c) {
             if (chars_to_wire[c]) {
                 states[current_state].transitions[(char) c].emplace_back(
                     TransitionValue{
-                        .next = next_state(current_state),
+                        .next = next,
                         .priority = next_priority(),
                         .source = source,
                         .char_origin = debug
@@ -212,14 +217,15 @@ namespace NFA::TNFA {
                 );
             }
         }
-        return next_state(current_state);
+        return next;
     }
     auto TNFABuilder::wireEscaped(std::size_t current_state, const TokenID &source) -> std::size_t {
         const auto &esc = source.member.getEscaped();
         const char c = corelib::text::getEscapedFromChar(esc.c);
+        const std::size_t next = allocStateIn(states);
         states[current_state].transitions[c].emplace_back(
             TransitionValue{
-                .next = next_state(current_state),
+                .next = next,
                 .priority = next_priority(),
                 .source = source,
                 .char_origin = debug
@@ -233,7 +239,7 @@ namespace NFA::TNFA {
                     : std::nullopt
             }
         );
-        return next_state(current_state);
+        return next;
     }
     // Fires `actions` once, without consuming input, then continues from a
     // fresh state. Kept in its own table (not `transitions`) so cloning
@@ -243,7 +249,7 @@ namespace NFA::TNFA {
         std::size_t current_state,
         ActionChain actions
     ) -> std::size_t {
-        const std::size_t next = next_state(current_state);
+        const std::size_t next = allocStateIn(states);
         states[current_state].epsilon_transitions.insert(
             TransitionValue{
                 .next = next,
@@ -251,7 +257,6 @@ namespace NFA::TNFA {
                 .actions = std::move(actions),
             }
         );
-        states.emplace_back();
         return next;
     }
 
@@ -260,6 +265,10 @@ namespace NFA::TNFA {
         const TokenID &source,
         std::unordered_map<std::string, CaptureBoundaries> &capture_boundaries
     ) -> std::size_t {
+
+        // Everything wired below lives at indices >= first_new, plus edges
+        // leaving current_state itself.
+        const std::size_t first_new = states.size();
 
         std::size_t end_state;
         if (source.member.isString()) {
@@ -304,31 +313,36 @@ namespace NFA::TNFA {
         // Entry actions belong on the transition(s) consuming this member's
         // FIRST character, i.e. the ones leaving `current_state`. Exit
         // actions belong on the transition(s) consuming its LAST character,
-        // i.e. the ones arriving at `end_state`. For a single-character
-        // member (wireAny / wireCsequence / wireEscaped) those are the same
-        // state, but for a multi-character wireString they are not —
-        // `current_state` is only the entry state, so exit actions must be
-        // attached at `end_state - 1` (the predecessor state
-        // wireString/wireAny/etc. leave it in), never at `current_state`.
-        auto attach = [&](std::size_t state_id, const ActionChain &to_attach) {
+        // i.e. the ones ARRIVING at `end_state`.
+        //
+        // States are allocated fresh now, so "end_state - 1" no longer names
+        // the predecessor (for a one-character member it is current_state,
+        // which can be anywhere). The predecessor is found by looking for
+        // this member's edges that land on end_state, among the states this
+        // call created plus current_state.
+        auto attach_from = [&](std::size_t state_id, const ActionChain &to_attach,
+                               std::optional<std::size_t> only_into) {
             if (to_attach.empty()) return;
             for (auto &[_, transitions] : states[state_id].transitions) {
                 for (auto &t : transitions) {
-                    if (t.source == source) {
-                        t.actions.insert(
-                            t.actions.end(),
-                            to_attach.begin(),
-                            to_attach.end()
-                        );
-                    }
+                    if (!(t.source == source)) continue;
+                    if (only_into && t.next != *only_into) continue;
+                    t.actions.insert(
+                        t.actions.end(),
+                        to_attach.begin(),
+                        to_attach.end()
+                    );
                 }
             }
         };
 
-        attach(current_state, entry_actions);
-        attach(end_state - 1, exit_actions);
+        attach_from(current_state, entry_actions, std::nullopt);
 
-        states.emplace_back();
+        if (!exit_actions.empty()) {
+            attach_from(current_state, exit_actions, end_state);
+            for (std::size_t s = first_new; s < end_state; ++s)
+                attach_from(s, exit_actions, end_state);
+        }
 
         return end_state;
     }
@@ -358,6 +372,11 @@ namespace NFA::TNFA {
         // re-wired from scratch.
         std::unordered_map<std::string, std::size_t> end_of;
 
+        // key -> the state `id` was first wired FROM. Needed so a later
+        // predecessor that reaches an already-wired id (a shared successor,
+        // or a loop back to an earlier element) can be joined to it.
+        std::unordered_map<std::string, std::size_t> entry_of;
+
         // Index the edge table once by canonical key instead of re-scanning it
         // for every alt.
         std::unordered_map<std::string, const stdu::vector<TokenID> *> outgoing;
@@ -372,8 +391,31 @@ namespace NFA::TNFA {
 
             const std::string key = generateVariable(id);
 
-            if (const auto cached = end_of.find(key); cached != end_of.end())
+            if (const auto cached = end_of.find(key); cached != end_of.end()) {
+                // `id` is already wired. Returning silently dropped this edge:
+                // it only appeared to work while alternatives happened to share
+                // physical states. Join this predecessor to the existing entry
+                // with an epsilon edge (also gives loops their back-edge).
+                if (const auto entry = entry_of.find(key);
+                    entry != entry_of.end() && entry->second != current_state) {
+                    bool linked = false;
+                    for (const auto &e : states[current_state].epsilon_transitions) {
+                        if (e.next == entry->second && e.actions.empty()) {
+                            linked = true;
+                            break;
+                        }
+                    }
+                    if (!linked) {
+                        states[current_state].epsilon_transitions.insert(
+                            TransitionValue{
+                                .next = entry->second,
+                                .priority = next_priority(),
+                            }
+                        );
+                    }
+                }
                 return cached->second;
+            }
 
             std::size_t end_state;
 
@@ -416,66 +458,44 @@ namespace NFA::TNFA {
 
             // Record BEFORE walking our own outgoing edges...
             end_of.emplace(key, end_state);
+            entry_of.emplace(key, current_state);
 
-            // A terminal `id` already had every applicable capture event
-            // (both Entry- and Exit-position) attached directly onto its
-            // own transitions inside wireMember above. A non-terminal `id`
-            // (a nested token reference, e.g. `@ SYMBOL`) never goes
-            // through wireMember, so any capture boundary opening or
-            // closing around IT — an outer capture wrapping a captured
-            // nested token — would otherwise never be attached anywhere.
-            // This reduction point is the only physical edge such an `id`
-            // has here, so both kinds land on it, in order.
             ActionChain capture_actions;
             if (!is_terminal) {
-                if (const auto cb = capture_boundaries.find(generateVariable(id));
-                    cb != capture_boundaries.end()) {
+                if (const auto cb = capture_boundaries.find(generateVariable(id)); cb != capture_boundaries.end()) {
                     for (const auto &event : cb->second.events) {
                         capture_actions.push_back(ActionState{
-                            .action = event.kind == CaptureBoundaries::Kind::Begin
-                                ? Action::BEGIN
-                                : Action::END,
+                            .action = event.kind == CaptureBoundaries::Kind::Begin ? Action::BEGIN : Action::END,
                             .variable = generateVariable(event.capture),
                         });
                     }
                 }
             }
 
-            // ------------------------------------------------------------
-            // A captured TokenID is a semantic token boundary.
-            //
-            // The state returned by visit() is exactly the state reached
-            // after the captured token has consumed its input.  Reduction
-            // therefore belongs HERE, not on the BEGIN/END epsilon edge.
-            //
-            // Example:
-            //
-            //     CSEQUENCE: '[' @ SYMBOL ']'
-            //     SYMBOL: @ .
-            //
-            // `SYMBOL` ends at `end_state`; this is where SYMBOL must be
-            // reduced into a Token and pushed into the semantic value flow.
-            // ------------------------------------------------------------
-            if (!id.capture.empty()) {
-                markAccept(
-                    end_state,
-                    id,
-                    token,
-                    end_state,
-                    capture_actions
-                );
+            // Only a genuine nested-token reference (`@ SYMBOL`) reduces into its own
+            // Token instance here. A plain group capture (`@ ( ... )` around raw
+            // leaves of THIS token) is terminal and must never trigger a reduce — it
+            // only ever contributes BEGIN/END action cells on the real edges below.
+            if (!is_terminal && !id.capture.empty()) {
+                markAccept(end_state, id, token, end_state, capture_actions);
             }
+
             if (const auto edges = outgoing.find(key); edges != outgoing.end()) {
                 for (const auto &alt : *edges->second) {
                     if (alt.member.empty()) {
-                        // ACCEPT / sentinel: `id` completing here IS the
-                        // token ending, so `end_state` must become a real
-                        // accepting state. Mirror the captured-TokenID
-                        // reduction above; skip it if that already ran for
-                        // this `id` (same state, same binding) to avoid
-                        // wiring the same accept/END action twice.
-                        if (id.capture.empty()) {
-                            markAccept(end_state, id, token, end_state, capture_actions);
+                        // ACCEPT / sentinel: id completing here IS the token ending.
+                        // Whatever captures are still open on `id` close specifically
+                        // on THIS edge, regardless of whether `id` also has other
+                        // (e.g. self-loop) successors that keep them open elsewhere.
+                        ActionChain accept_capture_actions = capture_actions;
+                        for (auto it = id.capture.rbegin(); it != id.capture.rend(); ++it) {
+                            accept_capture_actions.push_back(ActionState{
+                                .action = Action::END,
+                                .variable = generateVariable(**it),
+                            });
+                        }
+                        if (is_terminal || id.capture.empty()) {
+                            markAccept(end_state, id, token, end_state, accept_capture_actions);
                         }
                         continue;
                     }
@@ -1139,28 +1159,31 @@ namespace NFA::TNFA {
                 return statements;
         };
 
-        if (token.data_block &&
-            token.data_block->isRegularDataBlock()) {
+        if (token.data_block && token.data_block->isRegularDataBlock()) {
+            std::cout << "Assigning at if{}" << std::endl;
 
             const auto &data_block =
                 token.data_block->getRegDataBlock();
 
             const AST::RuleMember *mem = nullptr;
-
+            LangAPI::Type type;
             for (const auto &[sym, next] : token.transitions) {
                 if (sym.token_name == tail.token_name &&
                     !sym.member.empty() &&
-                    !sym.member.prefix.empty()) {
+                    !sym.capture.empty()) {
+                    for (const auto cap : sym.capture) {
+                        if (cap->token_name == sym.token_name) {
+                            type = LLIR::BuilderBase::deduceVarTypeByRuleMember(cap->member);
+                            break;
+                        }
+                    }
                     mem = &sym.member;
                     break;
-                    }
+                }
             }
-
+            state.instance_value.name =
+                LangAPI::Symbol{tail.prev ? tail.prev->token_name : tail.token_name};
             if (mem) {
-                LangAPI::Type type =
-                    LLIR::BuilderBase::
-                        deduceVarTypeByRuleMember(*mem);
-
                 LangAPI::Statements insert_statements =
                     create_variable_for_access(
                         type,
@@ -1175,115 +1198,114 @@ namespace NFA::TNFA {
                     insert_statements.end()
                 );
 
-                state.instance_value.name =
-                    LangAPI::Symbol{tail.token_name};
-
                 state.instance_value.args.push_back(
                     LangAPI::Symbol::createExpression(
                         LangAPI::Symbol{"value"}
                     )
                 );
             }
-            } else if (
-                token.data_block &&
-                token.data_block->isTemplatedDataBlock()
-            ) {
+        } else if (
+            token.data_block &&
+            token.data_block->isTemplatedDataBlock()
+        ) {
+            std::cout << "Assigning at else if{}" << std::endl;
 
-                const auto &data_block =
-                    token.data_block->getTemplatedDataBlock();
+            const auto &data_block =
+                token.data_block->getTemplatedDataBlock();
 
-                stdu::vector<const TokenID *> members_with_prefix;
+            stdu::vector<const TokenID *> members_with_prefix;
 
-                for (const auto &[sym, next] : token.transitions) {
-                    if (sym.token_name == tail.token_name &&
-                        !sym.member.empty() &&
-                        !sym.member.prefix.empty()) {
+            for (const auto &[sym, next] : token.transitions) {
+                if (sym.token_name == tail.token_name &&
+                    !sym.member.empty() &&
+                    !sym.member.prefix.empty()) {
 
-                        if (std::find(
-                                members_with_prefix.begin(),
-                                members_with_prefix.end(),
-                                &sym
-                            ) == members_with_prefix.end()) {
+                    if (std::find(
+                            members_with_prefix.begin(),
+                            members_with_prefix.end(),
+                            &sym
+                        ) == members_with_prefix.end()) {
 
-                            members_with_prefix.push_back(&sym);
-                        }
+                        members_with_prefix.push_back(&sym);
                     }
                 }
+            }
 
-                std::sort(
-                    members_with_prefix.begin(),
-                    members_with_prefix.end(),
-                    [](const TokenID *a, const TokenID *b) {
-                        return a->position_in_token <
-                               b->position_in_token;
-                    }
+            std::sort(
+                members_with_prefix.begin(),
+                members_with_prefix.end(),
+                [](const TokenID *a, const TokenID *b) {
+                    return a->position_in_token <
+                           b->position_in_token;
+                }
+            );
+
+            state.instance_value.name =
+                LangAPI::Symbol{tail.prev ? tail.prev->token_name : tail.token_name};
+
+            const std::size_t limit =
+                std::min(
+                    data_block.names.size(),
+                    members_with_prefix.size()
                 );
 
-                state.instance_value.name =
-                    LangAPI::Symbol{tail.token_name};
+            for (
+                long long i =
+                    static_cast<long long>(limit) - 1;
+                i >= 0;
+                --i
+            ) {
+                const std::size_t u_idx =
+                    static_cast<std::size_t>(i);
 
-                const std::size_t limit =
-                    std::min(
-                        data_block.names.size(),
-                        members_with_prefix.size()
-                    );
+                const auto &key =
+                    data_block.names[u_idx];
 
-                for (
-                    long long i =
-                        static_cast<long long>(limit) - 1;
-                    i >= 0;
-                    --i
-                ) {
-                    const std::size_t u_idx =
-                        static_cast<std::size_t>(i);
-
-                    const auto &key =
-                        data_block.names[u_idx];
-
-                    LangAPI::Type type =
-                        LLIR::BuilderBase::
-                            deduceVarTypeByRuleMember(
-                                members_with_prefix[u_idx]->member
-                            );
-
-                    LangAPI::Statements insert_statements =
-                        create_variable_for_access(
-                            type,
-                            key,
-                            u_idx,
+                LangAPI::Type type =
+                    LLIR::BuilderBase::
+                        deduceVarTypeByRuleMember(
                             members_with_prefix[u_idx]->member
                         );
 
-                    state.statements.insert(
-                        state.statements.end(),
-                        insert_statements.begin(),
-                        insert_statements.end()
+                LangAPI::Statements insert_statements =
+                    create_variable_for_access(
+                        type,
+                        key,
+                        u_idx,
+                        members_with_prefix[u_idx]->member
                     );
 
-                    state.instance_value.args.push_back(
-                        LangAPI::Symbol::createExpression(
-                            LangAPI::Symbol{key}
-                        )
-                    );
-                }
-
-                std::reverse(
-                    state.instance_value.args.begin(),
-                    state.instance_value.args.end()
+                state.statements.insert(
+                    state.statements.end(),
+                    insert_statements.begin(),
+                    insert_statements.end()
                 );
-            } else {
-                state.instance_value =
-                    LangAPI::Inheritance{
-                    .name = LangAPI::Symbol{tail.token_name}
-                    };
+
+                state.instance_value.args.push_back(
+                    LangAPI::Symbol::createExpression(
+                        LangAPI::Symbol{key}
+                    )
+                );
             }
+
+            std::reverse(
+                state.instance_value.args.begin(),
+                state.instance_value.args.end()
+            );
+        } else {
+            std::cout << "Assigning at else{}" << std::endl;
+            state.instance_value =
+                LangAPI::Inheritance{
+                .name = LangAPI::Symbol{tail.prev ? tail.prev->token_name : tail.token_name}
+                };
+        }
 
         // Preserve the existing semantic ABI.
         std::reverse(
             state.instance_value.args.begin(),
             state.instance_value.args.end()
         );
-
+        std::cout << state.instance_value.name << ", prev.empty: " << (tail.prev == nullptr) << ", token: " << tail.token_name << " " << std::endl;
         state.nfa_index = state_id;
         state.next_state = DFATarget{
             .id = next,
@@ -1314,46 +1336,117 @@ operator<<(
 ) {
     const auto &states = b.getStates();
 
+    auto print_uc = [&os](unsigned char uc) {
+        if (std::isprint(static_cast<int>(uc))) {
+            os << '\'' << static_cast<char>(uc) << '\'';
+        } else {
+            os << "\\x"
+               << std::hex
+               << std::setw(2)
+               << std::setfill('0')
+               << static_cast<unsigned>(uc)
+               << std::dec
+               << std::setfill(' ');
+        }
+    };
+
     for (std::size_t id = 0; id < states.size(); ++id) {
-        os << "state #" << id << "\n";
+        os << "state #" << id << '\n';
+
+        using TransitionList =
+            std::remove_reference_t<
+                decltype(states[id].transitions.begin()->second)
+            >;
+
+        std::vector<
+            std::pair<unsigned char, const TransitionList *>
+        > sorted_trans;
+
+        sorted_trans.reserve(states[id].transitions.size());
 
         for (const auto &[ch, transitions] : states[id].transitions) {
-            const auto uc = static_cast<unsigned char>(ch);
+            sorted_trans.emplace_back(
+                static_cast<unsigned char>(ch),
+                &transitions
+            );
+        }
 
-            for (const auto &t : transitions) {
-                os << "  --";
+        std::sort(
+            sorted_trans.begin(),
+            sorted_trans.end(),
+            [](const auto &a, const auto &b) {
+                return a.first < b.first;
+            }
+        );
 
-                if (std::isprint(uc)) {
-                    os << '\'' << ch << '\'';
-                } else {
-                    os << "\\x"
-                       << std::hex
-                       << std::setw(2)
-                       << std::setfill('0')
-                       << static_cast<unsigned>(uc)
-                       << std::dec
-                       << std::setfill(' ');
+        std::size_t i = 0;
+
+        while (i < sorted_trans.size()) {
+            const unsigned char start_uc = sorted_trans[i].first;
+            unsigned char end_uc = start_uc;
+
+            const auto &range_transitions =
+                *sorted_trans[i].second;
+
+            std::size_t j = i + 1;
+
+            while (j < sorted_trans.size()) {
+                const unsigned char current_uc =
+                    sorted_trans[j].first;
+
+                // Don't allow unsigned-char overflow at 0xff.
+                const bool contiguous =
+                    static_cast<unsigned>(current_uc) ==
+                    static_cast<unsigned>(end_uc) + 1;
+
+                const bool same_transitions =
+                    *sorted_trans[j].second == range_transitions;
+
+                if (!contiguous || !same_transitions) {
+                    break;
                 }
 
-                os << "--> " << t.next
-                   << " " << t;
-
-                os << "\n";
+                end_uc = current_uc;
+                ++j;
             }
+
+            for (const auto &t : range_transitions) {
+                os << "  --";
+
+                if (start_uc == end_uc) {
+                    print_uc(start_uc);
+                } else {
+                    os << '[';
+                    print_uc(start_uc);
+                    os << '-';
+                    print_uc(end_uc);
+                    os << ']';
+                }
+
+                os << "--> "
+                   << t.next
+                   << ' '
+                   << t
+                   << '\n';
+            }
+
+            i = j;
         }
 
         for (const auto &e : states[id].epsilon_transitions) {
-            os << "  --epsilon--> " << e << "\n";
+            os << "  --epsilon--> "
+               << e
+               << '\n';
         }
 
         if (states[id].accept_binding) {
             os << "  (accept) "
                << *states[id].accept_binding
-               << "\n";
+               << '\n';
         }
 
         if (id + 1 < states.size()) {
-            os << "\n";
+            os << '\n';
         }
     }
 
