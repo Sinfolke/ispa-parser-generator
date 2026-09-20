@@ -448,6 +448,17 @@ auto DFA::build() -> const States<StateWithActions> & {
             if (next_subset.empty())
                 continue;
 
+            /*
+             * Read the transition's actions NOW, before next_closure can
+             * be moved into dfa_closures below. Reading them afterwards
+             * used a moved-from Closure, so every transition into a
+             * newly discovered DFA state silently lost its actions.
+             */
+            stdu::vector<RawAction> actions;
+
+            for (const auto &fired : next_closure.getTransitionActions())
+                actions.push_back(fired.raw);
+
 
             /*
              * ----------------------------------------------------------
@@ -538,10 +549,6 @@ auto DFA::build() -> const States<StateWithActions> & {
              *   - do not reorder
              */
 
-            stdu::vector<RawAction> actions;
-
-            for (const auto &fired : next_closure.getTransitionActions())
-                actions.push_back(fired.raw);
 
 
             /*
@@ -756,6 +763,15 @@ void DFA::optimizeRegistersAndLRTable() {
 
   // Single remap sweep, using `canonical` (only valid for indices that were
   // `used`).
+  // Semantic entries can chain into the action table ([semantic, END, ...]);
+  // their ActionTarget ids must follow the same compaction.
+  for (auto &sem : semantic_table) {
+    if (std::holds_alternative<NFA::ActionTarget>(sem.next_state)) {
+      auto &t = std::get<NFA::ActionTarget>(sem.next_state);
+      if (t.id < canonical.size() && canonical[t.id] != NFA::NULL_STATE)
+        t.id = canonical[t.id];
+    }
+  }
   for (auto &state : states) {
     if (state.accept_binding && state.accept_binding->reduce_rule_id) {
       auto &id = *state.accept_binding->reduce_rule_id;

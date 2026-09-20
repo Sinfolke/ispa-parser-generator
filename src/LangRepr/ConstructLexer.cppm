@@ -25,13 +25,13 @@ export namespace LangRepr {
             const stdu::vector<DFA::State<DFA::ClassTransitions>> &states,
             std::size_t state_count,
             std::size_t class_count
-        ) -> std::pair<LangAPI::Declaration, LangAPI::Declaration>;
+        ) -> std::optional<std::pair<LangAPI::Declaration, LangAPI::Declaration>>;
         auto makeDfaTableDecl(
             const stdu::vector<DFA::State<DFA::ClassTransitions>> &states,
             std::size_t state_count,
             std::size_t class_count
         ) -> std::pair<std::shared_ptr<LangAPI::Declaration>, LangAPI::Visibility>;
-        auto makeLRTableDecl(
+        auto makeActionTableDecl(
             const stdu::vector<NFA::TNFA::ActionState>& states,
             std::size_t state_count
         ) -> std::pair<std::shared_ptr<LangAPI::Declaration>, LangAPI::Visibility>;

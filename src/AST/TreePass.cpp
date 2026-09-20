@@ -72,10 +72,6 @@ void AST::TreePass::literalsToToken(
                 // make the rule to store the data via @ <rule>
                 newRuleMember.prefix.clear();
                 newRuleMember.quantifier = '\0';
-                newRuleMember.prefix.is_key_value = true;
-
-                // add data block
-                newRule.data_block = AST::DataBlock {AST::RegularDataBlock {AST::make_expr_from_value(AST::CllExprValue {AST::rvalue {AST::At()}})}};
                 // add copied member
                 newRule.rule_members = {std::make_shared<AST::RuleMember>(newRuleMember)};
 

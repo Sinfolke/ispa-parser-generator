@@ -427,6 +427,8 @@ void DFA::Closure::epsilonClosure(
              * ----------------------------------------------------------
              */
             if (edge.next == TNFA::NULL_STATE) {
+                if (terminal_actions_for.contains(frame.state))
+                    continue;   // a higher-priority terminal edge for this state already won
                 appendActions(
                     terminal_actions_for[frame.state],
                     edge_actions

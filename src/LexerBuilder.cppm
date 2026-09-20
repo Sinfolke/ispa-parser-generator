@@ -31,7 +31,7 @@ private:
     std::vector<std::size_t> token_type;
     std::size_t highest_states_count = 0;
     std::size_t highest_transition_count = 0;
-    stdu::vector<NFA::TNFA::ActionState> lr_table;
+    stdu::vector<NFA::TNFA::ActionState> action_table;
     stdu::vector<NFA::TNFA::SemanticState> semantic_table;
     std::size_t max_registers_count = 0;
     bool isTopLevel(const stdu::vector<std::string> &name);
@@ -40,8 +40,8 @@ public:
     void build();
     auto& getDFA() { return dfa; }
     auto& getDFA() const { return dfa; }
-    auto& getLRTable() { return lr_table; }
-    auto& getLRTable() const { return lr_table; }
+    auto& getActionTable() { return action_table; }
+    auto& getActionTable() const { return action_table; }
     auto& getSemanticTable() { return semantic_table; }
     auto& getSemanticTable() const { return semantic_table; }
     auto& getDfaCompatibleTable() { return dfa_compatible_table; }

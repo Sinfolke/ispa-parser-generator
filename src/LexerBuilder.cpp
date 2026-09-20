@@ -113,8 +113,8 @@ void LexerBuilder::build() {
     dfa.minimize();
     auto classified = dfa.classify();
     this->dfa = std::move(classified);
-    lr_table = dfa.getLR();
-    semantic_table = dfa.getSemantic();
+    action_table = dfa.getActionTable();
+    semantic_table = dfa.getSemanticTable();
     max_registers_count = 10;
 
 }

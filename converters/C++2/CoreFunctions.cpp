@@ -591,20 +591,37 @@ auto Core::convertRValue(const LangAPI::RValue &rvalue) -> std::string {
         case LangAPI::RValueType::Map: {
             const auto &map = rvalue.getMap();
             std::string res;
+
+            // Explicit type prefix if templates are specified
             if (!map.template_parameters.empty()) {
-                res += "std::unordered_map<" + convertTemplates(rvalue.getMap().template_parameters) + "> ";
+                res += "std::unordered_map<" + convertTemplates(map.template_parameters) + "> ";
             }
-            res +=  "{";
-            for (std::size_t i = 0; i < rvalue.getMap().keys.size(); i++) {
-                if (std::holds_alternative<LangAPI::String>(rvalue.getMap().keys[i])) {
-                    res += std::string("\"") + std::get<LangAPI::String>(rvalue.getMap().keys[i]).value + "\", ";
-                } else {
-                    res += std::to_string(std::get<LangAPI::Int>(rvalue.getMap().keys[i]).value) + ", ";
+
+            res += "{ ";
+
+            for (std::size_t i = 0; i < map.keys.size(); ++i) {
+                if (i > 0) {
+                    res += ", ";
                 }
-                res += "{ " + convertExpression(rvalue.getMap().values[i]) + "}, " ;
+
+                // Each map element pair MUST be enclosed in braces: { key, value }
+                res += "{ ";
+
+                // 1. Format Key
+                if (std::holds_alternative<LangAPI::String>(map.keys[i])) {
+                    res += "\"" + std::get<LangAPI::String>(map.keys[i]).value + "\"";
+                } else if (std::holds_alternative<LangAPI::Int>(map.keys[i])) {
+                    res += std::to_string(std::get<LangAPI::Int>(map.keys[i]).value);
+                }
+
+                res += ", ";
+
+                // 2. Format Value (convertExpression already formats nested maps/types correctly)
+                res += convertExpression(map.values[i]);
+
+                res += " }";
             }
-            res.pop_back();
-            res.pop_back();
+
             res += " }";
             return res;
         }

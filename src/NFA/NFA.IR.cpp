@@ -237,7 +237,7 @@ namespace NFA {
             }
             Token token;
             token.name = name;
-            token.top_level = isTopLevel(tree->getUsePlacesTable(), name);
+            token.top_level = tree->getTreeMap().at(name).isTopLevel || isTopLevel(tree->getUsePlacesTable(), name);
             token.data_block = &rule.data_block;
             stdu::vector<stdu::vector<TokenID>> states;
             for (std::size_t i = 0; i < rule.rule_members.size(); ++i)
@@ -275,7 +275,7 @@ namespace NFA {
             stdu::vector<Reference> references;
 
             for (const auto &[token_id, transition_values] : token.transitions) {
-                if (!token_id.member.empty() && token_id.member.isGroup())
+                if (!token_id.member.empty() && (token_id.member.isGroup() || token_id.member.quantifier != '\0'))
                     references.push_back(Reference{token_id, transition_values});
             }
 

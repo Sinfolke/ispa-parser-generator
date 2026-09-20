@@ -39,23 +39,23 @@ tests:
 #          - 'td'
 #          - 'td'
 #          - 'td'
-#  - name: http_method
-#    path: basic/http_method.isc
-#    input:
-#      - "GET"
-#      - "POST"
-#      - "PUT"
-#
-#    expect:
-#      -
-#        - for: HTTP_METHOD
-#          value: 'GET'
-#      -
-#        - for: HTTP_METHOD
-#          value: 'POST'
-#      -
-#        - for: HTTP_METHOD
-#          value: 'PUT'
+  - name: http_method
+    path: basic/http_method.isc
+    input:
+      - "GET"
+      - "POST"
+      - "PUT"
+
+    expect:
+      -
+        - for: HTTP_METHOD
+          value: 'GET'
+      -
+        - for: HTTP_METHOD
+          value: 'POST'
+      -
+        - for: HTTP_METHOD
+          value: 'PUT'
   - name: nested_tokens
     path: nested_tokens.isc
     input: "[abc\\]a-zA-Z]"

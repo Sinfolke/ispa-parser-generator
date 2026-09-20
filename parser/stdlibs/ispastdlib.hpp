@@ -20,6 +20,7 @@
 #include <functional>
 #include <algorithm>
 #include <iostream>
+#include <set>
 #include <unordered_set>
 
 #include "old/ispastdlib.hpp"
@@ -307,8 +308,9 @@ namespace DFA::API {
     using CharToClass = std::array<std::size_t, 256>;
     template<std::size_t States>
     using LRTable = std::array<State<3>, States>;
-    template<std::size_t States, std::size_t Classes>
-    using DFADebugTable = std::array<DFADebug, States * Classes>;
+    template<std::size_t Size>
+    using DFADebugTable = std::array<DFADebug, Size>;
+    using DebugIndex = std::unordered_map<long long, std::unordered_map<long long, long long>>;
 
     /*
      * Can be emit by parser generator.
@@ -325,6 +327,13 @@ namespace DFA::API {
         long long offset = 0;
         long long length = 1;
         char ch = '\0';
+
+        auto operator<(const DFADebug &other) const {
+            return std::tie(member, token_name, position_in_token, call, group, rule_run, offset, length, ch) < std::tie(other.member, other.token_name, other.position_in_token, other.call, other.group, other.rule_run, other.offset, other.length, other.ch);
+        }
+        auto operator==(const DFADebug &other) const{
+            return std::tie(member, token_name, position_in_token, call, group, rule_run, offset, length, ch) == std::tie(other.member, other.token_name, other.position_in_token, other.call, other.group, other.rule_run, other.offset, other.length, other.ch);
+        }
     };
 }
 namespace DFA {
@@ -333,8 +342,9 @@ namespace DFA {
         typename SemanticFunc,
         std::size_t table_states,
         std::size_t table_classes,
-        std::size_t lr_table_states,
-        std::size_t registers_count
+        std::size_t action_table_states,
+        std::size_t registers_count,
+        std::size_t debug_size
     >
     auto scan(
         const char* &pos,
@@ -342,14 +352,14 @@ namespace DFA {
         long long &scanning_line,
         const API::Table<table_states, table_classes> &table,
         const API::CharToClass class_table,
-        const API::LRTable<lr_table_states> lr_table,
+        const API::LRTable<action_table_states> action_table,
         std::vector<std::variant<std::monostate, Token, char, std::string>> &values,
         std::vector<std::vector<std::variant<std::monostate, Token, char, std::string>>> &vec_values,
         std::array<const char*, registers_count> registers,
         std::array<long long, registers_count> register_ids,
         SemanticFunc semantic,
-        std::array<long long, table_states> debug_array_state_to_offset,
-        API::DFADebugTable<table_states, table_classes> debug_array
+        const API::DFADebugTable<debug_size> &debug_array,
+        const API::DebugIndex &debug_index
     ) -> Token {
         // ---------- for semantic function ---------------
         const char* start = pos;
@@ -362,22 +372,23 @@ namespace DFA {
         // ------------------------------------------------------------
         // Main machine
         // ------------------------------------------------------------
-
         while (true) {
             if (state == API::null_state)
                 break;
 
-            API::DFADebug *debug = nullptr;
+            const API::DFADebug *debug = nullptr;
 
             // 1. Determine character class for current position
             char current_ch = *(immediate_action && *pos != '\0' ? pos + 1 : pos);
             std::size_t cls = class_table[static_cast<unsigned char>(current_ch)];
 
             // 2. Compute 1D index using base offset + char class
-            if (state < debug_array_state_to_offset.size()) {
-                auto offset = debug_array_state_to_offset[state] + cls;
-                if (offset < debug_array.size()) {
-                    debug = &debug_array[offset];
+            // 1. Safe lookup without mutating map or inserting null keys
+            if (debug_size > 0) {
+                if (auto state_it = debug_index.find(state); state_it != debug_index.end()) {
+                    if (auto cls_it = state_it->second.find(cls); cls_it != state_it->second.end()) {
+                        debug = &debug_array[cls_it->second];
+                    }
                 }
             }
 
@@ -391,44 +402,53 @@ namespace DFA {
                 if (debug->group != -1) {
                     std::cout << "$group" << debug->group;
                 }
-                std::cout << "; " << debug->offset << "/" << debug->length << ";\n";
-                std::cout << std::string(ss.str().size() + debug->offset, ' '); // csequence always has offset 0
-                if (debug->member[0] == '[') {
+                std::cout << "; " << debug->offset + 1 << "/" << debug->length << ";\n";
+                std::cout << std::string(ss.str().size() + debug->offset, ' ');
+
+                const auto &mem = debug->member;
+                if (mem.size() >= 2 && mem.front() == '[') {
                     bool escaped = false;
-                    for (std::size_t i = 1; i < debug->member.size(); ++i) {
-                        auto c = debug->member[i];
+
+                    for (std::size_t i = 1; i < mem.size(); ++i) {
+                        char c = mem[i];
+
                         if (escaped) {
                             escaped = false;
                             if (current_ch == c) {
-                                std::cout << std::string(i, ' ') << '^' << std::endl;
+                                std::cout << std::string(i, ' ') << "^\n";
                                 break;
                             }
-                        } else if (current_ch == c) {
-                            std::cout << std::string(i, ' ') << '^' << std::endl;
-                            break;
+                            continue; // Skip further range/escape processing for this character
                         }
+
                         if (c == '\\') {
                             escaped = true;
+                            continue; // Skip to next character after setting escape flag
                         }
-                        if (c == '-') {
-                            if (debug->member[i + 1] != ']') {
-                                auto range_begin = debug->member[i - 1];
-                                auto range_end = debug->member[i + 1];
-                                if (current_ch >= range_begin && current_ch <= range_end) {
-                                    std::cout << std::string(i - 1, ' ') << '^';
-                                    std::cout << ' ' << '^' << std::endl;
-                                    break;
-                                }
+
+                        if (current_ch == c) {
+                            std::cout << std::string(i, ' ') << "^\n";
+                            break;
+                        }
+
+                        // Check range e.g., a-z
+                        if (c == '-' && i > 1 && (i + 1) < mem.size() && mem[i + 1] != ']') {
+                            char range_begin = mem[i - 1];
+                            char range_end = mem[i + 1];
+
+                            if (current_ch >= range_begin && current_ch <= range_end) {
+                                std::cout << std::string(i - 1, ' ') << "^ ^\n";
+                                break;
                             }
                         }
                     }
                 } else {
-                    std::cout << '^' << std::endl;
+                    std::cout << "^\n";
                 }
             } else {
                 std::cout << "State " << state << " char '"
                           << *(immediate_action ? pos + 1 : pos)
-                          << "'" << std::endl;
+                          << "'\n";
             }
 
 
@@ -474,8 +494,8 @@ namespace DFA {
             // LR ACTION STATE
             // ========================================================
 
-            } else if (state < table.size() + lr_table.size()) {
-                const auto lr_action = lr_table[state - table.size()];
+            } else if (state < table.size() + action_table.size()) {
+                const auto lr_action = action_table[state - table.size()];
 
                 switch (static_cast<API::Action>(lr_action[0])) {
 
@@ -562,7 +582,7 @@ namespace DFA {
             // ========================================================
 
             } else {
-                const std::size_t semantic_index = state - table.size() - lr_table.size();
+                const std::size_t semantic_index = state - table.size() - action_table.size();
 
                 std::cout << "Calling semantic action " << semantic_index << std::endl;
 
@@ -631,25 +651,26 @@ protected:
         typename SemanticFunc,
         std::size_t table_states,
         std::size_t table_classes,
-        std::size_t lr_table_states,
-        std::size_t registers_count
+        std::size_t action_table_states,
+        std::size_t registers_count,
+        std::size_t debug_size
     >
     Token lookup(
         const DFA::API::Table<table_states, table_classes> &table,
         const DFA::API::CharToClass class_table,
-        const DFA::API::LRTable<lr_table_states> lr_table,
+        const DFA::API::LRTable<action_table_states> action_table,
         std::vector<std::variant<std::monostate, Token, char, std::string>> &values,
         std::vector<std::vector<std::variant<std::monostate, Token, char, std::string>>> &vec_values,
         std::array<const char*, registers_count> registers,
         std::array<long long, registers_count> register_ids,
         SemanticFunc semantic,
-        const std::array<long long, table_states> &debug_array_state_to_offset,
-        const DFA::API::DFADebugTable<table_states, table_classes> &debug_array,
+        const DFA::API::DFADebugTable<debug_size> &debug_array,
+        const DFA::API::DebugIndex &debug_index,
         const char* &pos
     ) {
         if (*pos == '\0')
             return Token {};
-        Token result = DFA::scan(pos, getCurrentPos(pos), line, table, class_table, lr_table, values, vec_values, registers, register_ids, semantic, debug_array_state_to_offset, debug_array);
+        Token result = DFA::scan(pos, getCurrentPos(pos), line, table, class_table, action_table, values, vec_values, registers, register_ids, semantic, debug_array, debug_index);
         values.clear();
         return result;
     }

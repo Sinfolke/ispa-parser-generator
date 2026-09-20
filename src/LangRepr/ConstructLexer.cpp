@@ -56,7 +56,44 @@ import std;
 // SAME formula used here to encode them -- these two sides have to agree
 // bit-for-bit.
 // -----------------------------------------------------------------------
+namespace {
 
+    // Cheap key for the part of DFADebug that comes from char_origin.
+    struct OriginKey {
+        bool has = false;
+        std::size_t rule_run = 0, offset = 0, length = 0;
+        char ch = '\0';
+        bool operator==(const OriginKey &) const = default;
+    };
+
+    OriginKey originKey(const NFA::TNFA::DFATarget &t) {
+        if (!t.char_origin) return {};
+        const auto &o = *t.char_origin;
+        return { true, o.rule_run, o.offset, o.length, o.ch };
+    }
+
+    struct SlotEntry { OriginKey origin; std::size_t slot; };
+
+    // Only called once per UNIQUE entry, so the token_name copy is paid once.
+    LangAPI::DFADebug makeDebug(const NFA::TNFA::DFATarget &target) {
+        LangAPI::DFADebug debug {
+            .member = target.debug.member,
+            .token_name = target.debug.token_name,
+            .position_in_token = target.debug.position_in_token,
+            .call = target.debug.call,
+            .group = target.debug.group,
+        };
+        if (target.char_origin) {
+            const auto &o = *target.char_origin;
+            debug.rule_run = o.rule_run;
+            debug.offset = o.offset;
+            debug.length = o.length;
+            debug.ch = o.ch;
+        }
+        return debug;
+    }
+
+} // namespace
 namespace LangRepr {
 
     auto ConstructLexer::makeCharClassTableDecl(const DFA::CharClassTable &table)
@@ -86,96 +123,89 @@ namespace LangRepr {
             LangAPI::Visibility::Private
         };
     }
-auto ConstructLexer::makeDebugTable(
-    const stdu::vector<DFA::State<DFA::ClassTransitions>> &states,
-    std::size_t state_count,
-    std::size_t class_count
-) -> std::pair<LangAPI::Declaration, LangAPI::Declaration> {
-        LangAPI::Array debug_array_state_to_offset;
-        LangAPI::Array debug_array;
 
-        debug_array_state_to_offset.values.resize(state_count);
-        debug_array.values.resize(state_count * class_count);
+    auto ConstructLexer::makeDebugTable(
+        const stdu::vector<DFA::State<DFA::ClassTransitions>> &states,
+        std::size_t state_count,
+        std::size_t class_count
+    ) -> std::optional<std::pair<LangAPI::Declaration, LangAPI::Declaration>> {
 
-        // 1. Pre-fill default entries
-        LangAPI::DFADebug default_debug = {
-            .token_name = {"<Undefined>"},
-            .position_in_token = 0,
-            .call = constants::NULL_STATE,
-            .group = constants::NULL_STATE,
-            .rule_run = constants::NULL_STATE,
-            .offset = 0,
-            .length = 1,
-            .ch = '\0'
-        };
+        LangAPI::Array debug_array;   // unique DFADebug only, no free slots
+        LangAPI::Map   debug_index;   // state_id -> (class_id -> slot in debug_array)
 
-        for (auto &val : debug_array.values) {
-            val = LangAPI::DFADebug::createExpression(default_debug);
-        }
+        // TokenID hashing is already used by the old code (`seen`), so no new hash
+        // is needed. The bucket is tiny: it only distinguishes different origins
+        // of the same TokenID.
+        utype::unordered_map<NFA::IR::TokenID, stdu::vector<SlotEntry>> slots;
 
-        // 2. Pre-fill state offset lookup table
-        for (std::size_t state_id = 0; state_id < state_count; ++state_id) {
-            std::size_t offset = state_id * class_count;
-            debug_array_state_to_offset.values[state_id] =
-                LangAPI::Int::createExpression(LangAPI::Int{.value = static_cast<long long>(offset)});
-        }
+        constexpr std::size_t NONE = std::numeric_limits<std::size_t>::max();
 
-        // 3. Directly populate active transition slots
-        std::size_t state_id = 0;
-        for (const auto &state : states) {
-            if (state_id >= state_count) break;
+        for (std::size_t s = 0; s < state_count && s < states.size(); ++s) {
+            LangAPI::Map row;
 
-            for (std::size_t cls = 0; cls < class_count && cls < state.transitions.size(); ++cls) {
-                const auto &t = state.transitions[cls];
-
+            for (std::size_t c = 0; c < class_count && c < states[s].transitions.size(); ++c) {
                 std::visit([&](const auto &target) {
-                    using T = std::decay_t<decltype(target)>;
-
-                    if constexpr (std::is_same_v<T, NFA::TNFA::DFATarget>) {
+                    using Target = std::decay_t<decltype(target)>;
+                    if constexpr (std::is_same_v<Target, NFA::TNFA::DFATarget>) {
                         if (target.id == NFA::NULL_STATE) return;
+
+                        const OriginKey origin = originKey(target);
+                        auto &bucket = slots[target.debug];
+
+                        std::size_t slot = NONE;
+                        for (const auto &e : bucket) {
+                            if (e.origin == origin) { slot = e.slot; break; }
+                        }
+
+                        if (slot == NONE) {
+                            slot = debug_array.values.size();          // dense, no gaps
+                            bucket.push_back({ origin, slot });
+                            debug_array.values.push_back(
+                                LangAPI::DFADebug::createExpression(makeDebug(target)));
+                        }
+
+                        row.keys.push_back(LangAPI::Int { .value = static_cast<long long>(c) });
+                        row.values.push_back(LangAPI::Int::createExpression(
+                            LangAPI::Int { .value = static_cast<long long>(slot) }));
                     }
-
-                    LangAPI::DFADebug debug = {
-                        .member = target.debug.member,
-                        .token_name = target.debug.token_name,
-                        .position_in_token = target.debug.position_in_token,
-                        .call = target.debug.call,
-                        .group = target.debug.group,
-                    };
-
-                    if (target.char_origin.has_value()) {
-                        const auto &char_origin = target.char_origin.value();
-                        debug.rule_run = char_origin.rule_run;
-                        debug.offset = char_origin.offset;
-                        debug.length = char_origin.length;
-                        debug.ch = char_origin.ch;
-                    }
-
-                    std::size_t index = (state_id * class_count) + cls;
-                    debug_array.values[index] = LangAPI::DFADebug::createExpression(debug);
-                }, t);
+                }, states[s].transitions[c]);
             }
-            ++state_id;
+
+            if (!row.keys.empty()) {   // states without debug cells are not emitted at all
+                debug_index.keys.push_back(LangAPI::Int { .value = static_cast<long long>(s) });
+                debug_index.values.push_back(LangAPI::Map::createExpression(std::move(row)));
+            }
         }
 
-        return std::make_pair(
-            LangAPI::Array::createDeclaration(
-                LangAPI::Variable {
-                    .name = "debug_array_state_to_offset",
-                        .type = LangAPI::Type {LangAPI::ValueType::FixedSizeArray, LangAPI::Type {LangAPI::ValueType::Int}, LangAPI::RValue {LangAPI::Int {.value = static_cast<long long>(debug_array_state_to_offset.values.size())}}},
-                    .value = LangAPI::Array::createExpression(debug_array_state_to_offset),
-                    .is_static = true
-                }
-            ),
-            LangAPI::Array::createDeclaration(
-                LangAPI::Variable {
-                        .name = "debug_array",
-                        .type = LangAPI::Type {LangAPI::ValueType::FixedSizeArray, LangAPI::Type {LangAPI::IspaLibSymbol {.exports = LangAPI::StdlibExports::DFADebug}}, LangAPI::RValue {LangAPI::Int {.value = static_cast<long long>(state_count * class_count)}}},
-                        .value = LangAPI::Array::createExpression(debug_array),
-                    .is_static = true
-                    }
-            )
-        );
+        if (debug_array.values.empty()) return std::nullopt;   // avoid zero-size array
+
+        using LangAPI::Type;
+        using LangAPI::ValueType;
+
+        auto array_decl = LangAPI::Array::createDeclaration(LangAPI::Variable {
+            .name = "debug_array",
+            .type = Type {
+                ValueType::FixedSizeArray,
+                Type { LangAPI::IspaLibSymbol { .exports = LangAPI::StdlibExports::DFADebug } },
+                LangAPI::RValue { LangAPI::Int {
+                    .value = static_cast<long long>(debug_array.values.size()) } }
+            },
+            .value = LangAPI::Array::createExpression(std::move(debug_array)),
+            .is_static = true
+        });
+
+        auto index_decl = LangAPI::Map::createDeclaration(LangAPI::Variable {
+            .name = "debug_index",
+            .type = Type {
+                ValueType::Map,
+                Type { ValueType::Int },
+                Type { ValueType::Map, Type { ValueType::Int }, Type { ValueType::Int } }
+            },
+            .value = LangAPI::Map::createExpression(std::move(debug_index)),
+            .is_static = true
+        });
+
+        return std::pair { std::move(array_decl), std::move(index_decl) };
     }
     // Emits the single unified transition table. Each entry is a plain
     // size_t, sentinel-encoded per the scheme above -- no wrapper type,
@@ -225,7 +255,7 @@ auto ConstructLexer::makeDebugTable(
                         encoded = LangAPI::Int::createRValue(LangAPI::Int {.value = static_cast<long long>(std::get<NFA::TNFA::ActionTarget>(t).id + state_count)});
                     } else if (std::holds_alternative<NFA::TNFA::SemanticTarget>(t)) {
                         // Same fix, mirrored for semantic_table.
-                        encoded = LangAPI::Int::createRValue(LangAPI::Int {.value = static_cast<long long>(std::get<NFA::TNFA::SemanticTarget>(t).id + state_count + lexer_builder.getLRTable().size())});
+                        encoded = LangAPI::Int::createRValue(LangAPI::Int {.value = static_cast<long long>(std::get<NFA::TNFA::SemanticTarget>(t).id + state_count + lexer_builder.getActionTable().size())});
                     } else {
                         throw Error("Unknown table type {}", t.index());
                     }
@@ -255,21 +285,21 @@ auto ConstructLexer::makeDebugTable(
         };
     }
 
-    auto ConstructLexer::makeLRTableDecl(
+    auto ConstructLexer::makeActionTableDecl(
         const stdu::vector<NFA::TNFA::ActionState> &states,
         std::size_t state_count
     ) -> std::pair<std::shared_ptr<LangAPI::Declaration>, LangAPI::Visibility> {
         (void)state_count;
 
-        constexpr std::size_t lr_columns = 3;
-        const auto lr_state_count = states.size();
+        constexpr std::size_t action_columns = 3;
+        const auto action_state_count = states.size();
 
         stdu::vector<LangAPI::Expression> rows;
-        rows.reserve(lr_state_count);
+        rows.reserve(action_state_count);
         std::unordered_map<std::string, std::size_t> register_ids;
         for (const auto &state : states) {
             stdu::vector<LangAPI::Expression> row;
-            row.reserve(lr_columns);
+            row.reserve(action_columns);
 
             row.push_back(LangAPI::Int::createExpression(LangAPI::Int {
                 .value = static_cast<long long>(state.action)
@@ -296,7 +326,7 @@ auto ConstructLexer::makeDebugTable(
                     }));
                 } else if (std::is_same_v<T, NFA::SemanticTarget>) {
                     row.push_back(LangAPI::Int::createExpression(LangAPI::Int {
-                        .value = static_cast<long long>(target.id + state_count + lexer_builder.getLRTable().size())
+                        .value = static_cast<long long>(target.id + state_count + lexer_builder.getActionTable().size())
                     }));
                 } else {
                     throw Error("Unknown target type {}", (int) target.id);
@@ -312,23 +342,23 @@ auto ConstructLexer::makeDebugTable(
             );
         }
 
-        LangAPI::IspaLibSymbol lr_table_symbol {
+        LangAPI::IspaLibSymbol action_table_symbol {
             .exports = LangAPI::StdlibExports::DfaTable
         };
-        lr_table_symbol.template_parameters.push_back(
+        action_table_symbol.template_parameters.push_back(
             std::make_shared<LangAPI::RValue>(
-                LangAPI::Int {.value = static_cast<long long>(lr_state_count)}
+                LangAPI::Int {.value = static_cast<long long>(action_state_count)}
             )
         );
-        lr_table_symbol.template_parameters.push_back(
+        action_table_symbol.template_parameters.push_back(
             std::make_shared<LangAPI::RValue>(
-                LangAPI::Int {.value = static_cast<long long>(lr_columns)}
+                LangAPI::Int {.value = static_cast<long long>(action_columns)}
             )
         );
 
         LangAPI::Variable var {
-            .name = "lr_table",
-            .type = LangAPI::Type {lr_table_symbol},
+            .name = "action_table",
+            .type = LangAPI::Type {action_table_symbol},
             .value = LangAPI::Array::createExpression(
                 LangAPI::Array {.values = rows}
             ),
@@ -360,7 +390,7 @@ auto ConstructLexer::makeDebugTable(
                 } else if (std::is_same_v<T, NFA::ActionTarget>) {
                     next_state = LangAPI::Int::createRValue(LangAPI::Int {.value = static_cast<long long>(target.id + lexer_builder.getDFA().states.size())});
                 } else if (std::is_same_v<T, NFA::SemanticTarget>) {
-                    next_state = LangAPI::Int::createRValue(LangAPI::Int {.value = static_cast<long long>(target.id + lexer_builder.getDFA().states.size() + lexer_builder.getLRTable().size())});
+                    next_state = LangAPI::Int::createRValue(LangAPI::Int {.value = static_cast<long long>(target.id + lexer_builder.getDFA().states.size() + lexer_builder.getActionTable().size())});
                 } else {
                     throw Error("Unknown target type {}", (int) target.id);
                 }
@@ -432,7 +462,7 @@ auto ConstructLexer::makeDebugTable(
 
         lexer.data.push_back(makeDfaTableDecl(states, state_count, class_count));
 
-        lexer.data.push_back(makeLRTableDecl(lexer_builder.getLRTable(), state_count));
+        lexer.data.push_back(makeActionTableDecl(lexer_builder.getActionTable(), state_count));
         lexer.data.push_back(std::make_pair(std::make_shared<LangAPI::Declaration>(LangAPI::Function::createDeclaration(makeSemanticSwitchFunction(lexer_builder.getSemanticTable()))), LangAPI::Visibility::Private));
         if (lexer_builder.getDFA().states.size() > 0) {
             lexer.data.push_back(std::make_pair(
@@ -477,15 +507,18 @@ auto ConstructLexer::makeDebugTable(
                 })),
                 LangAPI::Visibility::Private
             ));
-            auto [debug_array_state_to_offset, debug_array] = makeDebugTable(states, state_count, class_count);
-            lexer.data.push_back(std::make_pair(
-                std::make_shared<LangAPI::Declaration>(debug_array_state_to_offset),
-                LangAPI::Visibility::Private
-            ));
-            lexer.data.push_back(std::make_pair(
-                std::make_shared<LangAPI::Declaration>(debug_array),
-                LangAPI::Visibility::Private
-            ));
+            auto debug = makeDebugTable(states, state_count, class_count);
+            if (debug.has_value()) {
+                auto [debug_array, debug_index] = debug.value();
+                lexer.data.push_back(std::make_pair(
+                    std::make_shared<LangAPI::Declaration>(debug_array),
+                    LangAPI::Visibility::Private
+                ));
+                lexer.data.push_back(std::make_pair(
+                    std::make_shared<LangAPI::Declaration>(debug_index),
+                    LangAPI::Visibility::Private
+                ));
+            }
         }
 
         lexer.data.push_back(
@@ -508,14 +541,14 @@ auto ConstructLexer::makeDebugTable(
                                 {
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"dfa_table"}),
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"char_class_table"}),
-                                    LangAPI::Symbol::createExpression(LangAPI::Symbol {"lr_table"}),
+                                    LangAPI::Symbol::createExpression(LangAPI::Symbol {"action_table"}),
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"values"}),
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"vec_values"}),
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"registers"}),
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"register_ids"}),
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"semantic_action_exec"}),
-                                    LangAPI::Symbol::createExpression(LangAPI::Symbol {"debug_array_state_to_offset"}),
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"debug_array"}),
+                                    LangAPI::Symbol::createExpression(LangAPI::Symbol {"debug_index"}),
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"pos"}),
                                 }
                             })

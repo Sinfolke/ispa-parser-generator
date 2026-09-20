@@ -46,10 +46,10 @@ public:
   auto classify() -> ClassifiedDFA;
   auto &get() { return states; }
   auto &get() const { return states; }
-  auto &getLR() { return action_table; }
-  auto &getLR() const { return action_table; }
-  auto &getSemantic() { return semantic_table; }
-  auto &getSemantic() const { return semantic_table; }
+  auto &getActionTable() { return action_table; }
+  auto &getActionTable() const { return action_table; }
+  auto &getSemanticTable() { return semantic_table; }
+  auto &getSemanticTable() const { return semantic_table; }
 
   auto operator=(const DFA &other) {
     states = std::move(other.states);
