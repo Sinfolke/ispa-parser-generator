@@ -1336,7 +1336,7 @@ namespace NFA::TNFA {
                 token.data_block->getTemplatedDataBlock();
 
             stdu::vector<const TokenID *> members_with_prefix;
-
+            stdu::vector<LangAPI::Type> types;
             for (const auto &[sym, next] : token.transitions) {
                 if (sym.token_name == tail.token_name &&
                     !sym.member.empty() &&
@@ -1349,6 +1349,12 @@ namespace NFA::TNFA {
                         ) == members_with_prefix.end()) {
 
                         members_with_prefix.push_back(&sym);
+                        for (const auto cap : sym.capture) {
+                            if (cap->token_name == sym.token_name && cap->member == sym.member) {
+                                types.push_back(LLIR::BuilderBase::deduceVarTypeByRuleMember(cap->member));
+                                break;
+                            }
+                        }
                     }
                 }
             }
@@ -1383,11 +1389,7 @@ namespace NFA::TNFA {
                 const auto &key =
                     data_block.names[u_idx];
 
-                LangAPI::Type type =
-                    LLIR::BuilderBase::
-                        deduceVarTypeByRuleMember(
-                            members_with_prefix[u_idx]->member
-                        );
+                LangAPI::Type type = types[u_idx];
 
                 LangAPI::Statements insert_statements =
                     create_variable_for_access(
@@ -1427,7 +1429,6 @@ namespace NFA::TNFA {
             state.instance_value.args.begin(),
             state.instance_value.args.end()
         );
-        std::cout << state.instance_value.name << ", prev.empty: " << (tail.prev == nullptr) << ", token: " << tail.token_name << " " << std::endl;
         state.nfa_index = state_id;
         state.next_state = DFATarget{
             .id = next,

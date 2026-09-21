@@ -1,31 +1,13 @@
 name<__WS> : Rule {
    [ \t\n\r\v\f]*;
   Data: EmptyDataBlock
-}name<AUTO_1> : Rule {
-   "="
-  Data: EmptyDataBlock
-}name<AUTO_0> : Rule {
-   "int"
-  Data: EmptyDataBlock
-}name<ID> : Rule {
-  @  ( [_a-zA-Z]  \s0  [_a-zA-Z0-9]*;)
-  Data: [RegularDataBlock: CllExpr]
 }name<main> : Rule {
-   integer_variable
+   ID
   Data: EmptyDataBlock
 }name<__WSTOKEN> : Rule {
    [ \t\n\r\v\f]+;
   Data: EmptyDataBlock
-}name<integer_variable> : Rule {
-   AUTO_0
-   __WS
-  @  ID
-   __WS
-   AUTO_1
-   __WS
-  @  INTEGER
-  Data: TemplatedDataBlock(name, value)
-}name<INTEGER> : Rule {
-  @  [0-9]+;
+}name<ID> : Rule {
+  @  ( [a-zA-Z]  \s0  [_a-zA-Z0-9]*;)
   Data: [RegularDataBlock: CllExpr]
 }
