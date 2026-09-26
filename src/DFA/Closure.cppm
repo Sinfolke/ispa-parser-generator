@@ -1,5 +1,6 @@
 export module DFA.closure;
 
+import NFA.IR.API;
 import NFA.TNFA.API;
 import NFA.TNFA;
 import hash;
@@ -63,6 +64,18 @@ export namespace DFA {
 
     using ActionPath = std::vector<FiredAction>;
 
+    // One consuming NFA edge that is taken on a symbol, before its epsilon
+    // closure is computed. `actions` are the actions of that consuming edge
+    // only. Seeds are always returned in priority order.
+    struct SymbolSeed {
+        std::size_t priority = 0;
+        std::size_t source = NFA::TNFA::NULL_STATE;
+        std::size_t target = NFA::TNFA::NULL_STATE;
+        ActionPath actions;
+        const NFA::IR::TokenID *source_link = nullptr;
+        std::optional<NFA::TNFA::CharOrigin> char_origin;
+    };
+
     class Closure {
         const NFA::TNFA::TNFABuilder *nfa;
 
@@ -95,6 +108,11 @@ export namespace DFA {
          * in order and commit to the first match.
          */
         std::unordered_map<std::size_t, ActionPath> actions_for;
+
+        // TDFA support: the order in which the priority DFS committed the
+        // states, and which seed (index into the seeded list) reached each.
+        std::vector<std::size_t> discovery;
+        std::unordered_map<std::size_t, std::size_t> seed_of;
 
         void epsilonClosure(
             const stdu::vector<std::size_t> &source
@@ -185,6 +203,19 @@ export namespace DFA {
             return closure == other.closure;
         }
         auto getTransitionActions() const -> const ActionPath &;
+
+        // States in the order the priority DFS committed them.
+        auto getDiscoveryOrder() const -> const std::vector<std::size_t> & { return discovery; }
+        // Index (into the seeded list the closure was built from) of the seed
+        // whose path reaches `state`.
+        auto getSeedIndex(std::size_t state) const -> std::size_t { return seed_of.at(state); }
+
+        // All consuming edges leaving `current` on `symbol`, priority ordered.
+        static auto collectSeeds(
+            const NFA::TNFA::TNFABuilder *nfa,
+            const std::vector<std::size_t> &current,
+            const NFA::TransitionKey &symbol
+        ) -> std::vector<SymbolSeed>;
         auto getTerminalActionsForState(std::size_t state) const -> const ActionPath &;
     };
 }

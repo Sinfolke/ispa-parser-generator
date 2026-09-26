@@ -1,6 +1,7 @@
 export module NFA.TNFA;
 import NFA.IR;
 import NFA.IR.API;
+import LangAPI;
 import NFA.TNFA.API;
 import AST.Tree;
 import AST.API;
@@ -59,6 +60,20 @@ export namespace NFA::TNFA {
     std::unordered_map<std::size_t, TokenBinding> accept_map;
     std::size_t next_rule = 0;
     stdu::vector<SemanticState> semantic_table;
+
+    // Capture numbering. A capture gets its number the first time anything asks
+    // for it and keeps it, so the BEGIN/END operands, the DFA's output registers
+    // and the reduction code all agree on it without a second pass.
+    std::unordered_map<std::string, std::size_t> capture_ids;
+
+    // The reduction of a nested token (`@ SYMBOL`), built where the token is
+    // wired and inlined into the reduction of the token that contains it.
+    struct NestedReduction {
+        LangAPI::Statements statements; // reads the captures of this call site
+        std::string result;             // local variable holding the nested token instance
+    };
+    std::unordered_map<std::string, NestedReduction> nested_reductions;
+
     auto wireString(std::size_t current_state, const TokenID &source) -> std::size_t;
     auto wireAny(std::size_t current_state, const TokenID &source) -> std::size_t;
     auto wireCsequence(std::size_t current_state, const TokenID &source) -> std::size_t;
@@ -70,12 +85,17 @@ export namespace NFA::TNFA {
     auto wireMember(std::size_t current_state, const TokenID &source, std::unordered_map<std::string, CaptureBoundaries> &capture_boundaries) -> std::size_t;
     void wireSelfLoop(std::size_t pred_state, std::size_t state);
     void wireToken(const stdu::vector<std::string> &name, const Token &token, ExpansionStack &expansion_stack);
+      // Builds the reduction of `tail`. nested == false: `tail` ends the token, so the
+      // reduction becomes the token's accept action. nested == true: `tail` is a nested
+      // token reference; its reduction is only recorded (nested_reductions) so that the
+      // enclosing token's reduction can run it - the DFA never accepts there.
       void markAccept(
           std::size_t state_id,
           const TokenID &tail,
           const Token &token,
           std::size_t next,
-          ActionChain capture_boundaries
+          ActionChain capture_boundaries,
+          bool nested = false
       );
     std::size_t next_priority() { return priority_counter++; }
     std::size_t next_state(std::size_t current_state = NULL_STATE) { return current_state == NULL_STATE ? states.size() : ++current_state; }
@@ -92,6 +112,10 @@ export namespace NFA::TNFA {
     bool isCharNfa() { return true; }
     auto next_rule_run() { return next_rule++; };
     auto getSemanticTable() const { return semantic_table; }
+    // Number of the capture `capture` (assigned on first use).
+    auto captureId(const TokenID &capture) -> std::size_t;
+    // Every capture number handed out so far: capture k owns output registers 2k and 2k+1.
+    auto getCaptureCount() const -> std::size_t { return capture_ids.size(); }
     auto operator=(const TNFABuilder &tnfa) {
       debug = tnfa.debug;
       states = tnfa.states;
@@ -101,6 +125,8 @@ export namespace NFA::TNFA {
       priority_counter = tnfa.priority_counter;
       semantic_table = tnfa.semantic_table;
       accept_map = tnfa.accept_map;
+      capture_ids = tnfa.capture_ids;
+      nested_reductions = tnfa.nested_reductions;
     };
   };
 }

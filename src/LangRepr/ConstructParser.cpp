@@ -2,7 +2,7 @@ module LangRepr.ConstructParser;
 
 import LLIR.Builder.Base;
 import cpuf.printf;
-import NFA_OLD;
+import NFA.TNFA.API;
 import DFA;
 
 import corelib;

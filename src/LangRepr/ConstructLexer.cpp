@@ -291,12 +291,20 @@ namespace LangRepr {
     ) -> std::pair<std::shared_ptr<LangAPI::Declaration>, LangAPI::Visibility> {
         (void)state_count;
 
-        constexpr std::size_t action_columns = 3;
+        constexpr std::size_t action_columns = 4;
         const auto action_state_count = states.size();
-
         stdu::vector<LangAPI::Expression> rows;
         rows.reserve(action_state_count);
-        std::unordered_map<std::string, std::size_t> register_ids;
+
+        const auto push_operand = [](auto &row, std::size_t v) {
+            if (v == NFA::NULL_STATE)   // API::null_state; a raw -1 would narrow inside the size_t array
+                row.push_back(LangAPI::IspaLibSymbol::createExpression(
+                    LangAPI::IspaLibSymbol {.exports = LangAPI::StdlibExports::DfaNullState}));
+            else
+                row.push_back(LangAPI::Int::createExpression(
+                    LangAPI::Int {.value = static_cast<long long>(v)}));
+        };
+
         for (const auto &state : states) {
             stdu::vector<LangAPI::Expression> row;
             row.reserve(action_columns);
@@ -304,22 +312,12 @@ namespace LangRepr {
             row.push_back(LangAPI::Int::createExpression(LangAPI::Int {
                 .value = static_cast<long long>(state.action)
             }));
-            if (!register_ids.contains(state.variable)) {
-                register_ids[state.variable] = register_ids.size();
-                std::cout << state.variable << std::endl;
-            }
-            row.push_back(LangAPI::RValue::createExpression(LangAPI::Int {.value = static_cast<long long>(register_ids[state.variable])}));
+            push_operand(row, state.operand_a);
+            push_operand(row, state.operand_b);
             std::visit([&](const auto &target) {
                 using T = std::decay_t<decltype(target)>;
                 if (std::is_same_v<T, NFA::DFATarget>) {
-                    LangAPI::RValue encoded;
-                    if (target.id == NFA::NULL_STATE) {
-                        row.push_back(LangAPI::IspaLibSymbol::createExpression(LangAPI::IspaLibSymbol {.exports = LangAPI::StdlibExports::DfaNullState}));
-                    } else {
-                        row.push_back(LangAPI::Int::createExpression(LangAPI::Int {
-                            .value = static_cast<long long>(target.id)
-                        }));
-                    }
+                    push_operand(row, target.id);
                 } else if (std::is_same_v<T, NFA::ActionTarget>) {
                     row.push_back(LangAPI::Int::createExpression(LangAPI::Int {
                         .value = static_cast<long long>(target.id + state_count)
@@ -428,12 +426,11 @@ namespace LangRepr {
             .name = "semantic_action_exec",
             .parameters = {
                 std::make_pair(LangAPI::Type {LangAPI::ValueType::Int}, "state"),
+                std::make_pair(LangAPI::Type {LangAPI::IspaLibSymbol {.exports = LangAPI::StdlibExports::DfaCaptures, .Const = true, .Reference = true}}, "captures"),
                 std::make_pair(LangAPI::Type {LangAPI::ValueType::Int}, "start_pos"),
                 std::make_pair(LangAPI::Type {LangAPI::ValueType::NonOwnedString}, "start"),
                 std::make_pair(LangAPI::Type {LangAPI::ValueType::Int}, "length"),
                 std::make_pair(LangAPI::Type {LangAPI::ValueType::Int}, "line"),
-                std::make_pair(LangAPI::Type {LangAPI::ValueType::Reference, LangAPI::Type { LangAPI::ValueType::Array, LangAPI::Type {LangAPI::ValueType::Variant, LangAPI::RValue {LangAPI::Symbol {"Token"}}, LangAPI::ValueType::Char, LangAPI::ValueType::String }}}, "values"),
-                std::make_pair(LangAPI::Type {LangAPI::ValueType::Reference, LangAPI::Type { LangAPI::ValueType::Array, LangAPI::Type {LangAPI::ValueType::Array, LangAPI::Type {LangAPI::ValueType::Variant, LangAPI::RValue {LangAPI::Symbol {"Token"}}, LangAPI::ValueType::Char, LangAPI::ValueType::String }}}}, "vec_values"),
             },
             .is_static = true
         };
@@ -481,29 +478,11 @@ namespace LangRepr {
             ));
             lexer.data.push_back(std::make_pair(
                 std::make_shared<LangAPI::Declaration>(LangAPI::Function::createDeclaration(LangAPI::Variable {
-                    .name = "values",
-                    .type = LangAPI::Type { LangAPI::ValueType::Array, LangAPI::Type {LangAPI::ValueType::Variant, LangAPI::RValue {LangAPI::Symbol {"Token"}}, LangAPI::ValueType::Char, LangAPI::ValueType::String } },
-                })),
-                LangAPI::Visibility::Private
-            ));
-            lexer.data.push_back(std::make_pair(
-                std::make_shared<LangAPI::Declaration>(LangAPI::Function::createDeclaration(LangAPI::Variable {
-                    .name = "vec_values",
-                    .type = LangAPI::Type { LangAPI::ValueType::Array, LangAPI::Type {LangAPI::ValueType::Array, LangAPI::Type {LangAPI::ValueType::Variant, LangAPI::RValue {LangAPI::Symbol {"Token"}}, LangAPI::ValueType::Char, LangAPI::ValueType::String}}}
-                })),
-                LangAPI::Visibility::Private
-            ));
-            lexer.data.push_back(std::make_pair(
-                std::make_shared<LangAPI::Declaration>(LangAPI::Function::createDeclaration(LangAPI::Variable {
-                    .name = "registers",
-                    .type = LangAPI::Type { LangAPI::ValueType::FixedSizeArray, LangAPI::Type {LangAPI::ValueType::NonOwnedString}, LangAPI::Int::createRValue(LangAPI::Int {.value = static_cast<long long>(lexer_builder.getMaxRegistersCount())})}
-                })),
-                LangAPI::Visibility::Private
-            ));
-            lexer.data.push_back(std::make_pair(
-                std::make_shared<LangAPI::Declaration>(LangAPI::Function::createDeclaration(LangAPI::Variable {
-                    .name = "register_ids",
-                    .type = LangAPI::Type { LangAPI::ValueType::FixedSizeArray, LangAPI::Type {LangAPI::ValueType::Int}, LangAPI::Int::createRValue(LangAPI::Int {.value = static_cast<long long>(lexer_builder.getMaxRegistersCount())})}
+                    .name = "tdfa_registers",
+                    .type = LangAPI::Type { LangAPI::IspaLibSymbol {.exports = LangAPI::StdlibExports::TdfaLayout, {
+                        std::make_shared<LangAPI::RValue>(LangAPI::Int {.value = (long long) lexer_builder.getRegistersCount()}),
+                        std::make_shared<LangAPI::RValue>(LangAPI::Int {.value = (long long) lexer_builder.getOutputCount()})
+                    }}}
                 })),
                 LangAPI::Visibility::Private
             ));
@@ -542,10 +521,7 @@ namespace LangRepr {
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"dfa_table"}),
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"char_class_table"}),
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"action_table"}),
-                                    LangAPI::Symbol::createExpression(LangAPI::Symbol {"values"}),
-                                    LangAPI::Symbol::createExpression(LangAPI::Symbol {"vec_values"}),
-                                    LangAPI::Symbol::createExpression(LangAPI::Symbol {"registers"}),
-                                    LangAPI::Symbol::createExpression(LangAPI::Symbol {"register_ids"}),
+                                    LangAPI::Symbol::createExpression(LangAPI::Symbol {"tdfa_registers"}),
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"semantic_action_exec"}),
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"debug_array"}),
                                     LangAPI::Symbol::createExpression(LangAPI::Symbol {"debug_index"}),

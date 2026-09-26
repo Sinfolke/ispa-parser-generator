@@ -86,9 +86,6 @@ operator<<(
             case NFA::TNFA::Action::END:
                 os << "END";
                 break;
-            case NFA::TNFA::Action::PUSH:
-                os << "PUSH";
-                break;
         }
         os << ": " << s.variable;
         if (!s.debug_note.empty()) {

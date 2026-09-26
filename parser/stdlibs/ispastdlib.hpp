@@ -298,16 +298,19 @@ using Seq = std::vector<Node<RULE_T, DataStorageType>>;
 namespace DFA::API {
     struct DFADebug;
     inline auto null_state = std::numeric_limits<std::size_t>::max();
-    enum class Action {
-        UNDEF, BEGIN, END, PUSH, SNAPSHOT, SNAPSHOT_APPLY, SNAPSHOT_APPLY_END
-    };
+    // Same numbering as NFA::TNFA::Action, so the converter emits the value as is.
+    enum class Action { UNDEF, SET, SET_NEXT, COPY, APPEND, APPEND_NEXT };
     template<std::size_t Classes>
     using State = std::array<std::size_t, Classes>;
     template<std::size_t States, std::size_t Classes>
     using Table = std::array<State<Classes>, States>;
     using CharToClass = std::array<std::size_t, 256>;
+    // Row: {op, a, b, next_state}.
+    //   SET / SET_NEXT        reg[a] = position (NEXT: one past the character being consumed)
+    //   COPY                  reg[a] = reg[b]
+    //   APPEND / APPEND_NEXT  reg[a] = append(reg[b], position)   (b == null_state: empty list)
     template<std::size_t States>
-    using LRTable = std::array<State<3>, States>;
+    using LRTable = std::array<State<4>, States>;
     template<std::size_t Size>
     using DFADebugTable = std::array<DFADebug, Size>;
     using DebugIndex = std::unordered_map<long long, std::unordered_map<long long, long long>>;
@@ -335,126 +338,210 @@ namespace DFA::API {
             return std::tie(member, token_name, position_in_token, call, group, rule_run, offset, length, ch) == std::tie(other.member, other.token_name, other.position_in_token, other.call, other.group, other.rule_run, other.offset, other.length, other.ch);
         }
     };
+
+    // Capture k owns registers 2k (begin, or the head of a list capture's history)
+    // and 2k + 1 (end). A register that was never written is `unset`.
+    inline constexpr std::ptrdiff_t unset = -1;
+
+    struct HistoryNode {
+        std::ptrdiff_t pos;  // offset from the start of the token
+        std::ptrdiff_t prev; // previous node, `unset` ends the list
+    };
+
+    class Captures {
+        const char *base_ = nullptr;
+        const std::ptrdiff_t *out_ = nullptr;
+        const HistoryNode *history_ = nullptr;
+        long long first_line_ = 1;
+
+        auto begin_off(std::size_t k) const { return out_[2 * k]; }
+        auto end_off(std::size_t k) const { return out_[2 * k + 1]; }
+
+    public:
+        Captures() = default;
+        Captures(const char *base, const std::ptrdiff_t *out, const HistoryNode *history, long long first_line)
+            : base_(base), out_(out), history_(history), first_line_(first_line) {}
+
+        // scalar capture: both boundaries were recorded
+        auto is_set(std::size_t k) const -> bool { return begin_off(k) != unset && end_off(k) != unset; }
+        auto begin(std::size_t k) const -> const char * { return base_ + begin_off(k); }
+        auto end(std::size_t k) const -> const char * { return base_ + end_off(k); }
+        auto view(std::size_t k) const -> std::string_view {
+            return std::string_view(begin(k), static_cast<std::size_t>(end_off(k) - begin_off(k)));
+        }
+        auto text(std::size_t k) const -> std::string { return std::string(view(k)); }
+        auto character(std::size_t k) const -> char { return *begin(k); }
+
+        // list capture: one entry per iteration, in input order
+        auto list_views(std::size_t k) const -> std::vector<std::string_view> {
+            std::vector<std::ptrdiff_t> positions;
+            for (auto h = begin_off(k); h != unset; h = history_[h].prev)
+                positions.push_back(history_[h].pos);
+            std::reverse(positions.begin(), positions.end());
+            std::vector<std::string_view> spans;
+            for (std::size_t i = 0; i + 1 < positions.size(); i += 2)
+                spans.emplace_back(base_ + positions[i], static_cast<std::size_t>(positions[i + 1] - positions[i]));
+            return spans;
+        }
+        template<typename T = std::string>
+        auto list(std::size_t k) const -> std::vector<T> {
+            std::vector<T> out;
+            for (const auto v : list_views(k)) {
+                if constexpr (std::is_same_v<T, char>)
+                    out.push_back(v.empty() ? '\0' : v.front());
+                else
+                    out.push_back(T(v));
+            }
+            return out;
+        }
+
+        auto line(std::size_t k) const -> long long {
+            return first_line_ + std::count(base_, begin(k), '\n');
+        }
+        auto column(std::size_t k) const -> long long {
+            const char *b = begin(k);
+            const char *line_start = b;
+            while (line_start > base_ && line_start[-1] != '\n')
+                --line_start;
+            return (b - line_start) + 1;
+        }
+    };
+
+    template<std::size_t Registers, std::size_t Outputs>
+    struct TdfaLayout {
+        static constexpr std::size_t registers = Registers;
+        static constexpr std::size_t outputs = Outputs;
+    };
+}
+namespace DFA::detail {
+    // Debug trace of one DFA step.
+    template<std::size_t debug_size>
+    inline void trace_step(
+        const API::DFADebugTable<debug_size> &debug_array,
+        const API::DebugIndex &debug_index,
+        std::size_t state,
+        std::size_t cls,
+        char current_ch,
+        const char *pos,
+        bool immediate_action
+    ) {
+        const API::DFADebug *debug = nullptr;
+
+        // 2. Compute 1D index using base offset + char class
+        // 1. Safe lookup without mutating map or inserting null keys
+        if (debug_size > 0) {
+            if (auto state_it = debug_index.find(state); state_it != debug_index.end()) {
+                if (auto cls_it = state_it->second.find(cls); cls_it != state_it->second.end()) {
+                    debug = &debug_array[cls_it->second];
+                }
+            }
+        }
+
+        if (debug) {
+            std::stringstream ss;
+            ss << debug->token_name << ": ";
+            std::cout << ss.str() << debug->member;
+            if (debug->call != -1) {
+                std::cout << "$call" << debug->call;
+            }
+            if (debug->group != -1) {
+                std::cout << "$group" << debug->group;
+            }
+            std::cout << "; " << debug->offset + 1 << "/" << debug->length << ";\n";
+            std::cout << std::string(ss.str().size() + debug->offset, ' ');
+
+            const auto &mem = debug->member;
+            if (mem.size() >= 2 && mem.front() == '[') {
+                bool escaped = false;
+
+                for (std::size_t i = 1; i < mem.size(); ++i) {
+                    char c = mem[i];
+
+                    if (escaped) {
+                        escaped = false;
+                        if (current_ch == c) {
+                            std::cout << std::string(i, ' ') << "^\n";
+                            break;
+                        }
+                        continue; // Skip further range/escape processing for this character
+                    }
+
+                    if (c == '\\') {
+                        escaped = true;
+                        continue; // Skip to next character after setting escape flag
+                    }
+
+                    if (current_ch == c) {
+                        std::cout << std::string(i, ' ') << "^\n";
+                        break;
+                    }
+
+                    // Check range e.g., a-z
+                    if (c == '-' && i > 1 && (i + 1) < mem.size() && mem[i + 1] != ']') {
+                        char range_begin = mem[i - 1];
+                        char range_end = mem[i + 1];
+
+                        if (current_ch >= range_begin && current_ch <= range_end) {
+                            std::cout << std::string(i - 1, ' ') << "^ ^\n";
+                            break;
+                        }
+                    }
+                }
+            } else {
+                std::cout << "^\n";
+            }
+        } else {
+            std::cout << "State " << state << " char '"
+                      << *(immediate_action ? pos + 1 : pos)
+                      << "'\n";
+        }
+
+
+    }
 }
 namespace DFA {
+    // Walks the DFA, moving positions between registers. Reaching a semantic state calls
+    //     semantic(index, captures, start_pos, start, length, line) -> (next_state, Token)
+    // and next_state == null_state ends the match with that Token; any other value resumes the
+    // walk there. Returns an empty Token when nothing matches.
     template<
         typename Token,
         typename SemanticFunc,
         std::size_t table_states,
         std::size_t table_classes,
         std::size_t action_table_states,
-        std::size_t registers_count,
-        std::size_t debug_size
+        std::size_t debug_size,
+        std::size_t registers,
+        std::size_t outputs
     >
-    auto scan(
+    auto run(
         const char* &pos,
         long long start_pos,
         long long &scanning_line,
         const API::Table<table_states, table_classes> &table,
-        const API::CharToClass class_table,
-        const API::LRTable<action_table_states> action_table,
-        std::vector<std::variant<std::monostate, Token, char, std::string>> &values,
-        std::vector<std::vector<std::variant<std::monostate, Token, char, std::string>>> &vec_values,
-        std::array<const char*, registers_count> registers,
-        std::array<long long, registers_count> register_ids,
+        const API::CharToClass &class_table,
+        const API::LRTable<action_table_states> &action_table,
         SemanticFunc semantic,
         const API::DFADebugTable<debug_size> &debug_array,
-        const API::DebugIndex &debug_index
+        const API::DebugIndex &debug_index,
+        API::TdfaLayout<registers, outputs>
     ) -> Token {
-        // ---------- for semantic function ---------------
-        const char* start = pos;
-        long long current_line = scanning_line;
-        // ------------------------------------------------
+        static_assert(registers >= outputs, "output registers are registers 0 .. outputs-1");
+
+        const char *const start = pos;
+        const long long start_line = scanning_line;
+
+        std::array<std::ptrdiff_t, (registers > 0 ? registers : 1)> regs;
+        regs.fill(API::unset);
+        std::vector<API::HistoryNode> history;
+
         std::size_t state = 0;
-        std::size_t registers_allocated = 0;
-        std::unordered_map<std::size_t, const char*> snapshot_map;
         bool immediate_action = false;
-        // ------------------------------------------------------------
-        // Main machine
-        // ------------------------------------------------------------
-        while (true) {
-            if (state == API::null_state)
-                break;
 
-            const API::DFADebug *debug = nullptr;
-
-            // 1. Determine character class for current position
-            char current_ch = *(immediate_action && *pos != '\0' ? pos + 1 : pos);
-            std::size_t cls = class_table[static_cast<unsigned char>(current_ch)];
-
-            // 2. Compute 1D index using base offset + char class
-            // 1. Safe lookup without mutating map or inserting null keys
-            if (debug_size > 0) {
-                if (auto state_it = debug_index.find(state); state_it != debug_index.end()) {
-                    if (auto cls_it = state_it->second.find(cls); cls_it != state_it->second.end()) {
-                        debug = &debug_array[cls_it->second];
-                    }
-                }
-            }
-
-            if (debug) {
-                std::stringstream ss;
-                ss << debug->token_name << ": ";
-                std::cout << ss.str() << debug->member;
-                if (debug->call != -1) {
-                    std::cout << "$call" << debug->call;
-                }
-                if (debug->group != -1) {
-                    std::cout << "$group" << debug->group;
-                }
-                std::cout << "; " << debug->offset + 1 << "/" << debug->length << ";\n";
-                std::cout << std::string(ss.str().size() + debug->offset, ' ');
-
-                const auto &mem = debug->member;
-                if (mem.size() >= 2 && mem.front() == '[') {
-                    bool escaped = false;
-
-                    for (std::size_t i = 1; i < mem.size(); ++i) {
-                        char c = mem[i];
-
-                        if (escaped) {
-                            escaped = false;
-                            if (current_ch == c) {
-                                std::cout << std::string(i, ' ') << "^\n";
-                                break;
-                            }
-                            continue; // Skip further range/escape processing for this character
-                        }
-
-                        if (c == '\\') {
-                            escaped = true;
-                            continue; // Skip to next character after setting escape flag
-                        }
-
-                        if (current_ch == c) {
-                            std::cout << std::string(i, ' ') << "^\n";
-                            break;
-                        }
-
-                        // Check range e.g., a-z
-                        if (c == '-' && i > 1 && (i + 1) < mem.size() && mem[i + 1] != ']') {
-                            char range_begin = mem[i - 1];
-                            char range_end = mem[i + 1];
-
-                            if (current_ch >= range_begin && current_ch <= range_end) {
-                                std::cout << std::string(i - 1, ' ') << "^ ^\n";
-                                break;
-                            }
-                        }
-                    }
-                } else {
-                    std::cout << "^\n";
-                }
-            } else {
-                std::cout << "State " << state << " char '"
-                          << *(immediate_action ? pos + 1 : pos)
-                          << "'\n";
-            }
-
-
-            // ========================================================
-            // DFA STATE
-            // ========================================================
+        while (state != API::null_state) {
+            const char current_ch = *(immediate_action && *pos != '\0' ? pos + 1 : pos);
+            detail::trace_step(debug_array, debug_index, state,
+                               class_table[static_cast<unsigned char>(current_ch)], current_ch, pos, immediate_action);
 
             if (state < table.size()) {
                 if (immediate_action) {
@@ -463,25 +550,14 @@ namespace DFA {
                         scanning_line++;
                     if (*pos != '\0')
                         ++pos;
-
                 }
-                const std::size_t cls = class_table[static_cast<unsigned char>(*pos)];
-                const std::size_t next = table[state][cls];
-
-                std::cout << "Transitioning to " << next << std::endl;
-
+                const std::size_t next = table[state][class_table[static_cast<unsigned char>(*pos)]];
                 if (next == API::null_state)
                     break;
-
                 state = next;
 
-                // ----------------------------------------------------
-                // Consume the character only when the transition
-                // enters another DFA
-                //
-                // A semantic state does not consume input.
-                // ----------------------------------------------------
-
+                // Entering a DFA state consumes the character; entering an action chain
+                // does not, and the chain sees `pos` at that character.
                 if (next < table.size() && *pos != '\0') {
                     if (*pos == '\n')
                         scanning_line++;
@@ -489,133 +565,47 @@ namespace DFA {
                 } else {
                     immediate_action = true;
                 }
-
-            // ========================================================
-            // LR ACTION STATE
-            // ========================================================
-
             } else if (state < table.size() + action_table.size()) {
-                const auto lr_action = action_table[state - table.size()];
+                const auto &row = action_table[state - table.size()];
+                const auto action = static_cast<API::Action>(row[0]);
+                const auto here = static_cast<std::ptrdiff_t>(pos - start);
 
-                switch (static_cast<API::Action>(lr_action[0])) {
+                if (row[1] >= registers || (row[2] != API::null_state && row[2] >= registers))
+                    throw std::runtime_error("DFA: register out of range");
 
-                    // ------------------------------------------------
-                    // BEGIN
-                    // ------------------------------------------------
-
-                    case API::Action::BEGIN: {
-                        if (registers_allocated > 0 && register_ids[registers_allocated - 1] == lr_action[1]) {
-                            break;
-                        }
-                        std::cout << "Begin(" << lr_action[1] << ") on character " << *pos << std::endl;
-
-                        if (registers_allocated >= registers.size()) {
-                            throw std::runtime_error("DFA: register allocation overflow");
-                        }
-
-                        registers[registers_allocated] = pos;
-                        register_ids[registers_allocated] = lr_action[1];
-                        ++registers_allocated;
+                switch (action) {
+                    case API::Action::SET:
+                    case API::Action::SET_NEXT:
+                        regs[row[1]] = here + (action == API::Action::SET_NEXT ? 1 : 0);
                         break;
-                    }
-
-                    // ------------------------------------------------
-                    // END
-                    // ------------------------------------------------
-
-                    case API::Action::END: {
-                        if (registers_allocated == 0 || register_ids[registers_allocated - 1] != lr_action[1]) {
-                            break;
-                        }
-
-                        const char *begin = registers[registers_allocated - 1];
-
-                        std::cout << "END(" << lr_action[1] << "); Value accumulated "
-                                  << std::string(begin, pos - begin)
-                                  << std::endl;
-
-                        if (pos - begin <= 1) {
-                            values.push_back(*begin);
-                        } else {
-                            values.push_back(std::string(begin, pos - begin));
-                        }
-
-                        --registers_allocated;
+                    case API::Action::COPY:
+                        regs[row[1]] = regs[row[2]];
                         break;
-                    }
-
-                    // ------------------------------------------------
-                    // PUSH
-                    // ------------------------------------------------
-
-                    case API::Action::PUSH: {
-                        if (registers_allocated == 0 || register_ids[registers_allocated - 1] != lr_action[1]) {
-                            break;
-                        }
-
-                        const char *begin = registers[registers_allocated - 1];
-
-                        std::cout << "Pushing value "
-                                  << std::string(begin, pos - begin)
-                                  << std::endl;
-
-                        vec_values.emplace_back();
-                        if (pos - begin <= 1) {
-                            vec_values.back().push_back(*begin);
-                        } else {
-                            vec_values.back().push_back(std::string(begin, pos - begin));
-                        }
-
+                    case API::Action::APPEND:
+                    case API::Action::APPEND_NEXT:
+                        history.push_back({
+                            here + (action == API::Action::APPEND_NEXT ? 1 : 0),
+                            row[2] == API::null_state ? API::unset : regs[row[2]]
+                        });
+                        regs[row[1]] = static_cast<std::ptrdiff_t>(history.size()) - 1;
                         break;
-                    }
-
                     default:
-                        throw std::runtime_error(
-                            "DFA: Out of bound, non-enum action; Report this error to github"
-                        );
+                        throw std::runtime_error("DFA: unknown action; Report this error to github");
                 }
-
-                state = lr_action[2];
-
-            // ========================================================
-            // SEMANTIC STATE
-            // ========================================================
-
+                state = row[3];
             } else {
-                const std::size_t semantic_index = state - table.size() - action_table.size();
-
-                std::cout << "Calling semantic action " << semantic_index << std::endl;
-
-                std::pair<int, Token> t = semantic(
-                    semantic_index,
-                    start_pos,
-                    start,
-                    pos - start,
-                    current_line,
-                    values,
-                    vec_values
+                const API::Captures captures(start, regs.data(), history.data(), start_line);
+                auto result = semantic(
+                    state - table.size() - action_table.size(),
+                    captures, start_pos, start, static_cast<long long>(pos - start), start_line
                 );
-
-                if (!std::holds_alternative<std::monostate>(t.second)) {
-                    values.push_back(std::move(t.second));
-                }
-
-                state = t.first;
+                state = static_cast<std::size_t>(std::get<0>(result));
+                if (state == API::null_state)
+                    return std::get<1>(std::move(result));
             }
         }
-
-        // ------------------------------------------------------------
-        // Final result
-        // ------------------------------------------------------------
-
-        if (!values.empty() && !std::holds_alternative<Token>(values.front())) {
-            std::cout << "Warning [DFA]: Returned non-token result; Report this error to github"
-                      << std::endl;
-        }
-
-        return std::get<Token>(values.front());
+        return Token {};
     }
-
 } // namespace DFA
 template<class TOKEN_T, typename Token>
 class Lexer_base {
@@ -652,17 +642,14 @@ protected:
         std::size_t table_states,
         std::size_t table_classes,
         std::size_t action_table_states,
-        std::size_t registers_count,
-        std::size_t debug_size
+        std::size_t debug_size,
+        typename Layout
     >
     Token lookup(
         const DFA::API::Table<table_states, table_classes> &table,
-        const DFA::API::CharToClass class_table,
-        const DFA::API::LRTable<action_table_states> action_table,
-        std::vector<std::variant<std::monostate, Token, char, std::string>> &values,
-        std::vector<std::vector<std::variant<std::monostate, Token, char, std::string>>> &vec_values,
-        std::array<const char*, registers_count> registers,
-        std::array<long long, registers_count> register_ids,
+        const DFA::API::CharToClass &class_table,
+        const DFA::API::LRTable<action_table_states> &action_table,
+        Layout layout,
         SemanticFunc semantic,
         const DFA::API::DFADebugTable<debug_size> &debug_array,
         const DFA::API::DebugIndex &debug_index,
@@ -670,9 +657,8 @@ protected:
     ) {
         if (*pos == '\0')
             return Token {};
-        Token result = DFA::scan(pos, getCurrentPos(pos), line, table, class_table, action_table, values, vec_values, registers, register_ids, semantic, debug_array, debug_index);
-        values.clear();
-        return result;
+        return DFA::run<Token>(pos, getCurrentPos(pos), line, table, class_table, action_table,
+                               semantic, debug_array, debug_index, layout);
     }
 
 public:

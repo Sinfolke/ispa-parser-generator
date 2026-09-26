@@ -10,7 +10,9 @@ export namespace NFA::TNFA {
     inline constexpr auto NULL_STATE = std::numeric_limits<std::size_t>::max();
     inline constexpr std::size_t NESTED_REDUCE_ID_BASE = 1'000'000;
     enum class TableType { DFA, Action, Semantic };
-    enum class Action { UNDEF, BEGIN, END, PUSH };
+    // SET .. APPEND_NEXT are the DFA's register operations (same numbering as the runtime's
+    // API::Action); BEGIN/END/PUSH are the capture events the TNFA builder wires.
+    enum class Action { UNDEF, SET, SET_NEXT, COPY, APPEND, APPEND_NEXT, BEGIN, END, PUSH };
     enum class SemanticAction { UNDEF, REDUCE };
 
     // A literal rule member that matches more than one character (today,
@@ -113,8 +115,15 @@ export namespace NFA::TNFA {
         std::string variable;
         std::size_t next_nfa_state = NULL_STATE;
         std::variant<DFATarget, ActionTarget, SemanticTarget> next_state;
-        Action wrapped_action;
+        Action wrapped_action = Action::UNDEF;
         std::string debug_note;
+        // Register operands of SET .. APPEND_NEXT; on BEGIN/END operand_a is the capture number.
+        std::size_t operand_a = NULL_STATE;
+        std::size_t operand_b = NULL_STATE;
+        // BEGIN/END: fires before the consumed character, not after it.
+        bool before_char = false;
+        // BEGIN/END: the capture keeps every iteration (an Array value).
+        bool list_capture = false;
         auto operator==(const ActionState &other) const -> bool = default;
         auto operator<(const ActionState &other) const -> bool {
             if (action != other.action) {
@@ -123,12 +132,18 @@ export namespace NFA::TNFA {
             if (variable != other.variable) {
                 return variable < other.variable;
             }
+            if (operand_a != other.operand_a) {
+                return operand_a < other.operand_a;
+            }
+            if (operand_b != other.operand_b) {
+                return operand_b < other.operand_b;
+            }
             return next_state < other.next_state;
         };
 
     private:
         friend struct ::uhash;
-        auto members() const { return std::tie(action, variable, next_state); }
+        auto members() const { return std::tie(action, variable, next_state, operand_a, operand_b, before_char, list_capture); }
     };
 
     struct SemanticState {

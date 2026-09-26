@@ -33,7 +33,8 @@ private:
     std::size_t highest_transition_count = 0;
     stdu::vector<NFA::TNFA::ActionState> action_table;
     stdu::vector<NFA::TNFA::SemanticState> semantic_table;
-    std::size_t max_registers_count = 0;
+    std::size_t registers_count = 0;
+    std::size_t output_count = 0;
     bool isTopLevel(const stdu::vector<std::string> &name);
 public:
     LexerBuilder(AST::Tree &ast) : ast(ast) {};
@@ -53,6 +54,7 @@ public:
     auto& getFunctionsIR() const  { return function_ir; }
     auto& getMaxStatesCount() const{ return highest_states_count; }
     auto& getMaxTransitionCount() const { return highest_transition_count; }
-    auto& getMaxRegistersCount() const { return max_registers_count; }
+    auto& getRegistersCount() const { return registers_count; }
+    auto& getOutputCount() const { return output_count; }
     auto getDataBlocks() const -> LLIR::DataBlockList;
 };

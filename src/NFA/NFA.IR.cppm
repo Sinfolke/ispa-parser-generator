@@ -9,13 +9,15 @@ import std;
 using namespace NFA::IR;
 export namespace NFA {
     auto captureOf(AST::RuleMember &member,
-                   const stdu::vector<std::string> &token_name,
-                   std::size_t position_in_token) -> stdu::vector<TokenID*>;
+                        const AST::RuleMember& original_member,
+                        const stdu::vector<std::string> &token_name,
+                        std::size_t position_in_token) -> stdu::vector<TokenID *>;
     class InitialNFA {
         AST::Tree *tree;
         utype::unordered_map<stdu::vector<std::string>, Token> tokens;
         stdu::vector<std::unique_ptr<AST::RuleMember>> synthesized_members;
         stdu::vector<TokenID> statesAt(AST::RuleMember &member,
+                                                   const AST::RuleMember& original_member,
                                                    const stdu::vector<std::string> &name, std::size_t i);
         AST::RuleMember *synthesize(const AST::RuleMember &base,
                                      std::optional<AST::RulePrefix> prefix_override,
@@ -27,14 +29,15 @@ export namespace NFA {
         };
 
         Fragment expandMember(AST::RuleMember &member,
-                                                       TokenID *prev_leaf,
-                                                       const stdu::vector<std::string> &token_name,
-                                                       std::size_t position_in_token,
-                                                       std::size_t &site_counter,
-                                                       Token &token,
-                                                       const stdu::vector<TransitionValue> &next,
-                                                       stdu::vector<TokenID*> active_captures,
-                                                       const stdu::vector<std::size_t> &alt_path
+                                                   const AST::RuleMember& original_member,
+                                                   TokenID *prev_leaf,
+                                                   const stdu::vector<std::string> &token_name,
+                                                   std::size_t position_in_token,
+                                                   std::size_t &site_counter,
+                                                   Token &token,
+                                                   const stdu::vector<TransitionValue> &next,
+                                                   stdu::vector<TokenID *> active_captures,
+                                                   const stdu::vector<std::size_t> &alt_path
                                                        );
     public:
         InitialNFA(AST::Tree &tree) : tree(&tree) {}

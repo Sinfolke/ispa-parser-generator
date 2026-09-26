@@ -191,20 +191,16 @@ auto Core::convertIspaLibSymbol(const LangAPI::IspaLibSymbol &symbol) -> std::st
             return "::ISPA_STD::DFA::API::null_state";
         case LangAPI::StdlibExports::Error:
             return "std::runtime_error";
-        case LangAPI::StdlibExports::ActionUNDEF:
-            return "::ISPA_STD::DFA::API::Action::UNDEF";
-        case LangAPI::StdlibExports::ActionBEGIN:
-            return "::ISPA_STD::DFA::API::Action::BEGIN";
-        case LangAPI::StdlibExports::ActionEND:
-            return "::ISPA_STD::DFA::API::Action::BEGIN";
-        case LangAPI::StdlibExports::ActionPUSH:
-            return "::ISPA_STD::DFA::API::Action::BEGIN";
         case LangAPI::StdlibExports::TokenNodeConstruct:
             return "::ISPA_STD::Node<Tokens, " + convertTemplates(symbol.template_parameters) + ">::create";
         case LangAPI::StdlibExports::ParserNodeConstructor:
             return "::ISPA_STD::Node<Rules, " + convertTemplates(symbol.template_parameters) + ">::create";
         case LangAPI::StdlibExports::DFADebug:
             return "::ISPA_STD::DFA::API::DFADebug";
+        case LangAPI::StdlibExports::TdfaLayout:
+            return "::ISPA_STD::DFA::API::TdfaLayout<" + convertTemplates(symbol.template_parameters) + ">";
+        case LangAPI::StdlibExports::DfaCaptures:
+            return (symbol.Const ? "const " : "") + std::string("::ISPA_STD::DFA::API::Captures") + (symbol.Reference ? "&" : "");
         default:
             throw Error("Unknown IspaLibSymbol exports: {}", (int) symbol.exports);
     }

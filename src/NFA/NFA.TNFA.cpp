@@ -41,6 +41,12 @@ namespace NFA::TNFA {
         return v.str();
     }
 
+    // A capture with an Array value keeps every iteration (history register); any other is one span.
+    auto captureIsList(const TokenID &capture) -> bool {
+        return LLIR::BuilderBase::deduceVarTypeByRuleMember(capture.member).getValueType() ==
+               LangAPI::ValueType::Array;
+    }
+
     // Whether `id` is (transitively) inside `capture`. `TokenID::capture`
     // is stored outer-to-inner (the order the parser descends through
     // nested capture groups), which is exactly the order BEGIN/END must
@@ -354,6 +360,9 @@ namespace NFA::TNFA {
                         ? Action::BEGIN
                         : Action::END,
                     .variable = generateVariable(event.capture),
+                    .operand_a = captureId(event.capture),
+                    .before_char = event.position == CaptureBoundaries::Position::Entry,
+                    .list_capture = captureIsList(event.capture),
                 };
 
                 if (event.position == CaptureBoundaries::Position::Entry) {
@@ -448,12 +457,15 @@ namespace NFA::TNFA {
             }
             return no_events;
         };
-        auto to_actions = [](const BoundaryEvents &events) {
+        auto to_actions = [&](const BoundaryEvents &events) {
             ActionChain chain;
             for (const auto &event : events) {
                 chain.push_back(ActionState{
                     .action = event.kind == CaptureBoundaries::Kind::Begin ? Action::BEGIN : Action::END,
                     .variable = generateVariable(event.capture),
+                    .operand_a = captureId(event.capture),
+                    .before_char = event.position == CaptureBoundaries::Position::Entry,
+                    .list_capture = captureIsList(event.capture),
                 });
             }
             return chain;
@@ -565,7 +577,7 @@ namespace NFA::TNFA {
             // leaves of THIS token) is terminal and must never trigger a reduce — it
             // only ever contributes BEGIN/END action cells on the real edges below.
             if (!is_terminal && !id.capture.empty()) {
-                markAccept(end_state, id, token, end_state, capture_actions);
+                markAccept(end_state, id, token, end_state, capture_actions, /*nested=*/true);
             }
 
             if (const auto edges = outgoing.find(key); edges != outgoing.end()) {
@@ -580,6 +592,8 @@ namespace NFA::TNFA {
                             accept_capture_actions.push_back(ActionState{
                                 .action = Action::END,
                                 .variable = generateVariable(**it),
+                                .operand_a = captureId(**it),
+                                .list_capture = captureIsList(**it),
                             });
                         }
                         if (is_terminal || id.capture.empty()) {
@@ -653,12 +667,17 @@ namespace NFA::TNFA {
             }
         }
     }
+    auto TNFABuilder::captureId(const TokenID &capture) -> std::size_t {
+        return capture_ids.emplace(generateVariable(capture), capture_ids.size()).first->second;
+    }
+
     void TNFABuilder::markAccept(
         std::size_t state_id,
         const TokenID &tail,
         const Token &token,
         std::size_t next,
-        ActionChain capture_actions
+        ActionChain capture_actions,
+        bool nested
     ) {
         TokenBinding binding{
             .token_id = state_id,
@@ -667,664 +686,167 @@ namespace NFA::TNFA {
 
         SemanticState state;
 
-        using SymbolFactory =
-            std::function<LangAPI::StorageSymbol()>;
+        // Builds the reduction: reads captures through the `captures` parameter (a scalar capture is
+        // text(k)/character(k), a list capture is list<T>(k)). Nested tokens are reduced inline.
+        const std::string prefix =
+            nested ? "n" + std::to_string(state_id) + "_" : std::string{};
+        const auto local = [&](const std::string &name) { return prefix + name; };
+        const auto type_name = tail.prev ? tail.prev->token_name : tail.token_name;
 
-        auto symbol_of =
-            [](std::string name) -> SymbolFactory {
-                return [name] {
-                    LangAPI::StorageSymbol s;
-
-                    s.what =
-                        LangAPI::Symbol::createExpression(
-                            LangAPI::Symbol{name}
-                        );
-
-                    return s;
-                };
+        const auto symbol = [](const std::string &name) {
+            return LangAPI::Symbol::createExpression(LangAPI::Symbol{name});
+        };
+        const auto number = [](std::size_t v) {
+            return LangAPI::Int::createExpression(LangAPI::Int{.value = static_cast<long long>(v)});
         };
 
-        auto values_slot_at =
-            [](std::string array,
-               std::size_t offset) -> SymbolFactory {
-                return [array, offset] {
-                    LangAPI::StorageSymbol s;
-
-                    s.what =
-                        LangAPI::Symbol::createExpression(
-                            LangAPI::Symbol{array}
-                        );
-
-                    s.path = {
-                        LangAPI::StorageOffset{
-                            .offset =
-                                LangAPI::Int::createExpression(
-                                    LangAPI::Int{
-                                        .value =
-                                            static_cast<long long>(offset)
-                                    }
-                                )
-                        }
-                    };
-
-                    return s;
+        // captures.<method><template_types>(k)
+        const auto capture_call =
+            [&](const std::string &method,
+                std::size_t k,
+                const std::vector<LangAPI::Type> &template_types = {}) {
+                LangAPI::FunctionCall call{
+                    .name = std::make_shared<LangAPI::Symbol>(LangAPI::Symbol{method}),
+                    .args = {number(k)}
                 };
+                for (const auto &t : template_types)
+                    call.template_parameters.push_back(std::make_shared<LangAPI::Type>(t));
+                LangAPI::StorageSymbol storage;
+                storage.what = symbol("captures");
+                storage.path = {std::move(call)};
+                return LangAPI::StorageSymbol::createExpression(storage);
+            };
+
+        // The expression that produces a scalar capture as `t`.
+        const auto scalar_expression =
+            [&](const LangAPI::Type &t, std::size_t k, const std::string &what) {
+                if (t.isValueType()) {
+                    switch (t.getValueType()) {
+                        case LangAPI::ValueType::Char:
+                            return capture_call("character", k);
+                        case LangAPI::ValueType::String:
+                            return capture_call("text", k);
+                        default:
+                            break;
+                    }
+                }
+                throw Error("NFA.TNFA: cannot read the capture of '{}' as this type", what);
+            };
+
+        const auto capture_of = [](const TokenID &sym, bool same_member) -> const TokenID * {
+            for (const auto *cap : sym.capture) {
+                if (cap->token_name != sym.token_name)
+                    continue;
+                if (same_member && !(cap->member == sym.member))
+                    continue;
+                return cap;
+            }
+            return nullptr;
         };
 
-        auto unwrap_token =
-            [&](const SymbolFactory &source,
+        // Declares `name` and fills it from the captures of member `sym`.
+        const auto read_member =
+            [&](const TokenID &sym,
+                const TokenID *cap,
                 const std::string &name,
                 LangAPI::Statements &out) {
+                const auto &member = sym.member;
+                const LangAPI::Type t = LLIR::BuilderBase::deduceVarTypeByRuleMember(
+                    cap ? cap->original_member : sym.original_member);
 
-                LangAPI::Variable token_v{
-                    .name = name + "_token",
-                    .type = LangAPI::Type{
-                        LangAPI::Symbol{"Token"}
-                    },
-                    .value =
-                        LangAPI::GetVariant::createExpression(
-                            LangAPI::GetVariant{
-                                .type =
-                                    std::make_shared<LangAPI::Type>(
-                                        LangAPI::Type{
-                                            LangAPI::Symbol{"Token"}
-                                        }
-                                    ),
-                                .sym =
-                                    LangAPI::StorageSymbol::createExpression(
-                                        source()
-                                    )
-                            }
-                        )
-                };
-
-                out.push_back(
-                    LangAPI::Variable::createStatement(token_v)
-                );
-
-                return token_v.name;
-        };
-
-        auto extract_string_or_char =
-            [&](const SymbolFactory &source,
-                const std::string &target_name,
-                LangAPI::Statements &out) {
-
-                LangAPI::If type_check{
-                    LangAPI::CheckVariant::createExpression(
-                        LangAPI::CheckVariant{
-                            .type =
-                                std::make_shared<LangAPI::Type>(
-                                    LangAPI::ValueType::Char
-                                ),
-                            .sym =
-                                LangAPI::StorageSymbol::createExpression(
-                                    source()
-                                )
-                        }
-                    )
-                };
-
-                LangAPI::Variable stored_char{
-                    .name = target_name + "_stored",
-                    .type = LangAPI::ValueType::Char,
-                    .value =
-                        LangAPI::GetVariant::createExpression(
-                            LangAPI::GetVariant{
-                                .type =
-                                    std::make_shared<LangAPI::Type>(
-                                        LangAPI::ValueType::Char
-                                    ),
-                                .sym =
-                                    LangAPI::StorageSymbol::createExpression(
-                                        source()
-                                    )
-                            }
-                        )
-                };
-
-                type_check.stmt.push_back(
-                    LangAPI::Variable::createStatement(stored_char)
-                );
-
-                type_check.stmt.push_back(
-                    LangAPI::VariableAssignment::createStatement(
-                        LangAPI::VariableAssignment{
-                            .name = LangAPI::Symbol{target_name},
-                            .value =
-                                LangAPI::CharToStringConstructor::
-                                createExpression(
-                                    LangAPI::CharToStringConstructor{
-                                        .what =
-                                            LangAPI::Symbol::
-                                            createExpression(
-                                                LangAPI::Symbol{
-                                                    stored_char.name
-                                                }
-                                            )
-                                    }
-                                )
-                        }
-                    )
-                );
-
-                type_check.else_stmt.push_back(
-                    LangAPI::VariableAssignment::createStatement(
-                        LangAPI::VariableAssignment{
-                            .name = LangAPI::Symbol{target_name},
-                            .value =
-                                LangAPI::GetVariant::createExpression(
-                                    LangAPI::GetVariant{
-                                        .type =
-                                            std::make_shared<LangAPI::Type>(
-                                                LangAPI::ValueType::String
-                                            ),
-                                        .sym =
-                                            LangAPI::StorageSymbol::
-                                            createExpression(
-                                                source()
-                                            )
-                                    }
-                                )
-                        }
-                    )
-                );
-
-                out.push_back(type_check);
-        };
-
-        auto extract_variant_alternative =
-            [&](const SymbolFactory &source,
-                const std::string &target_name,
-                const stdu::vector<LangAPI::Type> &alternatives,
-                LangAPI::Statements &out) {
-
-                LangAPI::Statements chain;
-
-                for (std::size_t i = alternatives.size(); i-- > 0;) {
-                    const auto &alt = alternatives[i];
-
-                    LangAPI::If type_check{
-                        LangAPI::CheckVariant::createExpression(
-                            LangAPI::CheckVariant{
-                                .type =
-                                    std::make_shared<LangAPI::Type>(alt),
-                                .sym =
-                                    LangAPI::StorageSymbol::
-                                    createExpression(source())
-                            }
-                        )
-                    };
-
-                    type_check.stmt.push_back(
-                        LangAPI::VariableAssignment::
-                        createStatement(
-                            LangAPI::VariableAssignment{
-                                .name = LangAPI::Symbol{target_name},
-                                .value =
-                                    LangAPI::GetVariant::
-                                    createExpression(
-                                        LangAPI::GetVariant{
-                                            .type =
-                                                std::make_shared<
-                                                    LangAPI::Type>(alt),
-                                            .sym =
-                                                LangAPI::StorageSymbol::
-                                                createExpression(source())
-                                        }
-                                    )
-                            }
-                        )
-                    );
-
-                    type_check.else_stmt = std::move(chain);
-
-                    chain = LangAPI::Statements{};
-
-                    chain.push_back(
-                        LangAPI::If::createStatement(type_check)
-                    );
-                }
-
-                for (auto &stmt : chain)
-                    out.push_back(stmt);
-        };
-
-        auto assign_from =
-            [](const SymbolFactory &source,
-               const LangAPI::Type &t,
-               const std::string &target_name) {
-
-                return LangAPI::VariableAssignment::
-                    createStatement(
-                        LangAPI::VariableAssignment{
-                            .name = LangAPI::Symbol{target_name},
-                            .value =
-                                LangAPI::GetVariant::
-                                createExpression(
-                                    LangAPI::GetVariant{
-                                        .type =
-                                            std::make_shared<
-                                                LangAPI::Type>(t),
-                                        .sym =
-                                            LangAPI::StorageSymbol::
-                                            createExpression(source())
-                                    }
-                                )
-                        }
-                    );
-        };
-
-        // Keep the two tested helpers from implementation #1.
-        auto create_variable_for_access_repeating =
-            [&](const LangAPI::Type &t,
-                std::string name,
-                std::size_t offset,
-                const AST::RuleMember &field_member) {
-
-                // <<< keep lines 638-869 of your current commented
-                //     implementation unchanged >>>
-
-                LangAPI::Statements statements;
-
-                auto v_type =
-                    LangAPI::Type{
-                    LangAPI::ValueType::Array,
-                    LangAPI::Type{
-                        LangAPI::ValueType::Variant,
-                        LangAPI::Type{LangAPI::Symbol{"Token"}},
-                        LangAPI::Type{LangAPI::ValueType::Char},
-                        LangAPI::Type{LangAPI::ValueType::String}
-                    }
-                    };
-
-                LangAPI::Variable v{
-                    .name = name + "_with_variant",
-                    .type = v_type
-                };
-
-                LangAPI::Variable v_actual{
-                    .name = name,
-                    .type = t
-                };
-
-                LangAPI::Variable i{
-                    .name = "i_" + name,
-                    .type = LangAPI::ValueType::Int,
-                    .value =
-                        LangAPI::Int::createExpression(
-                            LangAPI::Int{.value = 0}
-                        )
-                };
-
-                auto vec_values_size = [] {
-                    LangAPI::StorageSymbol s;
-                    s.what =
-                        LangAPI::Symbol::createExpression(
-                            LangAPI::Symbol{"vec_values"}
-                        );
-                    s.path = {
-                        LangAPI::ArrayMethodCall{
-                            .method = LangAPI::ArrayMethods::Size
-                        }
-                    };
-                    return s;
-                };
-
-                LangAPI::While array_loop{
-                    LangAPI::Expression{
-                        LangAPI::ExpressionValue{
-                            LangAPI::Symbol{"i_" + name}
-                        },
-                        LangAPI::ExpressionValue{
-                            LangAPI::ExpressionElement::NotEqual
-                        },
-                        LangAPI::StorageSymbol::
-                            createExpressionValue(vec_values_size())
-                    }
-                };
-
-                auto element_at_i = [name] {
-                    LangAPI::StorageSymbol s;
-                    s.what =
-                        LangAPI::Symbol::createExpression(
-                            LangAPI::Symbol{
-                                name + "_with_variant"
-                            }
-                        );
-                    s.path = {
-                        LangAPI::StorageOffset{
-                            .offset =
-                                LangAPI::Symbol::createExpression(
-                                    LangAPI::Symbol{"i_" + name}
-                                )
-                        }
-                    };
-                    return s;
-                };
-
-                LangAPI::Statements loop_body;
-
-                if (field_member.isName() &&
-                    field_member.getName().isTerminal()) {
-
-                    const auto token_name =
-                        unwrap_token(
-                            element_at_i,
-                            name,
-                            loop_body
-                        );
-
-                    const std::string term_name =
-                        name + "_term";
-
-                    loop_body.push_back(
-                        LangAPI::Variable::createStatement(
-                            LangAPI::Variable{
-                                .name = term_name,
-                                .type = t
-                            }
-                        )
-                    );
-
-                    if (t.getValueType() ==
-                        LangAPI::ValueType::String) {
-
-                        extract_string_or_char(
-                            symbol_of(token_name),
-                            term_name,
-                            loop_body
-                        );
-                        } else {
-                            loop_body.push_back(
-                                assign_from(
-                                    symbol_of(token_name),
-                                    t,
-                                    term_name
-                                )
-                            );
-                        }
-
-                    LangAPI::StorageSymbol array_push;
-                    array_push.what =
-                        LangAPI::Symbol::createExpression(
-                            LangAPI::Symbol{name}
-                        );
-                    array_push.path = {
-                        LangAPI::ArrayMethodCall{
-                            .method = LangAPI::ArrayMethods::Push,
-                            .args = {
-                                LangAPI::Symbol::createExpression(
-                                    LangAPI::Symbol{term_name}
-                                )
-                            }
-                        }
-                    };
-
-                    loop_body.push_back(
-                        LangAPI::StorageSymbol::createStatement(
-                            array_push
-                        )
-                    );
-                    } else {
-                        LangAPI::StorageSymbol array_push;
-                        array_push.what =
-                            LangAPI::Symbol::createExpression(
-                                LangAPI::Symbol{name}
-                            );
-                        array_push.path = {
-                            LangAPI::ArrayMethodCall{
-                                .method = LangAPI::ArrayMethods::Push,
-                                .args = {
-                                    LangAPI::GetVariant::
-                                        createExpression(
-                                            LangAPI::GetVariant{
-                                                .type =
-                                                    std::make_shared<
-                                                        LangAPI::Type>(t),
-                                                .sym =
-                                                    LangAPI::StorageSymbol::
-                                                    createExpression(
-                                                        element_at_i()
-                                                    )
-                                            }
-                                        )
-                                }
-                            }
-                        };
-
-                        loop_body.push_back(
-                            LangAPI::StorageSymbol::createStatement(
-                                array_push
-                            )
+                // Nested token: its reduction was built when it was wired.
+                if (member.isName() && !member.getName().isTerminal()) {
+                    const auto it = nested_reductions.find(generateVariable(sym));
+                    if (it == nested_reductions.end()) {
+                        throw Error(
+                            "NFA.TNFA: the reduction of nested token '{}' was not built before '{}'",
+                            sym.token_name, tail.token_name
                         );
                     }
-
-                loop_body.push_back(
-                    LangAPI::Expression::createStatement(
-                        LangAPI::Expression{
-                            LangAPI::ExpressionValue{
-                                LangAPI::Symbol{"i_" + name}
-                            },
-                            LangAPI::ExpressionValue{
-                                LangAPI::ExpressionElement::PlusPlus
-                            }
-                        }
-                    )
-                );
-
-                array_loop.stmt = loop_body;
-
-                statements.push_back(v);
-                statements.push_back(v_actual);
-                statements.push_back(i);
-                statements.push_back(array_loop);
-
-                return statements;
-        };
-
-        auto create_variable_for_access =
-            [&](const LangAPI::Type &t,
-                std::string name,
-                std::size_t offset,
-                const AST::RuleMember &field_member) {
-
-                // <<< keep lines 874-1046 of your commented
-                //     implementation unchanged >>>
-
-                LangAPI::Statements statements;
-
-                statements.push_back(
-                    LangAPI::Variable{
+                    out.insert(out.end(), it->second.statements.begin(), it->second.statements.end());
+                    out.push_back(LangAPI::Variable::createStatement(LangAPI::Variable{
                         .name = name,
-                        .type = t
-                    }
-                );
-
-                auto values_slot =
-                    values_slot_at("values", offset);
-
-                const bool is_repeating_csequence_variant =
-                    (
-                        field_member.isCsequence() &&
-                        (
-                            field_member.quantifier == '+' ||
-                            field_member.quantifier == '*'
-                        )
-                    ) ||
-                    (
-                        t.isValueType() &&
-                        t.getValueType() ==
-                            LangAPI::ValueType::Variant
-                    );
-
-                if (is_repeating_csequence_variant) {
-                    if (t.getValueType() ==
-                        LangAPI::ValueType::String) {
-
-                        extract_string_or_char(
-                            values_slot,
-                            name,
-                            statements
-                        );
-                        } else if (
-                            t.getValueType() ==
-                            LangAPI::ValueType::Variant
-                        ) {
-                            const auto token_name =
-                                unwrap_token(
-                                    values_slot,
-                                    name,
-                                    statements
-                                );
-
-                            auto token_symbol =
-                                symbol_of(token_name);
-
-                            stdu::vector<LangAPI::Type> alternatives;
-
-                            for (auto &tp : t.template_parameters)
-                                alternatives.push_back(
-                                    std::get<LangAPI::Type>(tp)
-                                );
-
-                            extract_variant_alternative(
-                                token_symbol,
-                                name,
-                                alternatives,
-                                statements
-                            );
-                        } else {
-                            statements.push_back(
-                                assign_from(
-                                    values_slot,
-                                    t,
-                                    name
-                                )
-                            );
-                        }
-                } else if (
-                    field_member.isName() &&
-                    field_member.getName().isTerminal()
-                ) {
-                    const auto token_name =
-                        unwrap_token(
-                            values_slot,
-                            name,
-                            statements
-                        );
-
-                    auto token_symbol =
-                        symbol_of(token_name);
-
-                    if (t.getValueType() ==
-                        LangAPI::ValueType::String) {
-
-                        extract_string_or_char(
-                            token_symbol,
-                            name,
-                            statements
-                        );
-                        } else if (
-                            t.getValueType() ==
-                            LangAPI::ValueType::Variant
-                        ) {
-                            stdu::vector<LangAPI::Type> alternatives;
-
-                            for (auto &tp : t.template_parameters)
-                                alternatives.push_back(
-                                    std::get<LangAPI::Type>(tp)
-                                );
-
-                            extract_variant_alternative(
-                                token_symbol,
-                                name,
-                                alternatives,
-                                statements
-                            );
-                        } else {
-                            statements.push_back(
-                                assign_from(
-                                    token_symbol,
-                                    t,
-                                    name
-                                )
-                            );
-                        }
-                } else {
-                    statements.push_back(
-                        assign_from(
-                            values_slot,
-                            t,
-                            name
-                        )
-                    );
+                        .type = t,
+                        .value = symbol(it->second.result),
+                    }));
+                    return;
                 }
 
-                LangAPI::StorageSymbol pop;
+                if (!cap)
+                    throw Error("NFA.TNFA: member of '{}' has no capture to read", sym.token_name);
+                const std::size_t k = captureId(*cap);
 
-                pop.what =
-                    LangAPI::Symbol::createExpression(
-                        LangAPI::Symbol{"values"}
-                    );
-
-                pop.path = {
-                    LangAPI::ArrayMethodCall{
-                        .method = LangAPI::ArrayMethods::Pop
+                // Every iteration of a loop.
+                if (captureIsList(*cap)) {
+                    if (t.template_parameters.empty())
+                        throw Error("NFA.TNFA: list capture of '{}' has no element type", sym.token_name);
+                    const auto &elem = std::get<LangAPI::Type>(t.template_parameters.front());
+                    if (!elem.isValueType() ||
+                        (elem.getValueType() != LangAPI::ValueType::Char &&
+                         elem.getValueType() != LangAPI::ValueType::String)) {
+                        throw Error(
+                            "NFA.TNFA: a list of nested tokens is not supported yet ('{}')",
+                            sym.token_name
+                        );
                     }
-                };
+                    out.push_back(LangAPI::Variable::createStatement(LangAPI::Variable{
+                        .name = name,
+                        .type = t,
+                        .value = capture_call("list", k, {elem}),
+                    }));
+                    return;
+                }
 
-                statements.push_back(
-                    LangAPI::StorageSymbol::createStatement(pop)
-                );
+                // A union of alternatives: each alternative is anchored by its own
+                // capture and the one that was recorded wins.
+                if (t.isValueType() && t.getValueType() == LangAPI::ValueType::Variant) {
+                    out.push_back(LangAPI::Variable::createStatement(LangAPI::Variable{.name = name, .type = t}));
 
-                return statements;
-        };
+                    std::vector<const TokenID *> alternatives;
+                    for (const auto *c : sym.capture)
+                        if (c->token_name == sym.token_name)
+                            alternatives.push_back(c);
+
+                    LangAPI::Statements chain;
+                    for (std::size_t i = alternatives.size(); i-- > 0;) {
+                        const auto *alt = alternatives[i];
+                        const std::size_t alt_k = captureId(*alt);
+                        LangAPI::If check{capture_call("is_set", alt_k)};
+                        check.stmt.push_back(LangAPI::VariableAssignment::createStatement(
+                            LangAPI::VariableAssignment{
+                                .name = LangAPI::Symbol{name},
+                                .value = scalar_expression(
+                                    LLIR::BuilderBase::deduceVarTypeByRuleMember(alt->original_member),
+                                    alt_k, name),
+                            }));
+                        check.else_stmt = std::move(chain);
+                        chain = LangAPI::Statements{};
+                        chain.push_back(LangAPI::If::createStatement(check));
+                    }
+                    out.insert(out.end(), chain.begin(), chain.end());
+                    return;
+                }
+
+                out.push_back(LangAPI::Variable::createStatement(LangAPI::Variable{
+                    .name = name,
+                    .type = t,
+                    .value = scalar_expression(t, k, name),
+                }));
+            };
 
         if (token.data_block && token.data_block->isRegularDataBlock()) {
             std::cout << "Assigning at if{}" << std::endl;
 
-            const auto &data_block =
-                token.data_block->getRegDataBlock();
+            state.instance_value.name = LangAPI::Symbol{type_name};
 
-            const AST::RuleMember *mem = nullptr;
-            LangAPI::Type type;
-            for (const auto &[sym, next] : token.transitions) {
+            for (const auto &[sym, alternatives] : token.transitions) {
                 if (sym.token_name == tail.token_name &&
                     !sym.member.empty() &&
                     !sym.capture.empty()) {
-                    for (const auto cap : sym.capture) {
-                        if (cap->token_name == sym.token_name) {
-                            type = LLIR::BuilderBase::deduceVarTypeByRuleMember(cap->member);
-                            break;
-                        }
-                    }
-                    mem = &sym.member;
+                    read_member(sym, capture_of(sym, false), local("value"), state.statements);
+                    state.instance_value.args.push_back(symbol(local("value")));
                     break;
                 }
-            }
-            state.instance_value.name =
-                LangAPI::Symbol{tail.prev ? tail.prev->token_name : tail.token_name};
-            if (mem) {
-                LangAPI::Statements insert_statements =
-                    create_variable_for_access(
-                        type,
-                        "value",
-                        0,
-                        *mem
-                    );
-
-                state.statements.insert(
-                    state.statements.end(),
-                    insert_statements.begin(),
-                    insert_statements.end()
-                );
-
-                state.instance_value.args.push_back(
-                    LangAPI::Symbol::createExpression(
-                        LangAPI::Symbol{"value"}
-                    )
-                );
             }
         } else if (
             token.data_block &&
@@ -1332,30 +854,16 @@ namespace NFA::TNFA {
         ) {
             std::cout << "Assigning at else if{}" << std::endl;
 
-            const auto &data_block =
-                token.data_block->getTemplatedDataBlock();
+            const auto &data_block = token.data_block->getTemplatedDataBlock();
 
             stdu::vector<const TokenID *> members_with_prefix;
-            stdu::vector<LangAPI::Type> types;
-            for (const auto &[sym, next] : token.transitions) {
+            for (const auto &[sym, alternatives] : token.transitions) {
                 if (sym.token_name == tail.token_name &&
                     !sym.member.empty() &&
-                    !sym.member.prefix.empty()) {
-
-                    if (std::find(
-                            members_with_prefix.begin(),
-                            members_with_prefix.end(),
-                            &sym
-                        ) == members_with_prefix.end()) {
-
-                        members_with_prefix.push_back(&sym);
-                        for (const auto cap : sym.capture) {
-                            if (cap->token_name == sym.token_name && cap->member == sym.member) {
-                                types.push_back(LLIR::BuilderBase::deduceVarTypeByRuleMember(cap->member));
-                                break;
-                            }
-                        }
-                    }
+                    !sym.member.prefix.empty() &&
+                    std::find(members_with_prefix.begin(), members_with_prefix.end(), &sym) ==
+                        members_with_prefix.end()) {
+                    members_with_prefix.push_back(&sym);
                 }
             }
 
@@ -1363,53 +871,18 @@ namespace NFA::TNFA {
                 members_with_prefix.begin(),
                 members_with_prefix.end(),
                 [](const TokenID *a, const TokenID *b) {
-                    return a->position_in_token <
-                           b->position_in_token;
+                    return a->position_in_token < b->position_in_token;
                 }
             );
 
-            state.instance_value.name =
-                LangAPI::Symbol{tail.prev ? tail.prev->token_name : tail.token_name};
+            state.instance_value.name = LangAPI::Symbol{type_name};
 
-            const std::size_t limit =
-                std::min(
-                    data_block.names.size(),
-                    members_with_prefix.size()
-                );
-
-            for (
-                long long i =
-                    static_cast<long long>(limit) - 1;
-                i >= 0;
-                --i
-            ) {
-                const std::size_t u_idx =
-                    static_cast<std::size_t>(i);
-
-                const auto &key =
-                    data_block.names[u_idx];
-
-                LangAPI::Type type = types[u_idx];
-
-                LangAPI::Statements insert_statements =
-                    create_variable_for_access(
-                        type,
-                        key,
-                        u_idx,
-                        members_with_prefix[u_idx]->member
-                    );
-
-                state.statements.insert(
-                    state.statements.end(),
-                    insert_statements.begin(),
-                    insert_statements.end()
-                );
-
-                state.instance_value.args.push_back(
-                    LangAPI::Symbol::createExpression(
-                        LangAPI::Symbol{key}
-                    )
-                );
+            const std::size_t limit = std::min(data_block.names.size(), members_with_prefix.size());
+            for (std::size_t i = limit; i-- > 0;) {
+                const TokenID &sym = *members_with_prefix[i];
+                const std::string name = local(data_block.names[i]);
+                read_member(sym, capture_of(sym, true), name, state.statements);
+                state.instance_value.args.push_back(symbol(name));
             }
 
             std::reverse(
@@ -1420,7 +893,7 @@ namespace NFA::TNFA {
             std::cout << "Assigning at else{}" << std::endl;
             state.instance_value =
                 LangAPI::Inheritance{
-                .name = LangAPI::Symbol{tail.prev ? tail.prev->token_name : tail.token_name}
+                .name = LangAPI::Symbol{type_name}
                 };
         }
 
@@ -1429,17 +902,27 @@ namespace NFA::TNFA {
             state.instance_value.args.begin(),
             state.instance_value.args.end()
         );
+
+        if (nested) {
+            // not an accept point: inlined into the enclosing token's reduction
+            NestedReduction reduction;
+            reduction.statements = state.statements;
+            reduction.result = local("result");
+            reduction.statements.push_back(LangAPI::Variable::createStatement(LangAPI::Variable{
+                .name = reduction.result,
+                .type = LangAPI::Type{LangAPI::Symbol{type_name}},
+                .value = LangAPI::Inheritance::createExpression(state.instance_value),
+            }));
+            nested_reductions[generateVariable(tail)] = std::move(reduction);
+            return;
+        }
+
         state.nfa_index = state_id;
         state.next_state = DFATarget{
             .id = next,
             .debug = debug
         };
 
-        // Any capture BEGIN/END markers the caller resolved for `tail`
-        // (see the non-terminal branch in wireToken's `visit`) must fire
-        // before the semantic reduction itself, in the order they were
-        // computed, so nested captures close correctly before this token
-        // is reduced.
         capture_actions.push_back(state);
         states[state_id].epsilon_transitions.insert(
             TransitionValue {.actions = std::move(capture_actions)}

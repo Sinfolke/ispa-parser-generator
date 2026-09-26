@@ -17,11 +17,10 @@ export namespace NFA::IR {
         bool operator<(const Capture &other) const {
             if (member == other.member) {
                 return std::tie(token_name, position_in_token, call, group) <
-       std::tie(other.token_name, other.position_in_token, other.call, other.group);
+               std::tie(other.token_name, other.position_in_token, other.call, other.group);
             } else {
                 return &member < &other.member;
             }
-
         }
     private:
         friend struct ::uhash;
@@ -31,6 +30,7 @@ export namespace NFA::IR {
     };
     struct TokenID {
         AST::RuleMember member;
+        AST::RuleMember original_member; // copy of the original member in the AST::Tree
         stdu::vector<std::string> token_name;
         std::size_t position_in_token;
         std::size_t call = NULL_STATE;

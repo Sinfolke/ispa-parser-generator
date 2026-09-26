@@ -45,12 +45,6 @@ namespace NFA::Interpreter {
                             std::size_t len = (thread.input_pos >= start) ? (thread.input_pos - start) : 0;
                             thread.captured_vars[a.variable] = std::string(input.substr(start, len));
                         }
-                    } else if (a.action == TNFA::Action::PUSH) {
-                        if (auto it = thread.active_captures.find(a.variable); it != thread.active_captures.end()) {
-                            std::size_t start = it->second;
-                            std::size_t len = (thread.input_pos >= start) ? (thread.input_pos - start) : 0;
-                            thread.array_vars[a.variable].push_back(std::string(input.substr(start, len)));
-                        }
                     }
                 } else if (std::holds_alternative<TNFA::SemanticState>(act)) {
                     const auto &sem = std::get<TNFA::SemanticState>(act);

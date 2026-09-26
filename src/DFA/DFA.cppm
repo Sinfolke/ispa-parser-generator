@@ -32,6 +32,9 @@ class DFA {
   NFA::TNFA::TNFABuilder &nfa;
   stdu::vector<NFA::ActionState> action_table;
   stdu::vector<NFA::SemanticState> semantic_table;
+  // Number of TDFA registers the DFA needs (set by build()).
+  std::size_t register_count = 0;
+  std::size_t output_count = 0;
   auto sameAcceptBinding(const State<> &a, const State<> &b) -> bool;
   auto initialClass(const StateWithActions &s) -> std::size_t;
   void optimizeRegistersAndLRTable();
@@ -50,6 +53,8 @@ public:
   auto &getActionTable() const { return action_table; }
   auto &getSemanticTable() { return semantic_table; }
   auto &getSemanticTable() const { return semantic_table; }
+  auto getRegisterCount() const -> std::size_t { return register_count; }
+  auto getOutputCount() const -> std::size_t { return output_count; }
 
   auto operator=(const DFA &other) {
     states = std::move(other.states);
@@ -57,6 +62,8 @@ public:
     nfa = other.nfa;
     action_table = std::move(other.action_table);
     semantic_table = std::move(other.semantic_table);
+    register_count = other.register_count;
+    output_count = other.output_count;
   };
 };
 

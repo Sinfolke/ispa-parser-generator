@@ -4,7 +4,7 @@ import LexerBuilder;
 import LLIR.IR;
 import LangAPI;
 import AST.Tree;
-import NFA_OLD;
+import NFA.TNFA.API;
 import DFA.API;
 
 import dstd;

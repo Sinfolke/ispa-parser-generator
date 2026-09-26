@@ -9,11 +9,13 @@ namespace {
     std::deque<TokenID> capture_anchor_pool;
 
     TokenID *makeCaptureAnchor(AST::RuleMember &member,
+                               const AST::RuleMember& original_member,
                                const stdu::vector<std::string> &token_name,
                                std::size_t position_in_token,
                                std::size_t group = NULL_STATE) {
         capture_anchor_pool.push_back(TokenID{
             .member = member,
+            .original_member = original_member,
             .token_name = token_name,
             .position_in_token = position_in_token,
             .group = group,
@@ -34,21 +36,23 @@ bool isTopLevel(const AST::UsePlaceTable &use_table, const stdu::vector<std::str
 }
 
 auto NFA::captureOf(AST::RuleMember &member,
+                    const AST::RuleMember& original_member,
                     const stdu::vector<std::string> &token_name,
                     std::size_t position_in_token) -> stdu::vector<TokenID *> {
     stdu::vector<TokenID *> captures;
     if (!member.prefix.empty())
-        captures.push_back(makeCaptureAnchor(member, token_name, position_in_token));
+        captures.push_back(makeCaptureAnchor(member, original_member, token_name, position_in_token));
     return captures;
 }
 
 namespace NFA {
     stdu::vector<TokenID> InitialNFA::statesAt(AST::RuleMember &member,
+                                               const AST::RuleMember& original_member,
                                                const stdu::vector<std::string> &name, std::size_t i) {
         stdu::vector<TokenID> states;
         if (!member.isOp()) {
-            states.push_back(TokenID{.member = member, .token_name = name, .position_in_token = i,
-                                     .capture = NFA::captureOf(member, name, i)});
+            states.push_back(TokenID{.member = member, .original_member = original_member, .token_name = name, .position_in_token = i,
+                                     .capture = NFA::captureOf(member, original_member, name, i)});
             return states;
         }
         for (const auto &option : member.getOp().options) {
@@ -59,8 +63,8 @@ namespace NFA {
                              needs_prefix ? std::optional(member.prefix) : std::nullopt,
                              needs_quantifier ? std::optional(member.quantifier) : std::nullopt)
                 : option.get();
-            states.push_back(TokenID{.member = *alt, .token_name = name, .position_in_token = i,
-                                     .capture = NFA::captureOf(*alt, name, i)});
+            states.push_back(TokenID{.member = *alt, .original_member = *option, .token_name = name, .position_in_token = i,
+                                     .capture = NFA::captureOf(*alt, *option, name, i)});
         }
         return states;
     }
@@ -78,6 +82,7 @@ namespace NFA {
     }
 
     InitialNFA::Fragment InitialNFA::expandMember(AST::RuleMember &member,
+                                                   const AST::RuleMember& original_member,
                                                    TokenID *prev_leaf,
                                                    const stdu::vector<std::string> &token_name,
                                                    std::size_t position_in_token,
@@ -93,7 +98,7 @@ namespace NFA {
             synthesized_members.push_back(std::move(core_copy));
             AST::RuleMember *core = synthesized_members.back().get();
 
-            Fragment core_fragment = expandMember(*core, prev_leaf, token_name, position_in_token, site_counter, token, next, active_captures, alt_path);
+            Fragment core_fragment = expandMember(*core, original_member, prev_leaf, token_name, position_in_token, site_counter, token, next, active_captures, alt_path);
 
             if (member.quantifier == '*' || member.quantifier == '+') {
                 for (const auto &tail : core_fragment.tails) {
@@ -124,7 +129,7 @@ namespace NFA {
                 // path once outside the loop pinned every alternative to index 0.
                 auto path = alt_path;
                 path.push_back(alt_num);
-                Fragment sub = expandMember(*alt, prev_leaf, token_name, position_in_token, site_counter,
+                Fragment sub = expandMember(*alt, original_member, prev_leaf, token_name, position_in_token, site_counter,
                                             token, next, active_captures, path);
                 result.entries.insert(result.entries.end(), sub.entries.begin(), sub.entries.end());
                 result.tails.insert(result.tails.end(), sub.tails.begin(), sub.tails.end());
@@ -145,25 +150,25 @@ namespace NFA {
                     // Nothing distinguishes the group from its single child — fold
                     // the group's prefix onto it instead of adding a boundary.
                     child = synthesize(*child, member.prefix, std::nullopt);
-                    return expandMember(*child, prev_leaf, token_name, position_in_token, site_counter, token, next, active_captures, alt_path);
+                    return expandMember(*child, original_member, prev_leaf, token_name, position_in_token, site_counter, token, next, active_captures, alt_path);
                 }
 
                 stdu::vector<TokenID *> captures = active_captures;
                 if (group_captures) {
                     // Group and child both capture independently — the group needs
                     // its own boundary in addition to the child's.
-                    captures.push_back(makeCaptureAnchor(member, token_name, position_in_token, site_counter++));
+                    captures.push_back(makeCaptureAnchor(member, original_member, token_name, position_in_token, site_counter++));
                 }
-                return expandMember(*child, prev_leaf, token_name, position_in_token, site_counter, token, next, captures, alt_path);
+                return expandMember(*child, original_member, prev_leaf, token_name, position_in_token, site_counter, token, next, captures, alt_path);
             }
             if (!member.prefix.empty())
-                active_captures.push_back(makeCaptureAnchor(member, token_name, position_in_token, site_counter++));
+                active_captures.push_back(makeCaptureAnchor(member, original_member, token_name, position_in_token, site_counter++));
 
             stdu::vector<Fragment> parts(group.values.size());
             stdu::vector<TransitionValue> cursor_next = next;
             for (std::size_t i = group.values.size(); i-- > 0;) {
                 TokenID *element_prev = (i == 0) ? prev_leaf : nullptr; // filled in below for i > 0
-                parts[i] = expandMember(*group.values[i], element_prev, token_name, position_in_token, site_counter, token, cursor_next, active_captures, alt_path);
+                parts[i] = expandMember(*group.values[i], original_member, element_prev, token_name, position_in_token, site_counter, token, cursor_next, active_captures, alt_path);
                 cursor_next = parts[i].entries;
             }
             // Now that every element's fragment exists, wire prev forward: element i's
@@ -178,10 +183,11 @@ namespace NFA {
         }
 
         if (!member.prefix.empty())
-            active_captures.push_back(makeCaptureAnchor(member, token_name, position_in_token, site_counter));
+            active_captures.push_back(makeCaptureAnchor(member, original_member, token_name, position_in_token, site_counter));
 
         TokenID leaf_id{
             .member = member,
+            .original_member = original_member,
             .token_name = token_name,
             .position_in_token = position_in_token,
             .group = site_counter++,
@@ -241,7 +247,7 @@ namespace NFA {
             token.data_block = &rule.data_block;
             stdu::vector<stdu::vector<TokenID>> states;
             for (std::size_t i = 0; i < rule.rule_members.size(); ++i)
-                states.push_back(statesAt(*rule.rule_members[i], name, i));
+                states.push_back(statesAt(*rule.rule_members[i], *rule.rule_members[i], name, i));
 
             if (!states.empty()) {
                 // Inter-position transitions
@@ -251,7 +257,7 @@ namespace NFA {
                     }
                 }
                 // Terminal transitions for trailing states in the rule
-                TokenID terminal_marker{.token_name = name, .position_in_token = states.size()};
+                TokenID terminal_marker{.token_name = name, .position_in_token = states.size(), .original_member = {}};
                 for (const auto &last : states.back()) {
                     token.transitions[last] = {terminal_marker};
                 }
@@ -282,7 +288,7 @@ namespace NFA {
             std::size_t site_counter = 0;
             stdu::vector<std::size_t> alt_path;
             for (auto &reference : references) {
-                Fragment fragment = expandMember(reference.ref.member, reference.ref.prev, name, reference.ref.position_in_token,
+                Fragment fragment = expandMember(reference.ref.member, reference.ref.original_member, reference.ref.prev, name, reference.ref.position_in_token,
                                                   site_counter, token, reference.continuation, {}, alt_path);
 
                 for (auto &[token_id, transition_values] : token.transitions) {

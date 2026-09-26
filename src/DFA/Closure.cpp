@@ -102,77 +102,43 @@ void appendActions(
  * ----------------------------------------------------------------------
  */
 
-struct SymbolSeed {
-    std::size_t priority = 0;
-    std::size_t source = TNFA::NULL_STATE;
-    std::size_t target = TNFA::NULL_STATE;
+} // namespace
 
-    DFA::ActionPath actions;
-
-    const NFA::IR::TokenID* source_link;
-};
-
-
-auto collectSymbolSeeds(
+auto DFA::Closure::collectSeeds(
     const TNFA::TNFABuilder *nfa,
     const std::vector<std::size_t> &current,
     const TNFA::TransitionKey &symbol
-) -> std::vector<SymbolSeed> {
-
-    std::vector<SymbolSeed> candidates;
+) -> std::vector<DFA::SymbolSeed> {
+    std::vector<DFA::SymbolSeed> candidates;
 
     for (const std::size_t source : current) {
-        const auto &state =
-            nfa->getStates().at(source);
-
-        const auto it =
-            state.transitions.find(symbol);
-
+        const auto &state = nfa->getStates().at(source);
+        const auto it = state.transitions.find(symbol);
         if (it == state.transitions.end())
             continue;
 
         for (const auto &edge : it->second) {
             if (edge.next == TNFA::NULL_STATE)
                 continue;
-
-            candidates.push_back(
-                SymbolSeed{
-                    .priority = edge.priority,
-                    .source = source,
-                    .target = edge.next,
-                    .actions =
-                        transitionActions(
-                            source,
-                            edge
-                        ),
-                    .source_link = &edge.source
-                }
-            );
+            candidates.push_back(DFA::SymbolSeed{
+                .priority = edge.priority,
+                .source = source,
+                .target = edge.next,
+                .actions = transitionActions(source, edge),
+                .source_link = &edge.source,
+                .char_origin = edge.char_origin,
+            });
         }
     }
 
-
-    /*
-     * Lower priority number wins.
-     *
-     * Source is only a deterministic tie-breaker.
-     */
-    std::ranges::stable_sort(
-        candidates,
-        [](const SymbolSeed &a,
-           const SymbolSeed &b) {
-
-            if (a.priority != b.priority)
-                return a.priority < b.priority;
-
-            return a.source < b.source;
-        }
-    );
-
+    // Lower priority number wins; source is only a deterministic tie-breaker.
+    std::ranges::stable_sort(candidates, [](const DFA::SymbolSeed &a, const DFA::SymbolSeed &b) {
+        if (a.priority != b.priority)
+            return a.priority < b.priority;
+        return a.source < b.source;
+    });
     return candidates;
 }
-
-} // namespace
 
 
 /*
@@ -238,6 +204,9 @@ void DFA::Closure::epsilonClosure(
     actions_for.clear();
     terminal_actions_for.clear();
     transition_actions.clear();
+    discovery.clear();
+    seed_of.clear();
+    std::size_t current_seed = 0;
 
 
     /*
@@ -297,6 +266,8 @@ void DFA::Closure::epsilonClosure(
             state_id,
             path
         );
+        discovery.push_back(state_id);
+        seed_of.emplace(state_id, current_seed);
 
         sorted_unique_closure.insert(
             state_id
@@ -489,7 +460,9 @@ void DFA::Closure::epsilonClosure(
      * --------------------------------------------------------------
      */
 
+    std::size_t seed_index = 0;
     for (const auto &[state, path] : seeded_source) {
+        current_seed = seed_index++;
 
         /*
          * `path` here is the seed's own action path (e.g. the
@@ -568,7 +541,7 @@ void DFA::Closure::move(
 
 
     const auto seeds =
-        collectSymbolSeeds(
+        collectSeeds(
             nfa,
             current,
             symbol

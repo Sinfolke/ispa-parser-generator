@@ -7,9 +7,9 @@ def replace_std_vector_in_file(filepath):
         content = f.read()
 
     # Regex pattern to match std::vector exactly (not part of bigger word)
-    pattern = r'import NFA;'
+    pattern = r'import NFA_OLD;'
 
-    new_content, count = re.subn(pattern, 'import NFA_OLD;', content)
+    new_content, count = re.subn(pattern, 'import NFA.TNFA.API;', content)
 
     if count > 0:
         print(f"Replaced {count} occurrences in {filepath}")
