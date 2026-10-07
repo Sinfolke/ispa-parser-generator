@@ -146,9 +146,7 @@ namespace LangRepr {
     // 5. FunctionCall Traversal
     auto ConstructBase::ensureTypesNs(LangAPI::FunctionCall s) -> LangAPI::FunctionCall {
         if (std::holds_alternative<std::shared_ptr<LangAPI::Symbol>>(s.name)) {
-            insideTypeCount++;
             s.name = std::make_shared<LangAPI::Symbol>(ensureTypesNs(*std::get<std::shared_ptr<LangAPI::Symbol>>(s.name)));
-            insideTypeCount--;
         }
         for (auto &p : s.template_parameters) {
             std::visit([&](auto &param) {

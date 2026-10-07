@@ -87,10 +87,10 @@ export namespace LangAPI {
         Undef, Void, Char, Int, Bool, Float, String, NonOwnedString, Array, FixedSizeArray, Map, Symbol, StorageSymbol, Inheritance, Token, Rule, TokenResult, RuleResult, Span, Variant, Box, Any, Const, Reference, Tuple
     };
     enum class RValueType {
-        Undef, Char, Int, Bool, Float, String, Array, FixedSizeArray, Map, Pos, Symbol, IspaLibSymbol, StorageSymbol, Inheritance, IspaLibDfaTransition, IspaLibDfaSpanCharState, IspaLibDfaSpanMultiTableState, IspaLibDfaEmptyState, IspaLibDfaSpan, Reference, Span, MakeTuple, GetVariant, CheckVariant, CharToStringConstructor
+        Undef, Char, Int, Bool, Float, String, Array, FixedSizeArray, Map, Pos, Symbol, IspaLibSymbol, StorageSymbol, Inheritance, IspaLibDfaTransition, IspaLibDfaSpanCharState, IspaLibDfaSpanMultiTableState, IspaLibDfaEmptyState, IspaLibDfaSpan, Reference, Span, MakeTuple, GetVariant, CheckVariant, ToString, CharToStringConstructor, GetFromBox
     };
     enum class ExpressionValueType {
-        Empty, EmptyInitializer, RValue, ExpressionElement, FunctionCall, IspaLibFunctionCall, StringCompare, Return, Break, Continue, VariableAssignment, CounterIncreament, CounterIncreamentByLength,
+        Empty, EmptyInitializer, RValue, ExpressionElement, FunctionCall, IspaLibFunctionCall, StringCompare, Return, Break, Continue, VariableAssignment, CounterIncreament, CounterAssignment,
         ResetPosCounter, PushPosCounter, PopPosCounter, SkipSpaces, DfaLookup, ReportError, Lambda, DFADebug
     };
     enum class ArrayMethods {
@@ -108,7 +108,9 @@ export namespace LangAPI {
         DfaState, DfaTable, DfaClassTable, DfaAcceptTable, DfaLRTable, DfaNullState,
         ParserFunctionParameter, Error,
         TokenNodeConstruct, ParserNodeConstructor,
-        DFADebug, TdfaLayout, DfaCaptures
+        DFADebug, TdfaLayout, DfaCaptures,
+        ASTPrinter, Concat,
+        MatchResultValue
     };
 
 
@@ -443,8 +445,21 @@ export namespace LangAPI {
         }
 
     };
+    struct Property {
+        std::string name;
+
+        friend bool operator==(const Property &a, const Property &b);
+        friend bool operator!=(const Property &a, const Property &b) { return !(a == b); }
+        friend bool operator<(const Property &a, const Property &b);
+        friend auto operator<<(std::ostream& os, const Property &c) -> std::ostream&;
+    private:
+        friend struct ::uhash;
+        auto members() const {
+            return std::tie(name);
+        }
+    };
     struct StorageSymbol : RValueLevel {
-        using PathPart = std::variant<FunctionCall, ArrayMethodCall, IspaLibSymbol, StorageOffset, std::string>;
+        using PathPart = std::variant<FunctionCall, ArrayMethodCall, IspaLibSymbol, StorageOffset, Property, std::string>;
         Expression what;
         stdu::vector<PathPart> path;
 
@@ -456,6 +471,14 @@ export namespace LangAPI {
         template<std::ranges::input_range R>
         requires std::constructible_from<PathPart, std::ranges::range_value_t<R>>
         StorageSymbol(const R& el) {
+            for (auto &e : el) {
+                path.emplace_back(e);
+            }
+        }
+        template<std::ranges::input_range R>
+        requires std::constructible_from<PathPart, std::ranges::range_value_t<R>>
+        StorageSymbol(const Expression &what, const R& el) {
+            this->what = what;
             for (auto &e : el) {
                 path.emplace_back(e);
             }
@@ -758,8 +781,32 @@ export namespace LangAPI {
             return std::tie(what);
         }
     };
+    struct ToString : RValueLevel {
+        Expression what;
+        friend bool operator==(const ToString &a, const ToString& other);
+        friend bool operator!=(const ToString &a, const ToString& other) { return a != other; }
+        friend bool operator<(const ToString &a, const ToString& other);
+        friend auto operator<<(std::ostream& os, const ToString &c) -> std::ostream&;
+    private:
+        friend struct ::uhash;
+        auto members() const {
+            return std::tie(what);
+        }
+    };
+    struct GetFromBox : RValueLevel {
+        Expression what;
+        friend bool operator==(const GetFromBox &a, const GetFromBox& other);
+        friend bool operator!=(const GetFromBox &a, const GetFromBox& other) { return a != other; }
+        friend bool operator<(const GetFromBox &a, const GetFromBox& other);
+        friend auto operator<<(std::ostream& os, const GetFromBox &c) -> std::ostream&;
+    private:
+        friend struct ::uhash;
+        auto members() const {
+            return std::tie(what);
+        }
+    };
     class RValue : public ExpressionValueLevel {
-        std::variant<std::monostate, Char, Int, Bool, Float, String, Array, FixedSizeArray, Map, Pos, Symbol, IspaLibSymbol, StorageSymbol, Inheritance, IspaLibDfaTransition, IspaLibDfaSpanCharState, IspaLibDfaSpanMultiTableState, IspaLibDfaEmptyState, IspaLibDfaSpan, Reference, Span, MakeTuple, GetVariant, CheckVariant, CharToStringConstructor> value;
+        std::variant<std::monostate, Char, Int, Bool, Float, String, Array, FixedSizeArray, Map, Pos, Symbol, IspaLibSymbol, StorageSymbol, Inheritance, IspaLibDfaTransition, IspaLibDfaSpanCharState, IspaLibDfaSpanMultiTableState, IspaLibDfaEmptyState, IspaLibDfaSpan, Reference, Span, MakeTuple, GetVariant, CheckVariant, ToString, CharToStringConstructor, GetFromBox> value;
         friend struct ::uhash;
         auto members() const {
             return std::tie(value);
@@ -808,6 +855,8 @@ export namespace LangAPI {
         bool isMakeTuple()  const { return std::holds_alternative<MakeTuple>(value); }
         bool isGetVariant()  const { return std::holds_alternative<GetVariant>(value); }
         bool isCheckVariant()  const { return std::holds_alternative<CheckVariant>(value); }
+        bool isGetFromBox()  const { return std::holds_alternative<GetFromBox>(value); }
+        bool isToString()  const { return std::holds_alternative<ToString>(value); }
         bool isCharToStringConstructor()  const { return std::holds_alternative<CharToStringConstructor>(value); }
         bool isUndef() const { return std::holds_alternative<std::monostate>(value); }
         bool empty() const { return std::holds_alternative<std::monostate>(value); }
@@ -834,7 +883,9 @@ export namespace LangAPI {
         Reference&  getReference()  { return std::get<Reference>(value); }
         Span&  getSpan()  { return std::get<Span>(value); }
         MakeTuple&  getMakeTuple()  { return std::get<MakeTuple>(value); }
+        GetFromBox&  getGetFromBox()  { return std::get<GetFromBox>(value); }
         GetVariant&  getVariantCast()  { return std::get<GetVariant>(value); }
+        ToString&  getToString()  { return std::get<ToString>(value); }
         CharToStringConstructor&  getCharToStringConstructor()  { return std::get<CharToStringConstructor>(value); }
         CheckVariant&  CheckVariantCast()  { return std::get<CheckVariant>(value); }
 
@@ -861,6 +912,8 @@ export namespace LangAPI {
         const Span&  getSpan() const  { return std::get<Span>(value); }
         const MakeTuple&  getMakeTuple() const { return std::get<MakeTuple>(value); }
         const GetVariant&  getVariantCast() const { return std::get<GetVariant>(value); }
+        const GetFromBox&  getGetFromBox() const { return std::get<GetFromBox>(value); }
+        const ToString&  getToString() const { return std::get<ToString>(value); }
         const CharToStringConstructor&  getCharToStringConstructor() const { return std::get<CharToStringConstructor>(value); }
         const CheckVariant&  CheckVariantCast() const { return std::get<CheckVariant>(value); }
 
@@ -986,11 +1039,34 @@ export namespace LangAPI {
         }
         friend auto operator<<(std::ostream& os, const ForwardDeclaredClass &c) -> std::ostream&;
     };
+    struct Function : DeclarationLevel {
+        Type type;
+        std::string name;
+        stdu::vector<std::pair<Type, std::string>> parameters;
+        Statements statements;
+        stdu::vector<std::string> template_parameters;
+        bool override = false;
+        bool is_static = false;
+        bool is_const = false;
+        friend bool operator==(const Function &a, const Function &b);
+        bool operator!=(const Function& other) const {
+            return !(*this == other);
+        }
+        friend bool operator<(const Function &a, const Function &b);
+        friend auto operator<<(std::ostream& os, const Function &c) -> std::ostream&;
+    private:
+        friend struct ::uhash;
+        auto members() const {
+            return std::tie(type, name, parameters, statements, template_parameters);
+        }
+    };
     struct Class : DeclarationLevel {
         std::string name;
         stdu::vector<std::pair<std::shared_ptr<Declaration>, Visibility>> data;
         stdu::vector<std::pair<Visibility, std::variant<Symbol, IspaLibSymbol>>> inherit_members;
         Visibility default_visibility = Visibility::Public;
+        std::optional<Function> to_str_fun;
+        std::optional<Function> output_fun;
         bool operator==(const Class& other) const {
             return name == other.name && data == other.data && inherit_members == other.inherit_members && default_visibility == other.default_visibility;
         }
@@ -1023,26 +1099,6 @@ export namespace LangAPI {
         friend struct ::uhash;
         auto members() const {
             return std::tie(name,declarations);
-        }
-    };
-    struct Function : DeclarationLevel {
-        Type type;
-        std::string name;
-        stdu::vector<std::pair<Type, std::string>> parameters;
-        Statements statements;
-        stdu::vector<std::string> template_parameters;
-        bool override = false;
-        bool is_static = false;
-        friend bool operator==(const Function &a, const Function &b);
-        bool operator!=(const Function& other) const {
-            return !(*this == other);
-        }
-        friend bool operator<(const Function &a, const Function &b);
-        friend auto operator<<(std::ostream& os, const Function &c) -> std::ostream&;
-    private:
-        friend struct ::uhash;
-        auto members() const {
-            return std::tie(type, name, parameters, statements, template_parameters);
         }
     };
     struct TypeAlias : DeclarationLevel {
@@ -1254,16 +1310,16 @@ export namespace LangAPI {
             return std::tie();
         }
     };
-    struct CounterIncreamentByLength : ExpressionValueLevel {
-        bool operator==(const CounterIncreamentByLength& n) const { return name == n.name; }
-        bool operator!=(const CounterIncreamentByLength& n) const { return !(*this == n); }
-        bool operator<(const CounterIncreamentByLength& other) const { return name < other.name; }
-        friend auto operator<<(std::ostream& os, const CounterIncreamentByLength &c) -> std::ostream&;
-        std::string name;
+    struct AssignCounter : ExpressionValueLevel {
+        bool operator==(const AssignCounter& n) const { return v == n.v; }
+        bool operator!=(const AssignCounter& n) const { return !(*this == n); }
+        bool operator<(const AssignCounter& other) const { return v < other.v; }
+        friend auto operator<<(std::ostream& os, const AssignCounter &c) -> std::ostream&;
+        std::shared_ptr<Expression> v;
     private:
         friend struct ::uhash;
         auto members() const {
-            return std::tie(name);
+            return std::tie(v);
         }
     };
     struct ResetPosCounter : ExpressionValueLevel {
@@ -1391,7 +1447,7 @@ export namespace LangAPI {
             Continue,
             VariableAssignment,
             CounterIncreament,
-            CounterIncreamentByLength,
+            AssignCounter,
             ResetPosCounter,
             PushPosCounter,
             PopPosCounter,
@@ -1439,7 +1495,7 @@ export namespace LangAPI {
         bool isContinue() const { return std::holds_alternative<Continue>(value); }
         bool isVariableAssignment() const { return std::holds_alternative<VariableAssignment>(value); }
         bool isCounterIncreament() const { return std::holds_alternative<CounterIncreament>(value); }
-        bool isCounterIncreamentByLength() const { return std::holds_alternative<CounterIncreamentByLength>(value); }
+        bool isCounterAssignment() const { return std::holds_alternative<AssignCounter>(value); }
         bool isResetPosCounter() const { return std::holds_alternative<ResetPosCounter>(value); }
         bool isPushPosCounter() const { return std::holds_alternative<PushPosCounter>(value); }
         bool isPopPosCounter() const { return std::holds_alternative<PopPosCounter>(value); }
@@ -1460,7 +1516,7 @@ export namespace LangAPI {
         Continue& getContinue() { return std::get<Continue>(value); }
         VariableAssignment& getVariableAssignment() { return std::get<VariableAssignment>(value); }
         CounterIncreament& getCounterIncreament() { return std::get<CounterIncreament>(value); }
-        CounterIncreamentByLength& getCounterIncreamentByLength() { return std::get<CounterIncreamentByLength>(value); }
+        AssignCounter& getAssignCounter() { return std::get<AssignCounter>(value); }
         ResetPosCounter& getResetPosCounter() { return std::get<ResetPosCounter>(value); }
         PushPosCounter& getPushPosCounter() { return std::get<PushPosCounter>(value); }
         PopPosCounter& getPopPosCounter() { return std::get<PopPosCounter>(value); }
@@ -1481,7 +1537,7 @@ export namespace LangAPI {
         const Continue& getContinue() const { return std::get<Continue>(value); }
         const VariableAssignment& getVariableAssignment() const { return std::get<VariableAssignment>(value); }
         const CounterIncreament& getCounterIncreament() const { return std::get<CounterIncreament>(value); }
-        const CounterIncreamentByLength& getCounterIncreamentByLength() const { return std::get<CounterIncreamentByLength>(value); }
+        const AssignCounter& getCounterAssignment() const { return std::get<AssignCounter>(value); }
         const ResetPosCounter& getResetPosCounter() const { return std::get<ResetPosCounter>(value); }
         const PushPosCounter& getPushPosCounter() const { return std::get<PushPosCounter>(value); }
         const PopPosCounter& getPopPosCounter() const { return std::get<PopPosCounter>(value); }

@@ -22,7 +22,9 @@ export namespace Converter {
         virtual auto createForwardDeclarationClass(LangAPI::ForwardDeclaredClass forward_declared_class) -> void = 0;
         virtual auto setVisibility(LangAPI::Visibility visibility) -> void = 0;
         virtual auto createFunction(const LangAPI::Function &func) -> void = 0;
+        virtual auto createPrintFunction(const LangAPI::Function &func) -> void = 0;
         virtual auto closeFunction() -> void = 0;
+        virtual auto closePrintFunction() -> void = 0;
         virtual auto openTemplateParameters() -> void = 0;
         virtual auto createTemplateParameter(const std::string &name) -> void = 0;
         virtual auto closeTemplateParameters() -> void = 0;

@@ -14,4 +14,6 @@ integer_variable:
     @{name, value}
 ;
 
-main: integer_variable;
+main: @ integer_variable
+    {@}
+;

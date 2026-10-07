@@ -12,7 +12,6 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 endif()
 
 project(ISPA LANGUAGES CXX)
-
 # =============================================
 # Compile Definitions
 # =============================================

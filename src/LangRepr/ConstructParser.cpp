@@ -152,14 +152,50 @@ namespace LangRepr {
         }
         return ConstructBase::ensureTypesNs(stmt);
     }
+    auto ConstructParser::finalizeTypes(const LangAPI::Statement &stmt) -> LangAPI::Statement {
+        bool pushed = false;
+        if (stmt.isVariable()) {
+            auto v = stmt.getVariable();
+            if (v.type.isValueType() && (v.type == LangAPI::ValueType::TokenResult || v.type == LangAPI::ValueType::RuleResult)) {
+                v.type.template_parameters.push_back(LangAPI::Type {LangAPI::Symbol {"IT"}});
+            }
+            return v;
+        } else if (stmt.isIf()) {
+            LangAPI::If new_if;
+            new_if.expr = stmt.getIf().expr;
+            for (const auto &if_stmt : stmt.getIf().stmt) {
+                new_if.stmt.push_back(finalizeTypes(if_stmt));
+            }
+            for (const auto &else_stmt : stmt.getIf().else_stmt) {
+                new_if.else_stmt.push_back(finalizeTypes(else_stmt));
+            }
+            return LangAPI::If::createStatement(new_if);
+        } else if (stmt.isWhile()) {
+            LangAPI::While new_do_while;
+            new_do_while.expr = stmt.getWhile().expr;
+            for (const auto &dw_stmt : stmt.getWhile().stmt) {
+                new_do_while.stmt.push_back(finalizeTypes(dw_stmt));
+            }
+            return LangAPI::While::createStatement(new_do_while);
+        } else if (stmt.isDoWhile()) {
+            LangAPI::DoWhile new_while;
+            new_while.expr = stmt.getDoWhile().expr;
+            for (const auto &dw_stmt : stmt.getDoWhile().stmt) {
+                new_while.stmt.push_back(finalizeTypes(dw_stmt));
+            }
+            return LangAPI::DoWhile::createStatement(new_while);
+        }
+        return ConstructBase::ensureTypesNs(stmt);
+    }
     auto ConstructParser::constructParser() -> void {
         auto parser = createParserClass();
         // constructTokenMachineDFA(parser);
         for (const auto &prod : ir) {
-            LangAPI::Type fun_type = ensureTypesNs(LangAPI::Type {LangAPI::Symbol {prod.name} }); // must be type as symbols are not automatically assigned
+            LangAPI::Type rule_type = ensureTypesNs(LangAPI::Type {LangAPI::Symbol {prod.name} });
+            LangAPI::Type fun_type = ensureTypesNs(LangAPI::Type {LangAPI::ValueType::RuleResult, rule_type, LangAPI::Type {LangAPI::Symbol {"IT"}}});
             LangAPI::Statements stmts;
             for (const auto &stmt : prod.members) {
-                stmts.push_back(finalizeReturnStatement(stmt));
+                stmts.push_back(finalizeReturnStatement(finalizeTypes(stmt)));
             }
             LangAPI::Variable result_v;
             result_v.type = ensureTypesNs(LangAPI::Type {LangAPI::Symbol {prod.name} });
@@ -185,7 +221,35 @@ namespace LangRepr {
                     .value = ConstructBase::ensureTypesNs(prod.block.getRegularDataBlock().first)
                 }));
             }
-            stmts.push_back(LangAPI::Return::createStatement(LangAPI::Return { .value = LangAPI::Symbol::createExpression(LangAPI::Symbol {"result"}) }));
+            LangAPI::Variable match_result;
+            match_result.type = fun_type;
+            match_result.name = "match_result";
+            stmts.push_back(LangAPI::Variable::createStatement(match_result));
+            LangAPI::StorageSymbol match_status;
+            match_status.what = LangAPI::Symbol::createExpression(LangAPI::Symbol {"match_result"});
+            match_status.path.push_back("status");
+            stmts.push_back(LangAPI::VariableAssignment::createStatement(LangAPI::VariableAssignment {
+                .name = match_status,
+                .value = LangAPI::Bool::createExpression(LangAPI::Bool {.value = true})
+            }));
+            LangAPI::StorageSymbol match_data;
+            match_data.what = LangAPI::Symbol::createExpression(LangAPI::Symbol {"match_result"});
+            match_data.path.push_back("node");
+            match_data.path.push_back(LangAPI::FunctionCall {
+                .name = std::make_shared<LangAPI::Symbol>("data")
+            });
+            stmts.push_back(LangAPI::VariableAssignment::createStatement(LangAPI::VariableAssignment {
+                .name = match_data,
+                .value = LangAPI::Symbol::createExpression(LangAPI::Symbol {"result"})
+            }));
+            LangAPI::StorageSymbol match_it;
+            match_it.what = LangAPI::Symbol::createExpression(LangAPI::Symbol {"match_result"});
+            match_it.path.push_back("it");
+            stmts.push_back(LangAPI::VariableAssignment::createStatement(LangAPI::VariableAssignment {
+                .name = match_it,
+                .value = LangAPI::Symbol::createExpression(LangAPI::Symbol {"pos"})
+            }));
+            stmts.push_back(LangAPI::Return::createStatement(LangAPI::Return { .value = LangAPI::Symbol::createExpression(LangAPI::Symbol {"match_result"}) }));
             LangAPI::Function prod_fun {
                 .type = fun_type,
                 .name = corelib::text::join(prod.name, "_"),
@@ -195,6 +259,51 @@ namespace LangRepr {
             };
             parser.data.push_back(std::make_pair(std::make_shared<LangAPI::Declaration>(std::move(prod_fun)), LangAPI::Visibility::Private));
         }
+
+        auto add_parse_wrapper = [&](std::string name, std::string iterator_type, stdu::vector<LangAPI::Expression> iterator_args) {
+            auto iterator = LangAPI::FunctionCall::createExpression(LangAPI::FunctionCall {
+                .name = std::make_shared<LangAPI::Symbol>(LangAPI::Symbol {"Lexer", std::move(iterator_type)}),
+                .args = std::move(iterator_args)
+            });
+            auto main_call = LangAPI::FunctionCall::createExpression(LangAPI::FunctionCall {
+                .name = std::make_shared<LangAPI::Symbol>("main"),
+                .args = {iterator}
+            });
+
+            LangAPI::StorageSymbol main_data;
+            main_data.what = std::move(main_call);
+            main_data.path.emplace_back("node");
+            main_data.path.emplace_back(LangAPI::FunctionCall {
+                .name = std::make_shared<LangAPI::Symbol>("data")
+            });
+
+            LangAPI::StorageSymbol tree;
+            tree.what = LangAPI::Symbol::createExpression(LangAPI::Symbol {"tree"});
+
+            auto parse_wrapper = LangAPI::Function {
+                .type = LangAPI::Type {LangAPI::ValueType::Void},
+                .name = std::move(name),
+                .statements = {
+                    LangAPI::VariableAssignment::createStatement(LangAPI::VariableAssignment {
+                        .name = tree,
+                        .value = LangAPI::StorageSymbol::createExpression(main_data)
+                    })
+                },
+                .override = true
+            };
+            parser.data.emplace_back(
+                std::make_shared<LangAPI::Declaration>(LangAPI::Function::createDeclaration(std::move(parse_wrapper))),
+                LangAPI::Visibility::Public
+            );
+        };
+        LangAPI::Expression lexer_reference;
+        lexer_reference.push_back(LangAPI::ExpressionElement::Multiply);
+        lexer_reference.push_back(LangAPI::Symbol::createRValue(LangAPI::Symbol {"lexer"}));
+        add_parse_wrapper("parseFromTokens", "iterator", {lexer_reference});
+        add_parse_wrapper("lazyParse", "lazy_iterator", {
+            lexer_reference,
+            LangAPI::Symbol::createExpression(LangAPI::Symbol {"text"})
+        });
         holder.push(parser);
     }
 }

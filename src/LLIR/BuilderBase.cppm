@@ -18,7 +18,7 @@ export namespace LLIR {
         static auto generateVariableName(std::size_t &variable_count) -> std::string;
         static auto createSuccessVariable(std::size_t &variable_count) -> LangAPI::Variable;
         static auto createAssignUvarBlock(LangAPI::Statements &statements, const LangAPI::Variable &uvar, const LangAPI::Variable &var, const LangAPI::Variable &shadow_var) -> void;
-        static auto createDefaultStatements(const LangAPI::Variable &var, const LangAPI::Variable &svar) -> LangAPI::Statements;
+        static auto createDefaultStatements(const LangAPI::Variable &var, const LangAPI::Variable &svar, stdu::vector<std::string> name = {}) -> LangAPI::Statements;
         static auto createDefaultStatements(const LangAPI::Variable &svar) -> LangAPI::Statements;
         static auto createDefaultStatements() -> LangAPI::Statements;
         static auto createDefaultCall(LangAPI::Statements &block, const LangAPI::Variable &var, const std::string &name, LangAPI::Expression &expr) -> LangAPI::Statement;
@@ -51,7 +51,7 @@ export namespace LLIR {
         auto addPostLoopCheck(const AST::RuleMember &rule, const LangAPI::Variable &var, bool addError = true) -> void;
         auto handle_plus_qualifier(const AST::RuleMember &rule, LangAPI::ConditionalElement loop, const LangAPI::Variable &uvar, const LangAPI::Variable &var, LangAPI::Variable &shadow_var, bool addError = true) -> void;
         auto add_shadow_variable(LangAPI::Statements &block, LangAPI::Statements &statements, const LangAPI::Variable &var) -> LangAPI::Variable;
-        virtual auto pushBasedOnQualifier(const AST::RuleMember &rule, LangAPI::Expression &expr, LangAPI::Statements &stmt, LangAPI::Variable &uvar, const LangAPI::Variable &var, const LangAPI::Variable &svar, char quantifier, bool add_shadow_var) -> LangAPI::Variable;
+        virtual auto pushBasedOnQualifier(const AST::RuleMember &rule, LangAPI::Expression &expr, LangAPI::Statements &stmt, LangAPI::Variable &uvar, const LangAPI::Variable &var, const LangAPI::Variable &svar, char quantifier, bool add_shadow_var, stdu::vector<std::string> name = {}) -> LangAPI::Variable;
         void pushConvResult(const AST::RuleMember &rule, const LangAPI::Variable &var, const LangAPI::Variable &uvar, const LangAPI::Variable &svar, const LangAPI::Variable &shadow_var, char quantifier);
         // error handling functions
         auto getNextTerminal(stdu::vector<std::shared_ptr<AST::RuleMember>> symbols, std::size_t pos) ->  std::set<stdu::vector<std::string>>;

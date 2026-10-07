@@ -17,6 +17,7 @@ export namespace LangRepr {
     public:
         auto createParserClass(std::string main_node = "main") -> LangAPI::Class;
         auto finalizeReturnStatement(const LangAPI::Statement &stmt) -> LangAPI::Statement;
+        auto finalizeTypes(const LangAPI::Statement &stmt) -> LangAPI::Statement;
 
         auto constructTokenMachineDFA(LangAPI::Class &parser_class) -> void;
 

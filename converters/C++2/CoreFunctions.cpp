@@ -21,6 +21,8 @@ auto Core::isNestedArrayType(const LangAPI::Type &t) -> bool {
     }
     return false;
 }
+auto Tokens() { return "::" + Core::name + "::Tokens"; }
+auto Rules() { return "::" + Core::name + "::Rules"; }
 auto Core::convertType(const LangAPI::Type &type) -> std::string {
     if (type.isValueType()) {
         switch (type.getValueType()) {
@@ -55,11 +57,11 @@ auto Core::convertType(const LangAPI::Type &type) -> std::string {
             case LangAPI::ValueType::Map:
                 return std::string("std::unordered_map<") + convertTemplates(type.template_parameters) + ">";
             case LangAPI::ValueType::Token:
-                return std::string("::ISPA_STD::Node<Tokens, ") + convertTemplates(type.template_parameters) + ">";
+                return std::string("::ISPA_STD::Node<" + Tokens() + ", ") + convertTemplates(type.template_parameters) + ">";
             case LangAPI::ValueType::Rule:
-                return std::string("::ISPA_STD::Node<Rules, ") + convertTemplates(type.template_parameters) + ">";
+                return std::string("::ISPA_STD::Node<" + Rules() + ", ") + convertTemplates(type.template_parameters) + ">";
             case LangAPI::ValueType::TokenResult:
-                return std::string("::ISPA_STD::MatchResult<Tokens, ") + convertTemplates(type.template_parameters) + ">";
+                return std::string("::ISPA_STD::MatchResult<<" + Tokens() + ", ") + convertTemplates(type.template_parameters) + ">";
             case LangAPI::ValueType::RuleResult:
                 return std::string("::ISPA_STD::MatchResult<Rules, ") + convertTemplates(type.template_parameters) + ">";
             case LangAPI::ValueType::Variant:
@@ -75,9 +77,7 @@ auto Core::convertType(const LangAPI::Type &type) -> std::string {
                 throw Error("Unknown type");
         }
     } else if (type.isSymbol()) {
-        auto sym = convertSymbol(type.getSymbol());
-        if (sym == "std::any") return "Tokens";
-        return sym;
+        return convertSymbol(type.getSymbol());
     } else if (type.isIspaLibSymbol()) {
         return convertIspaLibSymbol(type.getIspaLibSymbol());
     } else throw Error("unknown variant type in Type::type");
@@ -160,6 +160,10 @@ auto Core::convertStorageSymbol(const LangAPI::StorageSymbol &symbol) -> std::st
             res += ")";
         } else if (std::holds_alternative<LangAPI::StorageOffset>(part)) {
             res += "[" + convertExpression(std::get<LangAPI::StorageOffset>(part).offset) + "]";
+        } else if (std::holds_alternative<LangAPI::Property>(part)) {
+            res += std::get<LangAPI::Property>(part).name + "()";
+        } else if (std::holds_alternative<LangAPI::IspaLibSymbol>(part)) {
+            res += convertIspaLibSymbol(std::get<LangAPI::IspaLibSymbol>(part));
         } else {
             // Append function call to the current storage symbol chain
             res += convertFunctionCall(std::get<LangAPI::FunctionCall>(part), true);
@@ -171,10 +175,12 @@ auto Core::convertIspaLibSymbol(const LangAPI::IspaLibSymbol &symbol) -> std::st
     switch (symbol.exports) {
         case LangAPI::StdlibExports::Node:
             return std::string("::ISPA_STD::Node<") + convertTemplates(symbol.template_parameters) + ">";
+        case LangAPI::StdlibExports::MatchResult:
+            return std::string("::ISPA_STD::MatchResult<") + convertTemplates(symbol.template_parameters) + ">";
         case LangAPI::StdlibExports::Lexer:
-            return std::string("::ISPA_STD::Lexer_base") + (symbol.template_parameters.empty() ? "" : ("<Tokens, " + convertTemplates(symbol.template_parameters) + ">"));
+            return std::string("::ISPA_STD::Lexer_base") + (symbol.template_parameters.empty() ? "" : ("<" + Tokens() + ", " + convertTemplates(symbol.template_parameters) + ">"));
         case LangAPI::StdlibExports::Parser:
-            return std::string("::ISPA_STD::LLParser_base<Tokens, Rules") + (symbol.template_parameters.empty() ? "" : ", " + convertTemplates(symbol.template_parameters)) + ">";
+            return std::string("::ISPA_STD::LLParser_base<") + Tokens() + ", " + Rules() + (symbol.template_parameters.empty() ? "" : ", " + convertTemplates(symbol.template_parameters)) + ">";
         case LangAPI::StdlibExports::LexerMakeTokenParameter:
             return (symbol.Const ? "const " : "") + std::string("char*") + (symbol.Reference ? "&" : "");
         case LangAPI::StdlibExports::ParserFunctionParameter:
@@ -192,15 +198,21 @@ auto Core::convertIspaLibSymbol(const LangAPI::IspaLibSymbol &symbol) -> std::st
         case LangAPI::StdlibExports::Error:
             return "std::runtime_error";
         case LangAPI::StdlibExports::TokenNodeConstruct:
-            return "::ISPA_STD::Node<Tokens, " + convertTemplates(symbol.template_parameters) + ">::create";
+            return "::ISPA_STD::Node<" + Tokens() + ", " + convertTemplates(symbol.template_parameters) + ">::create";
         case LangAPI::StdlibExports::ParserNodeConstructor:
-            return "::ISPA_STD::Node<Rules, " + convertTemplates(symbol.template_parameters) + ">::create";
+            return "::ISPA_STD::Node<" + Rules() + ", " + convertTemplates(symbol.template_parameters) + ">::create";
         case LangAPI::StdlibExports::DFADebug:
             return "::ISPA_STD::DFA::API::DFADebug";
         case LangAPI::StdlibExports::TdfaLayout:
             return "::ISPA_STD::DFA::API::TdfaLayout<" + convertTemplates(symbol.template_parameters) + ">";
         case LangAPI::StdlibExports::DfaCaptures:
             return (symbol.Const ? "const " : "") + std::string("::ISPA_STD::DFA::API::Captures") + (symbol.Reference ? "&" : "");
+        case LangAPI::StdlibExports::ASTPrinter:
+            return "::ISPA_STD::ASTPrinter";
+        case LangAPI::StdlibExports::Concat:
+            return "::ISPA_STD::concat";
+        case LangAPI::StdlibExports::MatchResultValue:
+            return "node";
         default:
             throw Error("Unknown IspaLibSymbol exports: {}", (int) symbol.exports);
     }
@@ -271,8 +283,8 @@ auto Core::convertExpression(const LangAPI::Expression &expression) -> std::stri
             case LangAPI::ExpressionValueType::CounterIncreament:
                 out << std::string("++") + counter.back();
                 break;
-            case LangAPI::ExpressionValueType::CounterIncreamentByLength:
-                out << counter.back() + " += " + expr.getCounterIncreamentByLength().name + ".token.length()";
+            case LangAPI::ExpressionValueType::CounterAssignment:
+                out << counter.back() + " = " + convertExpression(*expr.getCounterAssignment().v);
                 break;
             case LangAPI::ExpressionValueType::ResetPosCounter:
                 counter.pop_back();
@@ -289,7 +301,7 @@ auto Core::convertExpression(const LangAPI::Expression &expression) -> std::stri
                 break;
             }
             case LangAPI::ExpressionValueType::SkipSpaces:
-                out << "skip_spaces(" << counter.back() << ")";
+                out << "skip_spaces<Types::__WS>(" << counter.back() << ")";
                 break;
             case LangAPI::ExpressionValueType::DfaLookup: {
                 const auto &lookup = expr.getDfaLookup();
@@ -624,9 +636,10 @@ auto Core::convertRValue(const LangAPI::RValue &rvalue) -> std::string {
         case LangAPI::RValueType::Pos: {
             const auto &counter_data = rvalue.getPos();
             std::string res;
-            if (counter_data.dereference) res += "*";
+            if (counter_data.dereference) res += "(*";
             if (counter_data.offset != 0) res += "(" + counter.back() + " + " + std::to_string(counter_data.offset) + ")";
-            else                          res += counter.back();
+            else                          res +=  counter.back();
+            if (counter_data.dereference) res += ")";
             return res;
         }
         case LangAPI::RValueType::Symbol:
@@ -732,8 +745,12 @@ auto Core::convertRValue(const LangAPI::RValue &rvalue) -> std::string {
             return convertGetVariant(rvalue.getVariantCast());
         case LangAPI::RValueType::CheckVariant:
             return "std::holds_alternative<" + convertType(*rvalue.CheckVariantCast().type) + ">(" + convertExpression(rvalue.CheckVariantCast().sym) + ")";
+        case LangAPI::RValueType::ToString:
+            return "std::to_string(" + convertExpression(rvalue.getToString().what) + ")";
         case LangAPI::RValueType::CharToStringConstructor:
             return "std::string(1, " + convertExpression(rvalue.getCharToStringConstructor().what) + ")";
+        case LangAPI::RValueType::GetFromBox:
+            return "(*" + convertExpression(rvalue.getGetFromBox().what) + ")";
         default:
             throw Error("Unknown RValue type: {}", (int) rvalue.type());
     }

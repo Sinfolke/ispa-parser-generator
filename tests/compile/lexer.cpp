@@ -10,18 +10,15 @@ int main(int argc, const char** argv) {
     }
     Parser::Lexer lexer;
     auto tokens = lexer.makeTokens(argv[1]);
-    // for (auto token : tokens) {
-    //     std::cout << token.index() << "\n";
-    //     if (std::holds_alternative<ISPA_STD::Node<Parser::Tokens, Parser::Types::INTEGER>>(token)) {
-    //         const auto tt = std::get<ISPA_STD::Node<Parser::Tokens, Parser::Types::INTEGER>>(token);
-    //         std::cout << "INTEGER { " << tt.value << " }\n";
-    //     } else if (std::holds_alternative<ISPA_STD::Node<Parser::Tokens, Parser::Types::ID>>(token)) {
-    //         const auto tt = std::get<ISPA_STD::Node<Parser::Tokens, Parser::Types::ID>>(token);
-    //         std::cout << "ID {" << tt.value << "}\n";
-    //     } else if (std::holds_alternative<ISPA_STD::Node<Parser::Tokens, Parser::Types::__WS>>(token)) {
-    //         std::cout << "WHITESPACE{}\n";
-    //     }
-    // }
+    for (const auto &token : tokens) {
+        std::visit([](const auto token){
+            if constexpr (std::is_same_v<std::decay_t<decltype(token)>, std::monostate>) {
+                std::cout << "<EOF>" << std::endl;
+            } else {
+                std::cout << token << std::endl;
+            }
+        }, token);
+    }
 }
 // int main() {
 //     Parser::Lexer lexer;

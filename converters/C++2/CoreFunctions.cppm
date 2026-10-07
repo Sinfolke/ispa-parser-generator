@@ -25,7 +25,7 @@ export namespace Core {
     bool is_directed_to_source = false;
     bool inside_array = false;
     std::stringstream init_content;
-
+    stdu::vector<LangAPI::Function*> output_operators;
     // helper
     auto isNestedArrayType(const LangAPI::Type &t) -> bool;
 

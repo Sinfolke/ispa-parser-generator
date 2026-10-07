@@ -66,40 +66,40 @@
  * 
 */
 namespace ISPA_STD {
-/**
- * @brief An error thrown when you're trying to access some features required with tokens only
- *
- */
-class Lexer_No_Tokens_exception : public std::exception {
+    /**
+     * @brief An error thrown when you're trying to access some features required with tokens only
+     *
+     */
+    class Lexer_No_Tokens_exception : public std::exception {
     public:
-    const char* what() const noexcept override {
-        return ISC_STD_LIBMARK "Lexer_No_Tokens_exception: the tokenizator has no tokens but some operation required them";
-    }
-};
-class Lexer_No_Input_exception : public std::exception {
+        const char* what() const noexcept override {
+            return ISC_STD_LIBMARK "Lexer_No_Tokens_exception: the tokenizator has no tokens but some operation required them";
+        }
+    };
+    class Lexer_No_Input_exception : public std::exception {
     public:
-    const char* what() const noexcept override {
-        return ISC_STD_LIBMARK "Lexer_No_Input_exception: the tokenizator has no input provided but the operation required it";
-    }
-};
-class Parser_No_Input_exception : public std::exception {
+        const char* what() const noexcept override {
+            return ISC_STD_LIBMARK "Lexer_No_Input_exception: the tokenizator has no input provided but the operation required it";
+        }
+    };
+    class Parser_No_Input_exception : public std::exception {
     public:
-    const char* what() const noexcept override {
-        return ISC_STD_LIBMARK "Parser_No_Input_exception: the parser has no input provided but the operation required it";
-    }
-};
-class AdvancedDFA_exception : public std::exception {
-    std::string message;
-public:
-    AdvancedDFA_exception(const char* message) {
-        this->message = "ispastdlib Internal Error in Advanced DFA: ";
-        this->message += message;
-    }
-    [[nodiscard]] auto what() const noexcept -> const char* override {
-        return message.c_str();
-    }
-};
-class node_exception : public std::exception {
+        const char* what() const noexcept override {
+            return ISC_STD_LIBMARK "Parser_No_Input_exception: the parser has no input provided but the operation required it";
+        }
+    };
+    class AdvancedDFA_exception : public std::exception {
+        std::string message;
+    public:
+        AdvancedDFA_exception(const char* message) {
+            this->message = "ispastdlib Internal Error in Advanced DFA: ";
+            this->message += message;
+        }
+        [[nodiscard]] auto what() const noexcept -> const char* override {
+            return message.c_str();
+        }
+    };
+    class node_exception : public std::exception {
     private:
         std::string mes;
         void fill(const std::string& method) {
@@ -127,13 +127,13 @@ class node_exception : public std::exception {
     public:
         node_exception(const char* method) {  fill(method);  }
         node_exception() {  fill();  }
-    const char* what() const noexcept override {
-        return mes.c_str();
-    }
-};
-// prior C++20 span type
-template<typename T>
-class Span {
+        const char* what() const noexcept override {
+            return mes.c_str();
+        }
+    };
+    // prior C++20 span type
+    template<typename T>
+    class Span {
     public:
         using value_type = T;
         using pointer = T*;
@@ -176,125 +176,250 @@ class Span {
     private:
         pointer data_;
         size_type size_;
-};
-template<class TOKEN_T, const char* (*ToString)(TOKEN_T)>
-class bad_get : public std::bad_cast {
-    TOKEN_T required_name;
-    TOKEN_T get_name;
-    std::string message; // cache the message for `what()`
-public:
-    bad_get(TOKEN_T required_name, TOKEN_T get_name, std::string namespace_name = "<Parser>")
-        : required_name(required_name), get_name(get_name) {
-        message = std::string("Expected ") + namespace_name + "::get::" + ToString(required_name) + "(), but got " + namespace_name + "::get::" + ToString(get_name) + "()";
-    }
-
-    const char* what() const noexcept override {
-        return message.c_str();
-    }
-};
-template<typename T>
-std::ostream& operator<<(std::ostream& os, const Span<T>& span) {
-    os << "[";
-    for (auto i = 0; i < span.size(); ++i) {
-        if (i != 0) os << ", ";
-        os << span[i];
-    }
-    os << "]";
-    return os;
-}
-template<typename T, std::size_t N>
-std::ostream& operator<<(std::ostream& os, const std::array<T, N>& arr) {
-    os << "[";
-    for (auto i = 0; i < arr.size(); ++i) {
-        if (i != 0) os << ", ";
-        os << arr[i];
-    }
-    os << "]";
-    return os;
-}
-template<typename T>
-std::ostream& operator<<(std::ostream& os, const std::vector<T>& arr) {
-    os << "[";
-    for (auto i = 0; i < arr.size(); ++i) {
-        if (i != 0) os << ", ";
-        os << arr[i];
-    }
-    os << "]";
-    return os;
-}
-template<class EnumT, class DataStorageType, class = std::enable_if_t<std::is_class_v<DataStorageType>>>
-class Node : public DataStorageType {
-    std::size_t _startpos = std::string::npos;
-    std::size_t _length = 0;
-    std::size_t _line = 0;
-    std::size_t _column = 0;
-    const char* _start = nullptr;
-    const char* _end = nullptr;
-    EnumT _name = EnumT::NONE;
-    bool _empty = false;
-public:
-    Node(const std::size_t startpos, const char* start, const char* end, std::size_t length, std::size_t line, std::size_t column, EnumT name)
-        : _startpos(startpos), _start(start), _end(end), _length(length), _line(line), _column(column), _name(name) {}
-    template<class  ...Args, class = std::enable_if_t<std::is_constructible_v<DataStorageType, Args...>>>
-    Node(const std::size_t startpos, const char* start, const char* end, std::size_t length, std::size_t line, std::size_t column, EnumT name, Args&& ...args)
-        : _startpos(startpos), _start(start), _end(end), _length(length), _line(line), _column(column), _name(name), DataStorageType(std::forward<Args>(args)...) {}
-    Node(const std::size_t startpos, const char* start, const char* end, std::size_t length, std::size_t line, std::size_t column, EnumT name, DataStorageType data)
-        : _startpos(startpos), _start(start), _end(end), _length(length), _line(line), _column(column), _name(name), DataStorageType(data) {}
-    Node() : _empty(true) {}
-
-    Node(const Node&) = default;
-    Node(Node&&) noexcept = default;
-
-    Node& operator=(const Node&) = default;
-    Node& operator=(Node&&) noexcept = default;
-    /**
-     * @brief Get the end position based on startpos and length
-     *
-     * @return long long
-     */
-    std::size_t endpos() const {
-        if (_startpos == std::string::npos || _end == nullptr || _start == nullptr)
-            throw node_exception("endpos");
-        return _startpos + (_end - _start);
-    }
-    /* clear rule */
-    void clear() {
-        _startpos = std::string::npos;
-        _line = 0;
-        _column = 0;
-        _length = 0;
-        _start = nullptr;
-        _end = nullptr;
-        _name = EnumT::NONE;
-        _empty = true;
-    }
-    auto empty() const { return _empty; }
-    auto startpos() const { return _startpos; }
-    auto line() const { return _line; }
-    auto column() const{ return _column; }
-    auto length() const { return _length; }
-    auto start() const { return _start; }
-    auto end() const { return _end; }
-    auto name() const { return _name; }
-    auto& data() { return static_cast<DataStorageType&>(*this); }
-    const auto& data() const { return static_cast<const DataStorageType&>(*this); }
-    static auto create(const long long startpos, const char* start, const long long length, const long long line, EnumT enumv, DataStorageType t) {
-        std::size_t column = 0;
-        for (const char* count = start; start - count != startpos && *count != '\n'; --count) {
-            ++column;
+    };
+    template<class TOKEN_T, const char* (*ToString)(TOKEN_T)>
+    class bad_get : public std::bad_cast {
+        TOKEN_T required_name;
+        TOKEN_T get_name;
+        std::string message; // cache the message for `what()`
+    public:
+        bad_get(TOKEN_T required_name, TOKEN_T get_name, std::string namespace_name = "<Parser>")
+            : required_name(required_name), get_name(get_name) {
+            message = std::string("Expected ") + namespace_name + "::get::" + ToString(required_name) + "(), but got " + namespace_name + "::get::" + ToString(get_name) + "()";
         }
-        return Node {(std::size_t) startpos, start, start + length, (std::size_t) length, (std::size_t) line, column, enumv, std::move(t)};
+
+        const char* what() const noexcept override {
+            return message.c_str();
+        }
+    };
+    template<typename T>
+    std::ostream& operator<<(std::ostream& os, const Span<T>& span) {
+        os << "[";
+        for (auto i = 0; i < span.size(); ++i) {
+            if (i != 0) os << ", ";
+            os << span[i];
+        }
+        os << "]";
+        return os;
     }
-};
-template<class EnumT, class DataStorageType>
-struct MatchResult {
-    bool status = false;
-    Node<EnumT, DataStorageType> node = {};
-};
-template<class TOKEN_T, typename Token>
-using TokenFlow = std::vector<Token>;
-template<class RULE_T, class DataStorageType>
-using Seq = std::vector<Node<RULE_T, DataStorageType>>;
+    template<typename T, std::size_t N>
+    std::ostream& operator<<(std::ostream& os, const std::array<T, N>& arr) {
+        os << "[";
+        for (auto i = 0; i < arr.size(); ++i) {
+            if (i != 0) os << ", ";
+            os << arr[i];
+        }
+        os << "]";
+        return os;
+    }
+    template<typename T>
+    std::ostream& operator<<(std::ostream& os, const std::vector<T>& arr) {
+        os << "[";
+        for (auto i = 0; i < arr.size(); ++i) {
+            if (i != 0) os << ", ";
+            os << arr[i];
+        }
+        os << "]";
+        return os;
+    }
+
+    /*
+     * An AST print API that simply generator's work on every language internals
+     */
+    template<typename OS>
+    class ASTPrinter {
+    public:
+        explicit ASTPrinter(OS* out = nullptr)
+            : out(out) {}
+
+        explicit ASTPrinter(OS& out)
+            : out(&out) {}
+
+        void set_output(OS* output) {
+            out = output;
+        }
+
+        void up(bool has_more_siblings = true) {
+            ++depth;
+            branches.push_back(has_more_siblings);
+        }
+
+        void down() {
+            if (depth > 0)
+                --depth;
+
+            if (!branches.empty())
+                branches.pop_back();
+        }
+
+        void node(const char* name, bool last = false) {
+            print_prefix(last);
+            *out << name << '\n';
+        }
+
+        template<typename T>
+        void node_with_value(
+            const char* name,
+            const T& value,
+            bool last = false)
+        {
+            print_prefix(last);
+            *out << name << ": " << value << '\n';
+        }
+        template<typename T>
+        void write(const T& value, bool last = false) {
+            print_prefix(last);
+            *out << value;
+        }
+    private:
+        void print_prefix(bool last) {
+            if (depth == 0)
+                return;
+
+            // Print indentation / continuation lines for parent levels.
+            for (std::size_t i = 0; i + 1 < depth; ++i) {
+                if (i < branches.size() && branches[i])
+                    *out << "│   ";
+                else
+                    *out << "    ";
+            }
+
+            // Current node.
+            *out << (last ? "└" : "├");
+        }
+
+    private:
+        OS* out = nullptr;
+        std::size_t depth = 0;
+        std::vector<bool> branches;
+    };
+    template<class EnumT, class DataStorageType, class = std::enable_if_t<std::is_class_v<DataStorageType>>>
+    class Node {
+        std::size_t _startpos = std::string::npos;
+        std::size_t _length = 0;
+        std::size_t _line = 0;
+        std::size_t _column = 0;
+        const char* _start = nullptr;
+        const char* _end = nullptr;
+        EnumT _name = EnumT::NONE;
+        bool _empty = false;
+        DataStorageType _data;
+    public:
+        Node(const std::size_t startpos, const char* start, const char* end, std::size_t length, std::size_t line, std::size_t column, EnumT name)
+            : _startpos(startpos), _start(start), _end(end), _length(length), _line(line), _column(column), _name(name) {}
+        template<class  ...Args, class = std::enable_if_t<std::is_constructible_v<DataStorageType, Args...>>>
+        Node(const std::size_t startpos, const char* start, const char* end, std::size_t length, std::size_t line, std::size_t column, EnumT name, Args&& ...args)
+            : _startpos(startpos), _start(start), _end(end), _length(length), _line(line), _column(column), _name(name), _data(std::forward<Args>(args)...) {}
+        Node(const std::size_t startpos, const char* start, const char* end, std::size_t length, std::size_t line, std::size_t column, EnumT name, DataStorageType data)
+            : _startpos(startpos), _start(start), _end(end), _length(length), _line(line), _column(column), _name(name), _data(data) {}
+        Node() : _empty(true) {}
+
+        Node(const Node&) = default;
+        Node(Node&&) noexcept = default;
+
+        Node& operator=(const Node&) = default;
+        Node& operator=(Node&&) noexcept = default;
+        /**
+         * @brief Get the end position based on startpos and length
+         *
+         * @return long long
+         */
+        std::size_t endpos() const {
+            if (_startpos == std::string::npos || _end == nullptr || _start == nullptr)
+                throw node_exception("endpos");
+            return _startpos + (_end - _start);
+        }
+        /* clear rule */
+        void clear() {
+            _startpos = std::string::npos;
+            _line = 0;
+            _column = 0;
+            _length = 0;
+            _start = nullptr;
+            _end = nullptr;
+            _name = EnumT::NONE;
+            _empty = true;
+        }
+        auto empty() const { return _empty; }
+        auto startpos() const { return _startpos; }
+        auto line() const { return _line; }
+        auto column() const{ return _column; }
+        auto length() const { return _length; }
+        auto start() const { return _start; }
+        auto end() const { return _end; }
+        auto name() const { return _name; }
+        auto &data() { return _data; }
+        auto &data() const { return _data; }
+        static auto create(const long long startpos, const char* start, const long long length, const long long line, EnumT enumv, DataStorageType t) {
+            std::size_t column = 0;
+            for (const char* count = start; start - count != startpos && *count != '\n'; --count) {
+                ++column;
+            }
+            return Node {(std::size_t) startpos, start, start + length, (std::size_t) length, (std::size_t) line, column, enumv, std::move(t)};
+        }
+        // Nested nodes render into the caller's printer, retaining its depth.
+        auto print(ASTPrinter<std::ostream> &printer) const {
+            if constexpr (std::is_pointer_v<DataStorageType>) {
+                if (_data) {
+                    _data->write_to_output(printer);
+                }
+            } else {
+                _data.write_to_output(printer);
+            }
+        }
+        auto print(std::ostream &os) const {
+            os << _data;
+        }
+        // equivalent to to_string method of AST node struct
+        auto to_string() const {
+            return _data.to_string();
+        }
+    };
+    template<typename ENUM_T, typename NodeType>
+    auto operator<<(std::ostream &os, const Node<ENUM_T, NodeType> &node) -> std::ostream& {
+        node.print(os);
+        return os;
+    }
+    template<class EnumT, class DataStorageType, class IT>
+    struct MatchResult {
+        bool status = false;
+        Node<EnumT, DataStorageType> node = {};
+        IT it;
+    };
+    template<class TOKEN_T, typename Token>
+    using TokenFlow = std::vector<Token>;
+    template<class RULE_T, class DataStorageType>
+    using Seq = std::vector<Node<RULE_T, DataStorageType>>;
+// Helper to convert individual types into std::string
+template <typename T>
+std::string to_string_helper(T&& val) {
+    using UnrefT = std::remove_reference_t<T>;
+
+    if constexpr (std::is_same_v<UnrefT, std::string>) {
+        return std::forward<T>(val);
+    } else if constexpr (std::is_convertible_v<T, std::string_view>) {
+        return std::string(std::string_view(val));
+    } else if constexpr (std::is_same_v<UnrefT, char>) {
+        return std::string(1, val);
+    } else if constexpr (std::is_same_v<UnrefT, bool>) {
+        return val ? "true" : "false";
+    } else if constexpr (std::is_arithmetic_v<UnrefT>) {
+        return std::to_string(val);
+    } else {
+        static_assert(!sizeof(T*), "concat: unsupported type");
+    }
+}
+
+// Base case: zero arguments
+inline std::string concat() {
+    return {};
+}
+
+// Variadic concatenation using C++17 fold expressions
+template <typename... Args>
+std::string concat(Args&&... args) {
+    return (to_string_helper(std::forward<Args>(args)) + ...);
+}
 namespace DFA::API {
     struct DFADebug;
     inline auto null_state = std::numeric_limits<std::size_t>::max();
@@ -672,18 +797,19 @@ public:
         void advance() {
             if (isEnd()) return;
             current = owner->makeToken(pos);
-            if (!current.empty()) counter++;
+            if (!isEnd()) counter++;
         }
 
     public:
+        lazy_iterator() = default;
         lazy_iterator(Lexer_base& owner, const char* in) : owner(&owner), pos(in) {
             current = owner.makeToken(pos);
-            counter = current.empty() ? 0 : 1;
+            counter = !std::holds_alternative<std::monostate>(current);
         }
         lazy_iterator(const lazy_iterator& other)
             : owner(other.owner), current(other.current), pos(other.pos), counter(other.counter) {}
 
-        bool isEnd() const { return current.empty(); }
+        bool isEnd() const { return std::holds_alternative<std::monostate>(current); }
 
         lazy_iterator& operator=(const lazy_iterator& other) {
             if (this != &other) {
@@ -698,8 +824,8 @@ public:
         lazy_iterator operator++(int) { auto tmp = *this; advance(); return tmp; }
         void operator+=(std::size_t count) { while (count-- > 0 && !isEnd()) advance(); }
 
-        ptrdiff_t operator-(const lazy_iterator& other) const {
-            return static_cast<ptrdiff_t>(counter) - static_cast<ptrdiff_t>(other.counter);
+        std::ptrdiff_t operator-(const lazy_iterator& other) const {
+            return static_cast<std::ptrdiff_t>(counter) - static_cast<std::ptrdiff_t>(other.counter);
         }
         const Token& operator*() const { return current; }
         const Token* operator->() const { return &current; }
@@ -712,6 +838,7 @@ public:
         typename TokenFlow<TOKEN_T, Token>::iterator pos;
 
     public:
+        iterator() = default;
         iterator(Lexer_base& owner) : owner(&owner), pos(owner.tokens.begin()) {}
 
         iterator& operator=(const iterator& other) { owner = other.owner; pos = other.pos; return *this; }
@@ -819,33 +946,25 @@ protected:
     const char* text = nullptr;
     MainNode tree;
     // skip spaces for tokens
-    template <class IT>
-    std::size_t skip_spaces(IT& pos) {
-        auto prev = pos;
-        while (pos->name() == TOKEN_T::__WHITESPACE)
+    template <typename SpaceTokenType, typename IT>
+    void skip_spaces(IT& pos) {
+        while (std::holds_alternative<Node<TOKEN_T, SpaceTokenType>>(*pos))
             ++pos;
-        
-        return pos - prev;
     }
     static void PANIC_MODE() {}
 public:
-    virtual MatchResult<RULE_T, Token> getRule(typename Lexer_base<TOKEN_T, Token>::lazy_iterator &pos) = 0;
-    virtual MatchResult<RULE_T, Token> getRule(typename Lexer_base<TOKEN_T, Token>::iterator &pos) = 0;
     virtual void parseFromTokens() = 0;
     virtual void lazyParse() = 0;
     // Constructors
     LLParser_base() {}
-    LLParser_base(const Lexer_base<TOKEN_T, Token>& lexer) {
-        if (lexer.hasTokens())
-            this->lexer = &lexer;
+    LLParser_base(Lexer_base<TOKEN_T, Token>& lexer) {
+        this->lexer = &lexer;
     }
     LLParser_base(const char* text) : text(text) {}
     virtual ~LLParser_base() {}
     // Parsing methods
     MainNode& parse(Lexer_base<TOKEN_T, Token>& lex) {
-        if (lex.hasTokens()) {
-            lexer = &lex;
-        }
+        lexer = &lex;
         return parse();
     }
     MainNode& parse(const char* txt) {
@@ -870,6 +989,8 @@ public:
      */
     MainNode& parse() {
         if (lexer != nullptr) {
+            if (!lexer->hasInput())
+                lexer->makeTokens();
             parseFromTokens();
         } else if (text != nullptr) {
             lazyParse();
@@ -903,12 +1024,6 @@ protected:
 
         std::size_t next_state = goto_entry.value();
         stack.push_back({rule_name, next_state});
-    }
-    MatchResult<RULE_T, Token> getRule(typename Lexer_base<TOKEN_T, Token>::lazy_iterator &pos) {
-        return {};
-    }
-    MatchResult<RULE_T, Token> getRule(typename Lexer_base<TOKEN_T, Token>::iterator &pos) {
-        return {};
     }
     virtual std::string TokensToString(TOKEN_T token) = 0;
     virtual std::string RulesToString(RULE_T rule) = 0;

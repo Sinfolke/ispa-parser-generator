@@ -19,8 +19,10 @@ export namespace Cpp {
         auto closeClass() -> void override;
         auto createForwardDeclarationClass(LangAPI::ForwardDeclaredClass forward_declared_class) -> void override;
         auto createFunction(const LangAPI::Function &func) -> void override;
+        auto createPrintFunction(const LangAPI::Function &func) -> void override;
         auto setVisibility(LangAPI::Visibility visibility) -> void override;
         auto closeFunction() -> void override;
+        auto closePrintFunction() -> void override;
         auto openTemplateParameters() -> void override;
         auto createTemplateParameter(const std::string &name) -> void override;
         auto closeTemplateParameters() -> void override;

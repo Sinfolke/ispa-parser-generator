@@ -4,6 +4,7 @@ import Cpp.Statement;
 import Cpp.CoreFunctions;
 import corelib;
 import logging;
+import cpuf.op;
 import std;
 
 namespace Cpp {
@@ -33,10 +34,12 @@ namespace Cpp {
     auto Declarations::createNamespace(const std::string &name) -> void {
         Core::output->writeln("namespace {} {", name);;
         Core::output->increaseIndentation();
+        Core::symbol_path.push_back(name);
     }
     auto Declarations::closeNamespace() -> void {
         Core::output->decreaseIndentation();
         Core::output->writeln("}");
+        Core::symbol_path.pop_back();
     }
     auto Declarations::createClass(const LangAPI::Class &the_class) -> void {
         Core::prev_visibility = the_class.default_visibility;
@@ -105,12 +108,12 @@ namespace Cpp {
             Core::output->pop_back();
             Core::output->pop_back();
         }
-        Core::output->dwrite(") -> {}{}", Core::convertType(func.type), func.override ? " override" : "");
+        Core::output->dwrite(") {}-> {}{}", func.is_const ? "const " : "", Core::convertType(func.type), func.override ? " override" : "");
         if (!func.statements.empty()) {
             if (func.template_parameters.empty()) {
                 Core::output->dwriteln(";");
                 Core::output = &Core::cpp_file;
-                Core::output->dwrite("auto {}::{} (", corelib::text::join(Core::symbol_path, "::"), func.name);
+                Core::output->dwrite("auto ::{}::{} (", corelib::text::join(Core::symbol_path, "::"), func.name);
                 if (!func.parameters.empty()) {
                     for (const auto &p : func.parameters) {
                         Core::output->dwrite("{} {}, ", Core::convertType(p.first), p.second);
@@ -118,6 +121,24 @@ namespace Cpp {
                     Core::output->pop_back();
                     Core::output->pop_back();
                 }
+                Core::output->dwrite(") {}-> {}", func.is_const ? "const " : "", Core::convertType(func.type));
+            }
+            Core::output->dwriteln("{");
+            Core::output->increaseIndentation();
+            Core::symbol_path.push_back(func.name);
+        } else {
+            Core::output->dwriteln(";");
+            Core::forward_declared = true;
+        }
+    }
+    auto Declarations::createPrintFunction(const LangAPI::Function &func) -> void {
+        Core::output->write("auto operator<<(std::ostream &os, const {} &{}) -> std::ostream&", Core::convertType(func.parameters.front().first), func.parameters.front().second);
+        if (!func.statements.empty()) {
+            if (func.template_parameters.empty()) {
+                Core::output->dwriteln(";");
+                Core::output = &Core::cpp_file;
+                Core::output->dwrite("auto {}::operator<<(std::ostream &os, const {} &{}) -> std::ostream&", corelib::text::join(Core::symbol_path, "::"), Core::convertType(func.parameters.front().first), func.parameters.front().second);
+            } else {
                 Core::output->dwrite(") -> {}", Core::convertType(func.type));
             }
             Core::output->dwriteln("{");
@@ -129,6 +150,17 @@ namespace Cpp {
         }
     }
     auto Declarations::closeFunction() -> void {
+        if (Core::forward_declared) {
+            Core::forward_declared = false;
+        } else {
+            Core::output->decreaseIndentation();
+            Core::output->write("}\n");
+            Core::symbol_path.pop_back();
+            Core::templated = false;
+            Core::output = &Core::h_file;
+        }
+    }
+    auto Declarations::closePrintFunction() -> void {
         if (Core::forward_declared) {
             Core::forward_declared = false;
         } else {
@@ -169,6 +201,7 @@ namespace Cpp {
         Core::output->writeln("};");
     }
     auto Declarations::createVariable(const LangAPI::Variable &v) -> void {
+        std::cout << "Symbol path: " << Core::symbol_path << std::endl;
         Core::output->write("{}{} {}", v.is_static ? "static " : "", Core::convertType(v.type), v.name);
         bool nested_array_type = v.nested_array_type || Core::isNestedArrayType(v.type);
         if (v.is_static) {
@@ -178,9 +211,7 @@ namespace Cpp {
                 }
             }
             if (!v.value.empty()) {
-                auto cpp_sym_path = Core::symbol_path;
-                cpp_sym_path.erase(cpp_sym_path.begin());
-                Core::cpp_file.writeln("{} {}::{} = {}{}{};", Core::convertType(v.type), corelib::text::join(cpp_sym_path, "::"), v.name, nested_array_type ? "{" : "", Core::convertExpression(v.value), nested_array_type ? "}" : "");
+                Core::cpp_file.writeln("{} {}::{} = {}{}{};", Core::convertType(v.type), corelib::text::join(Core::symbol_path, "::"), v.name, nested_array_type ? "{" : "", Core::convertExpression(v.value), nested_array_type ? "}" : "");
             }
         }
         Core::output->dwriteln(";");

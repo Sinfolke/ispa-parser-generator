@@ -18,6 +18,7 @@ export namespace LangRepr {
         const std::string &namespace_name;
         std::unique_ptr<::Converter::Declarations, void(*)(::Converter::Declarations*)> decls;
         std::unique_ptr<::Converter::Statement, void(*)(::Converter::Statement*)> stmts;
+        std::vector<const LangAPI::Function*> output_functions;
         void buildDeclaration(const LangAPI::Declaration &decl) {
             if (decl.isNamespace()) {
                 const auto &namespace_decl = decl.getNamespace();
@@ -31,7 +32,17 @@ export namespace LangRepr {
                     decls->setVisibility(visibility);
                     buildDeclaration(*declaration);
                 }
+                if (cls.to_str_fun) {
+                    decls->setVisibility(LangAPI::Visibility::Public);
+                    buildDeclaration(*cls.to_str_fun);
+                }
                 decls->closeClass();
+                // now output print function
+                if (cls.output_fun) {
+                    decls->createPrintFunction(*cls.output_fun);
+                    buildStatements(cls.output_fun->statements);
+                    decls->closePrintFunction();
+                }
             } else if (decl.isForwardDeclaredClass()) {
                 decls->createForwardDeclarationClass(decl.getForwardDeclaredClass());
             } else if (decl.isVariable()) {

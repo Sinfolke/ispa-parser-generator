@@ -33,7 +33,442 @@ auto collectReferencedNames(const LangAPI::Type &type) -> std::pair<utype::unord
     walk(type, false);
     return std::make_pair(out, to_forward_declare);
 }
+
 namespace LangRepr {
+    // A member's name plus its declared LangAPI type.
+    struct MemberInfo {
+        std::string name;
+        LangAPI::Type type;
+    };
+
+    // Returns true when the type represents a generated AST node.
+    auto isNodeType(const LangAPI::Type& type) -> bool {
+        if (!type.isValueType())
+            return false;
+
+        const auto value_type = type.getValueType();
+
+        if (value_type == LangAPI::ValueType::Token ||
+               value_type == LangAPI::ValueType::Rule) {
+            return true;
+        }
+        if (value_type == LangAPI::ValueType::Box) {
+            return isNodeType(std::get<LangAPI::Type>(type.template_parameters.front()));
+        }
+        return false;
+    }
+
+    // Returns the wrapped node type if `type` is a wrapper around a node.
+    //
+    // This helper deliberately only reasons about LangAPI semantics.
+    // The backend is responsible for deciding how the wrapper is represented
+    // in the target language.
+    auto nodeInnerType(const LangAPI::Type& type) -> const LangAPI::Type* {
+        if (!type.isValueType())
+            return nullptr;
+
+        if (type.getValueType() != LangAPI::ValueType::Box)
+            return nullptr;
+
+        if (type.template_parameters.empty())
+            return nullptr;
+
+        const auto& parameter = type.template_parameters.front();
+
+        if (!std::holds_alternative<LangAPI::Type>(parameter))
+            return nullptr;
+
+        const auto& inner = std::get<LangAPI::Type>(parameter);
+
+        return isNodeType(inner) ? &inner : nullptr;
+    };
+    // Returns the wrapped node type if `t` is a wrapper around a node.
+    auto boxedNodeInnerType(const LangAPI::Type &t) -> const LangAPI::Type* {
+        if (!t.isValueType() || t.getValueType() != LangAPI::ValueType::Box || t.template_parameters.empty())
+            return nullptr;
+        const auto &param = t.template_parameters.front();
+        if (!std::holds_alternative<LangAPI::Type>(param))
+            return nullptr;
+        const auto &inner = std::get<LangAPI::Type>(param);
+        return isNodeType(inner) ? &inner : nullptr;
+    }
+    // Create an expression referencing a member.
+    auto memberExpression(const std::string& member) -> LangAPI::Expression {
+        return LangAPI::Symbol::createExpression(
+            LangAPI::Symbol{member}
+        );
+    }
+
+    // Convert an arbitrary LangAPI value into its textual representation.
+    //
+    // This is deliberately a semantic LangAPI operation. The generator does
+    // not decide whether the target language uses:
+    //
+    //     std::to_string(value)
+    //     value.to_string()
+    //     str(value)
+    //     String.valueOf(value)
+    //     ...
+    //
+    // That decision belongs to the target-language backend.
+    auto memberToStringExpression(
+        const std::string& member,
+        const LangAPI::Type&
+    ) -> LangAPI::Expression {
+        return LangAPI::ToString::createExpression(
+            LangAPI::ToString{
+                .what = memberExpression(member)
+            }
+        );
+    }
+
+// Generate:
+    //
+    //     to_string() -> String
+    //
+    // producing:
+    //
+    //     ClassName {field1 = value1, field2 = value2, ...}
+    //
+    // The representation is constructed as a semantic concatenation expression,
+    // rather than using target-language-specific mutable-string operations.
+    auto generateToStringFunction(
+        const LangAPI::Class& cls,
+        const stdu::vector<MemberInfo>& members
+    ) -> LangAPI::Function {
+        LangAPI::Function function;
+
+        function.name = "to_string";
+        function.type = LangAPI::Type{
+            LangAPI::ValueType::String
+        };
+        function.is_const = true;
+
+        auto stringLiteral = [](std::string value)
+            -> LangAPI::Expression {
+            return LangAPI::String::createExpression(
+                LangAPI::String{
+                    .value = std::move(value)
+                }
+            );
+        };
+
+        stdu::vector<LangAPI::Expression> parts;
+
+        // ClassName {
+        parts.push_back(
+            stringLiteral(cls.name + " {")
+        );
+
+        for (std::size_t i = 0; i < members.size(); ++i) {
+            const auto& member = members[i];
+
+            // field =
+            parts.push_back(
+                stringLiteral(member.name + " = ")
+            );
+            if (isNodeType(member.type)) {
+                // value: call member.to_string()
+                parts.push_back(
+                    LangAPI::StorageSymbol::createExpression(
+                        LangAPI::StorageSymbol{
+                            LangAPI::Symbol::createExpression(LangAPI::Symbol {member.name}),
+                            stdu::vector<LangAPI::StorageSymbol::PathPart>{
+                                LangAPI::FunctionCall{
+                                    .name = std::make_shared<LangAPI::Symbol>(
+                                        LangAPI::Symbol{"to_string"}
+                                    ),
+                                }
+                            }
+                        }
+                    )
+                );
+            } else {
+                parts.push_back(LangAPI::Symbol::createExpression(LangAPI::Symbol {member.name}));
+            }
+            if (i + 1 < members.size()) {
+                parts.push_back(
+                    stringLiteral(", ")
+                );
+            }
+        }
+
+        // }
+        parts.push_back(
+            stringLiteral("}")
+        );
+
+        // return concat(...)
+        function.statements.push_back(
+            LangAPI::Return::createStatement(
+                LangAPI::Return{
+                    .value =
+                        LangAPI::IspaLibFunctionCall::createExpression(
+                            LangAPI::IspaLibFunctionCall{
+                                .symbol = {.exports = LangAPI::StdlibExports::Concat},
+                                .args = std::move(parts)
+                            }
+                        )
+                }
+            )
+        );
+
+        return function;
+    }
+// Render into an existing printer so nested nodes retain their parent's depth.
+auto generateWriteToOutputFunction(
+    const LangAPI::Class& cls,
+    const std::vector<MemberInfo>& members
+) -> LangAPI::Function {
+    LangAPI::Function print_func;
+
+    print_func.name = "write_to_output";
+    print_func.type = LangAPI::ValueType::Void;
+    print_func.is_const = true;
+    print_func.parameters.emplace_back(
+        LangAPI::Type{LangAPI::Symbol{"::ISPA_STD::ASTPrinter<std::ostream>&"}},
+        "printer"
+    );
+
+    auto symbolExpr = [](const std::string& name) {
+        return LangAPI::Symbol::createExpression(
+            LangAPI::Symbol{name}
+        );
+    };
+
+    auto boolExpr = [](bool value) {
+        return LangAPI::Bool::createExpression(
+            LangAPI::Bool{.value = value}
+        );
+    };
+
+    /*
+     * printer.node(name, last)
+     */
+    auto printerNode = [&](const std::string& name, bool last) {
+        LangAPI::StorageSymbol call{
+            symbolExpr("printer"),
+            std::vector<LangAPI::StorageSymbol::PathPart>{
+                LangAPI::FunctionCall{
+                    .name = std::make_shared<LangAPI::Symbol>(
+                        LangAPI::Symbol{"node"}
+                    ),
+                    .args = {
+                        LangAPI::String::createExpression(
+                            LangAPI::String{.value = name}
+                        ),
+                        boolExpr(last)
+                    }
+                }
+            }
+        };
+
+        return LangAPI::StorageSymbol::createStatement(
+            std::move(call)
+        );
+    };
+
+    /*
+     * printer.node_with_value(name, value, last)
+     */
+    auto printerNodeValue = [&](
+        const std::string& name,
+        LangAPI::Expression value,
+        bool last
+    ) {
+        LangAPI::StorageSymbol call{
+            symbolExpr("printer"),
+            std::vector<LangAPI::StorageSymbol::PathPart>{
+                LangAPI::FunctionCall{
+                    .name = std::make_shared<LangAPI::Symbol>(
+                        LangAPI::Symbol{"node_with_value"}
+                    ),
+                    .args = {
+                        LangAPI::String::createExpression(
+                            LangAPI::String{.value = name}
+                        ),
+                        std::move(value),
+                        boolExpr(last)
+                    }
+                }
+            }
+        };
+
+        return LangAPI::StorageSymbol::createStatement(
+            std::move(call)
+        );
+    };
+
+    /*
+     * printer.up(has_more_siblings)
+     */
+    auto printerUp = [&](bool has_more_siblings) {
+        LangAPI::StorageSymbol call{
+            symbolExpr("printer"),
+            std::vector<LangAPI::StorageSymbol::PathPart>{
+                LangAPI::FunctionCall{
+                    .name = std::make_shared<LangAPI::Symbol>(
+                        LangAPI::Symbol{"up"}
+                    ),
+                    .args = {
+                        boolExpr(has_more_siblings)
+                    }
+                }
+            }
+        };
+
+        return LangAPI::StorageSymbol::createStatement(
+            std::move(call)
+        );
+    };
+
+    /*
+     * printer.down()
+     */
+    auto printerDown = [&]() {
+        LangAPI::StorageSymbol call{
+            symbolExpr("printer"),
+            std::vector<LangAPI::StorageSymbol::PathPart>{
+                LangAPI::FunctionCall{
+                    .name = std::make_shared<LangAPI::Symbol>(
+                        LangAPI::Symbol{"down"}
+                    )
+                }
+            }
+        };
+
+        return LangAPI::StorageSymbol::createStatement(
+            std::move(call)
+        );
+    };
+
+    // Root node
+    print_func.statements.push_back(
+        printerNode(cls.name, members.empty())
+    );
+
+    if (!members.empty()) {
+        print_func.statements.push_back(
+            printerUp(false)
+        );
+
+        for (std::size_t i = 0; i < members.size(); ++i) {
+            const auto& member = members[i];
+            const bool is_last = i == members.size() - 1;
+
+            const bool direct_node = isNodeType(member.type);
+            const bool boxed_node =
+                !direct_node &&
+                boxedNodeInnerType(member.type) != nullptr;
+
+            if (direct_node || boxed_node) {
+                //
+                // Node:
+                //   printer.node("member", last);
+                //   printer.up(...);
+                //   <object>.data.<member>.print(printer);
+                //   printer.down();
+                //
+
+                print_func.statements.push_back(
+                    printerNode(member.name, is_last)
+                );
+
+                print_func.statements.push_back(
+                    printerUp(!is_last)
+                );
+
+                LangAPI::StorageSymbol member_print_call{
+                    LangAPI::Symbol::createExpression(LangAPI::Symbol {member.name}),
+                    std::vector<LangAPI::StorageSymbol::PathPart>{
+                        LangAPI::FunctionCall{
+                            .name = std::make_shared<LangAPI::Symbol>(
+                                LangAPI::Symbol{"print"}
+                            ),
+                            .args = { symbolExpr("printer") } // Pass printer instance
+                        }
+                    }
+                };
+
+                print_func.statements.push_back(
+                    LangAPI::StorageSymbol::createStatement(
+                        std::move(member_print_call)
+                    )
+                );
+
+                print_func.statements.push_back(
+                    printerDown()
+                );
+            } else {
+                //
+                // Leaf:
+                //   printer.node_with_value(
+                //       "member",
+                //       <object>.data.<member>,
+                //       last
+                //   );
+                //
+
+                print_func.statements.push_back(
+                    printerNodeValue(
+                        member.name,
+                    symbolExpr(member.name),
+                        is_last
+                    )
+                );
+            }
+        }
+
+        print_func.statements.push_back(
+            printerDown()
+        );
+    }
+
+    return print_func;
+}
+
+// Public entry point: only a top-level print owns a new printer.
+auto generatePrintFunction() -> LangAPI::Function {
+    LangAPI::Function function;
+    function.name = "print";
+    function.type = LangAPI::ValueType::Void;
+    function.is_const = true;
+    function.parameters.emplace_back(LangAPI::Type{LangAPI::Symbol{"std::ostream&"}}, "os");
+    function.statements.push_back(LangAPI::Variable{
+        .name = "printer",
+        .type = LangAPI::Type{LangAPI::IspaLibSymbol{.exports = LangAPI::StdlibExports::ASTPrinter}},
+        .value = LangAPI::Inheritance::createExpression(LangAPI::Inheritance{
+            .name = LangAPI::IspaLibSymbol{.exports = LangAPI::StdlibExports::ASTPrinter},
+            .args = {LangAPI::Symbol::createExpression(LangAPI::Symbol{"os"})}
+        })
+    });
+    function.statements.push_back(LangAPI::Expression::createStatement(
+        LangAPI::FunctionCall::createExpression(LangAPI::FunctionCall{
+            .name = std::make_shared<LangAPI::Symbol>(LangAPI::Symbol{"write_to_output"}),
+            .args = {LangAPI::Symbol::createExpression(LangAPI::Symbol{"printer"})}
+        })
+    ));
+    return function;
+}
+
+auto generateStreamOutputFunction(const LangAPI::Class &cls) -> LangAPI::Function {
+    LangAPI::Function function;
+    function.name = "operator<<";
+    function.parameters.emplace_back(LangAPI::Type{LangAPI::Symbol{cls.name}}, cls.name);
+    function.statements.push_back(LangAPI::StorageSymbol::createStatement(
+        LangAPI::StorageSymbol{
+        LangAPI::Symbol::createExpression(LangAPI::Symbol{cls.name}),
+        stdu::vector<LangAPI::StorageSymbol::PathPart>{LangAPI::FunctionCall{
+            .name = std::make_shared<LangAPI::Symbol>(LangAPI::Symbol{"print"}),
+            .args = {LangAPI::Symbol::createExpression(LangAPI::Symbol{"os"})}
+        }}
+    }));
+    function.statements.push_back(LangAPI::Return::createStatement(LangAPI::Return{
+        .value = LangAPI::Symbol::createExpression(LangAPI::Symbol{"os"})
+    }));
+    return function;
+}
+
     auto ConstructTypes::constructTokensAndRulesEnum() -> void {
         LangAPI::Enum tokens_enum("Tokens", {"NONE"});
         LangAPI::Enum rules_enum("Rules", {"NONE"});
@@ -273,6 +708,10 @@ namespace LangRepr {
             }
         };
 
+        // Boxes a referenced (Symbol) type when it names something in `needs_box`
+        // (i.e. it's part of a dependency cycle, or was flagged for forward
+        // declaration) — this is what makes `Token<Identifier>` become
+        // `Token<Box<Identifier>>` for types that can't be stored by value here.
         std::function<void(LangAPI::Type &)> makeDependentTypeBox = [&](LangAPI::Type &t) {
             if (t.isSymbol()) {
                 Name actual_name;
@@ -293,6 +732,9 @@ namespace LangRepr {
                 }
             }
         };
+        // Walks a field's type looking for the Token/Rule/Box wrapper that
+        // carries a referenced type, and hands that referenced type to
+        // makeDependentTypeBox above.
         std::function<void(LangAPI::Type &)> makeDependentTypeBoxRecursively = [&](LangAPI::Type &t) {
             if (auto vt = t.getValueType(); vt == LangAPI::ValueType::Token || vt == LangAPI::ValueType::Rule || vt == LangAPI::ValueType::TokenResult || vt == LangAPI::ValueType::RuleResult || vt == LangAPI::ValueType::Box) {
                 makeDependentTypeBox(std::get<LangAPI::Type>(t.template_parameters[0]));
@@ -304,15 +746,24 @@ namespace LangRepr {
                 }
             }
         };
+
         for (const auto &fullName : sorted) {
             const Node *old = root.find(fullName);
             if (!old) continue; // or throw
             LangAPI::Class c;
             c.name = corelib::text::join(fullName, "_");
+
+            // Collected AFTER makeDependentTypeBoxRecursively/switchToFlatTypeRecursively
+            // run on each field's type below, so `members` reflects each field's
+            // actual, final declared type (Box-wrapping included) — exactly what
+            // generateToStringFunction/generatePrintFunction need to see.
+            stdu::vector<MemberInfo> members;
+
             if (old->data.is_regular_data_block()) {
                 auto type = old->data.getRegularDataBlock().second;
                 makeDependentTypeBoxRecursively(type);
                 switchToFlatTypeRecursively(type);
+                members.push_back(MemberInfo{"value", type});
                 c.data.push_back(
                     std::make_pair(
                         std::make_shared<LangAPI::Declaration>(LangAPI::Variable::createDeclaration(LangAPI::Variable {.name = "value", .type = type})),
@@ -324,9 +775,25 @@ namespace LangRepr {
                     auto t = type.second;
                     makeDependentTypeBoxRecursively(t);
                     switchToFlatTypeRecursively(t);
+                    members.push_back(MemberInfo{name, t});
                     c.data.push_back((std::make_pair(std::make_shared<LangAPI::Declaration>(LangAPI::Variable::createDeclaration(LangAPI::Variable {.name = name, .type = t})), LangAPI::Visibility::Public)));
                 }
             }
+
+            // Member rendering shares one printer through every nested node.
+            c.data.push_back({
+                std::make_shared<LangAPI::Declaration>(LangAPI::Function::createDeclaration(
+                    generateWriteToOutputFunction(c, members))),
+                LangAPI::Visibility::Public
+            });
+            c.data.push_back({
+                std::make_shared<LangAPI::Declaration>(LangAPI::Function::createDeclaration(
+                    generatePrintFunction())),
+                LangAPI::Visibility::Public
+            });
+            c.to_str_fun = generateToStringFunction(c, members);
+            c.output_fun = generateStreamOutputFunction(c);
+
             flatTypesNamespace.declarations.push_back(LangAPI::Class::createDeclaration(std::move(c)));
         }
 

@@ -29,11 +29,11 @@ auto LLIR::RValueBuilder::deduceType() -> LangAPI::Type {
     } else if (value.isAt()) {
         if (unnamed_datablock_units.empty())
             throw Error("no more data accamulated with @");
-        const auto &t = unnamed_datablock_units.front().type;
-        type = t;
-        if (t == LangAPI::ValueType::RuleResult)
+        const auto &v = unnamed_datablock_units.front();
+        type = v.type;
+        if (type == LangAPI::ValueType::RuleResult)
             type.type = LangAPI::ValueType::Rule;
-        else if (t == LangAPI::ValueType::TokenResult)
+        else if (type == LangAPI::ValueType::TokenResult)
             type.type = LangAPI::ValueType::Token;
     } else if (value.isArray()) {
         LangAPI::Type types;
@@ -88,7 +88,14 @@ void LLIR::RValueBuilder::build() {
             throw Error("Not found variable to convert into expr");
         data.set(LangAPI::Symbol {find_it->name});
     } else if (value.isAt()) {
-        data.set(LangAPI::Symbol {unnamed_datablock_units.front().name});
+        const auto &v = unnamed_datablock_units.front();
+        if (v.type.isValueType() && v.type.getValueType() == LangAPI::ValueType::TokenResult || v.type.getValueType() == LangAPI::ValueType::RuleResult) {
+            data.set(LangAPI::StorageSymbol {
+                LangAPI::Symbol::createExpression(LangAPI::Symbol {v.name}), stdu::vector<LangAPI::StorageSymbol::PathPart> {LangAPI::IspaLibSymbol {.exports = LangAPI::StdlibExports::MatchResultValue}}
+            });
+        } else {
+            data.set(LangAPI::Symbol {v.name});
+        }
     } else if (value.isArray()) {
         LangAPI::Array array;
         LangAPI::Type type;

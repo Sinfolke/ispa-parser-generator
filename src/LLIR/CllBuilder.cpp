@@ -31,13 +31,24 @@ auto LLIR::CllExprBuilder::CllExprValueToIR(const AST::CllExprValue &value) -> L
         const auto &v = value.getVariable();
         LangAPI::Symbol variable_mention;
         BuilderBase::pushVariablePrefix(expr, v.pre_increament);
-        expr.push_back(LangAPI::Symbol::createExpressionValue(LangAPI::Symbol {v.name}));
+        auto it = std::find_if(vars.begin(), vars.end(), [&](const LangAPI::Variable &var) { return var.name == v.name; });
+        if (it == vars.end()) {
+            throw Error("Undefined variable in AST: {}", v.name);
+        }
+        if (it->type.isValueType() && it->type.getValueType() == LangAPI::ValueType::TokenResult || it->type.getValueType() == LangAPI::ValueType::RuleResult) {
+            expr.push_back(LangAPI::StorageSymbol::createExpressionValue(LangAPI::StorageSymbol {
+                    LangAPI::Symbol::createExpression(LangAPI::Symbol {v.name}), stdu::vector<LangAPI::StorageSymbol::PathPart> {LangAPI::IspaLibSymbol {.exports = LangAPI::StdlibExports::MatchResultValue}}
+            }));
+        } else {
+            expr.push_back(LangAPI::Symbol::createExpressionValue(LangAPI::Symbol {v.name}));
+        }
         if (v.braceExpression.has_value()) {
             expr.push_back(LangAPI::ExpressionValue { LangAPI::ExpressionElement::SquareBraceOpen });
             CllExprBuilder brace_expr(*this, v.braceExpression.value());
             expr.insert(expr.end(), brace_expr.get().begin(), brace_expr.get().end());
             expr.push_back(LangAPI::ExpressionValue { LangAPI::ExpressionElement::SquareBraceClose });
         }
+
         BuilderBase::pushVariablePrefix(expr, v.post_increament);
     } else if (value.isrvalue()) {
         if (rvalueBuilder == nullptr) {

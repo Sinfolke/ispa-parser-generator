@@ -160,7 +160,6 @@ namespace LangAPI {
             case ExpressionValueType::Continue: os << "Continue"; break;
             case ExpressionValueType::VariableAssignment: os << "VariableAssignment"; break;
             case ExpressionValueType::CounterIncreament: os << "CounterIncreament"; break;
-            case ExpressionValueType::CounterIncreamentByLength: os << "CounterIncreamentByLength"; break;
             case ExpressionValueType::ResetPosCounter: os << "ResetPosCounter"; break;
             case ExpressionValueType::PushPosCounter: os << "PushPosCounter"; break;
             case ExpressionValueType::PopPosCounter: os << "PopPosCounter"; break;
@@ -359,6 +358,16 @@ namespace LangAPI {
         os << "[" << obj.offset << "]";
         return os;
     }
+    bool operator==(const Property &a, const Property &b) {
+        return a.name == b.name;
+    }
+    bool operator<(const Property &a, const Property &b) {
+        return a.name < b.name;
+    }
+    auto operator<<(std::ostream &os, const Property &obj) -> std::ostream& {
+        os << obj.name;
+        return os;
+    }
     bool operator==(const StorageSymbol &a, const StorageSymbol &b){
         return a.what == b.what && a.path == b.path;
     }
@@ -493,6 +502,14 @@ namespace LangAPI {
         os << "std::string(1, '" << obj.what << "')";
         return os;
     }
+    auto operator<<(std::ostream &os, const ToString &obj) -> std::ostream& {
+        os << "std::string(" << obj.what << ")";
+        return os;
+    }
+    auto operator<<(std::ostream &os, const GetFromBox &obj) -> std::ostream& {
+        os << "(*" << obj.what << ")";
+        return os;
+    }
     auto operator<<(std::ostream &os, const IspaLibDfaSpan &obj) -> std::ostream& {
         os << "Span<" << obj.type << "> {" << obj.assing_name << "}";
         return os;
@@ -587,6 +604,18 @@ namespace LangAPI {
         return a.what == b.what;
     }
     bool operator<(const CharToStringConstructor &a, const CharToStringConstructor &b) {
+        return a.what < b.what;
+    }
+    bool operator==(const ToString &a, const ToString &b) {
+        return a.what == b.what;
+    }
+    bool operator<(const ToString &a, const ToString &b) {
+        return a.what < b.what;
+    }
+    bool operator==(const GetFromBox &a, const GetFromBox &b) {
+        return a.what == b.what;
+    }
+    bool operator<(const GetFromBox &a, const GetFromBox &b) {
         return a.what < b.what;
     }
     auto operator<<(std::ostream &os, const Namespace &obj) -> std::ostream& {
@@ -699,8 +728,8 @@ namespace LangAPI {
         return os << "++pos";
     }
 
-    auto operator<<(std::ostream &os, const CounterIncreamentByLength &obj) -> std::ostream& {
-        return os << "pos += " << obj.name << ".lenght();";
+    auto operator<<(std::ostream &os, const AssignCounter &obj) -> std::ostream& {
+        return os << "pos = " << *obj.v << ";";
     }
 
     auto operator<<(std::ostream &os, const ResetPosCounter &obj) -> std::ostream& {

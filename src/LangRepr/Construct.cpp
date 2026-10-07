@@ -22,7 +22,7 @@ import LangRepr.ConstructParser;
 
 namespace LangRepr {
     auto Construct::constructTypes() -> void {
-        ConstructTypes construct_types(holder, lexer_builder, ir);
+        ConstructTypes construct_types(holder, lexer_builder, ir, namespace_name);
         construct_types.constructTokensAndRulesEnum();
         // construct_types.constructTokensAndRulesEnumToString();
         construct_types.constructTypesNamespace();
@@ -34,8 +34,8 @@ namespace LangRepr {
 
     }
     auto Construct::constructParser() -> void {
-        // ConstructParser construct_parser(holder, lexer_builder, ir);
-        // construct_parser.constructParser();
+        ConstructParser construct_parser(holder, lexer_builder, ir, tree);
+        construct_parser.constructParser();
     }
 
     auto Construct::construct() -> Holder& {

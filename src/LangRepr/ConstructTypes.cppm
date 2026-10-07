@@ -107,11 +107,12 @@ export namespace LangRepr {
         Holder &holder;
         LexerBuilder &lexer_builder;
         LLIR::IR &ir;
+        const std::string &namespace_name;
     public:
         auto constructTokensAndRulesEnum() -> void;
         auto constructTokensAndRulesEnumToString() -> void;
         auto constructTypesNamespace() -> void;
-        ConstructTypes(Holder &holder, LexerBuilder &lexer_builder, LLIR::IR &ir) : holder(holder), lexer_builder(lexer_builder), ir(ir) {};
+        ConstructTypes(Holder &holder, LexerBuilder &lexer_builder, LLIR::IR &ir, const std::string &namespace_name) : holder(holder), lexer_builder(lexer_builder), ir(ir), namespace_name(namespace_name) {};
 
         ~ConstructTypes() {}
     };

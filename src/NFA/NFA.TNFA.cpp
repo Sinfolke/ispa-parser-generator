@@ -720,12 +720,15 @@ namespace NFA::TNFA {
         // The expression that produces a scalar capture as `t`.
         const auto scalar_expression =
             [&](const LangAPI::Type &t, std::size_t k, const std::string &what) {
+                cpuf::printf("type: {}", t);
                 if (t.isValueType()) {
                     switch (t.getValueType()) {
                         case LangAPI::ValueType::Char:
                             return capture_call("character", k);
                         case LangAPI::ValueType::String:
                             return capture_call("text", k);
+                        case LangAPI::ValueType::Token:
+                            return capture_call("token", k, {t});
                         default:
                             break;
                     }
@@ -742,6 +745,32 @@ namespace NFA::TNFA {
                 return cap;
             }
             return nullptr;
+        };
+
+        // Flat `|` options have separate capture anchors but occupy one field.
+        // Collect every branch at this position, not just the representative
+        // chosen from the unordered transition map.
+        const auto flat_alternatives = [&](const TokenID &sym, const TokenID *cap) {
+            std::vector<const TokenID *> result;
+            if (!cap || !sym.alt.empty() || cap->group != NULL_STATE)
+                return result;
+            for (const auto &[other, _] : token.transitions) {
+                if (other.token_name != sym.token_name ||
+                    other.position_in_token != sym.position_in_token ||
+                    !other.alt.empty())
+                    continue;
+                for (const auto *candidate : other.capture) {
+                    if (candidate->token_name == sym.token_name &&
+                        candidate->position_in_token == cap->position_in_token &&
+                        candidate->group == NULL_STATE &&
+                        std::ranges::find(result, candidate) == result.end())
+                        result.push_back(candidate);
+                }
+            }
+            std::ranges::sort(result, {}, [](const TokenID *candidate) {
+                return generateVariable(*candidate);
+            });
+            return result;
         };
 
         // Declares `name` and fills it from the captures of member `sym`.
@@ -797,16 +826,20 @@ namespace NFA::TNFA {
                     return;
                 }
 
-                // A union of alternatives: each alternative is anchored by its own
-                // capture and the one that was recorded wins.
-                if (t.isValueType() && t.getValueType() == LangAPI::ValueType::Variant) {
+                auto alternatives = flat_alternatives(sym, cap);
+                const bool has_flat_options = alternatives.size() > 1;
+                if (alternatives.empty()) {
+                    for (const auto *candidate : sym.capture)
+                        if (candidate->token_name == sym.token_name)
+                            alternatives.push_back(candidate);
+                }
+
+                // Distinct branches may have the same scalar type (e.g. GET | POST)
+                // as well as different types. In either case only the branch
+                // actually matched has both capture boundaries set.
+                if (has_flat_options ||
+                    (t.isValueType() && t.getValueType() == LangAPI::ValueType::Variant)) {
                     out.push_back(LangAPI::Variable::createStatement(LangAPI::Variable{.name = name, .type = t}));
-
-                    std::vector<const TokenID *> alternatives;
-                    for (const auto *c : sym.capture)
-                        if (c->token_name == sym.token_name)
-                            alternatives.push_back(c);
-
                     LangAPI::Statements chain;
                     for (std::size_t i = alternatives.size(); i-- > 0;) {
                         const auto *alt = alternatives[i];
@@ -834,9 +867,8 @@ namespace NFA::TNFA {
                 }));
             };
 
+        // Build IR based on data block type
         if (token.data_block && token.data_block->isRegularDataBlock()) {
-            std::cout << "Assigning at if{}" << std::endl;
-
             state.instance_value.name = LangAPI::Symbol{type_name};
 
             for (const auto &[sym, alternatives] : token.transitions) {
@@ -848,15 +880,10 @@ namespace NFA::TNFA {
                     break;
                 }
             }
-        } else if (
-            token.data_block &&
-            token.data_block->isTemplatedDataBlock()
-        ) {
-            std::cout << "Assigning at else if{}" << std::endl;
-
+        } else if (token.data_block && token.data_block->isTemplatedDataBlock()) {
             const auto &data_block = token.data_block->getTemplatedDataBlock();
 
-            stdu::vector<const TokenID *> members_with_prefix;
+            std::vector<const TokenID *> members_with_prefix;
             for (const auto &[sym, alternatives] : token.transitions) {
                 if (sym.token_name == tail.token_name &&
                     !sym.member.empty() &&
@@ -871,9 +898,20 @@ namespace NFA::TNFA {
                 members_with_prefix.begin(),
                 members_with_prefix.end(),
                 [](const TokenID *a, const TokenID *b) {
-                    return a->position_in_token < b->position_in_token;
+                    if (a->position_in_token != b->position_in_token)
+                        return a->position_in_token < b->position_in_token;
+                    return generateVariable(*a) < generateVariable(*b);
                 }
             );
+            // The branches of a flat option are one data-block field, not
+            // separate fields. Their captures are selected by read_member.
+            members_with_prefix.erase(
+                std::unique(members_with_prefix.begin(), members_with_prefix.end(),
+                    [](const TokenID *a, const TokenID *b) {
+                        return a->alt.empty() && b->alt.empty() &&
+                               a->position_in_token == b->position_in_token;
+                    }),
+                members_with_prefix.end());
 
             state.instance_value.name = LangAPI::Symbol{type_name};
 
@@ -884,17 +922,11 @@ namespace NFA::TNFA {
                 read_member(sym, capture_of(sym, true), name, state.statements);
                 state.instance_value.args.push_back(symbol(name));
             }
-
-            std::reverse(
-                state.instance_value.args.begin(),
-                state.instance_value.args.end()
-            );
         } else {
-            std::cout << "Assigning at else{}" << std::endl;
-            state.instance_value =
-                LangAPI::Inheritance{
+            // No data block: inherit constructor
+            state.instance_value = LangAPI::Inheritance{
                 .name = LangAPI::Symbol{type_name}
-                };
+            };
         }
 
         // Preserve the existing semantic ABI.
@@ -904,7 +936,7 @@ namespace NFA::TNFA {
         );
 
         if (nested) {
-            // not an accept point: inlined into the enclosing token's reduction
+            // Not an accept point: inlined into the enclosing token's reduction
             NestedReduction reduction;
             reduction.statements = state.statements;
             reduction.result = local("result");

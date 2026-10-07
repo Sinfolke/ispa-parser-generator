@@ -84,19 +84,27 @@ void LLIR::BuilderBase::addPostLoopCheck(const AST::RuleMember &rule, const Lang
     post_loop_condition.stmt = std::move(stmt);
     statements.push_back(LangAPI::If::createStatement(post_loop_condition));
 }
-auto LLIR::BuilderBase::createDefaultStatements(const LangAPI::Variable &var, const LangAPI::Variable &svar) -> LangAPI::Statements {
+auto LLIR::BuilderBase::createDefaultStatements(const LangAPI::Variable &var, const LangAPI::Variable &svar, stdu::vector<std::string> name) -> LangAPI::Statements {
     if (var.type == LangAPI::ValueType::Char) {
         return LangAPI::VariableAssignment::createStatements(LangAPI::VariableAssignment {.name = LangAPI::Symbol {var.name}, .value = LangAPI::Pos::createExpression(LangAPI::Pos {.dereference = true})});
     } else if (var.type == LangAPI::ValueType::Token) {
         return LangAPI::Statements {
-            LangAPI::Statement {LangAPI::VariableAssignment::createStatement(LangAPI::VariableAssignment {.name = LangAPI::Symbol {var.name}, .value = LangAPI::Pos::createExpression(LangAPI::Pos {.dereference = true})})},
+            LangAPI::Statement {LangAPI::VariableAssignment::createStatement(LangAPI::VariableAssignment {.name = LangAPI::Symbol {var.name}, .value = LangAPI::GetVariant::createExpression(LangAPI::GetVariant {.type = std::make_shared<LangAPI::Type> (LangAPI::Type {LangAPI::ValueType::Token, LangAPI::Type {LangAPI::Symbol {name}}}), .sym = LangAPI::Pos::createExpression(LangAPI::Pos {.dereference = true})})})},
             LangAPI::Statement {LangAPI::VariableAssignment::createStatement(LangAPI::VariableAssignment { .name = LangAPI::Symbol {svar.name}, .value = LangAPI::Bool::createExpression(LangAPI::Bool {.value = true })})},
             LangAPI::Statement {LangAPI::Expression::createStatement(increasePos())}
         };
     } else {
         return LangAPI::Statements {
             LangAPI::Statement {LangAPI::VariableAssignment::createStatement(LangAPI::VariableAssignment { .name = LangAPI::Symbol {svar.name}, .value = LangAPI::Bool::createExpression(LangAPI::Bool {.value = true })})},
-            LangAPI::Statement {LangAPI::Expression::createStatement(increasePos())}
+            LangAPI::Statement {LangAPI::Expression::createStatement(LangAPI::VariableAssignment::createExpression(
+                LangAPI::AssignCounter {
+                    .v = std::make_shared<LangAPI::Expression>(LangAPI::StorageSymbol::createExpression(
+                        LangAPI::StorageSymbol {
+                        LangAPI::Symbol::createExpression(LangAPI::Symbol {var.name}),
+                        stdu::vector<LangAPI::StorageSymbol::PathPart> { "it" }
+                    }))
+                }
+            ))}
         };
     }
 }
@@ -155,7 +163,8 @@ auto LLIR::BuilderBase::pushBasedOnQualifier(
     const LangAPI::Variable &var,
     const LangAPI::Variable &svar,
     char quantifier,
-    bool add_shadow_var
+    bool add_shadow_var,
+    stdu::vector<std::string> name
 ) -> LangAPI::Variable {
     //block.push_back({LLIR::types::ASSIGN_VARIABLE, Variable_assign {svar.name, LLIR::var_assign_types::ASSIGN, LLIR::var_assign_values::_TRUE}});
     LangAPI::Variable shadow_variable;
@@ -196,7 +205,7 @@ auto LLIR::BuilderBase::pushBasedOnQualifier(
             }
             statements.insert(statements.end(), stmt.begin(), stmt.end());
             statements.push_back(LangAPI::If::createStatement(LangAPI::If {expr, blk}));
-            auto ending_block = createDefaultStatements(var, svar);
+            auto ending_block = createDefaultStatements(var, svar, name);
             statements.insert(statements.end(), ending_block.begin(), ending_block.end());
             statements.insert(statements.end(), shadow_var_assign_block.begin(), shadow_var_assign_block.end());
             break;

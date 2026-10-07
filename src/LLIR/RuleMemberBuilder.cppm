@@ -74,9 +74,10 @@ export namespace LLIR {
             const LangAPI::Variable &svar,
             const LangAPI::Statement &call,
             char quantifier,
+            stdu::vector<std::string> &name,
             bool add_shadow_var = false
         ) -> LangAPI::Variable;
-
+        auto createAssignUvarBlock(LangAPI::Statements &statements, const LangAPI::Variable &uvar, const LangAPI::Variable &var, const LangAPI::Variable &shadow_var) -> void;
     public:
         void build() override;
         NameBuilder(BuilderDataWrapper &data, const AST::RuleMember &rule) : BuilderBase(data), rule(rule) {}

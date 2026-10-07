@@ -56,6 +56,7 @@ auto LLIR::NameBuilder::pushBasedOnQualifier(
     const LangAPI::Variable &svar,
     const LangAPI::Statement &call,
     char quantifier,
+    stdu::vector<std::string> &name,
     bool add_shadow_var
 ) -> LangAPI::Variable {
        //block.push_back({IR::types::ASSIGN_VARIABLE, IR::variable_assign {svar.name, IR::var_assign_types::ASSIGN, IR::var_assign_values::_TRUE}});
@@ -112,7 +113,7 @@ auto LLIR::NameBuilder::pushBasedOnQualifier(
             // }
             statements.insert(statements.end(), stmt.begin(), stmt.end());
             statements.push_back(LangAPI::If::createStatement(LangAPI::If {expr, blk}));
-            auto ending_block = createDefaultStatements(var, svar);
+            auto ending_block = createDefaultStatements(var, svar, name);
             statements.insert(statements.end(), ending_block.begin(), ending_block.end());
             statements.insert(statements.end(), shadow_var_assign_block.begin(), shadow_var_assign_block.end());
             break;
@@ -120,8 +121,18 @@ auto LLIR::NameBuilder::pushBasedOnQualifier(
     }
     return shadow_variable;
 }
+auto LLIR::NameBuilder::createAssignUvarBlock(LangAPI::Statements &statements, const LangAPI::Variable &uvar, const LangAPI::Variable &var, const LangAPI::Variable &shadow_var) -> void {
+    if (!uvar.name.empty()) {
+        statements.push_back(LangAPI::VariableAssignment::createStatement(LangAPI::VariableAssignment {
+                .name = LangAPI::Symbol {uvar.name},
+                .value = LangAPI::StorageSymbol::createExpression(LangAPI::StorageSymbol {
+                    LangAPI::Symbol::createExpression(LangAPI::Symbol {shadow_var.name.empty() ? var.name : shadow_var.name}), stdu::vector<LangAPI::StorageSymbol::PathPart> {LangAPI::IspaLibSymbol {.exports = LangAPI::StdlibExports::MatchResultValue}}
+                })
+            })
+        );
+    }
+}
 void LLIR::MemberBuilder::buildMember(const AST::RuleMember &member) {
-    addSpaceSkip = true;
     std::unique_ptr<BuilderBase> builder;
     if (member.isGroup()) {
         builder = std::make_unique<GroupBuilder>(*this, member);
@@ -152,8 +163,6 @@ void LLIR::MemberBuilder::buildMember(const AST::RuleMember &member) {
     exports_list.insert(exports_list.end(), builder->getReturnVars().begin(), builder->getReturnVars().end());
     statements.insert(statements.end(), builder->getData().begin(), builder->getData().end());
     isFirst = false;
-    if (addSpaceSkip)
-        statements.push_back(LangAPI::SkipSpaces::createStatement(LangAPI::SkipSpaces {.isToken = isToken}));
 }
 auto LLIR::MemberBuilder::build() -> void {
     bool isFirst = true;
@@ -519,7 +528,7 @@ void LLIR::NameBuilder::build() {
     //     symbol_follow->back().first = name;
     // }
     LangAPI::Symbol type_name {name};
-    if (!isToken && isCallingToken) {
+    if (isCallingToken) {
         var.type = { LangAPI::ValueType::Token, LangAPI::Type {type_name} };
     } else {
         var.type =  { isCallingToken ? LangAPI::ValueType::TokenResult : LangAPI::ValueType::RuleResult, LangAPI::Type { type_name } };
@@ -532,19 +541,32 @@ void LLIR::NameBuilder::build() {
     statements.push_back(LangAPI::Variable::createStatement(var));
     statements.push_back(LangAPI::Variable::createStatement(svar));
     if (isCallingToken) {
-        LangAPI::Symbol compare_sym = {name};
-        compare_sym.path.insert(compare_sym.path.begin(), "Tokens");
+        LangAPI::Symbol token_name {name};
+        token_name.path.insert(token_name.path.begin(), "Types");
         LangAPI::Expression expr = {
-            LangAPI::Pos::createExpressionValue(LangAPI::Pos {.dereference = true}),
-            LangAPI::ExpressionValue { LangAPI::ExpressionElement::Equal },
-            LangAPI::Symbol::createExpressionValue(compare_sym)
+            LangAPI::CheckVariant {
+                .type = std::make_shared<LangAPI::Type>(LangAPI::Type {LangAPI::ValueType::Token, LangAPI::Type {LangAPI::Symbol {token_name}}}),
+                .sym = LangAPI::Pos::createExpression(LangAPI::Pos {.dereference = true})
+            },
         };
-        shadow_var = BuilderBase::pushBasedOnQualifier(rule, expr, statements, uvar, var, svar, rule.quantifier, true);
+        shadow_var = BuilderBase::pushBasedOnQualifier(rule, expr, statements, uvar, var, svar, rule.quantifier, true, name);
     } else {
         LangAPI::Expression expr;
         auto call = createDefaultCall(statements, var, corelib::text::join(name, "_"), expr);
         statements.push_back(call);
-        shadow_var = pushBasedOnQualifier(rule, expr, statements, uvar, var, svar, call, rule.quantifier);
+        auto advance_to_match_end = [&]() {
+            statements.push_back(LangAPI::AssignCounter::createStatement(LangAPI::AssignCounter{
+                .v = std::make_shared<LangAPI::Expression>(LangAPI::StorageSymbol::createExpression(
+                    LangAPI::StorageSymbol{
+                        LangAPI::Symbol::createExpression(LangAPI::Symbol{var.name}),
+                        stdu::vector<LangAPI::StorageSymbol::PathPart>{"it"}
+                    }))
+            }));
+        };
+        // A called parser rule returns its consumed end position in MatchResult.it;
+        // use it instead of the old single-character counter increment.
+        advance_to_match_end();
+        shadow_var = pushBasedOnQualifier(rule, expr, statements, uvar, var, svar, call, rule.quantifier, name);
     }
     pushConvResult(rule, var, uvar, svar, shadow_var, rule.quantifier);
 }
