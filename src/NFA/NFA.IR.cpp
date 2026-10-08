@@ -257,7 +257,7 @@ namespace NFA {
                     }
                 }
                 // Terminal transitions for trailing states in the rule
-                TokenID terminal_marker{.token_name = name, .position_in_token = states.size(), .original_member = {}};
+                TokenID terminal_marker{.original_member = {}, .token_name = name, .position_in_token = states.size()};
                 for (const auto &last : states.back()) {
                     token.transitions[last] = {terminal_marker};
                 }
