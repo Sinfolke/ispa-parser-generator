@@ -9,11 +9,49 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
+  resolve-tag:
+    name: Resolve release tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - name: Checkout repository and tags
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Select tag
+        id: tag
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "release" ]]; then
+            tag="$RELEASE_TAG"
+          elif [[ "$REF_TYPE" == "tag" ]]; then
+            tag="$REF_NAME"
+          else
+            # Manual run: select the highest version-numbered v* tag.
+            tag="$(git tag --list 'v*' --sort=-version:refname | sed -n '1p')"
+          fi
+          if [[ -z "$tag" ]]; then
+            echo 'No v* release tag found' >&2
+            exit 1
+          fi
+          git rev-parse --verify "refs/tags/${tag}^{commit}" >/dev/null
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Building release tag: $tag"
+
   build:
     name: Build (${{ matrix.os }})
+    needs: resolve-tag
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -24,19 +62,22 @@ jobs:
             cpp_compiler: clang++-20
             triplet: x64-linux-libcxx
             overlay_triplets: cmake/triplets
-            extra_cxx_flags: -stdlib=libc++
+            extra_cxx_flags: '-stdlib=libc++'
+            artifact_name: ispa-linux-x64
           - os: windows-latest
             c_compiler: cl
             cpp_compiler: cl
             triplet: x64-windows
             overlay_triplets: ''
             extra_cxx_flags: ''
+            artifact_name: ispa-windows-x64
 
     steps:
-      - name: Checkout code with submodules
+      - name: Checkout tagged code with submodules
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          ref: ${{ needs.resolve-tag.outputs.tag }}
+          submodules: true
           fetch-depth: 1
 
       - name: Setup Ninja
@@ -85,8 +126,8 @@ jobs:
             "-DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}"
             "-DCMAKE_C_COMPILER=${{ matrix.c_compiler }}"
             "-DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}"
-            -DCMAKE_BUILD_TYPE=Release
-            -S "$GITHUB_WORKSPACE"
+            "-DCMAKE_BUILD_TYPE=Release"
+            -S "${{ github.workspace }}"
           )
 
           if [[ -n "${{ matrix.extra_cxx_flags }}" ]]; then
@@ -98,10 +139,65 @@ jobs:
           fi
 
           if [[ -n "${{ matrix.overlay_triplets }}" ]]; then
-            CMAKE_ARGS+=("-DVCPKG_OVERLAY_TRIPLETS=$GITHUB_WORKSPACE/${{ matrix.overlay_triplets }}")
+            CMAKE_ARGS+=(
+              "-DVCPKG_OVERLAY_TRIPLETS=${{ github.workspace }}/${{ matrix.overlay_triplets }}"
+            )
           fi
 
           cmake "${CMAKE_ARGS[@]}"
 
       - name: Build
         run: cmake --build build --config Release
+
+      - name: Stage release binaries (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          install -m 755 build/ispa release/ispa-linux-x64
+          install -m 755 build/libispa-converter-cpp.so release/libispa-converter-cpp-linux-x64.so
+
+      - name: Stage release binaries (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          test -f build/ispa.exe
+          test -f build/ispa-converter-cpp.dll
+          cp build/ispa.exe release/ispa-windows-x64.exe
+          cp build/ispa-converter-cpp.dll release/ispa-converter-cpp-windows-x64.dll
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: release/*
+          if-no-files-found: error
+
+  publish:
+    name: Attach binaries to GitHub Release
+    needs: [resolve-tag, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download platform artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ispa-*
+          path: release
+          merge-multiple: true
+
+      - name: Create release if missing and attach binaries
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.resolve-tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          ls -lh release/
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --verify-tag --generate-notes --title "$TAG"
+          fi
+          gh release upload "$TAG" release/* --clobber
