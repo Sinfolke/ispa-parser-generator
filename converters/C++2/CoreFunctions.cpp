@@ -68,7 +68,7 @@ auto Core::convertType(const LangAPI::Type &type) -> std::string {
             case LangAPI::ValueType::Variant:
                 return std::string("std::variant<std::monostate, ") + convertTemplates(type.template_parameters) + ">";
             case LangAPI::ValueType::Box:
-                return std::string("std::unique_ptr<") + convertTemplates(type.template_parameters) + ">";
+                return std::string("std::shared_ptr<") + convertTemplates(type.template_parameters) + ">";
             case LangAPI::ValueType::Span:
                 return "::ISPA_STD::Span<" + convertTemplates(type.template_parameters) + ">";
             case LangAPI::ValueType::Undef:
@@ -209,7 +209,7 @@ auto Core::convertIspaLibSymbol(const LangAPI::IspaLibSymbol &symbol) -> std::st
         case LangAPI::StdlibExports::DfaCaptures:
             return (symbol.Const ? "const " : "") + std::string("::ISPA_STD::DFA::API::Captures") + (symbol.Reference ? "&" : "");
         case LangAPI::StdlibExports::ASTPrinter:
-            return "::ISPA_STD::ASTPrinter";
+            return "::ISPA_STD::ASTPrinter<std::ostream>";
         case LangAPI::StdlibExports::Concat:
             return "::ISPA_STD::concat";
         case LangAPI::StdlibExports::MatchResultValue:

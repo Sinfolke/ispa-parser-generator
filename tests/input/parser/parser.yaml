@@ -9,7 +9,7 @@ tests:
     input: "int my_variable123 = 45"
   - name: json
     path: basic/json.isc
-    input: "{\\\"name\\\": \\\"Yuriy\\\", \\\"hello\\\": \\\"world!\\\"}"
+    input: "{\\\"name\\\": \\\"Yuriy\\\", \\\"age\\\": \\\"17.5\\\", \\\"hello\\\": \\\"world!\\\", \\\"Hobbies\\\": [\\\"Programming\\\", \\\"Gym\\\"]}"
 
 #    expect:
 #      - for: json

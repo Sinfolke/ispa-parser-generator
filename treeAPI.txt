@@ -1,28 +1,62 @@
-name<ID> : Rule {
-  @  ( [_a-zA-Z]  [_a-zA-Z0-9]*;)
+name<json> : Rule {
+  @  ( map |  array |  rv)
   Data: [RegularDataBlock: CllExpr]
-}name<__WS> : Rule {
-   [ \t\n\r\v\f]*;
+}name<rv> : Rule {
+  @  ( STRING |  NUMBER)
+  Data: [RegularDataBlock: CllExpr]
+}name<NUMBER> : Rule {
+  @  [0-9]+;
+   ( "." @  [0-9]+;)?;
+  Data: TemplatedDataBlock(main, floating)
+}name<AUTO_0> : Rule {
+   "["
   Data: EmptyDataBlock
-}name<integer_variable> : Rule {
+}name<array> : Rule {
    AUTO_0
    __WS?;
-  @  ID
+  @  rv
    __WS?;
-   AUTO_1
+   ( AUTO_1  __WS?; @  rv)*;
    __WS?;
-  @  INTEGER
-  Data: TemplatedDataBlock(name, value)
-}name<INTEGER> : Rule {
-  @  [0-9]+;
+   AUTO_2
+  Data: TemplatedDataBlock(first, sequence)
+}name<STRING> : Rule {
+   "\""
+  @  [^"]*;
+   "\""
   Data: [RegularDataBlock: CllExpr]
-}name<AUTO_0> : Rule {
-   "int"
-  Data: EmptyDataBlock
+}name<map> : Rule {
+   AUTO_3
+   __WS?;
+  @  STRING
+   __WS?;
+   AUTO_4
+   __WS?;
+  @  rv
+   __WS?;
+   ( AUTO_1  __WS?; @  STRING  __WS?;  AUTO_4  __WS?; @  rv)*;
+   __WS?;
+   AUTO_5
+  Data: TemplatedDataBlock(key, value, keys, values)
 }name<main> : Rule {
-  @  integer_variable
+  @  json
   Data: [RegularDataBlock: CllExpr]
 }name<AUTO_1> : Rule {
-   "="
+   ","
+  Data: EmptyDataBlock
+}name<AUTO_2> : Rule {
+   "]"
+  Data: EmptyDataBlock
+}name<AUTO_3> : Rule {
+   "{"
+  Data: EmptyDataBlock
+}name<AUTO_4> : Rule {
+   ":"
+  Data: EmptyDataBlock
+}name<AUTO_5> : Rule {
+   "}"
+  Data: EmptyDataBlock
+}name<__WS> : Rule {
+   [ \t\n\r\v\f]*;
   Data: EmptyDataBlock
 }

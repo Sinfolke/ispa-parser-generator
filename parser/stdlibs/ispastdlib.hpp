@@ -246,6 +246,8 @@ namespace ISPA_STD {
 
         explicit ASTPrinter(OS& out)
             : out(&out) {}
+        explicit ASTPrinter(OS&& out)
+        : out(&out) {}
 
         void set_output(OS* output) {
             out = output;
@@ -305,6 +307,17 @@ namespace ISPA_STD {
         std::size_t depth = 0;
         std::vector<bool> branches;
     };
+    template<typename T>
+    struct shared_ptr_traits {
+        static constexpr bool value = false;
+        using element_type = void;
+    };
+
+    template<typename T>
+    struct shared_ptr_traits<std::shared_ptr<T>> {
+        static constexpr bool value = true;
+        using element_type = T;
+    };
     template<typename EnumT, typename DataStorageType, typename IT>
     struct MatchResult;
     template<class EnumT, class DataStorageType, class = std::enable_if_t<std::is_class_v<DataStorageType>>>
@@ -337,6 +350,47 @@ namespace ISPA_STD {
         auto operator=(
             const MatchResult<EnumT, DataStorageType, IT>& mr
         ) -> Node&;
+
+        template<typename T = DataStorageType,
+                 std::enable_if_t<!shared_ptr_traits<T>::value, int> = 0>
+        auto operator=(
+            const Node<EnumT, std::shared_ptr<T>>& other
+        ) -> Node& {
+            if (!other.data())
+                throw std::runtime_error("Cannot assign null Node data");
+
+            _data = *other.data();
+            return *this;
+        }
+
+        template<typename T = DataStorageType,
+                 std::enable_if_t<shared_ptr_traits<T>::value, int> = 0>
+        auto operator=(
+            const Node<
+                EnumT,
+                typename shared_ptr_traits<T>::element_type
+            >& other
+        ) -> Node& {
+            _data = std::make_shared<
+                typename shared_ptr_traits<T>::element_type
+            >(other.data());
+
+            return *this;
+        }
+        template<typename SourceDataType, typename IT>
+        auto operator=(
+            MatchResult<EnumT, SourceDataType, IT>&& result
+        ) -> Node& {
+            *this = std::move(result.node);
+            return *this;
+        }
+        template<typename SourceDataType, typename IT>
+        auto operator=(
+            MatchResult<EnumT, SourceDataType, IT>& result
+        ) -> Node& {
+            *this = std::move(result.node);
+            return *this;
+        }
         /**
          * @brief Get the end position based on startpos and length
          *
@@ -376,8 +430,11 @@ namespace ISPA_STD {
             return Node {(std::size_t) startpos, start, start + length, (std::size_t) length, (std::size_t) line, column, enumv, std::move(t)};
         }
         // Nested nodes render into the caller's printer, retaining its depth.
-        auto print(ASTPrinter<std::ostream> &printer) const {
-            if constexpr (std::is_pointer_v<DataStorageType>) {
+        auto print(ASTPrinter<std::ostream>& printer) const -> void {
+            if constexpr (
+                std::is_pointer_v<DataStorageType> ||
+                shared_ptr_traits<DataStorageType>::value
+            ) {
                 if (_data) {
                     _data->write_to_output(printer);
                 }
@@ -390,7 +447,13 @@ namespace ISPA_STD {
         }
         // equivalent to to_string method of AST node struct
         auto to_string() const {
-            return _data.to_string();
+            if constexpr (std::is_pointer_v<DataStorageType> || shared_ptr_traits<DataStorageType>::value) {
+                if (_data) {
+                    return _data->to_string();
+                } else throw std::runtime_error("null pointer dereference");
+            } else {
+                return _data.to_string();
+            }
         }
     };
     template<typename ENUM_T, typename NodeType>

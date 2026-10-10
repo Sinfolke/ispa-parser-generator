@@ -177,7 +177,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    name: Attach binaries to GitHub Release
+    name: Package and attach ZIPs to GitHub Release
     needs: [resolve-tag, build]
     runs-on: ubuntu-latest
     steps:
@@ -188,7 +188,43 @@ jobs:
           path: release
           merge-multiple: true
 
-      - name: Create release if missing and attach binaries
+      - name: Package platform ZIP archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYZIP'
+          from pathlib import Path
+          from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
+
+          release = Path('release')
+          packages = Path('packages')
+          packages.mkdir(exist_ok=True)
+          platforms = {
+              'ispa-linux-x64.zip': [
+                  ('ispa-linux-x64', 'ispa', True),
+                  ('libispa-converter-cpp-linux-x64.so', 'libispa-converter-cpp.so', True),
+              ],
+              'ispa-windows-x64.zip': [
+                  ('ispa-windows-x64.exe', 'ispa.exe', False),
+                  ('ispa-converter-cpp-windows-x64.dll', 'ispa-converter-cpp.dll', False),
+              ],
+          }
+          for zip_name, files in platforms.items():
+              with ZipFile(packages / zip_name, 'w', ZIP_DEFLATED, compresslevel=9) as archive:
+                  for source, member_name, executable in files:
+                      path = release / source
+                      if not path.is_file():
+                          raise FileNotFoundError(f'Missing release binary: {path}')
+                      info = ZipInfo(member_name)
+                      info.compress_type = ZIP_DEFLATED
+                      info.create_system = 3  # Unix permission metadata
+                      info.external_attr = (0o100755 if executable else 0o100644) << 16
+                      archive.writestr(info, path.read_bytes(), compress_type=ZIP_DEFLATED, compresslevel=9)
+              print(f'Created {packages / zip_name}')
+          PYZIP
+          ls -lh packages/
+
+      - name: Create release if missing and attach ZIP archives
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -196,8 +232,7 @@ jobs:
           TAG: ${{ needs.resolve-tag.outputs.tag }}
         run: |
           set -euo pipefail
-          ls -lh release/
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" --verify-tag --generate-notes --title "$TAG"
           fi
-          gh release upload "$TAG" release/* --clobber
+          gh release upload "$TAG" packages/*.zip --clobber

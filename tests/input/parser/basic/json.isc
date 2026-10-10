@@ -2,27 +2,32 @@ NUMBER:
     @ [0-9]+ \s0 ('.' \s0 @ [0-9]+)?
     @{main, floating}
 ;
+
 STRING:
     '"' \s0 @ [^"]* \s0 '"'
     {@}
 ;
+
 rv:
     @ NUMBER | STRING
     {@}
 ;
+
 array:
-    '[' @ rv (',' @ rv)* ']'
+    '[' @ json (',' @ json)* ']'
     @{first, sequence}
 ;
-map:
-    '{' @ STRING ':' @ rv (',' @ STRING ':' @ rv)* '}'
 
+map:
+    '{' @ STRING ':' @ json (',' @ STRING ':' @ json)* '}'
     @{key, value, keys, values}
 ;
+
 json:
     @ map | array | rv
     {@}
 ;
+
 main:
     @ json
     {@}

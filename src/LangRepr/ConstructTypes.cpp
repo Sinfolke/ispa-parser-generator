@@ -226,7 +226,7 @@ auto generateWriteToOutputFunction(
     print_func.type = LangAPI::ValueType::Void;
     print_func.is_const = true;
     print_func.parameters.emplace_back(
-        LangAPI::Type{LangAPI::Symbol{"::ISPA_STD::ASTPrinter<std::ostream>&"}},
+        LangAPI::Type{LangAPI::IspaLibSymbol{.exports = LangAPI::StdlibExports::ASTPrinter}},
         "printer"
     );
 
