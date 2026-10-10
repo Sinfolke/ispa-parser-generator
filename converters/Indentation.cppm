@@ -26,7 +26,7 @@ export namespace Converter {
         }
 
         auto increase(char c) -> bool {
-            if (!std::isspace(c) || c == '\n')
+            if (!std::isspace(static_cast<unsigned char>(c)) || c == '\n')
                 return false;
             if (c != ' ') {
                 spaces++;
@@ -40,7 +40,7 @@ export namespace Converter {
             convertSpacesToTabs();
         }
         auto decrease(char c) -> bool {
-            if (!std::isspace(c) || c == '\n')
+            if (!std::isspace(static_cast<unsigned char>(c)) || c == '\n')
                 return false;
             if (c != ' ') {
                 spaces--;

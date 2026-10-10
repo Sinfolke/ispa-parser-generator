@@ -8,7 +8,6 @@ import Cpp.Declarations;
 import constants;
 
 import dstd;
-#include <valgrind/valgrind.h>
 
 auto Core::isNestedArrayType(const LangAPI::Type &t) -> bool {
     if (t.isValueType() && (t.getValueType() == LangAPI::ValueType::Array || t.getValueType() == LangAPI::ValueType::FixedSizeArray)) {

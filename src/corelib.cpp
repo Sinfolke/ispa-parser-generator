@@ -59,7 +59,8 @@ namespace corelib::text {
     }
     bool isAllAlpha(const std::string& str) {
         for (const char &ch : str) {
-            if (!std::isalpha(ch))
+            const auto byte = static_cast<unsigned char>(ch);
+            if (!std::isalpha(byte))
                 return false;
         }
         return true;
@@ -67,7 +68,8 @@ namespace corelib::text {
 
     bool isUpper(const char* str) {
         for (; *str; str++) {
-            if (std::isalpha(*str) && std::islower(*str))
+            const auto byte = static_cast<unsigned char>(*str);
+            if (std::isalpha(byte) && std::islower(byte))
                 return false;
         }
         return true;
@@ -75,7 +77,8 @@ namespace corelib::text {
 
     bool isUpper(const std::string str) {
         for (char ch : str) {
-            if (std::isalpha(ch) && std::islower(ch))
+            const auto byte = static_cast<unsigned char>(ch);
+            if (std::isalpha(byte) && std::islower(byte))
                 return false;
         }
         return true;
@@ -88,13 +91,13 @@ namespace corelib::text {
     }
     std::string ToUpper(std::string str) {
         for (auto &c : str)
-            c = std::toupper(c);
-        return str; 
+            c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+        return str;
     }
     std::string ToLower(std::string str) {
         for (auto &c : str)
-            c = std::tolower(c);
-        return str; 
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        return str;
     }
     // Returns the escaped representation of a character, e.g., '\n' -> "\\n", 'A' -> "A"
     std::string getEscapedAsStr(char in, bool /*stringContext*/) {

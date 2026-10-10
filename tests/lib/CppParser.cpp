@@ -5,7 +5,11 @@ import corelib;
 import std;
 
 auto CppParser::generate() -> int {
+#ifdef _WIN32
+    return utils::command("{} -a LL -o {} --lang cpp {} --ddall --dd TestDumps", std::filesystem::path(BINARY_DIR) / "ispa.exe", temp_directory / "Parser", File::getGrammarFile(name));
+#else
     return utils::command("{} -a LL -o {} --lang cpp {} --ddall --dd TestDumps", std::filesystem::path(BINARY_DIR) / "ispa", temp_directory / "Parser", File::getGrammarFile(name));
+#endif
 }
 auto CppParser::compile(std::string bootloader_name, std::string clang) -> int {
     return utils::command("{} {} {} -I {} -I {} -ferror-limit=1 -o {} -g",

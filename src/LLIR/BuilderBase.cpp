@@ -489,7 +489,7 @@ auto LLIR::BuilderBase::getErrorName(const AST::RuleMember &rule) -> std::string
             std::string result;
             for (const auto &part : name.name) {
                 for (const auto &char_part : part) {
-                    result += std::tolower(char_part);
+                    result += static_cast<char>(std::tolower(static_cast<unsigned char>(char_part)));
                 }
                 result += " ";
             }

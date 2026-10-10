@@ -1,6 +1,7 @@
 module Semantic;
 import corelib;
 import logging;
+import cpuf.op;
 import std;
 
 auto Semantic::checkDependency(

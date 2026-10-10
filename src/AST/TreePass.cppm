@@ -3,6 +3,7 @@ import corelib;
 import LLIR.IR;
 import AST.Tree;
 import AST.API;
+import cpuf.op;
 import dstd;
 import std;
 

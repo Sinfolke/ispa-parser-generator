@@ -479,7 +479,7 @@ namespace LangRepr {
             lexer.data.push_back(std::make_pair(
                 std::make_shared<LangAPI::Declaration>(LangAPI::Function::createDeclaration(LangAPI::Variable {
                     .name = "tdfa_registers",
-                    .type = LangAPI::Type { LangAPI::IspaLibSymbol {.exports = LangAPI::StdlibExports::TdfaLayout, {
+                    .type = LangAPI::Type { LangAPI::IspaLibSymbol {.exports = LangAPI::StdlibExports::TdfaLayout, .template_parameters = {
                         std::make_shared<LangAPI::RValue>(LangAPI::Int {.value = (long long) lexer_builder.getRegistersCount()}),
                         std::make_shared<LangAPI::RValue>(LangAPI::Int {.value = (long long) lexer_builder.getOutputCount()})
                     }}}
