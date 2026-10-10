@@ -1,0 +1,29 @@
+NUMBER:
+    @ [0-9]+ \s0 ('.' \s0 @ [0-9]+)?
+    @{main, floating}
+;
+STRING:
+    '"' \s0 @ [^"]* \s0 '"'
+    {@}
+;
+rv:
+    @ NUMBER | STRING
+    {@}
+;
+array:
+    '[' @ rv (',' @ rv)* ']'
+    @{first, sequence}
+;
+map:
+    '{' @ STRING ':' @ rv (',' @ STRING ':' @ rv)* '}'
+
+    @{key, value, keys, values}
+;
+json:
+    @ map | array | rv
+    {@}
+;
+main:
+    @ json
+    {@}
+;

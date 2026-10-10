@@ -20,6 +20,8 @@
 #include <functional>
 #include <algorithm>
 #include <iostream>
+#include <iomanip>
+#include <cctype>
 #include <set>
 #include <unordered_set>
 
@@ -65,6 +67,16 @@
  * @brief standard library for the ISPA-generated parser. Do not try to use it directly but use instead auto generated API
  * 
 */
+namespace std {
+    template<typename ...Ts>
+    auto operator<<(std::ostream &os, std::variant<Ts...> v) -> std::ostream& {
+        std::visit([&os](auto&& arg) {
+            if constexpr (!std::is_same_v<std::decay_t<decltype(arg)>, std::monostate>)
+                os << arg;
+        }, v);
+        return os;
+    }
+}
 namespace ISPA_STD {
     /**
      * @brief An error thrown when you're trying to access some features required with tokens only
@@ -293,6 +305,8 @@ namespace ISPA_STD {
         std::size_t depth = 0;
         std::vector<bool> branches;
     };
+    template<typename EnumT, typename DataStorageType, typename IT>
+    struct MatchResult;
     template<class EnumT, class DataStorageType, class = std::enable_if_t<std::is_class_v<DataStorageType>>>
     class Node {
         std::size_t _startpos = std::string::npos;
@@ -319,6 +333,10 @@ namespace ISPA_STD {
 
         Node& operator=(const Node&) = default;
         Node& operator=(Node&&) noexcept = default;
+        template<typename IT>
+        auto operator=(
+            const MatchResult<EnumT, DataStorageType, IT>& mr
+        ) -> Node&;
         /**
          * @brief Get the end position based on startpos and length
          *
@@ -386,792 +404,1208 @@ namespace ISPA_STD {
         Node<EnumT, DataStorageType> node = {};
         IT it;
     };
+
+    template<typename EnumT, typename DataStorageType, typename Enable>
+    template<typename IT>
+    auto Node<EnumT, DataStorageType, Enable>::operator=(
+        const MatchResult<EnumT, DataStorageType, IT>& mr
+    ) -> Node& {
+        return *this = mr.node;
+    }
     template<class TOKEN_T, typename Token>
     using TokenFlow = std::vector<Token>;
     template<class RULE_T, class DataStorageType>
     using Seq = std::vector<Node<RULE_T, DataStorageType>>;
-// Helper to convert individual types into std::string
-template <typename T>
-std::string to_string_helper(T&& val) {
-    using UnrefT = std::remove_reference_t<T>;
 
-    if constexpr (std::is_same_v<UnrefT, std::string>) {
-        return std::forward<T>(val);
-    } else if constexpr (std::is_convertible_v<T, std::string_view>) {
-        return std::string(std::string_view(val));
-    } else if constexpr (std::is_same_v<UnrefT, char>) {
-        return std::string(1, val);
-    } else if constexpr (std::is_same_v<UnrefT, bool>) {
-        return val ? "true" : "false";
-    } else if constexpr (std::is_arithmetic_v<UnrefT>) {
-        return std::to_string(val);
-    } else {
-        static_assert(!sizeof(T*), "concat: unsupported type");
+    template<typename Tokens, typename Type>
+    std::string to_string_helper(
+        const ISPA_STD::Node<Tokens, Type>& node
+    );
+
+    template<typename... Ts>
+    std::string to_string_helper(
+        const std::variant<Ts...>& v
+    );
+    template<typename Tokens, typename Type>
+    std::string to_string_helper(
+        const ISPA_STD::Node<Tokens, Type>& node
+    );
+
+    template<typename... Ts>
+    std::string to_string_helper(
+        const std::variant<Ts...>& v
+    );
+
+    template<typename T, typename Allocator>
+    std::string to_string_helper(
+        const std::vector<T, Allocator>& values
+    );
+    inline std::string to_string_helper(const std::string& val) {
+        return val;
     }
-}
 
-// Base case: zero arguments
-inline std::string concat() {
-    return {};
-}
+    inline std::string to_string_helper(std::string_view val) {
+        return std::string(val);
+    }
 
-// Variadic concatenation using C++17 fold expressions
-template <typename... Args>
-std::string concat(Args&&... args) {
-    return (to_string_helper(std::forward<Args>(args)) + ...);
-}
-namespace DFA::API {
-    struct DFADebug;
-    inline auto null_state = std::numeric_limits<std::size_t>::max();
-    // Same numbering as NFA::TNFA::Action, so the converter emits the value as is.
-    enum class Action { UNDEF, SET, SET_NEXT, COPY, APPEND, APPEND_NEXT };
-    template<std::size_t Classes>
-    using State = std::array<std::size_t, Classes>;
-    template<std::size_t States, std::size_t Classes>
-    using Table = std::array<State<Classes>, States>;
-    using CharToClass = std::array<std::size_t, 256>;
-    // Row: {op, a, b, next_state}.
-    //   SET / SET_NEXT        reg[a] = position (NEXT: one past the character being consumed)
-    //   COPY                  reg[a] = reg[b]
-    //   APPEND / APPEND_NEXT  reg[a] = append(reg[b], position)   (b == null_state: empty list)
-    template<std::size_t States>
-    using LRTable = std::array<State<4>, States>;
-    template<std::size_t Size>
-    using DFADebugTable = std::array<DFADebug, Size>;
-    using DebugIndex = std::unordered_map<long long, std::unordered_map<long long, long long>>;
+    inline std::string to_string_helper(const char* val) {
+        return val ? std::string(val) : std::string();
+    }
 
-    /*
-     * Can be emit by parser generator.
-     * This turns the DFA walker from class -> next state into something can be reversed to actual grammar structures
-    */
-    struct DFADebug {
-        std::string member;
-        std::string token_name;
-        long long position_in_token;
-        long long call;
-        long long group;
+    // Characters
+    inline std::string to_string_helper(char val) {
+        return std::string(1, val);
+    }
 
-        long long rule_run = null_state;
-        long long offset = 0;
-        long long length = 1;
-        char ch = '\0';
+    // Booleans
+    inline std::string to_string_helper(bool val) {
+        return val ? "true" : "false";
+    }
 
-        auto operator<(const DFADebug &other) const {
-            return std::tie(member, token_name, position_in_token, call, group, rule_run, offset, length, ch) < std::tie(other.member, other.token_name, other.position_in_token, other.call, other.group, other.rule_run, other.offset, other.length, other.ch);
-        }
-        auto operator==(const DFADebug &other) const{
-            return std::tie(member, token_name, position_in_token, call, group, rule_run, offset, length, ch) == std::tie(other.member, other.token_name, other.position_in_token, other.call, other.group, other.rule_run, other.offset, other.length, other.ch);
-        }
-    };
+    // Integers
+    inline std::string to_string_helper(short val) {
+        return std::to_string(val);
+    }
 
-    // Capture k owns registers 2k (begin, or the head of a list capture's history)
-    // and 2k + 1 (end). A register that was never written is `unset`.
-    inline constexpr std::ptrdiff_t unset = -1;
+    inline std::string to_string_helper(unsigned short val) {
+        return std::to_string(val);
+    }
 
-    struct HistoryNode {
-        std::ptrdiff_t pos;  // offset from the start of the token
-        std::ptrdiff_t prev; // previous node, `unset` ends the list
-    };
+    inline std::string to_string_helper(int val) {
+        return std::to_string(val);
+    }
 
-    class Captures {
-        const char *base_ = nullptr;
-        const std::ptrdiff_t *out_ = nullptr;
-        const HistoryNode *history_ = nullptr;
-        long long first_line_ = 1;
+    inline std::string to_string_helper(unsigned int val) {
+        return std::to_string(val);
+    }
 
-        auto begin_off(std::size_t k) const { return out_[2 * k]; }
-        auto end_off(std::size_t k) const { return out_[2 * k + 1]; }
+    inline std::string to_string_helper(long val) {
+        return std::to_string(val);
+    }
 
-    public:
-        Captures() = default;
-        Captures(const char *base, const std::ptrdiff_t *out, const HistoryNode *history, long long first_line)
-            : base_(base), out_(out), history_(history), first_line_(first_line) {}
+    inline std::string to_string_helper(unsigned long val) {
+        return std::to_string(val);
+    }
 
-        // scalar capture: both boundaries were recorded
-        auto is_set(std::size_t k) const -> bool { return begin_off(k) != unset && end_off(k) != unset; }
-        auto begin(std::size_t k) const -> const char * { return base_ + begin_off(k); }
-        auto end(std::size_t k) const -> const char * { return base_ + end_off(k); }
-        auto view(std::size_t k) const -> std::string_view {
-            return std::string_view(begin(k), static_cast<std::size_t>(end_off(k) - begin_off(k)));
-        }
-        auto text(std::size_t k) const -> std::string { return std::string(view(k)); }
-        auto character(std::size_t k) const -> char { return *begin(k); }
+    inline std::string to_string_helper(long long val) {
+        return std::to_string(val);
+    }
 
-        // list capture: one entry per iteration, in input order
-        auto list_views(std::size_t k) const -> std::vector<std::string_view> {
-            std::vector<std::ptrdiff_t> positions;
-            for (auto h = begin_off(k); h != unset; h = history_[h].prev)
-                positions.push_back(history_[h].pos);
-            std::reverse(positions.begin(), positions.end());
-            std::vector<std::string_view> spans;
-            for (std::size_t i = 0; i + 1 < positions.size(); i += 2)
-                spans.emplace_back(base_ + positions[i], static_cast<std::size_t>(positions[i + 1] - positions[i]));
-            return spans;
-        }
-        template<typename T = std::string>
-        auto list(std::size_t k) const -> std::vector<T> {
-            std::vector<T> out;
-            for (const auto v : list_views(k)) {
-                if constexpr (std::is_same_v<T, char>)
-                    out.push_back(v.empty() ? '\0' : v.front());
-                else
-                    out.push_back(T(v));
-            }
-            return out;
-        }
+    inline std::string to_string_helper(unsigned long long val) {
+        return std::to_string(val);
+    }
 
-        auto line(std::size_t k) const -> long long {
-            return first_line_ + std::count(base_, begin(k), '\n');
-        }
-        auto column(std::size_t k) const -> long long {
-            const char *b = begin(k);
-            const char *line_start = b;
-            while (line_start > base_ && line_start[-1] != '\n')
-                --line_start;
-            return (b - line_start) + 1;
-        }
-    };
+    // Floating-point
+    inline std::string to_string_helper(float val) {
+        return std::to_string(val);
+    }
 
-    template<std::size_t Registers, std::size_t Outputs>
-    struct TdfaLayout {
-        static constexpr std::size_t registers = Registers;
-        static constexpr std::size_t outputs = Outputs;
-    };
-}
-namespace DFA::detail {
-    // Debug trace of one DFA step.
-    template<std::size_t debug_size>
-    inline void trace_step(
-        const API::DFADebugTable<debug_size> &debug_array,
-        const API::DebugIndex &debug_index,
-        std::size_t state,
-        std::size_t cls,
-        char current_ch,
-        const char *pos,
-        bool immediate_action
+    inline std::string to_string_helper(double val) {
+        return std::to_string(val);
+    }
+
+    inline std::string to_string_helper(long double val) {
+        return std::to_string(val);
+    }
+
+    // Empty variant alternative
+    inline std::string to_string_helper(std::monostate) {
+        return "";
+    }
+
+    // Node overload
+    template<typename Tokens, typename Type>
+    std::string to_string_helper(
+        const ISPA_STD::Node<Tokens, Type>& node
     ) {
-        const API::DFADebug *debug = nullptr;
+        return node.to_string();
+    }
 
-        // 2. Compute 1D index using base offset + char class
-        // 1. Safe lookup without mutating map or inserting null keys
-        if (debug_size > 0) {
-            if (auto state_it = debug_index.find(state); state_it != debug_index.end()) {
-                if (auto cls_it = state_it->second.find(cls); cls_it != state_it->second.end()) {
-                    debug = &debug_array[cls_it->second];
+    // Variant overload
+    template<typename... Ts>
+    std::string to_string_helper(const std::variant<Ts...>& v) {
+        return std::visit(
+            [](const auto& arg) -> std::string {
+                return to_string_helper(arg);
+            },
+            v
+        );
+    }
+    template<typename T, typename Allocator>
+    std::string to_string_helper(
+        const std::vector<T, Allocator>& values
+    ) {
+        std::string result;
+
+        for (const auto& value : values) {
+            result += to_string_helper(value);
+        }
+
+        return result;
+    }
+    // Base case: zero arguments
+    inline std::string concat() {
+        return {};
+    }
+
+    // Variadic concatenation using C++17 fold expressions
+    template <typename... Args>
+    std::string concat(Args&&... args) {
+        return (to_string_helper(std::forward<Args>(args)) + ...);
+    }
+    namespace DFA::API {
+        struct DFADebug;
+        inline auto null_state = std::numeric_limits<std::size_t>::max();
+        // Same numbering as NFA::TNFA::Action, so the converter emits the value as is.
+        enum class Action { UNDEF, SET, SET_NEXT, COPY, APPEND, APPEND_NEXT };
+        template<std::size_t Classes>
+        using State = std::array<std::size_t, Classes>;
+        template<std::size_t States, std::size_t Classes>
+        using Table = std::array<State<Classes>, States>;
+        using CharToClass = std::array<std::size_t, 256>;
+        // Row: {op, a, b, next_state}.
+        //   SET / SET_NEXT        reg[a] = position (NEXT: one past the character being consumed)
+        //   COPY                  reg[a] = reg[b]
+        //   APPEND / APPEND_NEXT  reg[a] = append(reg[b], position)   (b == null_state: empty list)
+        template<std::size_t States>
+        using LRTable = std::array<State<4>, States>;
+        template<std::size_t Size>
+        using DFADebugTable = std::array<DFADebug, Size>;
+        using DebugIndex = std::unordered_map<long long, std::unordered_map<long long, long long>>;
+
+        /*
+         * Can be emit by parser generator.
+         * This turns the DFA walker from class -> next state into something can be reversed to actual grammar structures
+        */
+        struct DFADebug {
+            std::string member;
+            std::string token_name;
+            long long position_in_token;
+            long long call;
+            long long group;
+
+            long long rule_run = null_state;
+            long long offset = 0;
+            long long length = 1;
+            char ch = '\0';
+
+            auto operator<(const DFADebug &other) const {
+                return std::tie(member, token_name, position_in_token, call, group, rule_run, offset, length, ch) < std::tie(other.member, other.token_name, other.position_in_token, other.call, other.group, other.rule_run, other.offset, other.length, other.ch);
+            }
+            auto operator==(const DFADebug &other) const{
+                return std::tie(member, token_name, position_in_token, call, group, rule_run, offset, length, ch) == std::tie(other.member, other.token_name, other.position_in_token, other.call, other.group, other.rule_run, other.offset, other.length, other.ch);
+            }
+        };
+
+        // Capture k owns registers 2k (begin, or the head of a list capture's history)
+        // and 2k + 1 (end). A register that was never written is `unset`.
+        inline constexpr std::ptrdiff_t unset = -1;
+
+        struct HistoryNode {
+            std::ptrdiff_t pos;  // offset from the start of the token
+            std::ptrdiff_t prev; // previous node, `unset` ends the list
+        };
+
+        class Captures {
+            const char *base_ = nullptr;
+            const std::ptrdiff_t *out_ = nullptr;
+            const HistoryNode *history_ = nullptr;
+            long long first_line_ = 1;
+
+            auto begin_off(std::size_t k) const { return out_[2 * k]; }
+            auto end_off(std::size_t k) const { return out_[2 * k + 1]; }
+
+        public:
+            Captures() = default;
+            Captures(const char *base, const std::ptrdiff_t *out, const HistoryNode *history, long long first_line)
+                : base_(base), out_(out), history_(history), first_line_(first_line) {}
+
+            // scalar capture: both boundaries were recorded
+            auto is_set(std::size_t k) const -> bool { return begin_off(k) != unset && end_off(k) != unset; }
+            auto begin(std::size_t k) const -> const char * { return base_ + begin_off(k); }
+            auto end(std::size_t k) const -> const char * { return base_ + end_off(k); }
+            auto view(std::size_t k) const -> std::string_view {
+                return std::string_view(begin(k), static_cast<std::size_t>(end_off(k) - begin_off(k)));
+            }
+            auto text(std::size_t k) const -> std::string { return std::string(view(k)); }
+            auto character(std::size_t k) const -> char { return *begin(k); }
+
+            // list capture: one entry per iteration, in input order
+            auto list_views(std::size_t k) const -> std::vector<std::string_view> {
+                std::vector<std::ptrdiff_t> positions;
+                for (auto h = begin_off(k); h != unset; h = history_[h].prev)
+                    positions.push_back(history_[h].pos);
+                std::reverse(positions.begin(), positions.end());
+                std::vector<std::string_view> spans;
+                for (std::size_t i = 0; i + 1 < positions.size(); i += 2)
+                    spans.emplace_back(base_ + positions[i], static_cast<std::size_t>(positions[i + 1] - positions[i]));
+                return spans;
+            }
+            template<typename T = std::string>
+            auto list(std::size_t k) const -> std::vector<T> {
+                std::vector<T> out;
+                for (const auto v : list_views(k)) {
+                    if constexpr (std::is_same_v<T, char>)
+                        out.push_back(v.empty() ? '\0' : v.front());
+                    else
+                        out.push_back(T(v));
+                }
+                return out;
+            }
+
+            auto line(std::size_t k) const -> long long {
+                return first_line_ + std::count(base_, begin(k), '\n');
+            }
+            auto column(std::size_t k) const -> long long {
+                const char *b = begin(k);
+                const char *line_start = b;
+                while (line_start > base_ && line_start[-1] != '\n')
+                    --line_start;
+                return (b - line_start) + 1;
+            }
+        };
+
+        template<std::size_t Registers, std::size_t Outputs>
+        struct TdfaLayout {
+            static constexpr std::size_t registers = Registers;
+            static constexpr std::size_t outputs = Outputs;
+        };
+    }
+    namespace DFA::detail {
+        // Debug trace of one DFA step.
+        template<std::size_t debug_size>
+        inline void trace_step(
+            const API::DFADebugTable<debug_size> &debug_array,
+            const API::DebugIndex &debug_index,
+            std::size_t state,
+            std::size_t cls,
+            char current_ch,
+            const char *pos,
+            bool immediate_action
+        ) {
+            const API::DFADebug *debug = nullptr;
+
+            // 2. Compute 1D index using base offset + char class
+            // 1. Safe lookup without mutating map or inserting null keys
+            if (debug_size > 0) {
+                if (auto state_it = debug_index.find(state); state_it != debug_index.end()) {
+                    if (auto cls_it = state_it->second.find(cls); cls_it != state_it->second.end()) {
+                        debug = &debug_array[cls_it->second];
+                    }
                 }
             }
-        }
 
-        if (debug) {
-            std::stringstream ss;
-            ss << debug->token_name << ": ";
-            std::cout << ss.str() << debug->member;
-            if (debug->call != -1) {
-                std::cout << "$call" << debug->call;
-            }
-            if (debug->group != -1) {
-                std::cout << "$group" << debug->group;
-            }
-            std::cout << "; " << debug->offset + 1 << "/" << debug->length << ";\n";
-            std::cout << std::string(ss.str().size() + debug->offset, ' ');
+            if (debug) {
+                std::stringstream ss;
+                ss << debug->token_name << ": ";
+                std::cout << ss.str() << debug->member;
+                if (debug->call != -1) {
+                    std::cout << "$call" << debug->call;
+                }
+                if (debug->group != -1) {
+                    std::cout << "$group" << debug->group;
+                }
+                std::cout << "; " << debug->offset + 1 << "/" << debug->length << ";\n";
+                std::cout << std::string(ss.str().size() + debug->offset, ' ');
 
-            const auto &mem = debug->member;
-            if (mem.size() >= 2 && mem.front() == '[') {
-                bool escaped = false;
+                const auto &mem = debug->member;
+                if (mem.size() >= 2 && mem.front() == '[') {
+                    bool escaped = false;
 
-                for (std::size_t i = 1; i < mem.size(); ++i) {
-                    char c = mem[i];
+                    for (std::size_t i = 1; i < mem.size(); ++i) {
+                        char c = mem[i];
 
-                    if (escaped) {
-                        escaped = false;
+                        if (escaped) {
+                            escaped = false;
+                            if (current_ch == c) {
+                                std::cout << std::string(i, ' ') << "^\n";
+                                break;
+                            }
+                            continue; // Skip further range/escape processing for this character
+                        }
+
+                        if (c == '\\') {
+                            escaped = true;
+                            continue; // Skip to next character after setting escape flag
+                        }
+
                         if (current_ch == c) {
                             std::cout << std::string(i, ' ') << "^\n";
                             break;
                         }
-                        continue; // Skip further range/escape processing for this character
-                    }
 
-                    if (c == '\\') {
-                        escaped = true;
-                        continue; // Skip to next character after setting escape flag
-                    }
+                        // Check range e.g., a-z
+                        if (c == '-' && i > 1 && (i + 1) < mem.size() && mem[i + 1] != ']') {
+                            char range_begin = mem[i - 1];
+                            char range_end = mem[i + 1];
 
-                    if (current_ch == c) {
-                        std::cout << std::string(i, ' ') << "^\n";
-                        break;
-                    }
-
-                    // Check range e.g., a-z
-                    if (c == '-' && i > 1 && (i + 1) < mem.size() && mem[i + 1] != ']') {
-                        char range_begin = mem[i - 1];
-                        char range_end = mem[i + 1];
-
-                        if (current_ch >= range_begin && current_ch <= range_end) {
-                            std::cout << std::string(i - 1, ' ') << "^ ^\n";
-                            break;
+                            if (current_ch >= range_begin && current_ch <= range_end) {
+                                std::cout << std::string(i - 1, ' ') << "^ ^\n";
+                                break;
+                            }
                         }
                     }
+                } else {
+                    std::cout << "^\n";
                 }
             } else {
-                std::cout << "^\n";
+                std::cout << "State " << state << " char '"
+                          << *(immediate_action ? pos + 1 : pos)
+                          << "'\n";
             }
-        } else {
-            std::cout << "State " << state << " char '"
-                      << *(immediate_action ? pos + 1 : pos)
-                      << "'\n";
         }
 
+        inline const char* action_name(API::Action action) {
+            switch (action) {
+                case API::Action::SET:         return "SET";
+                case API::Action::SET_NEXT:    return "SET_NEXT";
+                case API::Action::COPY:        return "COPY";
+                case API::Action::APPEND:      return "APPEND";
+                case API::Action::APPEND_NEXT: return "APPEND_NEXT";
+                default:                       return "UNKNOWN";
+            }
+        }
 
-    }
-}
-namespace DFA {
-    // Walks the DFA, moving positions between registers. Reaching a semantic state calls
-    //     semantic(index, captures, start_pos, start, length, line) -> (next_state, Token)
-    // and next_state == null_state ends the match with that Token; any other value resumes the
-    // walk there. Returns an empty Token when nothing matches.
-    template<
-        typename Token,
-        typename SemanticFunc,
-        std::size_t table_states,
-        std::size_t table_classes,
-        std::size_t action_table_states,
-        std::size_t debug_size,
-        std::size_t registers,
-        std::size_t outputs
-    >
-    auto run(
-        const char* &pos,
-        long long start_pos,
-        long long &scanning_line,
-        const API::Table<table_states, table_classes> &table,
-        const API::CharToClass &class_table,
-        const API::LRTable<action_table_states> &action_table,
-        SemanticFunc semantic,
-        const API::DFADebugTable<debug_size> &debug_array,
-        const API::DebugIndex &debug_index,
-        API::TdfaLayout<registers, outputs>
-    ) -> Token {
-        static_assert(registers >= outputs, "output registers are registers 0 .. outputs-1");
+        inline std::string debug_char(unsigned char c) {
+            switch (c) {
+                case '\0': return "\\0";
+                case '\n': return "\\n";
+                case '\r': return "\\r";
+                case '\t': return "\\t";
+                case '\\': return "\\\\";
+                case '\'': return "\\'";
+                default:
+                    if (c >= 32 && c <= 126)
+                        return std::string(1, static_cast<char>(c));
 
-        const char *const start = pos;
-        const long long start_line = scanning_line;
+                    std::ostringstream os;
+                    os << "\\x"
+                       << std::hex
+                       << std::setw(2)
+                       << std::setfill('0')
+                       << static_cast<unsigned>(c);
+                    return os.str();
+            }
+        }
 
-        std::array<std::ptrdiff_t, (registers > 0 ? registers : 1)> regs;
-        regs.fill(API::unset);
-        std::vector<API::HistoryNode> history;
+        template<typename Table, typename Actions>
+        void describe_target(
+            std::ostream& out,
+            std::size_t target,
+            const Table& table,
+            const Actions& actions
+        ) {
+            const std::size_t dfa_count = table.size();
+            const std::size_t action_end = dfa_count + actions.size();
 
-        std::size_t state = 0;
-        bool immediate_action = false;
+            if (target == API::null_state) {
+                out << "NULL";
+                return;
+            }
 
-        while (state != API::null_state) {
-            const char current_ch = *(immediate_action && *pos != '\0' ? pos + 1 : pos);
-            detail::trace_step(debug_array, debug_index, state,
-                               class_table[static_cast<unsigned char>(current_ch)], current_ch, pos, immediate_action);
+            std::set<std::size_t> visited;
 
-            if (state < table.size()) {
-                if (immediate_action) {
-                    immediate_action = false;
-                    if (*pos == '\n')
-                        scanning_line++;
-                    if (*pos != '\0')
-                        ++pos;
+            while (true) {
+                if (target == API::null_state) {
+                    out << "NULL";
+                    return;
                 }
-                const std::size_t next = table[state][class_table[static_cast<unsigned char>(*pos)]];
-                if (next == API::null_state)
-                    break;
-                state = next;
 
-                // Entering a DFA state consumes the character; entering an action chain
-                // does not, and the chain sees `pos` at that character.
-                if (next < table.size() && *pos != '\0') {
-                    if (*pos == '\n')
-                        scanning_line++;
-                    ++pos;
-                } else {
-                    immediate_action = true;
+                if (target < dfa_count) {
+                    out << "DFA[" << target << "]";
+                    return;
                 }
-            } else if (state < table.size() + action_table.size()) {
-                const auto &row = action_table[state - table.size()];
+
+                if (target >= action_end) {
+                    out << "SEMANTIC["
+                        << target - action_end
+                        << "]";
+                    return;
+                }
+
+                if (!visited.insert(target).second) {
+                    out << "ACTION CYCLE at state " << target;
+                    return;
+                }
+
+                const std::size_t action_index = target - dfa_count;
+                const auto& row = actions[action_index];
                 const auto action = static_cast<API::Action>(row[0]);
-                const auto here = static_cast<std::ptrdiff_t>(pos - start);
 
-                if (row[1] >= registers || (row[2] != API::null_state && row[2] >= registers))
-                    throw std::runtime_error("DFA: register out of range");
+                out << "ACTION[" << action_index << "] "
+                    << action_name(action)
+                    << "(r" << row[1];
 
                 switch (action) {
-                    case API::Action::SET:
-                    case API::Action::SET_NEXT:
-                        regs[row[1]] = here + (action == API::Action::SET_NEXT ? 1 : 0);
-                        break;
                     case API::Action::COPY:
-                        regs[row[1]] = regs[row[2]];
+                        out << ", r" << row[2];
                         break;
+
                     case API::Action::APPEND:
                     case API::Action::APPEND_NEXT:
-                        history.push_back({
-                            here + (action == API::Action::APPEND_NEXT ? 1 : 0),
-                            row[2] == API::null_state ? API::unset : regs[row[2]]
-                        });
-                        regs[row[1]] = static_cast<std::ptrdiff_t>(history.size()) - 1;
+                        if (row[2] == API::null_state)
+                            out << ", unset";
+                        else
+                            out << ", r" << row[2];
                         break;
+
                     default:
-                        throw std::runtime_error("DFA: unknown action; Report this error to github");
+                        break;
                 }
-                state = row[3];
-            } else {
-                const API::Captures captures(start, regs.data(), history.data(), start_line);
-                auto result = semantic(
-                    state - table.size() - action_table.size(),
-                    captures, start_pos, start, static_cast<long long>(pos - start), start_line
-                );
-                state = static_cast<std::size_t>(std::get<0>(result));
-                if (state == API::null_state)
-                    return std::get<1>(std::move(result));
+
+                out << ") -> ";
+
+                target = static_cast<std::size_t>(row[3]);
             }
         }
-        return Token {};
+
+
+        template<
+            typename Table,
+            typename Classes,
+            typename Actions,
+            std::size_t DebugSize
+        >
+        void dump_dfa_table(
+            const Table& table,
+            const Classes& class_table,
+            const Actions& actions,
+            const API::DFADebugTable<DebugSize>& debug_array,
+            const API::DebugIndex& debug_index,
+            std::ostream& out = std::cerr
+        ) {
+            out << "\n========== DECODED DFA TABLE ==========\n";
+            out << "DFA states: " << table.size() << '\n';
+            out << "Action states: " << actions.size() << '\n';
+
+            const std::size_t semantic_base =
+                table.size() + actions.size();
+
+            // Map character classes to their byte values.
+            std::map<std::size_t, std::vector<unsigned>> class_chars;
+
+            for (unsigned c = 0; c < 256; ++c) {
+                const auto cls = static_cast<std::size_t>(
+                    class_table[static_cast<unsigned char>(c)]
+                );
+
+                class_chars[cls].push_back(c);
+            }
+
+            out << "\n--- DFA TRANSITIONS ---\n";
+
+            for (std::size_t state = 0; state < table.size(); ++state) {
+                out << "\nDFA[" << state << "]\n";
+
+                for (std::size_t cls = 0;
+                     cls < table[state].size();
+                     ++cls) {
+
+                    const auto target = table[state][cls];
+
+                    if (target == API::null_state)
+                        continue;
+
+                    out << "  CLASS[" << cls << "]";
+
+                    const auto it = class_chars.find(cls);
+
+                    if (it != class_chars.end()) {
+                        out << " {";
+
+                        const auto& chars = it->second;
+                        const std::size_t limit =
+                            std::min<std::size_t>(chars.size(), 12);
+
+                        for (std::size_t i = 0; i < limit; ++i) {
+                            if (i) out << ", ";
+
+                            out << "'"
+                                << debug_char(
+                                    static_cast<unsigned char>(chars[i])
+                                )
+                                << "'";
+                        }
+
+                        if (chars.size() > limit)
+                            out << ", ... (" << chars.size() << " total)";
+
+                        out << "}";
+                    }
+
+                    out << "\n    TARGET: ";
+
+                    describe_target(
+                        out,
+                        target,
+                        table,
+                        actions
+                    );
+
+                    out << '\n';
+
+                    // Your existing debug decoder takes an actual
+                    // input character in addition to state and class.
+                    //
+                    // Use one representative character from the class.
+                    if (it != class_chars.end() && !it->second.empty()) {
+                        const char representative = static_cast<char>(
+                            it->second.front()
+                        );
+
+                        out << "    SOURCE DEBUG:\n";
+
+                        // The existing trace_step() currently owns its
+                        // output destination. This call uses a dummy
+                        // position since we are not executing the DFA.
+                        //
+                        // Only safe if trace_step() does not dereference
+                        // its position argument.
+                        //
+                        // Prefer the formatter refactoring described
+                        // below if trace_step() reads the input pointer.
+                        const char dummy_input[] = {representative, '\0'};
+
+                        detail::trace_step(
+                            debug_array,
+                            debug_index,
+                            state,
+                            cls,
+                            representative,
+                            dummy_input,
+                            false
+                        );
+                    }
+                }
+            }
+
+            out << "\n--- ACTION TABLE ---\n";
+
+            for (std::size_t i = 0; i < actions.size(); ++i) {
+                out << "ACTION[" << i << "]"
+                    << " (global=" << table.size() + i << ") -> ";
+
+                describe_target(
+                    out,
+                    table.size() + i,
+                    table,
+                    actions
+                );
+
+                out << '\n';
+            }
+
+            out << "\n--- SEMANTIC STATES ---\n";
+
+            std::set<std::size_t> semantic_indices;
+
+            auto collect_semantic = [&](std::size_t target) {
+                std::set<std::size_t> visited;
+
+                while (target != API::null_state &&
+                       target >= table.size() &&
+                       target < semantic_base) {
+
+                    if (!visited.insert(target).second)
+                        return;
+
+                    target = actions[target - table.size()][3];
+                }
+
+                if (target != API::null_state &&
+                    target >= semantic_base) {
+                    semantic_indices.insert(target - semantic_base);
+                }
+            };
+
+            for (std::size_t state = 0; state < table.size(); ++state) {
+                for (std::size_t cls = 0;
+                     cls < table[state].size();
+                     ++cls) {
+                    collect_semantic(table[state][cls]);
+                }
+            }
+
+            for (std::size_t i = 0; i < actions.size(); ++i)
+                collect_semantic(actions[i][3]);
+
+            for (const auto index : semantic_indices) {
+                out << "SEMANTIC[" << index << "]"
+                    << " (global=" << semantic_base + index << ")\n";
+            }
+
+            out << "=======================================\n";
+        }
+
+
     }
-} // namespace DFA
-template<class TOKEN_T, typename Token>
-class Lexer_base {
-protected:
-    const char* _in = nullptr;
-    std::string _owned_input;
-    TokenFlow<TOKEN_T, Token> tokens;
-    long long line;
-    std::size_t getCurrentPos(const char* pos) const {
-        return pos - _in;
-    }
-    std::size_t skip_spaces(const char*& in) {
-        auto prev = in;
-        while (isspace(*in)) in++;
-        return in - prev;
-    }
-    std::size_t __line(const char* pos) const {
-        std::size_t count = 1;
-        for (const char* in = _in; in < pos; in++)
-            if (*in == '\n') count++;
-        return count;
-    }
-    std::size_t __column(const char* pos) const {
-        std::size_t count = 1;
-        for (const char* in = _in; in < pos; in++)
-            count = (*in == '\n') ? 0 : count + 1;
-        return count;
-    }
-    void panic_mode(const char*& pos) {
-        if (*pos != '\0') ++pos;
-    }
-    template<
-        typename SemanticFunc,
-        std::size_t table_states,
-        std::size_t table_classes,
-        std::size_t action_table_states,
-        std::size_t debug_size,
-        typename Layout
-    >
-    Token lookup(
-        const DFA::API::Table<table_states, table_classes> &table,
-        const DFA::API::CharToClass &class_table,
-        const DFA::API::LRTable<action_table_states> &action_table,
-        Layout layout,
-        SemanticFunc semantic,
-        const DFA::API::DFADebugTable<debug_size> &debug_array,
-        const DFA::API::DebugIndex &debug_index,
-        const char* &pos
-    ) {
-        if (*pos == '\0')
+    namespace DFA {
+        // Walks the DFA, moving positions between registers. Reaching a semantic state calls
+        //     semantic(index, captures, start_pos, start, length, line) -> (next_state, Token)
+        // and next_state == null_state ends the match with that Token; any other value resumes the
+        // walk there. Returns an empty Token when nothing matches.
+        template<
+            typename Token,
+            typename SemanticFunc,
+            std::size_t table_states,
+            std::size_t table_classes,
+            std::size_t action_table_states,
+            std::size_t debug_size,
+            std::size_t registers,
+            std::size_t outputs
+        >
+        auto run(
+            const char* &pos,
+            long long start_pos,
+            long long &scanning_line,
+            const API::Table<table_states, table_classes> &table,
+            const API::CharToClass &class_table,
+            const API::LRTable<action_table_states> &action_table,
+            SemanticFunc semantic,
+            const API::DFADebugTable<debug_size> &debug_array,
+            const API::DebugIndex &debug_index,
+            API::TdfaLayout<registers, outputs>
+        ) -> Token {
+            static_assert(registers >= outputs, "output registers are registers 0 .. outputs-1");
+
+            const char *const start = pos;
+            const long long start_line = scanning_line;
+
+            std::array<std::ptrdiff_t, (registers > 0 ? registers : 1)> regs;
+            regs.fill(API::unset);
+            std::vector<API::HistoryNode> history;
+
+            std::size_t state = 0;
+            bool immediate_action = false;
+            // if (debug_size > 0) {
+            //     detail::dump_dfa_table(
+            //         table,
+            //         class_table,
+            //         action_table,
+            //         debug_array,
+            //         debug_index,
+            //         std::cout
+            //     );
+            // }
+            while (state != API::null_state) {
+                const char current_ch = *(immediate_action && *pos != '\0' ? pos + 1 : pos);
+                detail::trace_step(debug_array, debug_index, state,
+                                   class_table[static_cast<unsigned char>(current_ch)], current_ch, pos, immediate_action);
+
+                if (state < table.size()) {
+                    if (immediate_action) {
+                        immediate_action = false;
+                        if (*pos == '\n')
+                            scanning_line++;
+                        if (*pos != '\0')
+                            ++pos;
+                    }
+                    const std::size_t next = table[state][class_table[static_cast<unsigned char>(*pos)]];
+                    if (next == API::null_state) {
+                        pos = start;
+                        scanning_line = start_line;
+                        break;
+                    }
+                    state = next;
+
+                    // Entering a DFA state consumes the character; entering an action chain
+                    // does not, and the chain sees `pos` at that character.
+                    if (next < table.size() && *pos != '\0') {
+                        if (*pos == '\n')
+                            scanning_line++;
+                        ++pos;
+                    } else {
+                        immediate_action = true;
+                    }
+                } else if (state < table.size() + action_table.size()) {
+                    const auto &row = action_table[state - table.size()];
+                    const auto action = static_cast<API::Action>(row[0]);
+                    const auto here = static_cast<std::ptrdiff_t>(pos - start);
+
+                    if (row[1] >= registers || (row[2] != API::null_state && row[2] >= registers))
+                        throw std::runtime_error("DFA: register out of range");
+
+                    switch (action) {
+                        case API::Action::SET:
+                        case API::Action::SET_NEXT:
+                            regs[row[1]] = here + (action == API::Action::SET_NEXT ? 1 : 0);
+                            break;
+                        case API::Action::COPY:
+                            regs[row[1]] = regs[row[2]];
+                            break;
+                        case API::Action::APPEND:
+                        case API::Action::APPEND_NEXT:
+                            history.push_back({
+                                here + (action == API::Action::APPEND_NEXT ? 1 : 0),
+                                row[2] == API::null_state ? API::unset : regs[row[2]]
+                            });
+                            regs[row[1]] = static_cast<std::ptrdiff_t>(history.size()) - 1;
+                            break;
+                        default:
+                            throw std::runtime_error("DFA: unknown action; Report this error to github");
+                    }
+                    state = row[3];
+                } else {
+                    const API::Captures captures(start, regs.data(), history.data(), start_line);
+                    auto result = semantic(
+                        state - table.size() - action_table.size(),
+                        captures, start_pos, start, static_cast<long long>(pos - start), start_line
+                    );
+                    state = static_cast<std::size_t>(std::get<0>(result));
+                    if (state == API::null_state)
+                        return std::get<1>(std::move(result));
+                }
+            }
             return Token {};
-        return DFA::run<Token>(pos, getCurrentPos(pos), line, table, class_table, action_table,
-                               semantic, debug_array, debug_index, layout);
-    }
-
-public:
-    // Accumulates tokens lazily; does not populate `tokens` on the owning lexer.
-    class lazy_iterator {
-        Lexer_base* owner = nullptr;
-        Token current;
-        const char* pos = nullptr;
-        std::size_t counter = 0;
-
-        void advance() {
-            if (isEnd()) return;
-            current = owner->makeToken(pos);
-            if (!isEnd()) counter++;
+        }
+    } // namespace DFA
+    template<class TOKEN_T, typename Token>
+    class Lexer_base {
+    protected:
+        const char* _in = nullptr;
+        std::string _owned_input;
+        TokenFlow<TOKEN_T, Token> tokens;
+        long long line;
+        std::size_t getCurrentPos(const char* pos) const {
+            return pos - _in;
+        }
+        std::size_t skip_spaces(const char*& in) {
+            auto prev = in;
+            while (isspace(*in)) in++;
+            return in - prev;
+        }
+        std::size_t __line(const char* pos) const {
+            std::size_t count = 1;
+            for (const char* in = _in; in < pos; in++)
+                if (*in == '\n') count++;
+            return count;
+        }
+        std::size_t __column(const char* pos) const {
+            std::size_t count = 1;
+            for (const char* in = _in; in < pos; in++)
+                count = (*in == '\n') ? 0 : count + 1;
+            return count;
+        }
+        void panic_mode(const char*& pos) {
+            if (*pos != '\0') ++pos;
+        }
+        template<
+            typename SemanticFunc,
+            std::size_t table_states,
+            std::size_t table_classes,
+            std::size_t action_table_states,
+            std::size_t debug_size,
+            typename Layout
+        >
+        Token lookup(
+            const DFA::API::Table<table_states, table_classes> &table,
+            const DFA::API::CharToClass &class_table,
+            const DFA::API::LRTable<action_table_states> &action_table,
+            Layout layout,
+            SemanticFunc semantic,
+            const DFA::API::DFADebugTable<debug_size> &debug_array,
+            const DFA::API::DebugIndex &debug_index,
+            const char* &pos
+        ) {
+            if (*pos == '\0')
+                return Token {};
+            return DFA::run<Token>(pos, getCurrentPos(pos), line, table, class_table, action_table,
+                                   semantic, debug_array, debug_index, layout);
         }
 
     public:
-        lazy_iterator() = default;
-        lazy_iterator(Lexer_base& owner, const char* in) : owner(&owner), pos(in) {
-            current = owner.makeToken(pos);
-            counter = !std::holds_alternative<std::monostate>(current);
+        // Accumulates tokens lazily; does not populate `tokens` on the owning lexer.
+        class lazy_iterator {
+            Lexer_base* owner = nullptr;
+            Token current;
+            const char* pos = nullptr;
+            std::size_t counter = 0;
+
+            void advance() {
+                if (isEnd()) return;
+                current = owner->makeToken(pos);
+                if (!isEnd()) counter++;
+            }
+
+        public:
+            lazy_iterator() = default;
+            lazy_iterator(Lexer_base& owner, const char* in) : owner(&owner), pos(in) {
+                current = owner.makeToken(pos);
+                counter = !std::holds_alternative<std::monostate>(current);
+            }
+            lazy_iterator(const lazy_iterator& other)
+                : owner(other.owner), current(other.current), pos(other.pos), counter(other.counter) {}
+
+            bool isEnd() const { return std::holds_alternative<std::monostate>(current); }
+
+            lazy_iterator& operator=(const lazy_iterator& other) {
+                if (this != &other) {
+                    owner = other.owner;
+                    current = other.current;
+                    pos = other.pos;
+                    counter = other.counter;
+                }
+                return *this;
+            }
+            lazy_iterator& operator++() { advance(); return *this; }
+            lazy_iterator operator++(int) { auto tmp = *this; advance(); return tmp; }
+            void operator+=(std::size_t count) { while (count-- > 0 && !isEnd()) advance(); }
+
+            std::ptrdiff_t operator-(const lazy_iterator& other) const {
+                return static_cast<std::ptrdiff_t>(counter) - static_cast<std::ptrdiff_t>(other.counter);
+            }
+            const Token& operator*() const { return current; }
+            const Token* operator->() const { return &current; }
+            std::size_t distance() const { return counter; }
+        };
+
+        // Iterates already-accumulated tokens; run makeTokens() before using this.
+        class iterator {
+            Lexer_base* owner = nullptr;
+            typename TokenFlow<TOKEN_T, Token>::iterator pos;
+
+        public:
+            iterator() = default;
+            iterator(Lexer_base& owner) : owner(&owner), pos(owner.tokens.begin()) {}
+
+            iterator& operator=(const iterator& other) { owner = other.owner; pos = other.pos; return *this; }
+            void operator+=(std::size_t count) { pos += count; }
+            iterator& operator++() { pos += 1; return *this; }
+            iterator operator++(int) { auto tmp = *this; pos += 1; return tmp; }
+            std::size_t operator-(const iterator& other) const { return pos - other.pos; }
+            iterator operator+(std::size_t count) const { auto tmp = *this; tmp += count; return tmp; }
+
+            bool isEnd() const { return std::holds_alternative<std::monostate>(*pos); }
+            Token& operator*() const { return *pos; }
+            Token* operator->() const { return &(*pos); }
+            std::size_t distance() const { return pos - owner->tokens.begin(); }
+        };
+        virtual Token makeToken(const char*& pos) = 0;
+        virtual void init() {}
+
+        Lexer_base() { init(); }
+        explicit Lexer_base(const std::string& in) : _owned_input(in), _in(_owned_input.c_str()) { init(); }
+        explicit Lexer_base(const char* in) : _in(in) { init(); }
+        explicit Lexer_base(const TokenFlow<TOKEN_T, Token>& tokens) : tokens(tokens) { init(); }
+        virtual ~Lexer_base() = default;
+
+        bool hasInput() const { return _in != nullptr; }
+        bool hasTokens() const { return !tokens.empty(); }
+
+        Lexer_base& setInput(const std::string& in) {
+            _owned_input = in;
+            _in = _owned_input.c_str();
+            return *this;
         }
-        lazy_iterator(const lazy_iterator& other)
-            : owner(other.owner), current(other.current), pos(other.pos), counter(other.counter) {}
+        Lexer_base& setInput(const char* in) {
+            _owned_input.clear();
+            _in = in;
+            return *this;
+        }
 
-        bool isEnd() const { return std::holds_alternative<std::monostate>(current); }
+        const TokenFlow<TOKEN_T, Token>& getTokens() const { return tokens; }
+        TokenFlow<TOKEN_T, Token>& getTokensReference() { return tokens; }
+        void clearTokens() { tokens.clear(); }
 
-        lazy_iterator& operator=(const lazy_iterator& other) {
+        TokenFlow<TOKEN_T, Token>& makeTokens() {
+            if (_in == nullptr)
+                throw Lexer_No_Input_exception();
+            const char* pos = _in;
+            while (*pos != '\0') {
+                const char* before = pos;
+                Token t = makeToken(pos);
+                if (pos == before) {
+                    throw std::runtime_error(
+                        std::string("Lexer: no token matches input at position ") +
+                        std::to_string(getCurrentPos(pos)) + " ('" + *pos + "')");
+                }
+                push(std::move(t));
+            }
+            push(Token{});
+            return tokens;
+        }
+        TokenFlow<TOKEN_T, Token>& makeTokens(const std::string& in) {
+            setInput(in);
+            return makeTokens();
+        }
+        TokenFlow<TOKEN_T, Token>& makeTokens(const char* in) {
+            setInput(in);
+            return makeTokens();
+        }
+        TokenFlow<TOKEN_T, Token>& makeTokensFromFile(const char* path) {
+            std::ifstream file(path, std::ios::in | std::ios::binary);
+            if (!file)
+                throw std::runtime_error(std::string("Failed to open file '") + path + "'");
+
+            std::string str;
+            file.seekg(0, std::ios::end);
+            str.reserve(static_cast<std::size_t>(file.tellg()));
+            file.seekg(0, std::ios::beg);
+            str.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+            return makeTokens(str);
+        }
+
+        const std::vector<std::string> getErrors() const { return {""}; }
+
+        void push(const TokenFlow<TOKEN_T, Token>& input_tokens) { tokens.append_range(input_tokens); }
+        void push(const Token& input_token) { tokens.push_back(input_token); }
+        void push(const Lexer_base& other) {
+            if (!other.hasTokens())
+                throw Lexer_No_Tokens_exception();
+            tokens.append_range(other.tokens);
+        }
+        void pop() { tokens.pop_back(); }
+        void pop(std::size_t n) {
+            if (n > tokens.size())
+                throw std::length_error(ISC_STD_LIBMARK "Lexer_base::pop(): n exceeds token count");
+            tokens.erase(tokens.end() - n, tokens.end());
+        }
+
+        Lexer_base& operator=(const Lexer_base& other) {
             if (this != &other) {
-                owner = other.owner;
-                current = other.current;
-                pos = other.pos;
-                counter = other.counter;
+                tokens = other.tokens;
+                _owned_input = other._owned_input;
+                _in = _owned_input.empty() ? other._in : _owned_input.c_str();
             }
             return *this;
         }
-        lazy_iterator& operator++() { advance(); return *this; }
-        lazy_iterator operator++(int) { auto tmp = *this; advance(); return tmp; }
-        void operator+=(std::size_t count) { while (count-- > 0 && !isEnd()) advance(); }
-
-        std::ptrdiff_t operator-(const lazy_iterator& other) const {
-            return static_cast<std::ptrdiff_t>(counter) - static_cast<std::ptrdiff_t>(other.counter);
-        }
-        const Token& operator*() const { return current; }
-        const Token* operator->() const { return &current; }
-        std::size_t distance() const { return counter; }
+        bool operator==(const Lexer_base& other) const { return tokens == other.tokens; }
+        bool operator!=(const Lexer_base& other) const { return tokens != other.tokens; }
     };
-
-    // Iterates already-accumulated tokens; run makeTokens() before using this.
-    class iterator {
-        Lexer_base* owner = nullptr;
-        typename TokenFlow<TOKEN_T, Token>::iterator pos;
-
+    /* PARSER */
+    template<class TOKEN_T, class RULE_T, typename MainNode, typename Token>
+    class LLParser_base {
+    protected:
+        Lexer_base<TOKEN_T, Token>* lexer = nullptr;
+        const char* text = nullptr;
+        MainNode tree;
+        // skip spaces for tokens
+        template <typename SpaceTokenType, typename IT>
+        void skip_spaces(IT& pos) {
+            while (std::holds_alternative<Node<TOKEN_T, SpaceTokenType>>(*pos))
+                ++pos;
+        }
+        static void PANIC_MODE() {}
     public:
-        iterator() = default;
-        iterator(Lexer_base& owner) : owner(&owner), pos(owner.tokens.begin()) {}
-
-        iterator& operator=(const iterator& other) { owner = other.owner; pos = other.pos; return *this; }
-        void operator+=(std::size_t count) { pos += count; }
-        iterator& operator++() { pos += 1; return *this; }
-        iterator operator++(int) { auto tmp = *this; pos += 1; return tmp; }
-        std::size_t operator-(const iterator& other) const { return pos - other.pos; }
-        iterator operator+(std::size_t count) const { auto tmp = *this; tmp += count; return tmp; }
-
-        bool isEnd() const { return pos->empty(); }
-        Token& operator*() const { return *pos; }
-        Token* operator->() const { return &(*pos); }
-        std::size_t distance() const { return pos - owner->tokens.begin(); }
-    };
-    virtual Token makeToken(const char*& pos) = 0;
-    virtual void init() {}
-
-    Lexer_base() { init(); }
-    explicit Lexer_base(const std::string& in) : _owned_input(in), _in(_owned_input.c_str()) { init(); }
-    explicit Lexer_base(const char* in) : _in(in) { init(); }
-    explicit Lexer_base(const TokenFlow<TOKEN_T, Token>& tokens) : tokens(tokens) { init(); }
-    virtual ~Lexer_base() = default;
-
-    bool hasInput() const { return _in != nullptr; }
-    bool hasTokens() const { return !tokens.empty(); }
-
-    Lexer_base& setInput(const std::string& in) {
-        _owned_input = in;
-        _in = _owned_input.c_str();
-        return *this;
-    }
-    Lexer_base& setInput(const char* in) {
-        _owned_input.clear();
-        _in = in;
-        return *this;
-    }
-
-    const TokenFlow<TOKEN_T, Token>& getTokens() const { return tokens; }
-    TokenFlow<TOKEN_T, Token>& getTokensReference() { return tokens; }
-    void clearTokens() { tokens.clear(); }
-
-    TokenFlow<TOKEN_T, Token>& makeTokens() {
-        if (_in == nullptr)
-            throw Lexer_No_Input_exception();
-        const char* pos = _in;
-        while (*pos != '\0')
-
-            push(makeToken(pos));
-        push(Token{});
-        return tokens;
-    }
-    TokenFlow<TOKEN_T, Token>& makeTokens(const std::string& in) {
-        setInput(in);
-        return makeTokens();
-    }
-    TokenFlow<TOKEN_T, Token>& makeTokens(const char* in) {
-        setInput(in);
-        return makeTokens();
-    }
-    TokenFlow<TOKEN_T, Token>& makeTokensFromFile(const char* path) {
-        std::ifstream file(path, std::ios::in | std::ios::binary);
-        if (!file)
-            throw std::runtime_error(std::string("Failed to open file '") + path + "'");
-
-        std::string str;
-        file.seekg(0, std::ios::end);
-        str.reserve(static_cast<std::size_t>(file.tellg()));
-        file.seekg(0, std::ios::beg);
-        str.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
-        return makeTokens(str);
-    }
-
-    const std::vector<std::string> getErrors() const { return {""}; }
-
-    void push(const TokenFlow<TOKEN_T, Token>& input_tokens) { tokens.append_range(input_tokens); }
-    void push(const Token& input_token) { tokens.push_back(input_token); }
-    void push(const Lexer_base& other) {
-        if (!other.hasTokens())
-            throw Lexer_No_Tokens_exception();
-        tokens.append_range(other.tokens);
-    }
-    void pop() { tokens.pop_back(); }
-    void pop(std::size_t n) {
-        if (n > tokens.size())
-            throw std::length_error(ISC_STD_LIBMARK "Lexer_base::pop(): n exceeds token count");
-        tokens.erase(tokens.end() - n, tokens.end());
-    }
-
-    Lexer_base& operator=(const Lexer_base& other) {
-        if (this != &other) {
-            tokens = other.tokens;
-            _owned_input = other._owned_input;
-            _in = _owned_input.empty() ? other._in : _owned_input.c_str();
+        virtual void parseFromTokens() = 0;
+        virtual void lazyParse() = 0;
+        // Constructors
+        LLParser_base() {}
+        LLParser_base(Lexer_base<TOKEN_T, Token>& lexer) {
+            this->lexer = &lexer;
         }
-        return *this;
-    }
-    bool operator==(const Lexer_base& other) const { return tokens == other.tokens; }
-    bool operator!=(const Lexer_base& other) const { return tokens != other.tokens; }
-};
-/* PARSER */
-template<class TOKEN_T, class RULE_T, typename MainNode, typename Token>
-class LLParser_base {
-protected:
-    Lexer_base<TOKEN_T, Token>* lexer = nullptr;
-    const char* text = nullptr;
-    MainNode tree;
-    // skip spaces for tokens
-    template <typename SpaceTokenType, typename IT>
-    void skip_spaces(IT& pos) {
-        while (std::holds_alternative<Node<TOKEN_T, SpaceTokenType>>(*pos))
-            ++pos;
-    }
-    static void PANIC_MODE() {}
-public:
-    virtual void parseFromTokens() = 0;
-    virtual void lazyParse() = 0;
-    // Constructors
-    LLParser_base() {}
-    LLParser_base(Lexer_base<TOKEN_T, Token>& lexer) {
-        this->lexer = &lexer;
-    }
-    LLParser_base(const char* text) : text(text) {}
-    virtual ~LLParser_base() {}
-    // Parsing methods
-    MainNode& parse(Lexer_base<TOKEN_T, Token>& lex) {
-        lexer = &lex;
-        return parse();
-    }
-    MainNode& parse(const char* txt) {
-        text = txt;
-        return parse();
-    }
-    void setInput(Lexer_base<TOKEN_T, Token> &lex) {
-        if (!lex.hasTokens())
+        LLParser_base(const char* text) : text(text) {}
+        virtual ~LLParser_base() {}
+        // Parsing methods
+        MainNode& parse(Lexer_base<TOKEN_T, Token>& lex) {
             lexer = &lex;
-    }
-    void setInput(const char* txt) {
-        text = txt;
-    }
-    void clearInput() {
-        lexer = nullptr;
-        text = nullptr;
-    }
-    /**
-     * @brief Parser the tokens based on input provided before
-     * 
-     * @return Tree<RULE_T> 
-     */
-    MainNode& parse() {
-        if (lexer != nullptr) {
-            if (!lexer->hasInput())
-                lexer->makeTokens();
-            parseFromTokens();
-        } else if (text != nullptr) {
-            lazyParse();
-        } else throw Parser_No_Input_exception();
-        return tree;
-    }
-};
-template <class TOKEN_T, class RULE_T, class MAIN_NODE, class Token, class Action, class ActionTable, class GotoTable, class RulesTable>
-class LRParser_base : public LLParser_base<TOKEN_T, RULE_T, MAIN_NODE, Token> {
-protected:
-    std::vector<std::pair<std::variant<TOKEN_T, RULE_T>, std::size_t>> stack;
-    template <class IT>
-    void shift(IT& pos, std::size_t state) {
-        stack.push_back({pos->name(), state});
-        pos++;
-    }
-    void reduce(const std::size_t rules_id, const GotoTable &goto_table, const RulesTable rules_table) {
-        const auto &rule_data = rules_table[rules_id];
-        const auto &rule_name = rule_data.first;
-        const auto &reduce_size = rule_data.second;
-        if (stack.size() < reduce_size) {
-            throw std::runtime_error("Stack underflow during reduce");
+            return parse();
         }
-        stack.erase(stack.end() - reduce_size, stack.end());
-        printf("Reduce: goto_table[%d][%d]\n", (int) stack.back().second, (int) rule_name);
-        // Perform the reduction
-        const auto& goto_entry = goto_table[stack.back().second][static_cast<std::size_t>(rule_name)];
-        if (!goto_entry.has_value()) {
-            throw std::runtime_error("Invalid GOTO after reduction");
+        MainNode& parse(const char* txt) {
+            text = txt;
+            return parse();
         }
-
-        std::size_t next_state = goto_entry.value();
-        stack.push_back({rule_name, next_state});
-    }
-    virtual std::string TokensToString(TOKEN_T token) = 0;
-    virtual std::string RulesToString(RULE_T rule) = 0;
-    template<class IT>
-    void parseFromPos(IT& pos, const ActionTable &action_table, const GotoTable &goto_table, RulesTable rules_table) {
-        stack.push_back({TOKEN_T::NONE, 0});
-        while(true) {
-            auto &current_state = stack.back().second;
-            const auto &action = action_table[current_state][(std::size_t) pos->name()];
-            printf("Token name: %s", TokensToString(pos->name()).c_str());
-            if (pos->data().has_value()) {
-                printf("[%s]", std::any_cast<std::string>(pos->data()).c_str());
-            }
-            printf(", state: %zu\n", current_state);
-            if (action.has_value()) {
-                auto& act = action.value();
-                printf("action: %d, next state: %zu\n", (int) act.type, act.state);
-                if (act.type == Action::SHIFT)
-                    shift(pos, act.state);
-                else if (act.type == Action::REDUCE)
-                    reduce(act.state, goto_table, rules_table);
-                else if (act.type == Action::ACCEPT)
-                    break;
-                else
-                    throw std::runtime_error("Error state");
-            } else {
-                throw std::runtime_error(("Action is not defined. stack size: " + std::to_string(stack.size())).c_str());
-            }
+        void setInput(Lexer_base<TOKEN_T, Token> &lex) {
+            if (!lex.hasTokens())
+                lexer = &lex;
         }
-        printf("Accepted. distance: %zu\n", pos.distance());
-        stack.clear();
-    }
-};
-template <class TOKEN_T, class RULE_T, class MAIN_NODE, class Token, class Action, class ActionTable, class GotoTable, class RulesTable, class DFATable>
-class ELRParser_base : public LRParser_base<TOKEN_T, RULE_T, MAIN_NODE, Token, Action, ActionTable, GotoTable, RulesTable> {
-private:
-    // cache tokens because of lazy iterator which makes tokens on dereference
-    std::deque<Node<TOKEN_T, Token>> dfa_token_cache;
-protected:
-    template <class IT>
-    void shift(IT& pos, std::size_t state) {
-        if (dfa_token_cache.empty()) {
-            printf("Pushing directly\n");
-            this->stack.push_back({pos->name(), state});
+        void setInput(const char* txt) {
+            text = txt;
+        }
+        void clearInput() {
+            lexer = nullptr;
+            text = nullptr;
+        }
+        /**
+         * @brief Parser the tokens based on input provided before
+         *
+         * @return Tree<RULE_T>
+         */
+        MainNode& parse() {
+            if (lexer != nullptr) {
+                if (!lexer->hasInput())
+                    lexer->makeTokens();
+                parseFromTokens();
+            } else if (text != nullptr) {
+                lazyParse();
+            } else throw Parser_No_Input_exception();
+            return tree;
+        }
+    };
+    template <class TOKEN_T, class RULE_T, class MAIN_NODE, class Token, class Action, class ActionTable, class GotoTable, class RulesTable>
+    class LRParser_base : public LLParser_base<TOKEN_T, RULE_T, MAIN_NODE, Token> {
+    protected:
+        std::vector<std::pair<std::variant<TOKEN_T, RULE_T>, std::size_t>> stack;
+        template <class IT>
+        void shift(IT& pos, std::size_t state) {
+            stack.push_back({pos->name(), state});
             pos++;
-        } else {
-            printf("Pushing from DFA cache, next token: ");
-            printf("%s", TokensToString(pos->name()).c_str());
-            if (pos->data().has_value()) {
-                printf("[%s]", std::any_cast<std::string>(pos->data()).c_str());
-            }
-            printf("\n");
-            this->stack.push_back({dfa_token_cache.front().name(), state});
-            dfa_token_cache.pop_back();
         }
-    }
-    template<class IT>
-    const std::optional<Action>& getAction(IT &pos, const ActionTable &action_table) {
-        auto &current_state = this->stack.back().second;
-        return dfa_token_cache.empty() ? action_table[current_state][(std::size_t) pos->name()] : action_table[current_state][(std::size_t) dfa_token_cache.front().name()];
-    }
-    template<class IT>
-    const Action* resolveDFA(IT &pos, std::size_t dfa_index, const DFATable &dfa_table) {
-        const Action* initial_action = nullptr;
-        printf("Resolving conflict in DFA table\n");
-        std::size_t current_dfa_length = dfa_token_cache.size();
-        for (std::size_t offset = 0;; offset++) {
-            if (offset >= current_dfa_length)
-                dfa_token_cache.push_back(*pos++);
-            const auto &[action, table] = dfa_table[dfa_index];
-            std::size_t i = 1;
-            while(table[i].first != dfa_token_cache[offset].name() && table[i].second != 0) i++;
-            const auto &go_state = table[i].second;
-            if (initial_action == nullptr) {
-                initial_action = &action;
+        void reduce(const std::size_t rules_id, const GotoTable &goto_table, const RulesTable rules_table) {
+            const auto &rule_data = rules_table[rules_id];
+            const auto &rule_name = rule_data.first;
+            const auto &reduce_size = rule_data.second;
+            if (stack.size() < reduce_size) {
+                throw std::runtime_error("Stack underflow during reduce");
             }
-            if (go_state == 0) {
-                if (table[0].second != 0) {
-                    dfa_index = table[0].second;
-                    continue;
-                }
-                if (action.type == Action::ERR) {
-                    printf("Returning initial action %d, state %zu\n", (int) initial_action->type, initial_action->state);
-                    return initial_action;
-                }
-                printf("returning action %d, state %zu\n", (int) action.type, action.state);
-                return &action;
+            stack.erase(stack.end() - reduce_size, stack.end());
+            printf("Reduce: goto_table[%d][%d]\n", (int) stack.back().second, (int) rule_name);
+            // Perform the reduction
+            const auto& goto_entry = goto_table[stack.back().second][static_cast<std::size_t>(rule_name)];
+            if (!goto_entry.has_value()) {
+                throw std::runtime_error("Invalid GOTO after reduction");
             }
-            dfa_index = go_state;
 
+            std::size_t next_state = goto_entry.value();
+            stack.push_back({rule_name, next_state});
         }
-    }
-    template<class IT>
-    void peformAction(IT &pos, Action act, GotoTable goto_table, RulesTable rules_table, DFATable dfa_table) {
-        switch (act.type)
-        {
-        case Action::SHIFT:
-            shift(pos, act.state);
-            break;
-        case Action::REDUCE:
-            this->reduce(act.state, goto_table, rules_table);
-            break;
-        case Action::DFA_RESOLVE: {
-            const auto resolved = resolveDFA(pos, act.state, dfa_table);
-            if (!resolved) throw std::runtime_error("Unresolvable DFA lookahead");
-            peformAction(pos, *resolved, goto_table, rules_table, dfa_table);
-            break;
-        }
-        default:
-            throw std::runtime_error("Error action");
-        }
-    }
-    template<class IT>
-    void parseFromPos(IT& pos, const ActionTable &action_table, const GotoTable &goto_table, RulesTable rules_table, DFATable dfa_table) {
-        this->stack.push_back({TOKEN_T::NONE, 0});
-        while(true) {
-            auto &current_state = this->stack.back().second;
-            const auto &action = getAction(pos, action_table);
-            if (dfa_token_cache.empty()) {
+        virtual std::string TokensToString(TOKEN_T token) = 0;
+        virtual std::string RulesToString(RULE_T rule) = 0;
+        template<class IT>
+        void parseFromPos(IT& pos, const ActionTable &action_table, const GotoTable &goto_table, RulesTable rules_table) {
+            stack.push_back({TOKEN_T::NONE, 0});
+            while(true) {
+                auto &current_state = stack.back().second;
+                const auto &action = action_table[current_state][(std::size_t) pos->name()];
                 printf("Token name: %s", TokensToString(pos->name()).c_str());
                 if (pos->data().has_value()) {
                     printf("[%s]", std::any_cast<std::string>(pos->data()).c_str());
                 }
                 printf(", state: %zu\n", current_state);
+                if (action.has_value()) {
+                    auto& act = action.value();
+                    printf("action: %d, next state: %zu\n", (int) act.type, act.state);
+                    if (act.type == Action::SHIFT)
+                        shift(pos, act.state);
+                    else if (act.type == Action::REDUCE)
+                        reduce(act.state, goto_table, rules_table);
+                    else if (act.type == Action::ACCEPT)
+                        break;
+                    else
+                        throw std::runtime_error("Error state");
+                } else {
+                    throw std::runtime_error(("Action is not defined. stack size: " + std::to_string(stack.size())).c_str());
+                }
+            }
+            printf("Accepted. distance: %zu\n", pos.distance());
+            stack.clear();
+        }
+    };
+    template <class TOKEN_T, class RULE_T, class MAIN_NODE, class Token, class Action, class ActionTable, class GotoTable, class RulesTable, class DFATable>
+    class ELRParser_base : public LRParser_base<TOKEN_T, RULE_T, MAIN_NODE, Token, Action, ActionTable, GotoTable, RulesTable> {
+    private:
+        // cache tokens because of lazy iterator which makes tokens on dereference
+        std::deque<Node<TOKEN_T, Token>> dfa_token_cache;
+    protected:
+        template <class IT>
+        void shift(IT& pos, std::size_t state) {
+            if (dfa_token_cache.empty()) {
+                printf("Pushing directly\n");
+                this->stack.push_back({pos->name(), state});
+                pos++;
             } else {
-                printf("Token name: %s", TokensToString(dfa_token_cache.front().name()).c_str());
+                printf("Pushing from DFA cache, next token: ");
+                printf("%s", TokensToString(pos->name()).c_str());
                 if (pos->data().has_value()) {
                     printf("[%s]", std::any_cast<std::string>(pos->data()).c_str());
                 }
-                printf(", state: %zu\n", current_state);
-            }
-
-            if (action.has_value()) {
-                auto& act = action.value();
-                printf("action: %d, next state: %zu\n", (int) act.type, act.state);
-                if (act.type == Action::ACCEPT)
-                    break;
-                peformAction(pos, act, goto_table, rules_table, dfa_table);
-            } else {
-                throw std::runtime_error(("Action is not defined. stack size: " + std::to_string(this->stack.size())).c_str());
+                printf("\n");
+                this->stack.push_back({dfa_token_cache.front().name(), state});
+                dfa_token_cache.pop_back();
             }
         }
-        printf("Accepted. distance: %zu\n", pos.distance());
-        // clear
-        this->stack.clear();
-        dfa_token_cache.clear();
-    }
-};
+        template<class IT>
+        const std::optional<Action>& getAction(IT &pos, const ActionTable &action_table) {
+            auto &current_state = this->stack.back().second;
+            return dfa_token_cache.empty() ? action_table[current_state][(std::size_t) pos->name()] : action_table[current_state][(std::size_t) dfa_token_cache.front().name()];
+        }
+        template<class IT>
+        const Action* resolveDFA(IT &pos, std::size_t dfa_index, const DFATable &dfa_table) {
+            const Action* initial_action = nullptr;
+            printf("Resolving conflict in DFA table\n");
+            std::size_t current_dfa_length = dfa_token_cache.size();
+            for (std::size_t offset = 0;; offset++) {
+                if (offset >= current_dfa_length)
+                    dfa_token_cache.push_back(*pos++);
+                const auto &[action, table] = dfa_table[dfa_index];
+                std::size_t i = 1;
+                while(table[i].first != dfa_token_cache[offset].name() && table[i].second != 0) i++;
+                const auto &go_state = table[i].second;
+                if (initial_action == nullptr) {
+                    initial_action = &action;
+                }
+                if (go_state == 0) {
+                    if (table[0].second != 0) {
+                        dfa_index = table[0].second;
+                        continue;
+                    }
+                    if (action.type == Action::ERR) {
+                        printf("Returning initial action %d, state %zu\n", (int) initial_action->type, initial_action->state);
+                        return initial_action;
+                    }
+                    printf("returning action %d, state %zu\n", (int) action.type, action.state);
+                    return &action;
+                }
+                dfa_index = go_state;
+
+            }
+        }
+        template<class IT>
+        void peformAction(IT &pos, Action act, GotoTable goto_table, RulesTable rules_table, DFATable dfa_table) {
+            switch (act.type)
+            {
+            case Action::SHIFT:
+                shift(pos, act.state);
+                break;
+            case Action::REDUCE:
+                this->reduce(act.state, goto_table, rules_table);
+                break;
+            case Action::DFA_RESOLVE: {
+                const auto resolved = resolveDFA(pos, act.state, dfa_table);
+                if (!resolved) throw std::runtime_error("Unresolvable DFA lookahead");
+                peformAction(pos, *resolved, goto_table, rules_table, dfa_table);
+                break;
+            }
+            default:
+                throw std::runtime_error("Error action");
+            }
+        }
+        template<class IT>
+        void parseFromPos(IT& pos, const ActionTable &action_table, const GotoTable &goto_table, RulesTable rules_table, DFATable dfa_table) {
+            this->stack.push_back({TOKEN_T::NONE, 0});
+            while(true) {
+                auto &current_state = this->stack.back().second;
+                const auto &action = getAction(pos, action_table);
+                if (dfa_token_cache.empty()) {
+                    printf("Token name: %s", TokensToString(pos->name()).c_str());
+                    if (pos->data().has_value()) {
+                        printf("[%s]", std::any_cast<std::string>(pos->data()).c_str());
+                    }
+                    printf(", state: %zu\n", current_state);
+                } else {
+                    printf("Token name: %s", TokensToString(dfa_token_cache.front().name()).c_str());
+                    if (pos->data().has_value()) {
+                        printf("[%s]", std::any_cast<std::string>(pos->data()).c_str());
+                    }
+                    printf(", state: %zu\n", current_state);
+                }
+
+                if (action.has_value()) {
+                    auto& act = action.value();
+                    printf("action: %d, next state: %zu\n", (int) act.type, act.state);
+                    if (act.type == Action::ACCEPT)
+                        break;
+                    peformAction(pos, act, goto_table, rules_table, dfa_table);
+                } else {
+                    throw std::runtime_error(("Action is not defined. stack size: " + std::to_string(this->stack.size())).c_str());
+                }
+            }
+            printf("Accepted. distance: %zu\n", pos.distance());
+            // clear
+            this->stack.clear();
+            dfa_token_cache.clear();
+        }
+    };
 } // namespace ISPA_STD
 
 #undef _ISC_GITHUB

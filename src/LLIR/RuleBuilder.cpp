@@ -73,7 +73,7 @@ LLIR::DataBlock LLIR::RuleBuilder::createDataBlock(const AST::DataBlock &data_bl
                 type.type = LangAPI::ValueType::Token;
             }
             const auto v = unnamed_datablock_units.front();
-            initial_map.try_emplace(name, std::make_pair(LangAPI::Symbol::createExpression(LangAPI::Symbol {v.name}), v.type));
+            initial_map.try_emplace(name, std::make_pair(LangAPI::Symbol::createExpression(LangAPI::Symbol {v.name}), type));
             unnamed_datablock_units.erase(unnamed_datablock_units.begin());
         }
         dtb.value = initial_map;

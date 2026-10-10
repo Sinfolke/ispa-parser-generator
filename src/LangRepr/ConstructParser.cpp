@@ -135,6 +135,16 @@ namespace LangRepr {
                 new_if.else_stmt.push_back(finalizeReturnStatement(else_stmt));
             }
             return LangAPI::If::createStatement(new_if);
+        } else if (stmt.isSwitch()) {
+            LangAPI::Switch sw;
+            sw.expression = stmt.getSwitch().expression;
+            for (auto case_stmt : stmt.getSwitch().cases) {
+                for (auto &stmt : case_stmt.second) {
+                    stmt = finalizeReturnStatement(stmt);
+                }
+                sw.cases.push_back(case_stmt);
+            }
+            return LangAPI::Switch::createStatement(sw);
         } else if (stmt.isWhile()) {
             LangAPI::While new_do_while;
             new_do_while.expr = stmt.getWhile().expr;
@@ -170,6 +180,16 @@ namespace LangRepr {
                 new_if.else_stmt.push_back(finalizeTypes(else_stmt));
             }
             return LangAPI::If::createStatement(new_if);
+        }  else if (stmt.isSwitch()) {
+            LangAPI::Switch sw;
+            sw.expression = stmt.getSwitch().expression;
+            for (auto case_stmt : stmt.getSwitch().cases) {
+                for (auto &stmt : case_stmt.second) {
+                    stmt = finalizeTypes(stmt);
+                }
+                sw.cases.push_back(case_stmt);
+            }
+            return LangAPI::Switch::createStatement(sw);
         } else if (stmt.isWhile()) {
             LangAPI::While new_do_while;
             new_do_while.expr = stmt.getWhile().expr;

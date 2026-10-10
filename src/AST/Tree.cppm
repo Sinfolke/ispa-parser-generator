@@ -12,6 +12,10 @@ export namespace AST {
     /*
      * Tree class that holds features could be done on it. Contains tree_map map
      */
+    using LLkToken = stdu::vector<std::string>;
+    using LLkSeq = std::vector<LLkToken>;
+    using LLkSet = std::set<LLkSeq>;
+    using LLkTable = std::map<LLkToken, LLkSet>;
     class Tree {
         TreeMap tree_map;
         SpacemodeStates spacemode = SpacemodeStates::MIXED;
@@ -22,6 +26,8 @@ export namespace AST {
         NullableMap nullable;
         First first;
         Follow follow;
+        std::map<std::size_t, LLkTable> first_k_cache;
+        std::map<std::size_t, LLkTable> follow_k_cache;
         NameToIndexMap name_to_index;
 
         static auto compute_group_length(const stdu::vector<std::shared_ptr<AST::RuleMember>> &group) -> std::size_t;
@@ -37,6 +43,11 @@ export namespace AST {
         auto createUsePlacesTable() -> UsePlaceTable&;
         bool isMemberNullable(const AST::RuleMember& member) const;
         void computeNullableSet();
+        bool processMemberFirst(
+            const AST::RuleMember& member,
+            const stdu::vector<std::string>& nonterminal,
+            bool& changed
+        );
         void constructFirstSet(const stdu::vector<AST::Rule>& options, const stdu::vector<std::string> &nonterminal, bool &changed);
         void constructFirstSet();
         // Helper function to collect the FIRST set of an arbitrary RuleMember (Name or Group)
@@ -45,13 +56,31 @@ export namespace AST {
         void processFollowForSequence(
             const stdu::vector<std::string>& lhs_name,
             const stdu::vector<std::shared_ptr<AST::RuleMember>>& members,
+            const stdu::vector<std::shared_ptr<AST::RuleMember>>& trailing,
             bool is_left_recursive,
             bool& hasChanges,
             stdu::vector<stdu::vector<std::string>>& prev_depend
         );
         void constructFollowSet();
         void formatFirstOrFollowSet(std::ostringstream &oss, AST::First &set);
+        auto memberBaseFirstK(const AST::RuleMember&, std::size_t,
+            const LLkTable&) const -> LLkSet;
+        auto memberFirstK(const AST::RuleMember&, std::size_t,
+            const LLkTable&) const -> LLkSet;
+        auto sequenceFirstK(
+            const stdu::vector<std::shared_ptr<AST::RuleMember>>&,
+            std::size_t, const LLkTable&) const -> LLkSet;
+        void propagateFollowSequenceK(
+            const stdu::vector<std::shared_ptr<AST::RuleMember>>&,
+            const LLkSet&, std::size_t, const LLkTable&, LLkTable&,
+            bool&) const;
     public:
+
+        void constructFirstSet(std::size_t k);
+        void constructFollowSet(std::size_t k);
+        auto getFirstSet(std::size_t k) -> const LLkTable&;
+        auto getFollowSet(std::size_t k) -> const LLkTable&;
+        auto getAlternativeLookahead(const AST::RuleMember& alt, const stdu::vector<std::string>& ruleName, std::size_t k) -> LLkSet;
         auto getTreeMap() const -> const TreeMap& { return tree_map; };
         auto getUse() const -> const Use& { return use; };
         auto getSpacemode() const -> const SpacemodeStates& { return spacemode; };

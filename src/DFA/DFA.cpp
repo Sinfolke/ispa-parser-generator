@@ -752,6 +752,15 @@ auto DFA::minimize() -> States<State<>> {
     destination.accept_binding = source.accept_binding;
 
     destination.accept_action = source.accept_action;
+    // Accept-action continuations are DFA state IDs too. They must be
+    // remapped alongside ordinary transitions.
+    if (destination.accept_action &&
+        destination.accept_action->terminal_dfa_target != NFA::NULL_STATE) {
+      const auto original = destination.accept_action->terminal_dfa_target;
+      Assert(original < n, "Invalid accept-action DFA target {}", original);
+      destination.accept_action->terminal_dfa_target =
+          class_to_new_index.at(partition_of.at(original));
+    }
 
     // ------------------------------------------------------------
     // Transitions
@@ -817,6 +826,19 @@ auto DFA::minimize() -> States<State<>> {
 
     const auto &state = minimized[current];
 
+    // An accept action may resume at a DFA state even without an
+    // ordinary transition to it; preserve that destination.
+    if (state.accept_action &&
+        state.accept_action->terminal_dfa_target != NFA::NULL_STATE) {
+      const auto next = state.accept_action->terminal_dfa_target;
+      Assert(next < minimized.size(),
+             "Invalid accept-action continuation {}", next);
+      if (!reachable[next]) {
+        reachable[next] = true;
+        q.push(next);
+      }
+    }
+
     for (const auto &[symbol, target] : state.transitions) {
 
       std::size_t next_state = NFA::NULL_STATE;
@@ -877,6 +899,16 @@ auto DFA::minimize() -> States<State<>> {
     destination.accept_binding = source.accept_binding;
 
     destination.accept_action = source.accept_action;
+    if (destination.accept_action &&
+        destination.accept_action->terminal_dfa_target != NFA::NULL_STATE) {
+      const auto original = destination.accept_action->terminal_dfa_target;
+      Assert(original < state_remap.size(),
+             "Invalid accept-action target {} during compaction", original);
+      const auto mapped = state_remap[original];
+      Assert(mapped != NFA::NULL_STATE,
+             "Reachability removed accept-action destination {}", original);
+      destination.accept_action->terminal_dfa_target = mapped;
+    }
 
     for (const auto &[symbol, target] : source.transitions) {
 
@@ -1116,6 +1148,10 @@ auto DFA::minimize() -> States<State<>> {
     // accept_binding alone from this point on.
     // ------------------------------------------------------------
     if (source.accept_action.has_value()) {
+      Assert(source.accept_action->terminal_dfa_target == NFA::NULL_STATE ||
+                 source.accept_action->terminal_dfa_target < compact.size(),
+             "Invalid compacted accept-action target {}",
+             source.accept_action->terminal_dfa_target);
       Assert(destination.accept_binding.has_value(),
              "DFA state {} has an accept action sequence but no "
              "accept binding to attach it to",
@@ -1230,11 +1266,12 @@ auto DFA::classify() -> ClassifiedDFA {
                     .char_origin = std::nullopt
                 };
             } else {
-                return NFA::DFATarget{
-                    .id = binding.token_id,
-                    .debug = debug_id,
-                    .char_origin = std::nullopt
-                };
+                // A token ID is NOT a DFA state ID. Bare accepting states
+                // need an explicit token-return path in the runtime; never
+                // encode token_id as a DFA transition target.
+                throw Error(
+                    "DFA::classify: accepting token {} has no reduction "
+                    "action or semantic handler", binding.token_id);
             }
         }
         return NFA::DFATarget{

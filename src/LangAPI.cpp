@@ -506,6 +506,10 @@ namespace LangAPI {
         os << "std::string(" << obj.what << ")";
         return os;
     }
+    auto operator<<(std::ostream &os, const Cast &obj) -> std::ostream& {
+        os << "static_cast<" << *obj.type << ">(" << obj.what << ")";
+        return os;
+    }
     auto operator<<(std::ostream &os, const GetFromBox &obj) -> std::ostream& {
         os << "(*" << obj.what << ")";
         return os;
@@ -599,6 +603,13 @@ namespace LangAPI {
     bool operator<(const CheckVariant &a, const CheckVariant &b) {
         if (a.type != b.type) return a.type < b.type;
         return a.sym < b.sym;
+    }
+    bool operator==(const Cast &a, const Cast &b) {
+        return a.type == b.type && a.what == b.what;
+    }
+    bool operator<(const Cast &a, const Cast &b) {
+        if (a.type != b.type) return a.type < b.type;
+        return a.what < b.what;
     }
     bool operator==(const CharToStringConstructor &a, const CharToStringConstructor &b) {
         return a.what == b.what;

@@ -617,31 +617,38 @@ auto AST::Tree::getInitialItemSet() -> InitialItemSet & {
     return initial_item_set;
 }
 
-// Helper function to determine if a single rule member is nullable
 bool AST::Tree::isMemberNullable(const AST::RuleMember& member) const {
-    if (member.isNospace()) {
+    // '?' (zero-or-one) and '*' (zero-or-more) make the occurrence itself
+    // skippable regardless of what it contains. '+' does NOT — it still
+    // requires at least one occurrence.
+    if (member.quantifier == '?' || member.quantifier == '*')
+        return true;
+
+    if (member.isNospace())
+        return true;
+
+    if (member.isName())
+        return nullable.count(member.getName().name) > 0;
+
+    if (member.isGroup()) {
+        // (a b c): nullable only if EVERY member is nullable
+        for (const auto& sub : member.getGroup().values) {
+            if (!isMemberNullable(*sub))
+                return false;
+        }
         return true;
     }
 
-    if (member.isName()) {
-        return nullable.count(member.getName().name) > 0;
-    }
-
-    if (member.isGroup()) {
-        // A group (A | B | C) is nullable if ANY of its alternative productions are completely nullable
-        for (const auto& alt_rule : member.getGroup().values) {
-            bool alt_all_nullable = true;
-            if (!isMemberNullable(*alt_rule)) {
-                alt_all_nullable = false;
-                break;
-            }
-            if (alt_all_nullable) {
-                return true; // Found a completely nullable path through this group
-            }
+    if (member.isOp()) {
+        // a | b | c: nullable if ANY option is nullable
+        for (const auto& opt : member.getOp().options) {
+            if (isMemberNullable(*opt))
+                return true;
         }
         return false;
     }
 
+    // String / Csequence / Hex / Bin / Any / Escaped / Cll: never nullable on their own
     return false;
 }
 
@@ -665,89 +672,86 @@ void AST::Tree::computeNullableSet() {
         }
     } while (changed);
 }
+// Processes one RuleMember as part of nonterminal's production: adds its
+// FIRST contribution to first[nonterminal] and returns whether the
+// occurrence itself is nullable (quantifier included). Only the caller
+// that owns a complete rule (constructFirstSet) is allowed to insert ε
+// into first[nonterminal] — this never does it directly, so a nullable
+// sub-expression in the middle of a longer rule can't wrongly mark the
+// whole rule nullable.
+bool AST::Tree::processMemberFirst(
+    const AST::RuleMember& member,
+    const stdu::vector<std::string>& nonterminal,
+    bool& changed
+) {
+    if (member.isNospace())
+        return true;
+
+    bool force_nullable = (member.quantifier == '?' || member.quantifier == '*');
+
+    if (member.isName()) {
+        const auto& rule_name = member.getName();
+
+        if (rule_name.name == nonterminal)
+            return force_nullable || nullable.count(rule_name.name) > 0;
+
+        auto& currentFirst = first[nonterminal];
+
+        if (rule_name.isNonterminal()) {
+            const auto& otherFirst = first[rule_name.name];
+            for (const auto& el : otherFirst) {
+                if (corelib::text::isUpper(el.back()) && el != stdu::vector<std::string>{"ε"})
+                    continue;
+                if (currentFirst.insert(el).second)
+                    changed = true;
+            }
+            return force_nullable || nullable.count(rule_name.name) > 0;
+        } else {
+            if (currentFirst.insert(rule_name.name).second)
+                changed = true;
+            return force_nullable; // a terminal is never nullable by itself, '?'/'*' makes the occurrence skippable
+        }
+    }
+
+    if (member.isGroup()) {
+        bool all_nullable = true;
+        for (const auto& sub : member.getGroup().values) {
+            if (!processMemberFirst(*sub, nonterminal, changed)) {
+                all_nullable = false;
+                break;
+            }
+        }
+        return force_nullable || all_nullable;
+    }
+
+    if (member.isOp()) {
+        bool any_nullable = false;
+        for (const auto& opt : member.getOp().options) {
+            if (processMemberFirst(*opt, nonterminal, changed))
+                any_nullable = true;
+        }
+        return force_nullable || any_nullable;
+    }
+
+    if (member.isString() || member.isCsequence() || member.isHex() || member.isBin())
+        return force_nullable;
+
+    throw Error("Unhandled RuleMember variant, rule {} but index {}", nonterminal, member.value.index());
+}
+
 void AST::Tree::constructFirstSet(const stdu::vector<AST::Rule>& options, const stdu::vector<std::string>& nonterminal, bool& changed) {
     logger.increaseIndentLevel();
     for (const auto& option : options) {
         bool nullable_prefix = true;
         for (const auto& m : option.rule_members) {
-            const auto &member = *m;
-            if (member.isNospace())
-                continue;
-
-            // Handle Groups native to your structural API
-            if (member.isGroup()) {
-                logger.log("Encountered inline group inside rule {}", nonterminal);
-                const auto& groupValues = member.getGroup().values;
-
-                // Synthesize a temporary single-rule container matching your signature
-                AST::Rule tempRule;
-                tempRule.rule_members = groupValues;
-                constructFirstSet(stdu::vector<AST::Rule>{tempRule}, nonterminal, changed);
-
-                if (!isMemberNullable(member)) {
-                    nullable_prefix = false;
-                    break;
-                }
-                continue;
-            }
-
-            if (member.isOp()) {
-                logger.log("Encountered operator options block inside rule {}", nonterminal);
-                AST::Rule tempRule;
-                tempRule.rule_members = member.getOp().options;
-                constructFirstSet(stdu::vector<AST::Rule>{tempRule}, nonterminal, changed);
-
-                if (!isMemberNullable(member)) {
-                    nullable_prefix = false;
-                    break;
-                }
-                continue;
-            }
-
-            if (!member.isName()) {
-                // If it is a string asset, terminal representation, or hex block
-                if (member.isString() || member.isCsequence() || member.isHex() || member.isBin()) {
-                    nullable_prefix = false;
-                    break;
-                }
-                throw Error("Unhandled RuleMember variant, rule {} but index {}", nonterminal, member.value.index());
-            }
-
-            const auto& rule_name = member.getName();
-            auto& currentFirst = first[nonterminal];
-
-            if (rule_name.name == nonterminal) {
-                logger.log("rule.name == non-terminal -> continue");
-                continue;
-            }
-
-            if (rule_name.isNonterminal()) {
-                const auto& otherFirst = first[rule_name.name];
-                logger.log("inserting non-terminal's[{}] first set: to {}", rule_name.name, nonterminal);
-                for (const auto& el : otherFirst) {
-                    if (corelib::text::isUpper(el.back()) && el != stdu::vector<std::string>{"ε"} ) continue;
-                    if (currentFirst.insert(el).second)
-                        changed = true;
-                }
-
-                if (nullable.find(rule_name.name) == nullable.end()) {
-                    nullable_prefix = false;
-                    break;
-                }
-            } else {
-                logger.log("inserting terminal {} to {}", rule_name.name, nonterminal);
-                if (currentFirst.insert(rule_name.name).second) {
-                    changed = true;
-                }
+            if (!processMemberFirst(*m, nonterminal, changed)) {
                 nullable_prefix = false;
                 break;
             }
         }
-
         if (nullable_prefix) {
-            if (first[nonterminal].insert({"ε"}).second) {
+            if (first[nonterminal].insert({"ε"}).second)
                 changed = true;
-            }
         }
     }
     logger.decreaseIndentLevel();
@@ -773,7 +777,6 @@ void AST::Tree::constructFirstSet() {
         }
     } while (changed);
 }
-
 void AST::Tree::collectMemberFirst(const AST::RuleMember& member, std::set<stdu::vector<std::string>>& outFirst) {
     if (member.isNospace()) return;
 
@@ -805,6 +808,7 @@ void AST::Tree::collectMemberFirst(const AST::RuleMember& member, std::set<stdu:
 void AST::Tree::processFollowForSequence(
     const stdu::vector<std::string>& lhs_name,
     const stdu::vector<std::shared_ptr<AST::RuleMember>>& members,
+    const stdu::vector<std::shared_ptr<AST::RuleMember>>& trailing,
     bool is_left_recursive,
     bool& hasChanges,
     stdu::vector<stdu::vector<std::string>>& prev_depend
@@ -813,66 +817,81 @@ void AST::Tree::processFollowForSequence(
         auto &member = *members[i];
         if (member.isNospace()) continue;
 
-        if (member.isName()) {
-            const auto& nameInfo = member.getName();
-            auto current_n = nameInfo.name;
-            if (nameInfo.isTerminal()) continue;
+        bool can_repeat = (member.quantifier == '*' || member.quantifier == '+');
 
-            if (lhs_name == current_n) {
-                auto f = first[lhs_name];
-                for (auto &e : f) {
-                    if (e == stdu::vector<std::string>{"ε"}) continue;
-                    if (follow[lhs_name].insert(e).second) hasChanges = true;
-                }
-                prev_depend.push_back(lhs_name);
-                continue;
+        // Everything after this member, plus whatever follows the whole
+        // sequence we're inside of (members[i+1..] ++ trailing).
+        stdu::vector<std::shared_ptr<AST::RuleMember>> rest(members.begin() + i + 1, members.end());
+        rest.insert(rest.end(), trailing.begin(), trailing.end());
+
+        if (member.isGroup()) {
+            // (a b c): descend into the sequence with the same trailing continuation
+            processFollowForSequence(lhs_name, member.getGroup().values, rest, is_left_recursive, hasChanges, prev_depend);
+            continue;
+        }
+
+        if (member.isOp()) {
+            // a | b | c: EACH alternative gets the same trailing continuation —
+            // they must not see each other as "what comes next".
+            for (const auto& opt : member.getOp().options) {
+                stdu::vector<std::shared_ptr<AST::RuleMember>> one{opt};
+                processFollowForSequence(lhs_name, one, rest, is_left_recursive, hasChanges, prev_depend);
+            }
+            continue;
+        }
+
+        if (!member.isName())
+            continue; // terminal-like leaf: nothing more to propagate
+
+        const auto& nameInfo = member.getName();
+        auto current_n = nameInfo.name;
+        if (nameInfo.isTerminal()) continue;
+
+        std::size_t j = 0;
+        bool reached_end_or_nullable = true;
+
+        while (j < rest.size()) {
+            if (rest[j]->isNospace()) { j++; continue; }
+
+            std::set<stdu::vector<std::string>> next_first;
+            collectMemberFirst(*rest[j], next_first);
+
+            for (const auto& e : next_first) {
+                if (e == stdu::vector<std::string>{"ε"}) continue;
+                if (follow[current_n].insert(e).second) hasChanges = true;
             }
 
-            if (is_left_recursive) {
-                auto prev_size = follow[current_n].size();
-                follow[current_n].insert(follow[lhs_name].begin(), follow[lhs_name].end());
-                if (prev_size != follow[current_n].size()) hasChanges = true;
-                prev_depend.push_back(current_n);
+            if (!isMemberNullable(*rest[j])) {
+                reached_end_or_nullable = false;
+                if (rest[j]->isName())
+                    prev_depend.push_back(rest[j]->getName().name);
+                break;
             }
+            j++;
+        }
 
-            std::size_t next_idx = i + 1;
-            bool reached_end_or_nullable = true;
-
-            while (next_idx < members.size()) {
-                if (members[next_idx]->isNospace()) { next_idx++; continue; }
-
-                std::set<stdu::vector<std::string>> next_first;
-                collectMemberFirst(*members[next_idx], next_first);
-
-                for (const auto& e : next_first) {
-                    if (e == stdu::vector<std::string>{"ε"}) continue;
-                    if (follow[current_n].insert(e).second) hasChanges = true;
-                }
-
-                if (!isMemberNullable(*members[next_idx])) {
-                    reached_end_or_nullable = false;
-                    if (members[next_idx]->isName()) {
-                        prev_depend.push_back(members[next_idx]->getName().name);
-                    }
-                    break;
-                }
-                next_idx++;
-            }
-
-            if (reached_end_or_nullable) {
-                auto &f_lhs = follow[lhs_name];
-                for (auto &sym : f_lhs) {
-                    if (follow[current_n].insert(sym).second) hasChanges = true;
-                }
+        if (reached_end_or_nullable) {
+            for (auto &sym : follow[lhs_name]) {
+                if (follow[current_n].insert(sym).second) hasChanges = true;
             }
         }
-        else if (member.isGroup()) {
-            // Process the internal vector of structural members recursively
-            processFollowForSequence(lhs_name, member.getGroup().values, is_left_recursive, hasChanges, prev_depend);
+
+        if (can_repeat) {
+            // a* / a+ : another occurrence of `a` can immediately follow
+            // this one, so FIRST(a) is also part of FOLLOW(a).
+            for (auto &e : first[current_n]) {
+                if (e == stdu::vector<std::string>{"ε"}) continue;
+                if (follow[current_n].insert(e).second) hasChanges = true;
+            }
         }
-        else if (member.isOp()) {
-            processFollowForSequence(lhs_name, member.getOp().options, is_left_recursive, hasChanges, prev_depend);
+
+        if (is_left_recursive) {
+            auto prev_size = follow[current_n].size();
+            follow[current_n].insert(follow[lhs_name].begin(), follow[lhs_name].end());
+            if (prev_size != follow[current_n].size()) hasChanges = true;
         }
+
+        prev_depend.push_back(current_n);
     }
 }
 
@@ -901,22 +920,19 @@ void AST::Tree::constructFollowSet() {
                 if (rules.rule_members.empty())
                     continue;
 
-                // Determine left-recursion properties exactly like original layout
                 bool is_left_recursive = false;
-                auto rules_members_it = rules.rule_members.begin();
-                while (rules_members_it != rules.rule_members.end() && (*rules_members_it)->isNospace())
-                    rules_members_it++;
+                auto it = rules.rule_members.begin();
+                while (it != rules.rule_members.end() && (*it)->isNospace())
+                    it++;
 
-                if (rules_members_it != rules.rule_members.end() &&
-                (*rules_members_it)->isName() &&
-                    name == (*rules_members_it)->getName().name) {
+                if (it != rules.rule_members.end() &&
+                    (*it)->isName() &&
+                    name == (*it)->getName().name) {
                     is_left_recursive = true;
                 }
 
                 logger.dlog("Processing {} -> ", name);
-
-                // Hand over full execution loop down to the group safe scanner
-                processFollowForSequence(name, rules.rule_members, is_left_recursive, hasChanges, prev_depend);
+                processFollowForSequence(name, rules.rule_members, {}, is_left_recursive, hasChanges, prev_depend);
             }
 
             if (hasChanges) {
@@ -999,3 +1015,225 @@ auto AST::Tree::generateRandomTokenInputs(std::size_t maxDepth) -> utype::unorde
     AstInputGenerator generator(initial_item_set);
     return generator.generateTokenSamples(maxDepth);
 }
+
+// AST::Tree FIRST_k / FOLLOW_k implementation (C++17).
+// Add the declarations shown in AST_Tree_LLk_INTEGRATION.md to AST::Tree.
+// Include this file in the same translation unit/module as AST::Tree implementation.
+// Each LookaheadSeq is a sequence of token identifiers; each token identifier
+// is stdu::vector<std::string> (the existing AST name representation).
+
+namespace {
+using Token = stdu::vector<std::string>;
+using Seq = std::vector<Token>;
+using Set = std::set<Seq>;
+
+// Concatenate and truncate to k tokens. Empty Seq is epsilon.
+Set llk_concat(const Set& left, const Set& right, std::size_t k) {
+    Set out;
+    for (const auto& a : left) {
+        for (const auto& b : right) {
+            Seq joined = a;
+            for (const auto& t : b) {
+                if (joined.size() == k) break;
+                joined.push_back(t);
+            }
+            out.insert(std::move(joined));
+        }
+    }
+    return out;
+}
+
+// Zero or more repetitions, truncated at k. Handles nullable operands.
+Set llk_star(const Set& operand, std::size_t k) {
+    Set result{Seq{}};
+    Set frontier{Seq{}};
+    while (true) {
+        Set added = llk_concat(frontier, operand, k);
+        Set next;
+        for (const auto& s : added) {
+            if (result.insert(s).second) next.insert(s);
+        }
+        if (next.empty()) break;
+        frontier = std::move(next);
+    }
+    return result;
+}
+
+bool llk_merge(Set& into, const Set& from) {
+    bool changed = false;
+    for (const auto& seq : from)
+        changed |= into.insert(seq).second;
+    return changed;
+}
+} // namespace
+
+// Base member FIRST_k, ignoring the member's own quantifier.
+auto AST::Tree::memberBaseFirstK(const AST::RuleMember& member,
+    std::size_t k, const LLkTable& table) const -> LLkSet {
+    if (member.isNospace()) return {LLkSeq{}};
+    if (member.isName()) {
+        const auto& name = member.getName();
+        if (name.isTerminal()) return {LLkSeq{name.name}};
+        const auto it = table.find(name.name);
+        return it == table.end() ? LLkSet{} : it->second;
+    }
+    if (member.isGroup()) {
+        LLkSet result{LLkSeq{}};
+        for (const auto& sub : member.getGroup().values)
+            result = llk_concat(result, memberFirstK(*sub, k, table), k);
+        return result;
+    }
+    if (member.isOp()) {
+        LLkSet result;
+        for (const auto& option : member.getOp().options)
+            llk_merge(result, memberFirstK(*option, k, table));
+        return result;
+    }
+    // These members do not consume a named token in the existing grammar
+    // analysis. Never silently interpret them as epsilon: that would produce
+    // false LL(k) decisions. Add tokenization/terminal expansion here if needed.
+    throw Error("FIRST_k: unsupported consuming RuleMember kind (index {})",
+                member.value.index());
+}
+
+auto AST::Tree::memberFirstK(const AST::RuleMember& member,
+    std::size_t k, const LLkTable& table) const -> LLkSet {
+    LLkSet base = memberBaseFirstK(member, k, table);
+    switch (member.quantifier) {
+        case '?': {
+            base.insert(LLkSeq{});
+            return base;
+        }
+        case '*': return llk_star(base, k);
+        case '+': return llk_concat(base, llk_star(base, k), k);
+        default: return base;
+    }
+}
+
+auto AST::Tree::sequenceFirstK(
+    const stdu::vector<std::shared_ptr<AST::RuleMember>>& members,
+    std::size_t k, const LLkTable& table) const -> LLkSet {
+    LLkSet result{LLkSeq{}};
+    for (const auto& member : members)
+        result = llk_concat(result, memberFirstK(*member, k, table), k);
+    return result;
+}
+
+// Calculate a complete fixed point at one depth. The previous depth is
+// intentionally retained in first_k_cache: FIRST_{k-1} alone is not a
+// sufficient seed to derive FIRST_k, so a new depth must reach its own fixed
+// point. Results for old depths are still immediately reusable.
+void AST::Tree::constructFirstSet(std::size_t k) {
+    if (!k) throw Error("FIRST_k requires k >= 1");
+    createInitialItemSet();
+    computeNullableSet();
+    for (std::size_t depth = 1; depth <= k; ++depth) {
+        if (first_k_cache.count(depth)) continue;
+        LLkTable working;
+        for (const auto& entry : initial_item_set) {
+            if (corelib::text::isUpper(entry.first.back()))
+                continue;
+            working[entry.first];
+        }
+        bool changed;
+        do {
+            changed = false;
+            for (const auto& entry : initial_item_set) {
+                const auto& name = entry.first;
+                if (corelib::text::isUpper(name.back()))
+                    continue;
+                for (const auto& production : entry.second)
+                    changed |= llk_merge(working[name],
+                        sequenceFirstK(production.rule_members, depth, working));
+            }
+        } while (changed);
+        first_k_cache.emplace(depth, std::move(working));
+    }
+}
+
+// Visit nonterminal occurrences in a sequence. 'after' is FIRST_k of what
+// can occur after the entire sequence (including enclosing context).
+void AST::Tree::propagateFollowSequenceK(
+    const stdu::vector<std::shared_ptr<AST::RuleMember>>& members,
+    const LLkSet& after, std::size_t k, const LLkTable& firstTable,
+    LLkTable& followTable, bool& changed) const {
+    LLkSet suffix = after;
+    for (auto it = members.rbegin(); it != members.rend(); ++it) {
+        const auto& member = **it;
+        const auto base = memberBaseFirstK(member, k, firstTable);
+        LLkSet innerAfter = suffix;
+        if (member.quantifier == '*' || member.quantifier == '+')
+            innerAfter = llk_concat(llk_star(base, k), suffix, k);
+
+        if (member.isName()) {
+            const auto& name = member.getName();
+            if (name.isNonterminal())
+                changed |= llk_merge(followTable[name.name], innerAfter);
+        } else if (member.isGroup()) {
+            propagateFollowSequenceK(member.getGroup().values, innerAfter,
+                                     k, firstTable, followTable, changed);
+        } else if (member.isOp()) {
+            for (const auto& option : member.getOp().options) {
+                stdu::vector<std::shared_ptr<AST::RuleMember>> single{option};
+                propagateFollowSequenceK(single, innerAfter,
+                                         k, firstTable, followTable, changed);
+            }
+        }
+        suffix = llk_concat(memberFirstK(member, k, firstTable), suffix, k);
+    }
+}
+
+void AST::Tree::constructFollowSet(std::size_t k) {
+    if (!k) throw Error("FOLLOW_k requires k >= 1");
+    constructFirstSet(k);
+    for (std::size_t depth = 1; depth <= k; ++depth) {
+        if (follow_k_cache.count(depth)) continue;
+        const auto& firstTable = first_k_cache.at(depth);
+        LLkTable working;
+        for (const auto& entry : initial_item_set) {
+            if (corelib::text::isUpper(entry.first.back()))
+                continue;
+            working[entry.first];
+        }
+        // '$' is an end-of-input marker. It is a token identifier, not epsilon.
+        working[Token{"__start"}].insert(LLkSeq{Token{"$"}});
+        bool changed;
+        do {
+            changed = false;
+            for (const auto& entry : initial_item_set) {
+                const auto& lhs = entry.first;
+                if (corelib::text::isUpper(lhs.back()))
+                    continue;
+                for (const auto& production : entry.second)
+                    propagateFollowSequenceK(production.rule_members,
+                        working[lhs], depth, firstTable, working, changed);
+            }
+        } while (changed);
+        follow_k_cache.emplace(depth, std::move(working));
+    }
+}
+
+auto AST::Tree::getFirstSet(std::size_t k) -> const LLkTable& {
+    constructFirstSet(k);
+    return first_k_cache.at(k);
+}
+
+auto AST::Tree::getFollowSet(std::size_t k) -> const LLkTable& {
+    constructFollowSet(k);
+    return follow_k_cache.at(k);
+}
+
+// FIRST_k(alternative followed by the current rule's continuation).
+// This replaces OpBuilder::firstK + withFollow for alternatives that are
+// represented as one RuleMember each.
+auto AST::Tree::getAlternativeLookahead(
+    const AST::RuleMember& alt,
+    const stdu::vector<std::string>& ruleName, std::size_t k) -> LLkSet {
+    const auto& firstTable = getFirstSet(k);
+    const auto& followTable = getFollowSet(k);
+    const auto firstAlt = memberFirstK(alt, k, firstTable);
+    const auto it = followTable.find(ruleName);
+    if (it == followTable.end() || it->second.empty()) return firstAlt;
+    return llk_concat(firstAlt, it->second, k);
+}
+

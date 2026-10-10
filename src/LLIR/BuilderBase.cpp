@@ -77,7 +77,7 @@ void LLIR::BuilderBase::handle_plus_qualifier(const AST::RuleMember &rule, LangA
 void LLIR::BuilderBase::addPostLoopCheck(const AST::RuleMember &rule, const LangAPI::Variable &var, bool addError) {
     auto stmt = LangAPI::Return::createStatements(LangAPI::Return {});
     if (addError && !isFirst) {
-        stmt.insert(stmt.begin(), LangAPI::ReportError::createExpression(LangAPI::ReportError { .message = getErrorName(rule) }));
+        // stmt.insert(stmt.begin(), LangAPI::ReportError::createExpression(LangAPI::ReportError { .message = getErrorName(rule) }));
     }
     LangAPI::If post_loop_condition;
     post_loop_condition.expr = LangAPI::Expression { stdu::vector<LangAPI::ExpressionValue> { { LangAPI::ExpressionElement::Not, LangAPI::Symbol::createExpressionValue(LangAPI::Symbol { var.name }) } } };
@@ -89,22 +89,23 @@ auto LLIR::BuilderBase::createDefaultStatements(const LangAPI::Variable &var, co
         return LangAPI::VariableAssignment::createStatements(LangAPI::VariableAssignment {.name = LangAPI::Symbol {var.name}, .value = LangAPI::Pos::createExpression(LangAPI::Pos {.dereference = true})});
     } else if (var.type == LangAPI::ValueType::Token) {
         return LangAPI::Statements {
-            LangAPI::Statement {LangAPI::VariableAssignment::createStatement(LangAPI::VariableAssignment {.name = LangAPI::Symbol {var.name}, .value = LangAPI::GetVariant::createExpression(LangAPI::GetVariant {.type = std::make_shared<LangAPI::Type> (LangAPI::Type {LangAPI::ValueType::Token, LangAPI::Type {LangAPI::Symbol {name}}}), .sym = LangAPI::Pos::createExpression(LangAPI::Pos {.dereference = true})})})},
+            // FIX: extract the matched token's payload out of the variant
+            // before advancing pos. Without this, var stays default-
+            // constructed — exactly why STRING_4/NUMBER_2 in rv() ended up
+            // empty despite success_N being correctly set true.
+            LangAPI::Statement {LangAPI::VariableAssignment::createStatement(LangAPI::VariableAssignment {
+                .name = LangAPI::Symbol {var.name},
+                .value = LangAPI::GetVariant::createExpression(LangAPI::GetVariant {
+                    .type = std::make_shared<LangAPI::Type>(LangAPI::Type {LangAPI::ValueType::Token, LangAPI::Type {LangAPI::Symbol {name}}}),
+                    .sym = LangAPI::Pos::createExpression(LangAPI::Pos {.dereference = true})
+                })
+            })},
             LangAPI::Statement {LangAPI::VariableAssignment::createStatement(LangAPI::VariableAssignment { .name = LangAPI::Symbol {svar.name}, .value = LangAPI::Bool::createExpression(LangAPI::Bool {.value = true })})},
             LangAPI::Statement {LangAPI::Expression::createStatement(increasePos())}
         };
     } else {
         return LangAPI::Statements {
             LangAPI::Statement {LangAPI::VariableAssignment::createStatement(LangAPI::VariableAssignment { .name = LangAPI::Symbol {svar.name}, .value = LangAPI::Bool::createExpression(LangAPI::Bool {.value = true })})},
-            LangAPI::Statement {LangAPI::Expression::createStatement(LangAPI::VariableAssignment::createExpression(
-                LangAPI::AssignCounter {
-                    .v = std::make_shared<LangAPI::Expression>(LangAPI::StorageSymbol::createExpression(
-                        LangAPI::StorageSymbol {
-                        LangAPI::Symbol::createExpression(LangAPI::Symbol {var.name}),
-                        stdu::vector<LangAPI::StorageSymbol::PathPart> { "it" }
-                    }))
-                }
-            ))}
         };
     }
 }
@@ -145,10 +146,12 @@ auto LLIR::BuilderBase::add_shadow_variable(LangAPI::Statements &block, LangAPI:
             }
         }
     };
-    undoRuleResult(shadow_var.type.getValueType());
-    shadow_var.type.template_parameters = {{var.type}};
+    auto element_type = var.type;
+    if (element_type.isValueType())
+        undoRuleResult(element_type.getValueType());
+    shadow_var.type.template_parameters = {{element_type}};
     shadow_var.type.type = LangAPI::ValueType::Array;
-    statements.push_back(LangAPI::Variable::createStatement(shadow_var));
+    block.push_back(LangAPI::Variable::createStatement(shadow_var));
     statements.push_back(
         LangAPI::StorageSymbol::createStatement(sym)
     );
@@ -190,6 +193,11 @@ auto LLIR::BuilderBase::pushBasedOnQualifier(
             break;
         }
         case '?':
+            // An absent optional token leaves the cursor and capture untouched.
+            // Assign the named result only when the optional actually matched.
+            createAssignUvarBlock(stmt, uvar, var, shadow_variable);
+            stmt.insert(stmt.end(), shadow_var_assign_block.begin(),
+                        shadow_var_assign_block.end());
             statements.push_back(LangAPI::If::createStatement(LangAPI::If {expr, stmt}));
             break;
         default:
@@ -201,7 +209,7 @@ auto LLIR::BuilderBase::pushBasedOnQualifier(
             // add exit statement
             LangAPI::Statements blk = LangAPI::Return::createStatements(LangAPI::Return {});
             if (!isFirst) {
-                blk.insert(blk.begin(), LangAPI::ReportError::createStatement( LangAPI::ReportError { .message = getErrorName(rule)}));
+                // blk.insert(blk.begin(), LangAPI::ReportError::createStatement( LangAPI::ReportError { .message = getErrorName(rule)}));
             }
             statements.insert(statements.end(), stmt.begin(), stmt.end());
             statements.push_back(LangAPI::If::createStatement(LangAPI::If {expr, blk}));
@@ -210,7 +218,10 @@ auto LLIR::BuilderBase::pushBasedOnQualifier(
             statements.insert(statements.end(), shadow_var_assign_block.begin(), shadow_var_assign_block.end());
             break;
     }
-    createAssignUvarBlock(statements, uvar, var, shadow_variable);
+    // Optional assignment is emitted inside its conditional branch.
+    // For other quantifiers retain the existing behavior.
+    if (quantifier != '?')
+        createAssignUvarBlock(statements, uvar, var, shadow_variable);
     return shadow_variable;
 }
 void LLIR::BuilderBase::pushConvResult(const AST::RuleMember &rule, const LangAPI::Variable &var, const LangAPI::Variable &uvar, const LangAPI::Variable &svar, const LangAPI::Variable &shadow_var, char quantifier) {
@@ -578,60 +589,79 @@ auto LLIR::BuilderBase::getLookaheadTerminals(const AST::RuleMember& symbol, con
 
 
 auto LLIR::BuilderBase::deduceUvarType(const LangAPI::Variable &var, const LangAPI::Variable &shadow_var) -> LangAPI::Type {
+    if (var.type.isValueType() && (var.type.getValueType() == LangAPI::ValueType::TokenResult || var.type.getValueType() == LangAPI::ValueType::RuleResult)) {
+        return {var.type.getValueType() == LangAPI::ValueType::TokenResult ? LangAPI::ValueType::Token : LangAPI::ValueType::Rule, var.type.template_parameters};
+    }
     return shadow_var.name.empty() ? var.type : shadow_var.type;
 }
 auto LLIR::BuilderBase::deduceVarTypeByRuleMember(const AST::RuleMember &mem) -> LangAPI::Type {
     LangAPI::Type type = LangAPI::ValueType::String;
     if (mem.isGroup()) {
-        const auto &val = mem.getGroup().values;
-        if (val.size() == 1) {
-            type = deduceVarTypeByRuleMember(*val[0]);
-        } else {
-            stdu::vector<LangAPI::Type> types;
-            utype::unordered_set<LangAPI::Type> meeted_types;
-            bool all_string = false;
-            bool all_char = true;
-            for (auto i = 0; i < val.size(); i++) {
-                auto tmp_type = deduceVarTypeByRuleMember(*val[i]);
-                meeted_types.insert(tmp_type);
-                if (tmp_type == LangAPI::ValueType::Char && all_char) {
-                    continue;
-                }
-                if (tmp_type == LangAPI::ValueType::String) {
-                    if (all_char) {
-                        all_string =  true;
-                        all_char = false;
-                    }
-                } else {
-                    all_string = false;
-                }
-            }
-            if (all_char) {
-                type = LangAPI::ValueType::Char;
-            } else if (all_string) {
-                type = LangAPI::ValueType::String;
-            } else {
-                LangAPI::Type tuple = {LangAPI::ValueType::Tuple};
-                for (const auto &insert_type : types) {
-                    tuple.template_parameters.push_back(insert_type);
-                }
-                return tuple;
-            }
+        const auto& values = mem.getGroup().values;
+
+        if (values.empty()) {
+            return LangAPI::ValueType::String;
         }
+
+        if (values.size() == 1) {
+            return deduceVarTypeByRuleMember(*values.front());
+        }
+
+        stdu::vector<LangAPI::Type> types;
+        types.reserve(values.size());
+
+        bool all_char = true;
+        bool all_string_like = true;
+
+        for (const auto& value : values) {
+            const auto current_type =
+                deduceVarTypeByRuleMember(*value);
+
+            types.push_back(current_type);
+
+            all_char &=
+                current_type == LangAPI::ValueType::Char;
+
+            all_string_like &=
+                current_type == LangAPI::ValueType::Char ||
+                current_type == LangAPI::ValueType::String;
+        }
+
+        if (all_char) {
+            return LangAPI::ValueType::Char;
+        }
+
+        if (all_string_like) {
+            return LangAPI::ValueType::String;
+        }
+
+        LangAPI::Type tuple{
+            LangAPI::ValueType::Tuple
+        };
+
+        for (const auto& current_type : types) {
+            tuple.template_parameters.push_back(current_type);
+        }
+        type = tuple;
     } else if (mem.isOp()) {
         std::optional<LangAPI::Type> first_type;
+        stdu::vector<LangAPI::Type> types;
         utype::unordered_set<LangAPI::Type> meeted_types;
         char prev_quantifier = '\0';
 
         for (const auto &el : mem.getOp().options) {
             auto t = deduceVarTypeByRuleMember(*el);
             meeted_types.insert(t);
+            types.push_back(t);
+        }
+        if (meeted_types.size() == 0) {
+            throw Error("Empty alternative type");
         }
         if (meeted_types.size() == 1) {
             return *meeted_types.begin();
         }
         type = LangAPI::ValueType::Variant;
-        for (const auto &mt : meeted_types) {
+        for (const auto &mt : types) {
             type.template_parameters.push_back(mt);
         }
     } else if (mem.isName()) {

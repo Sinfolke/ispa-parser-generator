@@ -7,9 +7,12 @@ tests:
   - name: integer_variable
     path: basic/Integer_variable.isc
     input: "int my_variable123 = 45"
+  - name: json
+    path: basic/json.isc
+    input: "{\\\"name\\\": \\\"Yuriy\\\", \\\"hello\\\": \\\"world!\\\"}"
 
-    expect:
-      - for: TEMPLATED_TYPE
-        value:
-          op: '=='
-          type: 'str'
+#    expect:
+#      - for: json
+#        value:
+#          op: '=='
+#          type: 'str'

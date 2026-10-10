@@ -3,6 +3,7 @@ export module LLIR.Rule.MemberBuilder;
 import LLIR.Builder.Base;
 import LLIR.Builder.DataWrapper;
 import AST.API;
+import AST.Tree;
 import LangAPI;
 import dstd;
 import std;
@@ -11,13 +12,11 @@ export namespace LLIR {
     class MemberBuilder : public BuilderBase {
         const stdu::vector<std::shared_ptr<AST::RuleMember>> *rules = nullptr;
         const AST::RuleMember *rule = nullptr;
-        bool addSpaceSkipFirst;
         void buildMember(const AST::RuleMember &member);
     public:
         void build() override;
         MemberBuilder(BuilderDataWrapper &data, const AST::RuleMember &rule) : BuilderBase(data), rule(&rule) {}
         MemberBuilder(BuilderDataWrapper &data, const stdu::vector<std::shared_ptr<AST::RuleMember>> &rules) : BuilderBase(data), rules(&rules) {}
-        auto getAddSpaceSkipFirst() const -> bool { return addSpaceSkipFirst; }
     };
 
     class GroupBuilder : public BuilderBase {
@@ -111,6 +110,36 @@ export namespace LLIR {
             LangAPI::Variable &var,
             LangAPI::Variable &svar
         ) -> LangAPI::Statements;
+        using LookaheadSeq = stdu::vector<stdu::vector<std::string>>; // up to k terminal ids
+
+        // --- dynamic k resolution -------------------------------------------------
+        // Tries k = 1, 2, 3, ... until either:
+        //   (a) a k is found with no conflicts between alternatives, or
+        //   (b) a hard cap is hit, as a safety valve against pathological grammars.
+        struct LLkResolution {
+            std::size_t k = 1;
+            std::vector<std::set<LookaheadSeq>> perAlt;
+            bool resolved = false;
+        };
+        // returns true (ok) if NO two alternatives share a lookahead string;
+        // collects colliding (i, j, seq) triples for diagnostics either way
+        bool checkLLkConflicts(const std::vector<std::set<LookaheadSeq>> &perAlt,
+                                std::vector<std::tuple<std::size_t, std::size_t, LookaheadSeq>> *conflicts = nullptr);
+
+        LangAPI::Switch buildDecisionTree(
+            const std::vector<std::set<LookaheadSeq>>& perAlt,
+            const std::vector<std::shared_ptr<AST::RuleMember>>& op,
+            const std::vector<std::size_t>& candidates,
+            std::size_t depth,
+            std::size_t k,
+            const LangAPI::Variable& result_var,
+            const LangAPI::Variable& success_var
+        );
+
+        LLkResolution resolveLLk(const std::vector<std::shared_ptr<AST::RuleMember>> &op,
+                                  const stdu::vector<std::string> &rule_name,
+                                  AST::Tree &tree,
+                                  std::size_t max_k = 32);
     public:
         void build() override;
         OpBuilder(BuilderDataWrapper &data, const AST::RuleMember &rule) : BuilderBase(data), rule(rule) {}

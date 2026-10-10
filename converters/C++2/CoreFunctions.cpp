@@ -8,6 +8,8 @@ import Cpp.Declarations;
 import constants;
 
 import dstd;
+#include <valgrind/valgrind.h>
+
 auto Core::isNestedArrayType(const LangAPI::Type &t) -> bool {
     if (t.isValueType() && (t.getValueType() == LangAPI::ValueType::Array || t.getValueType() == LangAPI::ValueType::FixedSizeArray)) {
         for (const auto &param : t.template_parameters) {
@@ -213,6 +215,8 @@ auto Core::convertIspaLibSymbol(const LangAPI::IspaLibSymbol &symbol) -> std::st
             return "::ISPA_STD::concat";
         case LangAPI::StdlibExports::MatchResultValue:
             return "node";
+        case LangAPI::StdlibExports::VariantIndex:
+            return "index()";
         default:
             throw Error("Unknown IspaLibSymbol exports: {}", (int) symbol.exports);
     }
@@ -486,48 +490,137 @@ auto Core::convertGetVariant(const LangAPI::GetVariant &get_variant) -> std::str
     std::cout << "ss: " << get_variant.sym << ", " << convertExpression(get_variant.sym) << std::endl;
     return std::string("std::get<") + convertType(*get_variant.type) + ">(" + convertExpression(get_variant.sym) + ")";
 }
-auto Core::convertDFADebug(const LangAPI::DFADebug &dfa_debug) -> std::string {
+
+auto Core::convertDFADebug(const LangAPI::DFADebug& dfa_debug)
+    -> std::string
+{
     std::stringstream ss;
-    ss << "::ISPA_STD::DFA::API::DFADebug {";
-    if (!dfa_debug.member.empty()) {
-        if (dfa_debug.member.isString()) {
-            ss << '"';
-            for (const auto c : dfa_debug.member.getString().value) {
-                if (c == '\\')
-                    ss << "\\\\";
-                else
-                    ss << c;
+
+    // Escape arbitrary text for a generated C++ string literal.
+    const auto escapeString = [](std::string_view value) {
+        std::string result;
+        result.reserve(value.size() * 2);
+
+        constexpr char hex[] = "0123456789ABCDEF";
+
+        for (unsigned char c : value) {
+            switch (c) {
+                case '\\': result += "\\\\"; break;
+                case '"':  result += "\\\""; break;
+                case '\n': result += "\\n";  break;
+                case '\r': result += "\\r";  break;
+                case '\t': result += "\\t";  break;
+                case '\0': result += "\\000"; break;
+
+                default:
+                    if (c < 0x20 || c == 0x7F) {
+                        result += "\\x";
+                        result += hex[c >> 4];
+                        result += hex[c & 0x0F];
+
+                        // Prevent hexadecimal escape continuation.
+                        result += "\"\"";
+                    } else {
+                        result += static_cast<char>(c);
+                    }
+                    break;
             }
-            ss << '"';
-        } else if (dfa_debug.member.isCsequence()) {
-            const auto &csequence = dfa_debug.member.getCsequence();
-            ss << "\"[";
-            for (const auto &c : csequence.characters)
-                ss << c;
-            for (const auto c : csequence.escaped) {
-                ss << "\\\\" << c;
-            }
-            for (const auto &c : csequence.diapasons) {
-                ss << c.first << '-' << c.second;
-            }
-            ss << "]\"";
-        } else {
-            ss << '"' << dfa_debug.member << '"';
         }
-    } else
-        ss << '"' << "<Undefined>" << '"';
-    ss
-        << ", " << '"' << corelib::text::join(dfa_debug.token_name, ".") << '"'
-        << ", " << dfa_debug.position_in_token
-        << ", " << (dfa_debug.call == constants::NULL_STATE ? "-1" : std::to_string(dfa_debug.call))
-        << ", " << (dfa_debug.group == constants::NULL_STATE ? "-1" : std::to_string(dfa_debug.group))
-        << ", " << (dfa_debug.rule_run == constants::NULL_STATE ? "-1" : std::to_string(dfa_debug.rule_run))
-        << ", " << dfa_debug.offset
-        << ", " << dfa_debug.length
-        << ", " << "'" << (dfa_debug.ch == '\\' ? "\\\\" : corelib::text::getCharFromEscapedAsStr(dfa_debug.ch, false)) << "'"
-    << "}";
+
+        return result;
+    };
+
+    // Escape a character for a generated C++ character literal.
+    const auto escapeChar = [](char value) {
+        switch (value) {
+            case '\\': return std::string("\\\\");
+            case '\'': return std::string("\\'");
+            case '\n': return std::string("\\n");
+            case '\r': return std::string("\\r");
+            case '\t': return std::string("\\t");
+            case '\0': return std::string("\\000");
+            default: {
+                const auto c = static_cast<unsigned char>(value);
+
+                if (c < 0x20 || c == 0x7F) {
+                    constexpr char hex[] = "0123456789ABCDEF";
+
+                    std::string result = "\\x";
+                    result += hex[c >> 4];
+                    result += hex[c & 0x0F];
+                    return result;
+                }
+
+                return std::string(1, value);
+            }
+        }
+    };
+
+    std::string member;
+
+    if (dfa_debug.member.empty()) {
+        member = "<Undefined>";
+    } else if (dfa_debug.member.isString()) {
+        member = dfa_debug.member.getString().value;
+    } else if (dfa_debug.member.isCsequence()) {
+        const auto& sequence =
+            dfa_debug.member.getCsequence();
+
+        member = "[";
+
+        for (const auto c : sequence.characters) {
+            member += c;
+        }
+
+        for (const auto c : sequence.escaped) {
+            member += '\\';
+            member += c;
+        }
+
+        for (const auto& [from, to] : sequence.diapasons) {
+            member += from;
+            member += '-';
+            member += to;
+        }
+
+        member += "]";
+    } else {
+        std::stringstream member_stream;
+        member_stream << dfa_debug.member;
+        member = member_stream.str();
+    }
+
+    ss << "::ISPA_STD::DFA::API::DFADebug {"
+       << '"' << escapeString(member) << '"'
+       << ", \"" << escapeString(
+            corelib::text::join(dfa_debug.token_name, ".")
+          ) << '"'
+       << ", " << (
+            dfa_debug.position_in_token
+          )
+       << ", " << (
+            dfa_debug.call == constants::NULL_STATE
+                ? "-1"
+                : std::to_string(dfa_debug.call)
+          )
+       << ", " << (
+            dfa_debug.group == constants::NULL_STATE
+                ? "-1"
+                : std::to_string(dfa_debug.group)
+          )
+       << ", " << (
+            dfa_debug.rule_run == constants::NULL_STATE
+                ? "-1"
+                : std::to_string(dfa_debug.rule_run)
+          )
+       << ", " << dfa_debug.offset
+       << ", " << dfa_debug.length
+       << ", '" << escapeChar(dfa_debug.ch) << "'"
+       << "}";
+
     return ss.str();
 }
+
 auto Core::convertRValue(const LangAPI::RValue &rvalue) -> std::string {
     switch (rvalue.type()) {
         case LangAPI::RValueType::Undef:
@@ -749,6 +842,8 @@ auto Core::convertRValue(const LangAPI::RValue &rvalue) -> std::string {
             return "std::to_string(" + convertExpression(rvalue.getToString().what) + ")";
         case LangAPI::RValueType::CharToStringConstructor:
             return "std::string(1, " + convertExpression(rvalue.getCharToStringConstructor().what) + ")";
+        case LangAPI::RValueType::Cast:
+            return "static_cast<" + convertType(*rvalue.getCast().type) + ">(" + convertExpression(rvalue.getCast().what) + ")";
         case LangAPI::RValueType::GetFromBox:
             return "(*" + convertExpression(rvalue.getGetFromBox().what) + ")";
         default:

@@ -1,0 +1,167 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "ISPA",
+  "scopeName": "source.ispa",
+  "fileTypes": ["isc"],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#character-sets" },
+    { "include": "#embedded-cll" },
+    { "include": "#declarations" },
+    { "include": "#directives" },
+    { "include": "#numbers" },
+    { "include": "#operators" },
+    { "include": "#punctuation" },
+    { "include": "#identifiers" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.ispa",
+          "match": "//.*$"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.single.ispa",
+          "begin": "'",
+          "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.ispa" } },
+          "end": "'",
+          "endCaptures": { "0": { "name": "punctuation.definition.string.end.ispa" } },
+          "patterns": [
+            { "name": "constant.character.escape.ispa", "match": "\\\\." }
+          ]
+        }
+      ]
+    },
+    "character-sets": {
+      "patterns": [
+        {
+          "name": "constant.other.character-class.ispa",
+          "begin": "\\[\\^?",
+          "beginCaptures": { "0": { "name": "punctuation.definition.character-class.ispa" } },
+          "end": "\\]",
+          "endCaptures": { "0": { "name": "punctuation.definition.character-class.ispa" } },
+          "patterns": [
+            { "name": "constant.character.escape.ispa", "match": "\\\\." },
+            { "name": "keyword.operator.range.ispa", "match": "-" }
+          ]
+        }
+      ]
+    },
+    "embedded-cll": {
+      "patterns": [
+        {
+          "name": "meta.embedded.cll.ispa",
+          "begin": "\\$",
+          "beginCaptures": { "0": { "name": "punctuation.definition.embedded.begin.ispa" } },
+          "end": ";",
+          "endCaptures": { "0": { "name": "punctuation.terminator.statement.ispa" } },
+          "patterns": [
+            { "include": "#comments" },
+            { "include": "#strings" },
+            { "include": "#numbers" },
+            { "include": "#cll-keywords" },
+            { "include": "#operators" },
+            { "include": "#punctuation" },
+            { "include": "#identifiers" }
+          ]
+        }
+      ]
+    },
+    "declarations": {
+      "patterns": [
+        {
+          "name": "meta.rule.ispa",
+          "match": "(?m)^\\s*(#)?([A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*)\\s*(:)",
+          "captures": {
+            "1": { "name": "punctuation.definition.nested-rule.ispa" },
+            "2": { "name": "entity.name.function.rule.ispa" },
+            "3": { "name": "punctuation.separator.key-value.ispa" }
+          }
+        },
+        {
+          "name": "meta.declaration.name.ispa",
+          "match": "\\b(name)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;",
+          "captures": {
+            "1": { "name": "keyword.other.declaration.ispa" },
+            "2": { "name": "entity.name.namespace.ispa" },
+            "3": { "name": "punctuation.terminator.statement.ispa" }
+          }
+        },
+        {
+          "name": "meta.declaration.spacemode.ispa",
+          "match": "\\b(spacemode)\\s+(mixed|skipped|allowed)\\s*;",
+          "captures": {
+            "1": { "name": "keyword.other.declaration.ispa" },
+            "2": { "name": "constant.language.ispa" },
+            "3": { "name": "punctuation.terminator.statement.ispa" }
+          }
+        }
+      ]
+    },
+    "directives": {
+      "patterns": [
+        {
+          "name": "meta.directive.use.ispa",
+          "match": "\\b(use)\\s+([A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)?)(?:\\s*,\\s*([A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)?))*\\s*;",
+          "captures": {
+            "1": { "name": "keyword.control.import.ispa" },
+            "2": { "name": "entity.name.namespace.ispa" },
+            "3": { "name": "entity.name.namespace.ispa" }
+          }
+        },
+        {
+          "name": "keyword.operator.capture.ispa",
+          "match": "@(?=\\s*(?:\\{|[A-Za-z_]))"
+        },
+        {
+          "name": "punctuation.definition.value-reference.ispa",
+          "match": "&(?=[A-Za-z_])"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        { "name": "constant.numeric.hexadecimal.ispa", "match": "\\b0[xX][0-9A-Fa-f]+\\b" },
+        { "name": "constant.numeric.binary.ispa", "match": "\\b0[bB][01]+\\b" },
+        { "name": "constant.numeric.ispa", "match": "[+-]?[0-9]+(?:[.,][0-9]+)?\\b" },
+        { "name": "constant.language.boolean.ispa", "match": "\\b(?:true|false)\\b" }
+      ]
+    },
+    "cll-keywords": {
+      "patterns": [
+        { "name": "keyword.control.ispa", "match": "\\b(?:if|while|for|throw)\\b" },
+        { "name": "storage.type.ispa", "match": "\\b(?:var|num|bool|str|arr|obj)\\b" },
+        { "name": "constant.language.boolean.ispa", "match": "\\b(?:true|false)\\b" },
+        { "name": "keyword.operator.word.ispa", "match": "\\b(?:and|or|not)\\b" }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        { "name": "keyword.operator.quantifier.ispa", "match": "[?+*]" },
+        { "name": "keyword.operator.logical.ispa", "match": "&&|\\|\\||==|!=|>=|<=|>|<|\\+=|-=|\\*=|/=|%=|=|!" },
+        { "name": "keyword.operator.ispa", "match": "\\\\s0|\\\\|\\||\\+|-|\\*|/|%|\\^|~" }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        { "name": "punctuation.separator.ispa", "match": ",|\\.|:" },
+        { "name": "punctuation.terminator.statement.ispa", "match": ";" },
+        { "name": "punctuation.section.group.begin.ispa", "match": "[({]" },
+        { "name": "punctuation.section.group.end.ispa", "match": "[)}]" },
+        { "name": "punctuation.definition.template.begin.ispa", "match": "@\\{" },
+        { "name": "punctuation.definition.template.end.ispa", "match": "\\}" }
+      ]
+    },
+    "identifiers": {
+      "patterns": [
+        { "name": "variable.other.ispa", "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b" }
+      ]
+    }
+  }
+}
