@@ -49,15 +49,28 @@ jobs:
         if: matrix.os == 'windows-latest'
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Install Ubuntu dependencies
+      - name: Install dependencies (Ubuntu)
         if: startsWith(matrix.os, 'ubuntu')
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             clang-20 \
+            gcc-15 \
             libboost-all-dev \
             libc++-20-dev \
-            libc++abi-20-dev
+            libc++abi-20-dev \
+            valgrind
+
+      - name: Fix libc++ modules std path (Ubuntu clang)
+        if: matrix.cpp_compiler == 'clang++-20'
+        run: |
+          real=/usr/lib/llvm-20/share/libc++/v1
+          bogus=/lib/share/libc++/v1
+          if [[ -d "$real" && ! -e "$bogus" ]]; then
+            sudo mkdir -p "$(dirname "$bogus")"
+            sudo ln -sfn "$real" "$bogus"
+          fi
+          ls -la "$bogus" 2>&1 || true
 
       - name: Configure CMake
         shell: bash
