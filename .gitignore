@@ -68,3 +68,4 @@ test-dump
 # dir where dumps are located
 Dumps
 TestDumps
+!.github
