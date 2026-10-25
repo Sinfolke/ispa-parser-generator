@@ -53,7 +53,12 @@ class PackageTests(unittest.TestCase):
             subprocess.run([str(program)], check=True)
 
             archive.unlink()
-            write_export_files(root)
+            entry = Path(__file__).resolve().parents[1] / 'cli' / 'pkg' / 'ispa_pkg_entry.py'
+            exported = subprocess.run(
+                [sys.executable, str(entry), '--root', str(root), '--export', '--export-path'],
+                capture_output=True, text=True, check=True)
+            self.assertEqual(exported.stdout.strip(), str(script))
+            self.assertIn('compiling src/example.cpp', exported.stderr)
             self.assertTrue(archive.is_file())
 
             (cpp / 'src' / 'example.cpp').write_text(

@@ -34,7 +34,7 @@ try {
   } finally { $zip.Dispose() }
   Expand-Archive -LiteralPath $zipPath -DestinationPath $extractDir
   if (-not (Test-Path (Join-Path $extractDir 'ispa.exe'))) { throw 'Archive does not contain ispa.exe' }
-  foreach ($file in @('ispa-pkg.exe', 'install.ps1', 'update.ps1')) {
+  foreach ($file in @('ispa-pkg.exe', 'ispadbg.exe', 'install.ps1', 'update.ps1')) {
     if (-not (Test-Path (Join-Path $extractDir $file))) { throw "Archive does not contain $file" }
   }
   $versions = Join-Path $root 'versions'
@@ -42,8 +42,12 @@ try {
   New-Item -ItemType Directory -Force -Path $versions, $bin | Out-Null
   if (-not (Test-Path $target)) {
     Move-Item -LiteralPath $extractDir -Destination $target
-  } elseif (-not (Test-Path (Join-Path $target 'ispa-pkg.exe'))) {
-    Copy-Item -LiteralPath (Join-Path $extractDir 'ispa-pkg.exe') -Destination (Join-Path $target 'ispa-pkg.exe')
+  } else {
+    foreach ($file in @('ispa-pkg.exe', 'ispadbg.exe')) {
+      if (-not (Test-Path (Join-Path $target $file))) {
+        Copy-Item -LiteralPath (Join-Path $extractDir $file) -Destination (Join-Path $target $file)
+      }
+    }
   }
 
   # Stable Windows launcher, forwarding arguments to the active release.
@@ -52,6 +56,8 @@ try {
   "@echo off`r`n`"$exe`" %*`r`n" | Set-Content -LiteralPath $shim -Encoding ASCII
   $pkg = Join-Path $target 'ispa-pkg.exe'
   "@echo off`r`n`"$pkg`" %*`r`n" | Set-Content -LiteralPath (Join-Path $bin 'ispa-pkg.cmd') -Encoding ASCII
+  $debugger = Join-Path $target 'ispadbg.exe'
+  "@echo off`r`n`"$debugger`" %*`r`n" | Set-Content -LiteralPath (Join-Path $bin 'ispadbg.cmd') -Encoding ASCII
   $updater = Join-Path $target 'update.ps1'
   "@echo off`r`npowershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$updater`" %*`r`n" | Set-Content -LiteralPath (Join-Path $bin 'ispa-update.cmd') -Encoding ASCII
   Set-Content -LiteralPath (Join-Path $root 'current-version') -Value $tag -NoNewline

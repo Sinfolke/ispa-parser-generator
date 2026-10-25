@@ -69,6 +69,7 @@ namespace Cpp {
 
     class Construct : protected ::Converter::ConstructBase {
         Context context;
+        bool debug_instrumentation_ = true;
         std::vector<std::pair<std::string, std::string>> writable_files;
         // declarations related
         auto determineOffloadCompatible(const LangAPI::Function &func) -> bool;
@@ -97,7 +98,9 @@ namespace Cpp {
         auto convertStatement(const LangAPI::Statement &statements, Converter::Writer &o) -> void;
         auto convertStatements(const LangAPI::Statements &statements, Converter::Writer &o) -> void;
     public:
-        Construct(const LangAPI::Declarations *source, const char *namespace_name, bool incremental) : ConstructBase(source, namespace_name, incremental) {
+        Construct(const LangAPI::Declarations *source, const char *namespace_name, bool incremental,
+                  bool debug_instrumentation = true)
+            : ConstructBase(source, namespace_name, incremental), debug_instrumentation_(debug_instrumentation) {
             Core::symbol_path = &context.symbol_path;
             Core::lambda_body = [this](const LangAPI::Statements& body) {
                 Converter::Writer writer;
@@ -111,5 +114,6 @@ namespace Cpp {
         auto construct() -> void override;
     };
 }
-extern "C" auto cpp_construct(const LangAPI::Declarations *tree, const char *namespace_name, bool incremental)
+extern "C" auto cpp_construct(const LangAPI::Declarations *tree, const char *namespace_name,
+                              bool incremental, bool debug_instrumentation)
     -> Cpp::Construct*;

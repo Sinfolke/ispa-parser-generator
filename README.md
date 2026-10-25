@@ -33,6 +33,47 @@ It is built around one idea: **easy to use, without giving up performance, exten
 
 The backend lowers **plain EBNF plus AST captures** to C++. The remaining grammar features above are being integrated into lowering.
 
+## Debugging generated parsers
+
+Generate and build a parser with the current generator, then run its existing
+executable under `ispadbg`:
+
+```sh
+./ispadbg --purpose matching --purpose ast -b grammar.isc:12 \
+  --record parser-trace.json -- ./my-parser input.txt
+./ispadbg --replay parser-trace.json
+```
+
+For a graphical view, run `./ispadbg-gui` (or the installed `ispadbg-gui`).
+Choose a parser program, enter an input string, then click **Run**. The input
+is passed as one command-line argument by default, as in `examples/main.cpp`;
+choose **Standard input** for parsers that read stdin. Use **Step**, **Next**,
+**Finish**, and **Continue** while paused. Select any trace row to inspect its
+variables, including `ctx` and AST values, in the expandable tree. **Open
+trace** and **Save trace** use the same JSON format as `ispadbg --replay` and
+`--record`. The GUI uses Python's Tkinter and needs a desktop display.
+
+Debug instrumentation is enabled by default when generating parsers. Pass
+`--no-debug-instrumentation` to `ispa` to omit generated source checkpoints,
+scope events, and value serialization. Pass `--debug-instrumentation` to
+explicitly enable them.
+
+Purpose IDs are `matching`, `failure`, and `ast`; `failure` is the default.
+The debugger prints the selected IDs at startup. The interactive commands are
+`s` (step), `n` (next), `f` (finish), `c` (continue), `b file:line` (breakpoint),
+`p [name]` (inspect a value), `ctx`, `back`, `forward`, and `live`. `back` and
+`forward` inspect recorded snapshots while the parser is paused; execution
+resumes from the live pause. Use `--no-interactive` to record without pausing.
+
+C++ generated code emits rule and production scopes, match outcomes, typed
+captures, source checkpoints for converted Python statements, and typed AST
+snapshots. The Python target uses the same v2 event protocol through
+`parser/stdlibs/target/ispa_debug.py`; include that directory in `PYTHONPATH`
+alongside `ispa_std.py` when running a generated Python parser. Traces are JSON
+and can be replayed after the parser exits.
+Live parser sessions currently require POSIX file descriptors; the Windows
+`ispadbg` executable supports offline `--replay` and help.
+
 ---
 
 ## 🔁 Bootstrap
@@ -184,12 +225,13 @@ ISPA has prebuilt GitHub Release archives for Linux x86_64, Windows x64, and mac
 
 ### Library packages (`ispa-pkg`)
 
-Release installers provide `ispa-pkg` alongside `ispa`. For a source checkout,
-install the Python CLI with `python3 -m pip install .` (Python 3.9+ and PyYAML).
-Tagged releases also publish standalone Nuitka builds named
-`ispa-pkg-<platform>.tar.gz` (or `.zip` on Windows) for the four supported
-Linux, Windows, and macOS targets. The ISPA platform archives include the
-corresponding Nuitka executable, which the installers and updaters activate.
+Release installers provide `ispa-pkg` and `ispadbg` alongside `ispa`. For a
+source checkout, install both Python CLIs with `python3 -m pip install .`
+(Python 3.9+ and PyYAML). Tagged releases also publish standalone Nuitka builds
+named `ispa-pkg-<platform>` and `ispadbg-<platform>` (`.tar.gz`, or `.zip` on
+Windows) for the four supported Linux, Windows, and macOS targets. The ISPA
+platform archives include both executables, which the installers and updaters
+activate.
 The CLI lives in `cli/pkg`. Libraries are installed under
 `~/.local/share/ispa/libraries` by default on Linux and macOS, or under the
 ISPA installation directory when launched from an installed release; use

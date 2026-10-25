@@ -10,6 +10,7 @@ from .model import MatchResult, Node, RawToken
 from .lexer import Lexer, Cursor
 from . import recovery as R
 from .recovery_context import (RuleContext, FailContext, custom_failure, custom_failure_decision)
+import ispa_debug
 
 
 class ParseError(RuntimeError):
@@ -403,6 +404,20 @@ class LLParser:
         return trial
 
     def _match(self, pos: Cursor, expected: Any, callback: Callable | None) -> Node:
+        if not ispa_debug.enabled():
+            return self._match_impl(pos, expected, callback)
+        name = getattr(expected, '__name__', str(expected))
+        ispa_debug.event('lexer_enter', name)
+        result = None
+        try:
+            result = self._match_impl(pos, expected, callback)
+            return result
+        finally:
+            success = result is not None and not result.empty()
+            ispa_debug.match(name, f'token index {pos.index}', success,
+                             'matched' if success else 'expected token or rule was absent')
+
+    def _match_impl(self, pos: Cursor, expected: Any, callback: Callable | None) -> Node:
         trial = self._skip_ws(pos, expected, callback)
         if callback is not None:
             result = callback(trial)
@@ -525,9 +540,7 @@ class LLParser:
                 result.status == R.RequiredStatus.Missing or self.unwinding()
                 or (not pos.isEnd() and result.recovery.mode != R.Mode.Propagate)):
             return Node()
-        diagnostics = self.recovery_state.diagnostics
-        raise RuntimeError(diagnostics[-1].message if diagnostics
-                           else f'ISPA required(): required {what} could not be recovered')
+        raise ParseError(what, pos.index)
 
     def required(self, pos: Cursor, expected: Any, callback: Callable | None = None,
                  fail: Callable | None = None) -> Node:

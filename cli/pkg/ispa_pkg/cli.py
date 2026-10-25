@@ -216,7 +216,8 @@ def build_cpp_library(package, name, root):
             else:
                 command = [*compiler, '-std=c++17', *flags, *include_flags,
                            '-c', str(source), '-o', str(obj)]
-            subprocess.run(command, check=True)
+            print(f'{name}: compiling {source.relative_to(cpp)}', file=sys.stderr)
+            subprocess.run(command, check=True, stdout=sys.stderr)
             objects.append(obj)
         archive_name = f'{name}.lib' if msvc else f'lib{name}.a'
         archive = work / archive_name
@@ -224,7 +225,8 @@ def build_cpp_library(package, name, root):
             command = [*archiver, '/nologo', f'/OUT:{archive}', *(str(obj) for obj in objects)]
         else:
             command = [*archiver, 'rcs', str(archive), *(str(obj) for obj in objects)]
-        subprocess.run(command, check=True)
+        print(f'{name}: archiving {archive.name}', file=sys.stderr)
+        subprocess.run(command, check=True, stdout=sys.stderr)
         destination = cpp / 'lib' / archive.name
         destination.parent.mkdir(parents=True, exist_ok=True)
         archive.replace(destination)

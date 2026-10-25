@@ -3,6 +3,7 @@
  * Part of the split ISPA std lib; include <ispastdlib.hpp> for everything.
  */
 #pragma once
+#include <ispastdlib/ispa_debug.hpp>
 #include <ispastdlib/dfa_api.hpp>
 #include <ispastdlib/core.hpp>
 
@@ -118,6 +119,8 @@ namespace DFA {
 
         const char *const start = pos;
         const long long start_line = scanning_line;
+        ispa::debug::MatchScope debug_scan("lexer scan",
+            ispa::debug::enabled() ? (*pos ? std::string(1, *pos) : std::string("<end of input>")) : std::string{});
 
         std::array<std::ptrdiff_t, (registers > 0 ? registers : 1)> regs;
         regs.fill(API::unset);
@@ -234,8 +237,10 @@ namespace DFA {
                     captures, start_pos, start, static_cast<long long>(pos - start), start_line
                 );
                 state = static_cast<std::size_t>(std::get<0>(result));
-                if (state == API::null_state)
+                if (state == API::null_state) {
+                    debug_scan.success();
                     return std::get<1>(std::move(result));
+                }
                 if (pos == last_pos) {
                     if (++steps_without_progress > 100) {
                         throw IspaInternalExcept(
@@ -248,6 +253,7 @@ namespace DFA {
                 }
             }
         }
+        debug_scan.outcome("DFA found no accepting token");
         return Token {};
     }
 } // namespace DFA

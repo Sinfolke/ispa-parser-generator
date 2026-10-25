@@ -162,6 +162,8 @@ auto MemLower::isWhitespaceRef(const AST::RuleMember &mem) -> bool {
 }
 
 auto MemLower::tokenIdSymbol(const AST::LLkToken &token) -> LangAPI::Symbol {
+    if (token.size() == 1 && token.front() == "$")
+        return LangAPI::Symbol{"::ISPA_STD", "Recovery", "EndOfInput"};
     LangAPI::Symbol sym {token};
     sym.path.insert(sym.path.begin(), std::string {"Tokens"});
     sym.path.emplace_back(std::string {"id"});
@@ -170,10 +172,9 @@ auto MemLower::tokenIdSymbol(const AST::LLkToken &token) -> LangAPI::Symbol {
 
 // `(*pos).kind` of the current lookahead cursor
 auto MemLower::kindOfCurrent() -> LangAPI::Expression {
-    return LangAPI::StorageSymbol::createExpression(LangAPI::StorageSymbol {
-        LangAPI::Pos::createExpression(LangAPI::Pos {.dereference = true}),
-        stdu::vector<LangAPI::StorageSymbol::PathPart> {LangAPI::Property {"kind"}}
-    });
+    return LangAPI::FunctionCall::createExpression(LangAPI::FunctionCall{
+        .name = std::make_shared<LangAPI::Symbol>(LangAPI::Symbol{"::ISPA_STD", "lookahead_kind"}),
+        .args = {LangAPI::Pos::createExpression(LangAPI::Pos{.dereference = false})}});
 }
 
 auto MemLower::tokenKindIs(const AST::LLkToken &token) -> LangAPI::Expression {

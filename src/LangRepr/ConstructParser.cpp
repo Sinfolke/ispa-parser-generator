@@ -256,6 +256,46 @@ namespace LangRepr {
         if (lr) constructLRParser(parser);
         // constructTokenMachineDFA(parser);
         if (!lr) for (const auto &prod : ir) {
+            const auto& source_rule = tree[prod.name];
+            auto debug_position = source_rule.position;
+            if (debug_position.line == 0 && !debug_position.file.empty()) {
+                    std::ifstream input(debug_position.file);
+                    if (input) {
+                        const std::string leaf = prod.name.back();
+                        std::string line;
+                        std::size_t row = 0;
+                        while (std::getline(input, line)) {
+                            ++row;
+                            const auto at = line.find(leaf);
+                            if (at == std::string::npos ||
+                                (at > 0 && (std::isalnum(static_cast<unsigned char>(line[at - 1])) || line[at - 1] == '_')))
+                                continue;
+                            if (std::any_of(line.begin(), line.begin() + static_cast<std::ptrdiff_t>(at),
+                                [](unsigned char ch) { return !std::isspace(ch) && ch != '#'; })) continue;
+                            auto end = at + leaf.size();
+                            while (end < line.size() && std::isspace(static_cast<unsigned char>(line[end]))) ++end;
+                            if (end == line.size() || (line[end] != ':' && line[end] != '{' && line[end] != '<')) continue;
+                            debug_position.line = row;
+                            debug_position.column = at + 1;
+                            break;
+                        }
+                    }
+            }
+            if (debug_position.line == 0) { debug_position.line = 1; debug_position.column = 1; }
+            const auto debug_scope = [&](std::string_view kind) {
+                std::ostringstream marker;
+                marker << "ISPA_DEBUG_SCOPE " << kind << ' '
+                       << std::quoted(corelib::text::join(prod.name, ".")) << ' '
+                       << std::quoted(debug_position.file) << ' '
+                       << debug_position.line << ' ' << debug_position.column;
+                return LangAPI::Comment::createStatement(LangAPI::Comment{.value = marker.str()});
+            };
+            const auto debug_entry = [&] {
+                std::ostringstream marker;
+                marker << "ISPA_DEBUG_LINE " << std::quoted(debug_position.file) << ' '
+                       << debug_position.line << ' ' << debug_position.column << " pos";
+                return LangAPI::Comment::createStatement(LangAPI::Comment{.value = marker.str()});
+            };
             const AST::DeclarationSyntax *declaration = nullptr;
             if (tree.contains(prod.name)) for (const auto &feature : tree[prod.name].features)
                 if (const auto *syntax = std::get_if<AST::DeclarationSyntax>(&feature)) declaration = syntax;
@@ -282,16 +322,20 @@ namespace LangRepr {
                         .name = std::make_shared<LangAPI::Symbol>(LangAPI::Symbol{"::ISPA_STD", "external_match"}),
                         .template_parameters = {std::make_shared<LangAPI::Type>(LangAPI::Type{LangAPI::Symbol{"::" + external.cpp_binding}})},
                         .args = {LangAPI::Symbol::createExpression(LangAPI::Symbol{"pos"})}})});
+                function.statements.insert(function.statements.begin(), debug_scope("rule"));
+                function.statements.insert(function.statements.begin() + 1, debug_entry());
                 parser.data.emplace_back(std::make_shared<LangAPI::Declaration>(LangAPI::Function::createDeclaration(function)), LangAPI::Visibility::Protected);
                 continue;
             }
             LangAPI::Statements stmts;
+            stmts.push_back(debug_scope("rule"));
+            stmts.push_back(debug_scope("production"));
+            stmts.push_back(debug_entry());
             LangAPI::Variable result_v;
             result_v.type = rule_type;
             result_v.name = "result";
             result_v.value = LangAPI::EmptyInitializer::createExpression(LangAPI::EmptyInitializer{});
             stmts.push_back(LangAPI::Variable::createStatement(result_v));
-            const auto& source_rule = tree[prod.name];
             const bool advanced = std::ranges::any_of(source_rule.features, [](const auto& feature) {
                 return std::holds_alternative<AST::AdvancedRule>(feature);
             });

@@ -42,6 +42,7 @@ class Lexer(Generic[T]):
     def lookup(self, table, class_table, action_table, layout, semantic,
                debug_array, debug_index, pos: Position) -> T | None:
         from .dfa import TdfaLayout, run_tdfa
+        import ispa_debug
         if pos.at_end():
             return None
         if layout is None:
@@ -51,8 +52,18 @@ class Lexer(Generic[T]):
                 if action == 3 and src >= 0:
                     registers = max(registers, src + 1)
             layout = TdfaLayout(registers, 0)
-        token, self.line = run_tdfa(self.source, pos, table, class_table,
-                                    action_table, layout, semantic, self.line)
+        tracing = ispa_debug.enabled()
+        if tracing:
+            ispa_debug.event('lexer_enter', 'lexer scan')
+        token = None
+        actual = self.source[pos.index:pos.index + 1]
+        try:
+            token, self.line = run_tdfa(self.source, pos, table, class_table,
+                                        action_table, layout, semantic, self.line)
+        finally:
+            if tracing:
+                ispa_debug.match('lexer scan', actual, token is not None,
+                                 'matched' if token is not None else 'DFA found no accepting token')
         return token
 
     def lookup_dfa(self, index: int, pos: Position) -> T | None:
@@ -92,6 +103,8 @@ class Lexer(Generic[T]):
                 if self._boundary is not None:
                     self._finished = True
                     return
+                import ispa_debug
+                ispa_debug.breakpoint('lexer made no progress')
                 raise LexError(before, self._line(self._cursor, before),
                                self._column(self._cursor, before),
                                self.source[before:before + 1])

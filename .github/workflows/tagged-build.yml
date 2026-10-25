@@ -79,7 +79,7 @@ jobs:
       release_tag: ${{ needs.resolve-tag.outputs.tag }}
 
   pkg:
-    name: Compile ispa-pkg for release
+    name: Compile Python CLIs for release
     needs: [resolve-tag, prepare-release]
     permissions:
       contents: write

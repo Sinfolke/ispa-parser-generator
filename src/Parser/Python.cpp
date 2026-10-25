@@ -30,6 +30,9 @@ struct PythonConverter {
     std::string token_rule;
     std::set<std::string> class_names, objects;
     std::map<std::string, la::Type> local_types;
+    std::set<std::string> debug_ready;
+    bool debug_ready_initialized = false;
+    std::size_t debug_line_cursor = 0;
     std::function<la::Statements(const py::IspaMatch&, std::set<std::string>&)> embedded_match;
     std::string localName(const std::string& name) const {
         return action_context && locals.contains(name) ? "ispa_action_" + name : name;
@@ -500,11 +503,57 @@ struct PythonConverter {
         }, e.kind);
     }
     la::Statements body(const py::StmtList& list) {
+        if (!debug_ready_initialized) { debug_ready = locals; debug_ready_initialized = true; }
         la::Statements out;
+        const auto checkpoint = [&](const py::Stmt& statement, const UAST::SourcePosition& position,
+                                    bool after) -> std::optional<la::Statement> {
+            if (position.file.empty() || position.line == 0 || statement.template get<py::Pass>())
+                return std::nullopt;
+            std::ostringstream marker;
+            marker << "ISPA_DEBUG_LINE " << std::quoted(position.file) << ' '
+                   << position.line << ' ' << position.column;
+            if (after) marker << " @after";
+            if (action_context && token_rule.empty()) marker << " ctx";
+            for (const auto& name : debug_ready)
+                if (name != "ctx") marker << ' ' << name << '=' << localName(name);
+            return la::Comment::createStatement(la::Comment{.value = marker.str()});
+        };
         for (const auto& p : list) {
             if (!p) throw std::invalid_argument("Python conversion: missing statement");
+            auto position = p->pos;
+            if (position.file.ends_with(".py") && position.line <= 1) {
+                std::ifstream source(position.file);
+                std::string line;
+                std::size_t row = 0;
+                while (std::getline(source, line)) {
+                    ++row;
+                    if (row < debug_line_cursor) continue;
+                    const auto column = line.find_first_not_of(" \t\r");
+                    if (column == std::string::npos || line[column] == '#' ||
+                        line.compare(column, 5, "else:") == 0 ||
+                        line.compare(column, 7, "except ") == 0 ||
+                        line.compare(column, 8, "finally:") == 0) continue;
+                    position.line = row;
+                    position.column = column + 1;
+                    debug_line_cursor = row + 1;
+                    break;
+                }
+            }
+            if (auto before = checkpoint(*p, position, false)) out.push_back(std::move(*before));
             auto part = stmt(*p);
             out.insert(out.end(), part.begin(), part.end());
+            if (auto assignment = p->template get<py::AnnAssign>(); assignment && !assignment->value) {
+                if (auto name = assignment->target ? assignment->target->template get<py::Name>() : nullptr)
+                    debug_ready.erase(name->id);
+            } else if (auto assignment = p->template get<py::Assign>()) {
+                if (assignment->targets.size() == 1)
+                    if (auto name = assignment->targets[0] ? assignment->targets[0]->template get<py::Name>() : nullptr)
+                        debug_ready.insert(name->id);
+            } else if (auto assignment = p->template get<py::AnnAssign>()) {
+                if (auto name = assignment->target ? assignment->target->template get<py::Name>() : nullptr)
+                    debug_ready.insert(name->id);
+            }
+            if (auto after = checkpoint(*p, position, true)) out.push_back(std::move(*after));
         }
         return out;
     }
@@ -597,6 +646,18 @@ struct PythonConverter {
             out.type = type(f->returns);
             scope.self_name = self_name;
             scope.class_names = class_names;
+            if (s.pos.file.ends_with(".py")) {
+                std::ifstream source(s.pos.file);
+                std::string line;
+                std::size_t row = 0;
+                while (std::getline(source, line)) {
+                    ++row;
+                    if (line.find("def " + f->name + "(") != std::string::npos) {
+                        scope.debug_line_cursor = row + 1;
+                        break;
+                    }
+                }
+            }
             if (!self_name.empty()) scope.objects.insert(self_name);
             for (auto& p : f->params) {
                 if (!self_name.empty() && p.name == self_name && &p == &f->params.front()) continue;

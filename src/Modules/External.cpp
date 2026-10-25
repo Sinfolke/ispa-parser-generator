@@ -26,6 +26,8 @@ ExternalPackage readExternal(const std::string& prefix) {
         std::string module, name;
         if (record == "header") {
             in >> std::quoted(header);
+            if (header.size() >= 2 && header.front() == '<' && header.back() == '>')
+                header = header.substr(1, header.size() - 2);
             const auto extension = std::filesystem::path(header).extension().string();
             if (extension != ".h" && extension != ".py")
                 throw std::runtime_error("Invalid external parser artifact in " + path.string());

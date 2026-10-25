@@ -7,6 +7,46 @@
 #include <ispastdlib/core.hpp>
 
 namespace ISPA_STD {
+    template<typename To, typename From>
+    void assign_compatible(To& target, const From& source);
+
+    template<std::size_t D, std::size_t S, class To, class From>
+    constexpr bool tuple_omitted_strings_compatible() {
+        if constexpr (D == std::tuple_size_v<To>) {
+            return S == std::tuple_size_v<From>;
+        } else if constexpr (std::is_same_v<std::tuple_element_t<D, To>, std::string>) {
+            return tuple_omitted_strings_compatible<D + 1, S, To, From>();
+        } else if constexpr (S == std::tuple_size_v<From>) {
+            return false;
+        } else {
+            using Target = std::tuple_element_t<D, To>;
+            using Source = std::tuple_element_t<S, From>;
+            return (std::is_constructible_v<Target, const Source&> ||
+                    std::is_assignable_v<Target&, const Source&>) &&
+                   tuple_omitted_strings_compatible<D + 1, S + 1, To, From>();
+        }
+    }
+
+    template<class To, class From> struct tuple_omitted_strings : std::false_type {};
+    template<class... To, class... From>
+    struct tuple_omitted_strings<std::tuple<To...>, std::tuple<From...>>
+        : std::bool_constant<(sizeof...(To) > sizeof...(From)) &&
+                             tuple_omitted_strings_compatible<0, 0,
+                                 std::tuple<To...>, std::tuple<From...>>()> {};
+
+    template<std::size_t D = 0, std::size_t S = 0, class To, class From>
+    void assign_tuple_omitted_strings(To& target, const From& source) {
+        if constexpr (D < std::tuple_size_v<To>) {
+            using Element = std::tuple_element_t<D, To>;
+            if constexpr (std::is_same_v<Element, std::string>) {
+                assign_tuple_omitted_strings<D + 1, S>(target, source);
+            } else {
+                assign_compatible(std::get<D>(target), std::get<S>(source));
+                assign_tuple_omitted_strings<D + 1, S + 1>(target, source);
+            }
+        }
+    }
+
     // Index of the alternative of variant V that is exactly T, or variant_npos. Pure std::is_same: no overload
     // resolution and no conversion-constructor instantiation, so it is O(N) cheap checks for an N-alternative variant.
     template<typename V, typename T, std::size_t... Is>
@@ -47,6 +87,9 @@ namespace ISPA_STD {
                 assign_compatible(converted, item);
                 target.push_back(std::move(converted));
             }
+
+        } else if constexpr (tuple_omitted_strings<To, From>::value) {
+            assign_tuple_omitted_strings(target, source);
 
         } else if constexpr (is_variant_v<To> && is_variant_v<From>) {
             std::visit(
@@ -115,11 +158,13 @@ namespace ISPA_STD {
             if constexpr (std::is_constructible_v<Alternative, From>) {
                 target.template emplace<I>(source);
                 return true;
+            } else if constexpr (tuple_omitted_strings<Alternative, From>::value) {
+                auto& value = target.template emplace<I>();
+                assign_tuple_omitted_strings(value, source);
+                return true;
+            } else {
+                return assign_variant_alternative<To, From, I + 1>(target, source);
             }
-
-            return assign_variant_alternative<To, From, I + 1>(
-                target, source
-            );
         }
     }
 } // namespace ISPA_STD

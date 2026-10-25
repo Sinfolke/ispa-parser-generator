@@ -14,6 +14,7 @@ export namespace Python {
         std::vector<std::pair<std::string, std::string>> files_;
         std::string output_;
         std::string current_scope_;
+        bool debug_instrumentation_ = true;
         unsigned indentation_ = 0;
         bool class_context_ = false;
         bool namespace_context_ = false;
@@ -47,7 +48,8 @@ export namespace Python {
         std::string statements_inline(const LangAPI::Statements& stmts, const std::vector<std::string>& params);
         void comment(const std::string& text);
     public:
-        Construct(const LangAPI::Declarations* src, const char* module_name, bool incremental);
+        Construct(const LangAPI::Declarations* src, const char* module_name, bool incremental,
+                  bool debug_instrumentation = true);
         auto get_files() -> const std::vector<std::pair<std::string, std::string>>& override {
             return files_;
         }
@@ -55,5 +57,5 @@ export namespace Python {
     };
 }
 
-extern "C" auto python_construct(const LangAPI::Declarations*, const char*, bool) -> Python::Construct*;
+extern "C" auto python_construct(const LangAPI::Declarations*, const char*, bool, bool) -> Python::Construct*;
 extern "C" auto python_construct_finish(Python::Construct*) -> void;

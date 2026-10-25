@@ -1,4 +1,4 @@
-name: Nuitka ispa-pkg release
+name: Nuitka Python CLIs release
 
 on:
   workflow_call:
@@ -27,18 +27,26 @@ jobs:
             platform: linux-x64
             executable: ispa-pkg
             archive: ispa-pkg-linux-x64.tar.gz
+            debugger: ispadbg
+            debugger_archive: ispadbg-linux-x64.tar.gz
           - os: windows-latest
             platform: windows-x64
             executable: ispa-pkg.exe
             archive: ispa-pkg-windows-x64.zip
+            debugger: ispadbg.exe
+            debugger_archive: ispadbg-windows-x64.zip
           - os: macos-26
             platform: macos-arm64
             executable: ispa-pkg
             archive: ispa-pkg-macos-arm64.tar.gz
+            debugger: ispadbg
+            debugger_archive: ispadbg-macos-arm64.tar.gz
           - os: macos-26-intel
             platform: macos-x64
             executable: ispa-pkg
             archive: ispa-pkg-macos-x64.tar.gz
+            debugger: ispadbg
+            debugger_archive: ispadbg-macos-x64.tar.gz
 
     steps:
       - name: Checkout release tag
@@ -66,7 +74,9 @@ jobs:
 
       - name: Test Python CLI
         shell: bash
-        run: python -m unittest tests/test_ispa_pkg.py -v
+        run: |
+          python -m unittest tests/test_ispa_pkg.py -v
+          python cli/ispadbg.py --help
 
       - name: Compile onefile executable
         if: runner.os != 'Windows'
@@ -83,6 +93,12 @@ jobs:
             --output-dir=dist \
             "--output-filename=$EXECUTABLE" \
             cli/pkg/ispa_pkg_entry.py
+          python -m nuitka \
+            --mode=onefile \
+            --assume-yes-for-downloads \
+            --output-dir=dist \
+            --output-filename=ispadbg \
+            cli/pkg/ispa_pkg/debugger.py
 
       - name: Compile Windows onefile executable
         if: runner.os == 'Windows'
@@ -97,22 +113,34 @@ jobs:
             --output-dir=dist `
             --output-filename=ispa-pkg.exe `
             cli/pkg/ispa_pkg_entry.py
+          python -m nuitka `
+            --mode=onefile `
+            --msvc=latest `
+            --assume-yes-for-downloads `
+            --output-dir=dist `
+            --output-filename=ispadbg.exe `
+            cli/pkg/ispa_pkg/debugger.py
 
       - name: Smoke test compiled CLI
         shell: bash
         env:
           EXECUTABLE: ${{ matrix.executable }}
+          DEBUGGER: ${{ matrix.debugger }}
         run: |
           set -euo pipefail
           test -f "dist/$EXECUTABLE"
           "dist/$EXECUTABLE" --help
           "dist/$EXECUTABLE" catalog list
+          test -f "dist/$DEBUGGER"
+          "dist/$DEBUGGER" --help
 
       - name: Package executable
         shell: bash
         env:
           EXECUTABLE: ${{ matrix.executable }}
           ARCHIVE: ${{ matrix.archive }}
+          DEBUGGER: ${{ matrix.debugger }}
+          DEBUGGER_ARCHIVE: ${{ matrix.debugger_archive }}
         run: |
           set -euo pipefail
           mkdir -p packages
@@ -122,15 +150,19 @@ jobs:
           from pathlib import Path
           from zipfile import ZIP_DEFLATED, ZipFile
 
-          executable = Path('dist') / os.environ['EXECUTABLE']
-          archive = Path('packages') / os.environ['ARCHIVE']
-          if os.environ['RUNNER_OS'] == 'Windows':
-              with ZipFile(archive, 'w', compression=ZIP_DEFLATED, compresslevel=9) as output:
-                  output.write(executable, arcname=executable.name)
-          else:
-              with tarfile.open(archive, 'w:gz') as output:
-                  output.add(executable, arcname=executable.name, recursive=False)
-          print(archive)
+          for executable_name, archive_name in (
+              (os.environ['EXECUTABLE'], os.environ['ARCHIVE']),
+              (os.environ['DEBUGGER'], os.environ['DEBUGGER_ARCHIVE']),
+          ):
+              executable = Path('dist') / executable_name
+              archive = Path('packages') / archive_name
+              if os.environ['RUNNER_OS'] == 'Windows':
+                  with ZipFile(archive, 'w', compression=ZIP_DEFLATED, compresslevel=9) as output:
+                      output.write(executable, arcname=executable.name)
+              else:
+                  with tarfile.open(archive, 'w:gz') as output:
+                      output.add(executable, arcname=executable.name, recursive=False)
+              print(archive)
           PY
 
       - name: Save workflow artifact
@@ -140,6 +172,13 @@ jobs:
           path: packages/${{ matrix.archive }}
           if-no-files-found: error
 
+      - name: Save debugger workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ispadbg-${{ matrix.platform }}
+          path: packages/${{ matrix.debugger_archive }}
+          if-no-files-found: error
+
       - name: Upload to GitHub Release
         shell: bash
         env:
@@ -147,6 +186,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
           TAG: ${{ inputs.release_tag }}
           ARCHIVE: ${{ matrix.archive }}
+          DEBUGGER_ARCHIVE: ${{ matrix.debugger_archive }}
         run: |
           set -euo pipefail
-          gh release upload "$TAG" "packages/$ARCHIVE" --clobber
+          gh release upload "$TAG" "packages/$ARCHIVE" "packages/$DEBUGGER_ARCHIVE" --clobber

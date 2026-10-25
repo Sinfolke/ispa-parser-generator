@@ -29,8 +29,19 @@
 #include <cctype>
 #include <functional>
 #include <cstring>
+#include <typeinfo>
 
 namespace ISPA_STD {
+    template<class IT>
+    Recovery::TokenId lookahead_kind(const IT& pos) {
+        if constexpr (detail::detected_v<detail::is_end, IT>) {
+            if (pos.isEnd()) return Recovery::EndOfInput;
+        } else if (pos->isEnd()) {
+            return Recovery::EndOfInput;
+        }
+        return static_cast<Recovery::TokenId>((*pos).kind());
+    }
+
     template<class Lexer, class Token>
     class BoundedSourceLexer : public Lexer {
         const char* boundary_ = nullptr;
@@ -363,11 +374,11 @@ namespace ISPA_STD {
         };
         template<class Action>
         static auto custom_failure(Action action) { return ActionFailure<Action>{std::move(action)}; }
-        template<class AST, class IT>
-        static auto action_result(const AST& ast, IT pos) {
-            MatchResult<AST, IT> result;
+        template <typename AST, typename IT>
+        static MatchResult<AST, std::decay_t<IT>> action_result(AST& ast, IT pos) {
+            MatchResult<AST, std::decay_t<IT>> result;
             result.status = true;
-            result.node.set_data(ast);
+            result.node.set_data(std::move(ast));
             result.it = std::move(pos);
             return result;
         }
@@ -465,6 +476,31 @@ namespace ISPA_STD {
         static auto cursor_position(const IT& pos) -> std::size_t {
             if constexpr (detail::detected_v<detail::distance, IT>) return pos.distance();
             else return reinterpret_cast<std::size_t>(std::addressof(*pos));
+        }
+        template<typename IT>
+        static std::string debug_actual(const IT& pos) {
+            if (!ispa::debug::enabled()) return {};
+            if (pos.isEnd()) return "<end of input>";
+            std::string actual = "token #" + std::to_string(Recovery::tokenId(*pos));
+            if constexpr (detail::detected_v<detail::meta_startpos_length, Token>) {
+                const auto& meta = pos->meta();
+                if (meta.start() && meta.length())
+                    actual += " '" + std::string(meta.start(), std::min<std::size_t>(meta.length(), 80)) + "'";
+            }
+            return actual;
+        }
+        static const char* debug_recovery_mode(Recovery::Mode mode) {
+            switch (mode) {
+            case Recovery::Mode::PanicUntil: return "panic until synchronization";
+            case Recovery::Mode::Insert: return "insert";
+            case Recovery::Mode::Delete: return "delete and retry";
+            case Recovery::Mode::Replace: return "replace";
+            case Recovery::Mode::Retry: return "retry";
+            case Recovery::Mode::Synchronize: return "synchronize";
+            case Recovery::Mode::Propagate: return "propagate to parent";
+            case Recovery::Mode::Abort: return "abort";
+            }
+            return "unknown";
         }
 
         // ----- frames -----
@@ -873,9 +909,13 @@ namespace ISPA_STD {
         }
         template<typename NodeStruct, typename IT, typename FailFunc>
         auto required(IT &pos, FailFunc&& fail) {
+            ispa::debug::MatchScope debug_match(ispa::debug::display_type<NodeStruct>(), debug_actual(pos));
             if constexpr (std::is_invocable_v<FailFunc&, IT&, Recovery::State&>) {
                 auto result = required_recovering<NodeStruct>(pos, fail);
-                if (result.node) return std::move(*result.node);
+                if (result.node) { debug_match.success(); return std::move(*result.node); }
+                if (result.status != Recovery::RequiredStatus::Matched)
+                    debug_match.outcome(std::string("recovery: ") + debug_recovery_mode(result.recovery.mode) +
+                        ", skipped " + std::to_string(result.recovery.skipped));
                 if (result.status != Recovery::RequiredStatus::Aborted &&
                     (result.status == Recovery::RequiredStatus::Missing ||
                      unwinding() ||
@@ -886,11 +926,13 @@ namespace ISPA_STD {
                     auto node = pos->template to_node<NodeStruct>();
                     ++pos;
                     commit_rule(pos);
+                    debug_match.success();
                     return node;
                 }
                 reject_absent_rule();
                 fail(pos);
             }
+            ispa::debug::breakpoint("required token failed");
             throw std::logic_error(recovery_state_.diagnostics.empty()
                 ? "ISPA required(): required token could not be recovered"
                 : recovery_state_.diagnostics.back().message);
@@ -898,9 +940,13 @@ namespace ISPA_STD {
         // All rule combinators take (pos, rec, [fail]), matching LL lowering.
         template<typename NodeStruct, typename IT, typename Recursive, typename FailFunc>
         auto required(IT &pos, Recursive&& rec, FailFunc&& fail) {
+            ispa::debug::MatchScope debug_match(ispa::debug::display_type<NodeStruct>(), debug_actual(pos));
             if constexpr (std::is_invocable_v<FailFunc&, IT&, Recovery::State&>) {
                 auto result = required_rule_recovering(pos, rec, fail);
-                if (result.node) return std::move(*result.node);
+                if (result.node) { debug_match.success(); return std::move(*result.node); }
+                if (result.status != Recovery::RequiredStatus::Matched)
+                    debug_match.outcome(std::string("recovery: ") + debug_recovery_mode(result.recovery.mode) +
+                        ", skipped " + std::to_string(result.recovery.skipped));
                 if (result.status != Recovery::RequiredStatus::Aborted &&
                     (result.status == Recovery::RequiredStatus::Missing || unwinding() ||
                      (!pos.isEnd() && result.recovery.mode != Recovery::Mode::Propagate)))
@@ -910,21 +956,25 @@ namespace ISPA_STD {
                 if (match.status) {
                     pos = match.it;
                     commit_rule(pos);
+                    debug_match.success();
                     return std::move(match.node);
                 }
                 reject_absent_rule();
                 fail(pos);
             }
+            ispa::debug::breakpoint("required rule failed");
             throw std::logic_error(recovery_state_.diagnostics.empty()
                 ? "ISPA required(): required rule could not be recovered"
                 : recovery_state_.diagnostics.back().message);
         }
         template<typename NodeStruct, typename IT>
         auto optional(IT &pos) {
+            ispa::debug::MatchScope debug_match(ispa::debug::display_type<NodeStruct>(), debug_actual(pos));
             if (pos->template holds<NodeStruct>()) {
                 auto node = pos->template to_node<NodeStruct>();
                 ++pos;
                 commit_rule(pos);
+                debug_match.success();
                 return node;
             }
             return Node<NodeStruct>{};

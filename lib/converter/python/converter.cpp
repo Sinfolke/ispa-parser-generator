@@ -105,8 +105,9 @@ namespace {
         return source.substr(begin, end - begin);
     }
 }
-Construct::Construct(const LangAPI::Declarations* src, const char* name, bool incremental)
-    : ConstructBase(src, name, incremental), core_(name) {
+Construct::Construct(const LangAPI::Declarations* src, const char* name, bool incremental,
+                     bool debug_instrumentation)
+    : ConstructBase(src, name, incremental), core_(name), debug_instrumentation_(debug_instrumentation) {
     core_.set_statement_writer([this](const LangAPI::Statements& s, const std::vector<std::string>& params) {
         return statements_inline(s, params);
     });
@@ -266,7 +267,11 @@ void Construct::statement(const LangAPI::Statement& stmt) {
     if (stmt.isExpression()) {
         const std::string expr = trim(core_.statement_expression(stmt.getExpression()));
         emit_pending_lambdas();
-        if (!expr.empty()) line(expr);
+        if (!expr.empty()) {
+            line(expr);
+            if (debug_instrumentation_ && expr.find("ispa_std.assign_compatible(result.") != std::string::npos)
+                line("ispa_debug.value(\"result\", result)");
+        }
     } else if (stmt.isIf()) if_stmt(stmt.getIf());
     else if (stmt.isWhile()) while_stmt(stmt.getWhile());
     else if (stmt.isDoWhile()) do_while_stmt(stmt.getDoWhile());
@@ -276,7 +281,34 @@ void Construct::statement(const LangAPI::Statement& stmt) {
         emit_pending_lambdas();
         line("raise " + expression);
     }
-    else if (stmt.isComment()) comment(stmt.getComment().value);
+    else if (stmt.isComment()) {
+        const auto& value = stmt.getComment().value;
+        if (value.starts_with("ISPA_DEBUG_LINE ")) {
+            std::istringstream input(value.substr(16));
+            std::string file, local, phase = "before";
+            int row = 0, column = 0;
+            input >> std::quoted(file) >> row >> column;
+            if (!input || row <= 0) throw std::runtime_error("Malformed ISPA debug line marker");
+            std::ostringstream args;
+            bool first = true;
+            while (input >> local) {
+                if (local == "@after") { phase = "after"; continue; }
+                const auto equal = local.find('=');
+                const auto label = equal == std::string::npos ? local : local.substr(0, equal);
+                const auto symbol = equal == std::string::npos ? local : local.substr(equal + 1);
+                if (!first) args << ", ";
+                first = false;
+                args << std::quoted(label) << ": " << Core::identifier(symbol);
+            }
+            std::ostringstream call;
+            call << "ispa_debug.line(" << std::quoted(file) << ", " << row << ", " << column
+                 << ", {" << args.str() << "}, " << std::quoted(phase) << ")";
+            line("if ispa_debug.enabled():");
+            ++indentation_;
+            line(call.str());
+            --indentation_;
+        } else if (!value.starts_with("ISPA_DEBUG_SCOPE ")) comment(value);
+    }
     else if (stmt.isVariable()) variable(stmt.getVariable());
     else throw std::runtime_error("Python target: unsupported statement kind");
 }
@@ -311,6 +343,9 @@ void Construct::variable(const LangAPI::Variable& var) {
     }
     emit_pending_lambdas();
     line(Core::identifier(var.name) + " = " + rhs);
+    if (debug_instrumentation_ && rhs.find("captures.") != std::string::npos)
+        line("ispa_debug.capture(" + std::string("\"") + Core::identifier(var.name) +
+             "\", " + Core::identifier(var.name) + ")");
 }
 void Construct::alias(const LangAPI::TypeAlias& value) {
     if (!value.template_parameters.empty())
@@ -362,21 +397,39 @@ void Construct::function(const LangAPI::Function& fn, bool ctor) {
         for (const auto& param : fn.parameters) names.push_back(Core::identifier(param.second));
         core_.enter_scope(names);
     }
+    LangAPI::Statements body = fn.statements;
+    unsigned debug_scopes = 0;
+    while (!body.empty() && body.front().isComment() &&
+           body.front().getComment().value.starts_with("ISPA_DEBUG_SCOPE ")) {
+        std::istringstream input(body.front().getComment().value.substr(17));
+        std::string kind, scope_name, file;
+        int row = 0, column = 0;
+        input >> kind >> std::quoted(scope_name) >> std::quoted(file) >> row >> column;
+        if (!input || (kind != "rule" && kind != "production"))
+            throw std::runtime_error("Malformed ISPA debug scope marker");
+        std::ostringstream call;
+        call << "with ispa_debug.scope(" << std::quoted(kind) << ", " << std::quoted(scope_name)
+             << ", " << std::quoted(file) << ", " << row << ", " << column << "):";
+        line(call.str());
+        ++indentation_;
+        ++debug_scopes;
+        body.erase(body.begin());
+    }
     bool emitted = false;
     if (ctor) {
         // Initialize every non-static member before custom constructor statements.
         // __init__ never shares mutable default arrays or dictionaries between instances.
         // This prelude is emitted by cls(), not here.
     }
-    if (!fn.statements.empty()) {
-        const auto frame_at = recovery_frame_statement(fn.statements);
+    if (!body.empty()) {
+        const auto frame_at = recovery_frame_statement(body);
         if (frame_at == std::string::npos) {
-            statements(fn.statements);
+            statements(body);
         } else {
             std::size_t index = 0;
             std::string frame_name;
             bool in_try = false;
-            for (const auto& st : fn.statements) {
+            for (const auto& st : body) {
                 statement(st);
                 if (index++ == frame_at) {
                     frame_name = Core::identifier(st.getVariable().name);
@@ -397,6 +450,7 @@ void Construct::function(const LangAPI::Function& fn, bool ctor) {
         emitted = true;
     }
     if (!emitted) line("pass");
+    while (debug_scopes > 0) { --indentation_; --debug_scopes; }
     core_.leave_scope();
     inside_function_ = saved_inside_function;
     core_.set_method_members({});
@@ -628,6 +682,7 @@ void Construct::construct() {
     // Before `import ispa_std`: the Python bootstrap rewrites that line to add its own custom_failure import.
     line("from ispa_std import custom_failure, custom_failure_decision");
     line("import ispa_std");
+    if (debug_instrumentation_) line("import ispa_debug");
     line("_ISPA_UNSET = object()");
     line();
     line(Core::identifier(namespace_name) + " = _sys.modules[__name__]");
@@ -685,9 +740,10 @@ void Construct::construct() {
 }
 }
 
-extern "C" auto python_construct(const LangAPI::Declarations* tree, const char* module_name, bool incremental)
+extern "C" auto python_construct(const LangAPI::Declarations* tree, const char* module_name,
+                                 bool incremental, bool debug_instrumentation)
     -> Python::Construct* {
-    return new Python::Construct(tree, module_name, incremental);
+    return new Python::Construct(tree, module_name, incremental, debug_instrumentation);
 }
 extern "C" auto python_construct_finish(Python::Construct* ptr) -> void {
     delete ptr;

@@ -23,6 +23,7 @@ export struct Args {
     // Internal: keep every exported module when generating a dependency.
     bool dependency_build = false;
     bool debug = false;
+    bool debug_instrumentation = true;
     bool logs = false;
     bool version = false;
     bool nfa_debug = false;

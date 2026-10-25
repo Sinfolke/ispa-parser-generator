@@ -744,7 +744,7 @@ jobs:
 
           ls -lh release/
 
-      - name: Add compiled ispa-pkg to platform archive
+      - name: Add compiled Python CLIs to platform archive
         if: inputs.release_tag != ''
         shell: bash
         env:
@@ -756,37 +756,43 @@ jobs:
           set -euo pipefail
           suffix="${ISPA_RELEASE_PLATFORM#ispa-}"
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            archive="ispa-pkg-$suffix.zip"
-            executable="ispa-pkg.exe"
+            extension="zip"
+            executable_suffix=".exe"
           else
-            archive="ispa-pkg-$suffix.tar.gz"
-            executable="ispa-pkg"
+            extension="tar.gz"
+            executable_suffix=""
           fi
           mkdir -p pkg-download
-          gh release download "$TAG" --pattern "$archive" --dir pkg-download
-          python3 - "$archive" "$executable" <<'PY'
+          for name in ispa-pkg ispadbg; do
+            gh release download "$TAG" --pattern "$name-$suffix.$extension" --dir pkg-download
+          done
+          python3 - "$suffix" "$extension" "$executable_suffix" <<'PY'
           from pathlib import Path
           import shutil
           import sys
           import tarfile
           import zipfile
 
-          archive, executable = sys.argv[1:]
-          source = Path('pkg-download') / archive
-          target = Path('release') / executable
-          if archive.endswith('.zip'):
-              with zipfile.ZipFile(source) as package, package.open(executable) as binary, target.open('wb') as output:
-                  shutil.copyfileobj(binary, output)
-          else:
-              with tarfile.open(source, 'r:gz') as package:
-                  member = package.getmember(executable)
-                  if not member.isfile():
-                      raise RuntimeError(f'{archive} does not contain a regular {executable}')
-                  with package.extractfile(member) as binary, target.open('wb') as output:
+          suffix, extension, executable_suffix = sys.argv[1:]
+          for name in ('ispa-pkg', 'ispadbg'):
+              archive = f'{name}-{suffix}.{extension}'
+              executable = name + executable_suffix
+              source = Path('pkg-download') / archive
+              target = Path('release') / executable
+              if archive.endswith('.zip'):
+                  with zipfile.ZipFile(source) as package, package.open(executable) as binary, target.open('wb') as output:
                       shutil.copyfileobj(binary, output)
-          target.chmod(0o755)
+              else:
+                  with tarfile.open(source, 'r:gz') as package:
+                      member = package.getmember(executable)
+                      if not member.isfile():
+                          raise RuntimeError(f'{archive} does not contain a regular {executable}')
+                      with package.extractfile(member) as binary, target.open('wb') as output:
+                          shutil.copyfileobj(binary, output)
+              target.chmod(0o755)
           PY
-          "release/$executable" --help
+          "release/ispa-pkg$executable_suffix" --help
+          "release/ispadbg$executable_suffix" --help
 
       - name: Upload release build artifacts
         if: inputs.upload_artifacts

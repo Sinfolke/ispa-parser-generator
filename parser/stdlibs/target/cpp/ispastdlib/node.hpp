@@ -6,6 +6,7 @@
 #include <ispastdlib/traits.hpp>
 #include <ispastdlib/ast_printer.hpp>
 #include <ispastdlib/core.hpp>
+#include <ispastdlib/ispa_debug.hpp>
 
 namespace ISPA_STD {
     template<class Destination, class Source>
@@ -239,4 +240,30 @@ namespace ISPA_STD {
     }
     template<class RULE_T, class DataStorageType>
     using Seq = std::vector<Node<RULE_T, DataStorageType>>;
+    template<class T, class E, class F>
+    void ispa_debug_fields(const Node<T, E>& node, F&& field) {
+        field("empty", node.empty());
+        if (!node.empty()) {
+            field("name", node.name());
+            field("startpos", node.startpos());
+            field("length", node.length());
+            field("line", node.line());
+            field("column", node.column());
+            field("data", node.data());
+        }
+    }
+    template<class T, class IT, class F>
+    void ispa_debug_fields(const MatchResult<T, IT>& result, F&& field) {
+        field("status", result.status);
+        field("node", result.node);
+    }
 } // namespace ISPA_STD
+
+namespace ispa::debug {
+    template<class T, class E> struct type_name<ISPA_STD::Node<T, E>> {
+        static std::string get() { return "ISPA.Node"; }
+    };
+    template<class T, class IT> struct type_name<ISPA_STD::MatchResult<T, IT>> {
+        static std::string get() { return "ISPA.MatchResult"; }
+    };
+}

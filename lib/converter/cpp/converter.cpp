@@ -647,12 +647,21 @@ namespace Cpp {
     // The standalone main header gets the declarations of free functions and (at its very end) the bodies of
     // the inline templates; it never includes anything from incremental/.
     auto Construct::produceFunction(const LangAPI::Function &func, OutputSrc &o, bool constructor) -> void {
+        const bool debug_rule = !func.statements.empty() && func.statements.front().isComment() &&
+            func.statements.front().getComment().value.starts_with("ISPA_DEBUG_SCOPE rule ");
         if (o.in_templated_class) {
             const auto signature = buildSignature(func, SigKind::Declaration, "", true, {}, constructor);
             emitLine(*o.h, signature + (func.statements.empty() ? ";" : " {"));
             if (!func.statements.empty()) {
                 o.h->increaseIndentation();
+                if (debug_rule) { emitLine(*o.h, "try {"); o.h->increaseIndentation(); }
                 convertStatements(func.statements, *o.h);
+                if (debug_rule) {
+                    o.h->decreaseIndentation();
+                    emitLine(*o.h, "} catch (const NoMatch&) { throw;");
+                    emitLine(*o.h, "} catch (const ::ISPA_STD::ExternalParseError&) { throw;");
+                    emitLine(*o.h, "} catch (...) { ::ispa::debug::breakpoint(\"uncaught parser failure\"); throw; }");
+                }
                 o.h->decreaseIndentation();
                 emitLine(*o.h, "}");
             }
@@ -698,7 +707,14 @@ namespace Cpp {
             auto writeDefinition = [&](Converter::Writer &w) {
                 emitLine(w, buildSignature(func, SigKind::Definition, qualifier, false, {}, constructor) + " {");
                 w.increaseIndentation();
+                if (debug_rule) { emitLine(w, "try {"); w.increaseIndentation(); }
                 convertStatements(func.statements, w);
+                if (debug_rule) {
+                    w.decreaseIndentation();
+                    emitLine(w, "} catch (const NoMatch&) { throw;");
+                    emitLine(w, "} catch (const ::ISPA_STD::ExternalParseError&) { throw;");
+                    emitLine(w, "} catch (...) { ::ispa::debug::breakpoint(\"uncaught parser failure\"); throw; }");
+                }
                 w.decreaseIndentation();
                 emitLine(w, "}");
             };
@@ -829,6 +845,23 @@ namespace Cpp {
         generateMembersStr(*o.h, methods, "methods");
         o.h->decreaseIndentation();
         emitLine(*o.h, "};");
+        if (debug_instrumentation_ && !o.in_class && cls.template_parameters.empty() &&
+            (!fields.empty() ||
+             std::find(context.symbol_path.begin(), context.symbol_path.end(), "FlatTypes") != context.symbol_path.end() ||
+             std::find(context.symbol_path.begin(), context.symbol_path.end(), "Types") != context.symbol_path.end())) {
+            std::ostringstream debug_type;
+            debug_type << std::quoted(joinStrings(context.symbol_path, "."));
+            emitLine(*o.h, "inline std::string_view ispa_debug_type(const " + split.leaf + "&) { return " + debug_type.str() + "; }");
+            emitLine(*o.h, "template<class F> void ispa_debug_fields(const " + split.leaf + "& value, F&& field) {");
+            o.h->increaseIndentation();
+            for (const auto& field : fields) {
+                std::ostringstream label;
+                label << std::quoted(field);
+                emitLine(*o.h, "field(" + label.str() + ", value." + field + ");");
+            }
+            o.h->decreaseIndentation();
+            emitLine(*o.h, "}");
+        }
         // A nested class is defined in its enclosing class's def.h. Emit a
         // forwarding header for the nested type so incremental consumers have
         // a stable include path without defining the C++ class a second time.
@@ -1042,12 +1075,55 @@ namespace Cpp {
     }
     auto Construct::produceVariableStatement(const LangAPI::Variable &variable, Converter::Writer &o) -> void {
         std::string line = Core::convertType(variable.type) + " " + variable.name;
+        const std::string initializer = Core::convertExpression(variable.value);
         if (!variable.value.empty())
-            line += " = " + Core::convertExpression(variable.value);
+            line += " = " + initializer;
         emitLine(o, line + ";");
+        if (debug_instrumentation_ && !context.symbol_path.empty() && context.symbol_path.back() == "semantic_action_exec" &&
+            initializer.find("captures.") != std::string::npos)
+            emitLine(o, "if (::ispa::debug::enabled()) ::ispa::debug::lexer_capture(\"" +
+                variable.name + "\", " + variable.name + ");");
     }
     auto Construct::produceComment(const LangAPI::Comment &comment, Converter::Writer &o) -> void {
         const std::string &text = comment.value;
+        if (text.starts_with("ISPA_DEBUG_LINE ")) {
+            std::istringstream input(text.substr(16));
+            std::string file, local;
+            int row = 0, column = 0;
+            input >> std::quoted(file) >> row >> column;
+            if (!input || row <= 0) throw std::runtime_error("Malformed ISPA debug line marker");
+            std::ostringstream location;
+            location << std::quoted(file) << ", " << row << ", " << column;
+            std::string snapshot = "::ispa::debug::Snapshot{}";
+            std::string phase = "before";
+            while (input >> local) {
+                if (local == "@after") phase = "after";
+                else if (local == "ctx") {
+                    snapshot += ".add(\"ctx.rule\", ctx.rule).add(\"ctx.pos\", ctx.pos).add(\"ctx.ast\", ctx.ast)";
+                } else {
+                    const auto equal = local.find('=');
+                    const auto label = equal == std::string::npos ? local : local.substr(0, equal);
+                    const auto symbol = equal == std::string::npos ? local : local.substr(equal + 1);
+                    snapshot += ".add(\"" + label + "\", " + symbol + ")";
+                }
+            }
+            emitLine(o, "if (::ispa::debug::enabled()) ::ispa::debug::line({" + location.str() + "}, " + snapshot + ", \"" + phase + "\");");
+            return;
+        }
+        if (text.starts_with("ISPA_DEBUG_SCOPE ")) {
+            std::istringstream input(text.substr(17));
+            std::string kind, name, file;
+            int row = 0, column = 0;
+            input >> kind >> std::quoted(name) >> std::quoted(file) >> row >> column;
+            if (!input || (kind != "rule" && kind != "production"))
+                throw std::runtime_error("Malformed ISPA debug scope marker");
+            std::ostringstream value;
+            value << "::ispa::debug::" << (kind == "rule" ? "RuleScope" : "ProductionScope")
+                  << " ispa_debug_" << kind << "{" << std::quoted(name) << ", {"
+                  << std::quoted(file) << ", " << row << ", " << column << "}};";
+            emitLine(o, value.str());
+            return;
+        }
         std::size_t start = 0;
         while (true) {
             const auto nl = text.find('\n', start);
@@ -1071,8 +1147,11 @@ namespace Cpp {
         if (stmt.isExpression()) {
             // plain expression statements (calls, assignments, return/break/continue, ...) were silently dropped before
             const std::string text = Core::convertExpression(stmt.getExpression());
-            if (!text.empty())
+            if (!text.empty()) {
                 emitLine(o, text + ";");
+                if (debug_instrumentation_ && text.find("assign_compatible(result.") != std::string::npos)
+                    emitLine(o, "if (::ispa::debug::enabled()) ::ispa::debug::value(\"result\", result, ::ispa::debug::active_location());");
+            }
         } else if (stmt.isIf()) {
             produceIf(stmt.getIf(), o);
         } else if (stmt.isWhile()) {
@@ -1288,8 +1367,9 @@ namespace Cpp {
     }
 }
 
-extern "C" auto cpp_construct(const LangAPI::Declarations *tree, const char *namespace_name, bool incremental) -> Cpp::Construct* {
-    return new Cpp::Construct(tree, namespace_name, incremental);
+extern "C" auto cpp_construct(const LangAPI::Declarations *tree, const char *namespace_name,
+                              bool incremental, bool debug_instrumentation) -> Cpp::Construct* {
+    return new Cpp::Construct(tree, namespace_name, incremental, debug_instrumentation);
 }
 extern "C" auto cpp_construct_finish(Cpp::Construct* c) -> void {
     delete c;

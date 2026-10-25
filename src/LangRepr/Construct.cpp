@@ -67,6 +67,7 @@ namespace LangRepr {
     }
 
     auto Construct::construct() -> Holder& {
+        if (lang == LangAPI::Language::Cpp) holder.include("ispastdlib/ispa_debug.hpp");
         for (const auto& [name, rule] : tree) if (rule.external) {
             holder.include(rule.external->header);
             holder.include("ispastdlib/external.hpp");

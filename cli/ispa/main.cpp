@@ -29,6 +29,7 @@ import AST.Pass;
 import AST.Semantic;
 import ISPA.Diagnostics;
 import LangRepr.Converter;
+import LangAPI;
 import Algorithm.API;
 import Algorithm.Cache;
 import hash;
@@ -40,6 +41,43 @@ import InstalledLibraries;
 
 namespace {
     namespace diagnostics = ISPA::Diagnostics;
+
+    void removeDebugStatements(LangAPI::Statements& statements) {
+        std::erase_if(statements, [](const LangAPI::Statement& statement) {
+            return statement.isComment() &&
+                (statement.getComment().value.starts_with("ISPA_DEBUG_LINE ") ||
+                 statement.getComment().value.starts_with("ISPA_DEBUG_SCOPE "));
+        });
+        for (auto& statement : statements) {
+            if (statement.isIf()) {
+                removeDebugStatements(statement.getIf().stmt);
+                removeDebugStatements(statement.getIf().else_stmt);
+            } else if (statement.isWhile() || statement.isDoWhile()) {
+                removeDebugStatements(statement.getWhileOrDoWhile().stmt);
+            } else if (statement.isSwitch()) {
+                for (auto& item : statement.getSwitch().cases)
+                    removeDebugStatements(item.second);
+            }
+        }
+    }
+
+    void removeDebugDeclarations(LangAPI::Declarations& declarations) {
+        for (auto& declaration : declarations) {
+            if (declaration.isNamespace()) removeDebugDeclarations(declaration.getNamespace().declarations);
+            else if (declaration.isFunction()) removeDebugStatements(declaration.getFunction().statements);
+            else if (declaration.isClass()) {
+                auto& cls = declaration.getClass();
+                if (cls.constructor) removeDebugStatements(cls.constructor->statements);
+                if (cls.to_str_fun) removeDebugStatements(cls.to_str_fun->statements);
+                if (cls.output_fun) removeDebugStatements(cls.output_fun->statements);
+                for (auto& item : cls.data) if (item.first) {
+                    LangAPI::Declarations member{*item.first};
+                    removeDebugDeclarations(member);
+                    *item.first = std::move(member.front());
+                }
+            }
+        }
+    }
 
     std::filesystem::path executablePath(const char* argv0) {
         namespace fs = std::filesystem;
@@ -540,10 +578,15 @@ int generate(Args args) {
         throw std::runtime_error("Algorithm returned no LangRepr converter: " + algorithm_name);
     Algorithm::ConversionRequest conversion_request{lexer_data, ast, args.language, name};
     auto holder = built.to_lang_repr(built.output.get(), conversion_request);
+    if (!args.debug_instrumentation) {
+        holder.removeInclude("ispastdlib/ispa_debug.hpp");
+        removeDebugDeclarations(holder.get());
+    }
 
     // dlib-loads libispa-converter-<lang> and resolves "<lang>_construct"
     // (e.g. the extern "C" cpp_construct in converter.cpp) internally.
     LangRepr::Converter converter(holder, to_string(args.language), name, args.incremental,
+        args.debug_instrumentation,
         InstalledLibraries::pluginPrefix(args.executable_dir, "converter", to_string(args.language)));
     converter.init();
     converter.construct();

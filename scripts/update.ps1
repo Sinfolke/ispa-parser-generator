@@ -70,7 +70,7 @@ try {
     if (-not $self -or -not (Test-Path -LiteralPath $self -PathType Leaf)) {
         throw 'Run update.ps1 from a saved script file.'
     }
-    foreach ($file in @('ispa-pkg.exe', 'update.ps1', 'install.ps1')) {
+    foreach ($file in @('ispa-pkg.exe', 'ispadbg.exe', 'update.ps1', 'install.ps1')) {
         if (-not (Test-Path (Join-Path $extracted $file))) { throw "Release archive does not contain $file" }
     }
     Set-Content -LiteralPath (Join-Path $extracted 'INSTALL_VERSION') -Value $latest
@@ -86,6 +86,9 @@ try {
     if (-not (Test-Path (Join-Path $destination 'ispa-pkg.exe'))) {
         Copy-Item -LiteralPath (Join-Path $extracted 'ispa-pkg.exe') -Destination (Join-Path $destination 'ispa-pkg.exe')
     }
+    if (-not (Test-Path (Join-Path $destination 'ispadbg.exe'))) {
+        Copy-Item -LiteralPath (Join-Path $extracted 'ispadbg.exe') -Destination (Join-Path $destination 'ispadbg.exe')
+    }
 
     New-Item -ItemType Directory -Path $bin -Force | Out-Null
     # Generate robust wrappers for custom installation locations.
@@ -96,6 +99,8 @@ try {
     Set-Content -LiteralPath (Join-Path $bin 'ispa-update.cmd') -Value $updateLauncher -Encoding Ascii
     $pkgLauncher = "@echo off`r`nsetlocal`r`nset /p ISPA_VERSION=<`"$escapedRoot\current-version`"`r`n`"$escapedRoot\versions\%ISPA_VERSION%\ispa-pkg.exe`" %*`r`n"
     Set-Content -LiteralPath (Join-Path $bin 'ispa-pkg.cmd') -Value $pkgLauncher -Encoding Ascii
+    $debuggerLauncher = "@echo off`r`nsetlocal`r`nset /p ISPA_VERSION=<`"$escapedRoot\current-version`"`r`n`"$escapedRoot\versions\%ISPA_VERSION%\ispadbg.exe`" %*`r`n"
+    Set-Content -LiteralPath (Join-Path $bin 'ispadbg.cmd') -Value $debuggerLauncher -Encoding Ascii
     Set-Content -LiteralPath $versionFile -Value $latest -NoNewline
 
     $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
@@ -104,7 +109,7 @@ try {
         [Environment]::SetEnvironmentVariable('Path', (($entries + $bin) -join ';'), 'User')
         Write-Host "Added $bin to user PATH. Open a new terminal."
     }
-    Write-Host "Installed ISPA $latest. Commands: ispa, ispa-update"
+    Write-Host "Installed ISPA $latest. Commands: ispa, ispa-pkg, ispadbg, ispa-update"
 }
 finally {
     Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue

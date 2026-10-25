@@ -12,18 +12,21 @@ export namespace LangRepr {
         const Holder &holder;
         std::string namespace_name;
         bool incremental;
+        bool debug_instrumentation;
         std::vector<std::pair<std::string, std::string>> files;
         std::string lang;
         ::Converter::ConstructBase *builder;
     public:
         Converter(const Holder &holder, const std::string &lang, const std::string &namespace_name,
-                  bool incremental, const std::string& library_prefix = {})
+                  bool incremental, bool debug_instrumentation = true,
+                  const std::string& library_prefix = {})
             : converter_lib(library_prefix.empty() ? "libispa-converter-" + lang : library_prefix),
-              holder(holder), namespace_name(namespace_name), incremental(incremental), lang(lang) {}
+              holder(holder), namespace_name(namespace_name), incremental(incremental),
+              debug_instrumentation(debug_instrumentation), lang(lang) {}
 
         auto init() -> void {
-            auto construct = converter_lib.loadfun<::Converter::ConstructBase*, const LangAPI::Declarations *, const char*, bool>(lang + "_construct");
-            builder = construct(&holder.get(), namespace_name.c_str(), incremental);
+            auto construct = converter_lib.loadfun<::Converter::ConstructBase*, const LangAPI::Declarations *, const char*, bool, bool>(lang + "_construct");
+            builder = construct(&holder.get(), namespace_name.c_str(), incremental, debug_instrumentation);
         }
         auto construct() -> void {
             builder->construct();

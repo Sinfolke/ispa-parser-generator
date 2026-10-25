@@ -16,6 +16,7 @@ export namespace LangRepr {
         void include(std::string path) {
             if (std::ranges::find(includes, path) == includes.end()) includes.push_back(std::move(path));
         }
+        void removeInclude(const std::string& path) { std::erase(includes, path); }
         const auto& getIncludes() const { return includes; }
 
         auto push(const LangAPI::Declaration &declaration) -> void { data.push_back(declaration); };

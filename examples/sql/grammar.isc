@@ -47,20 +47,20 @@ condition:
 ;
 
 comparison:
-    @ expr (\s0 @ operator \s0 @ expr)?
-    @{left, operator, right}
+    @ expr (\s0 @ op \s0 @ expr)?
+    @{left, oper, right}
 
-    #operator:
+    #op:
         @ '=' | '!=' | '<=' | '>=' | '<' | '>'
         {@}
     ;
 ;
 
 expr:
-    @ term (\s0 @ operator \s0 @ term)*
-    @{first, operators, rest}
+    @ term (\s0 @ op \s0 @ term)*
+    @{first, ops, rest}
 
-    #operator:
+    #op:
         @ '+' | '-'
 
         {@}
@@ -68,11 +68,11 @@ expr:
 ;
 
 term:
-    @ primary (\s0 @ operator \s0 @ primary)*
+    @ primary (\s0 @ op \s0 @ primary)*
 
-    @{first, operators, rest}
+    @{first, ops, rest}
 
-    #operator:
+    #op:
         @ '*' | '/'
 
         {@}
@@ -86,7 +86,7 @@ primary:
 
 order_clause:
     'ORDER' 'BY' @ ID @ direction?
-    @{column, direction}
+    @{column, direct}
 
     #direction:
         @ 'ASC' | 'DESC'
