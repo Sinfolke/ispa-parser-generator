@@ -9,7 +9,7 @@ BINARY = sys.argv.pop(1)
 
 class BridgeTests(unittest.TestCase):
     def parse(self, source):
-        process = subprocess.run([BINARY], input=source, text=True, capture_output=True, timeout=5)
+        process = subprocess.run([BINARY], input=source, text=True, encoding='utf-8', capture_output=True, timeout=5)
         self.assertEqual(process.returncode, 0, process.stderr[-1000:])
         result = json.loads(process.stdout)
         for item in result['tokens'] + result['diagnostics']:

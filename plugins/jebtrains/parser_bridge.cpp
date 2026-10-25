@@ -167,7 +167,13 @@ struct BridgeParser : ::Parser::Parser {
 struct Semantics {
     const std::string& source;
     std::vector<Span>& spans;
-    template<class T> static constexpr std::string_view typeName() { return __PRETTY_FUNCTION__; }
+    template<class T> static constexpr std::string_view typeName() {
+#ifdef _MSC_VER
+        return __FUNCSIG__;
+#else
+        return __PRETTY_FUNCTION__;
+#endif
+    }
     template<class T> void visit(const ISPA_STD::Node<T>& node, std::string_view role = {}) {
         if (node.empty()) return;
         if constexpr (std::is_same_v<T, Identifier>) {
