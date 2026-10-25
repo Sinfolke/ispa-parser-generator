@@ -40,6 +40,60 @@ namespace {
             offset += to.size();
         }
     }
+    std::string last_segment(const std::string& name) {
+        const auto p = name.rfind("::");
+        return p == std::string::npos ? name : name.substr(p + 2);
+    }
+    std::string symbol_last_name(const LangAPI::Symbol& symbol) {
+        std::string out;
+        for (const auto& piece : symbol.path)
+            if (const auto* text = std::get_if<std::string>(&piece)) out = last_segment(*text);
+        return out;
+    }
+    // A Python class statement needs its bases to exist already, while C++ may define a derived
+    // class before its base once the base is forward-declared. Stable order: every class keeps
+    // its position unless a base declared later in the same scope has to be pulled in front of it.
+    std::vector<const LangAPI::Declaration*> order_by_inheritance(const LangAPI::Declarations& decls) {
+        std::unordered_map<std::string, std::size_t> class_index;
+        for (std::size_t i = 0; i < decls.size(); ++i)
+            if (decls[i].isClass()) class_index.emplace(symbol_last_name(decls[i].getClass().name), i);
+        std::vector<const LangAPI::Declaration*> result;
+        result.reserve(decls.size());
+        std::vector<char> state(decls.size(), 0);  // 0 new, 1 visiting, 2 emitted
+        std::function<void(std::size_t)> visit = [&](std::size_t i) {
+            if (state[i]) return;  // also breaks inheritance cycles
+            state[i] = 1;
+            if (decls[i].isClass()) {
+                for (const auto& inherit : decls[i].getClass().inherit_members) {
+                    const auto* base = std::get_if<LangAPI::Symbol>(&inherit.second);
+                    if (!base) continue;
+                    const auto found = class_index.find(symbol_last_name(*base));
+                    if (found != class_index.end() && found->second != i) visit(found->second);
+                }
+            }
+            state[i] = 2;
+            result.push_back(&decls[i]);
+        };
+        for (std::size_t i = 0; i < decls.size(); ++i) visit(i);
+        return result;
+    }
+    // `auto frame = recovery_frame("rule");` owns the rule's recovery frame in C++ (RAII). Python has
+    // no destructors, so the body that follows it is wrapped in try/finally and the frame is closed.
+    // Returns the statement index, or npos.
+    std::size_t recovery_frame_statement(const LangAPI::Statements& s) {
+        std::size_t index = 0;
+        for (const auto& st : s) {
+            if (st.isVariable()) {
+                const auto& value = st.getVariable().value;
+                if (value.size() == 1 && value.front().type() == LangAPI::ExpressionValueType::FunctionCall) {
+                    const auto* name = std::get_if<std::shared_ptr<LangAPI::Symbol>>(&value.front().getFunctionCall().name);
+                    if (name && *name && symbol_last_name(**name) == "recovery_frame") return index;
+                }
+            }
+            ++index;
+        }
+        return std::string::npos;
+    }
     std::string bootstrap_newline_action(const std::string& source) {
         const auto action = source.find("ispa_token_result = Types.modules.tokens.NEWLINE()");
         if (action == std::string::npos) return {};
@@ -53,8 +107,8 @@ namespace {
 }
 Construct::Construct(const LangAPI::Declarations* src, const char* name, bool incremental)
     : ConstructBase(src, name, incremental), core_(name) {
-    core_.set_statement_writer([this](const LangAPI::Statements& s) {
-        return statements_inline(s);
+    core_.set_statement_writer([this](const LangAPI::Statements& s, const std::vector<std::string>& params) {
+        return statements_inline(s, params);
     });
 }
 void Construct::line(const std::string& text) {
@@ -83,17 +137,28 @@ void Construct::comment(const std::string& value) {
     std::string part;
     while (std::getline(in, part)) line("# " + part);
 }
-std::string Construct::statements_inline(const LangAPI::Statements& s) {
+std::string Construct::statements_inline(const LangAPI::Statements& s, const std::vector<std::string>& params) {
     auto saved_output = std::move(output_);
     const auto saved_indentation = indentation_;
+    const bool saved_inside_function = inside_function_;
     // Lambdas queued by the enclosing expression must not be flushed into this body.
     auto saved_lambdas = core_.take_pending_lambdas();
     output_.clear();
     indentation_ = 0;
+    inside_function_ = true;  // a lambda body is a function body even inside a class-field initializer
+    core_.enter_scope(params);
     statements(s);
+    const auto captured = core_.leave_scope();
     auto result = std::move(output_);
+    if (!captured.empty()) {
+        // [&]-captured locals that the body assigns to: bind them to the enclosing def.
+        std::string names;
+        for (const auto& name : captured) names += (names.empty() ? "" : ", ") + name;
+        result = "nonlocal " + names + "\n" + result;
+    }
     output_ = std::move(saved_output);
     indentation_ = saved_indentation;
+    inside_function_ = saved_inside_function;
     core_.restore_pending_lambdas(std::move(saved_lambdas));
     return result;
 }
@@ -219,6 +284,7 @@ void Construct::variable(const LangAPI::Variable& var) {
     // Non-static C++ class fields are instance-specific. Class emission initializes
     // them from __init__ instead of creating shared class attributes here.
     if (class_context_ && !inside_function_ && !var.is_static) return;
+    if (inside_function_) core_.declare(Core::identifier(var.name));  // local of the current def
     const bool default_init = var.value.empty() ||
         (var.value.size() == 1 && var.value.front().type() == LangAPI::ExpressionValueType::EmptyInitializer);
     std::string rhs;
@@ -231,6 +297,9 @@ void Construct::variable(const LangAPI::Variable& var) {
             case V::Array: case V::FixedSizeArray: case V::Span: rhs = "[]"; break;
             case V::Map: rhs = "{}"; break;
             case V::Bool: rhs = "False"; break;
+            // C++ default-initialises these; lr_capture_assign infers the destination type from them.
+            case V::Char: case V::String: case V::NonOwnedString: rhs = "\"\""; break;
+            case V::Float: rhs = "0.0"; break;
             case V::Int: case V::LargeUInt: rhs = "0"; break;
             default: rhs = "None"; break;
         }
@@ -288,6 +357,11 @@ void Construct::function(const LangAPI::Function& fn, bool ctor) {
     const bool saved_inside_function = inside_function_;
     inside_function_ = true;
     if (is_method || ctor) core_.set_method_members(class_members_);
+    {
+        std::vector<std::string> names;
+        for (const auto& param : fn.parameters) names.push_back(Core::identifier(param.second));
+        core_.enter_scope(names);
+    }
     bool emitted = false;
     if (ctor) {
         // Initialize every non-static member before custom constructor statements.
@@ -295,10 +369,35 @@ void Construct::function(const LangAPI::Function& fn, bool ctor) {
         // This prelude is emitted by cls(), not here.
     }
     if (!fn.statements.empty()) {
-        statements(fn.statements);
+        const auto frame_at = recovery_frame_statement(fn.statements);
+        if (frame_at == std::string::npos) {
+            statements(fn.statements);
+        } else {
+            std::size_t index = 0;
+            std::string frame_name;
+            bool in_try = false;
+            for (const auto& st : fn.statements) {
+                statement(st);
+                if (index++ == frame_at) {
+                    frame_name = Core::identifier(st.getVariable().name);
+                    line("try:");
+                    ++indentation_;
+                    in_try = true;
+                }
+            }
+            if (in_try) {
+                if (frame_at + 1 == index) line("pass");   // nothing after the frame declaration
+                --indentation_;
+                line("finally:");
+                ++indentation_;
+                line(frame_name + ".close()");   // pops the frame and counts down an unwind request
+                --indentation_;
+            }
+        }
         emitted = true;
     }
     if (!emitted) line("pass");
+    core_.leave_scope();
     inside_function_ = saved_inside_function;
     core_.set_method_members({});
     --indentation_;
@@ -340,8 +439,13 @@ void Construct::cls(const LangAPI::Class& value) {
     if (name == "Lexer") {
         class_members_.insert({"tokens", "lookup", "append_token", "source", "set_input"});
     } else if (name == "Parser") {
+        class_members_.insert({"lr_parse", "lr_parse_generalized", "getErrors"});
         class_members_.insert({"lexer", "tree", "errors", "required", "optional", "range", "counted",
             "range_optional", "skip_spaces", "recovery_frame", "recovery_at", "unwinding", "action_result"});
+        // Recovery runtime (ispa_std/parser.py). recover_choice stays bare: Core::call lowers it itself.
+        class_members_.insert({"getContextErrors", "fail_context", "rule_context", "custom_failure_decision",
+            "required_recovering", "sync_loop", "note_match", "reject_absent_rule", "recover_at_context",
+            "recovery_state"});
     }
 
     // Keep instance attributes independent even when initializer is a mutable value.
@@ -362,6 +466,11 @@ void Construct::cls(const LangAPI::Class& value) {
             const bool saved_inside = inside_function_;
             inside_function_ = true;
             core_.set_method_members(class_members_);
+            {
+                std::vector<std::string> names;
+                for (const auto& param : ctor.parameters) names.push_back(Core::identifier(param.second));
+                core_.enter_scope(names);
+            }
             if (has_lib_base) line("super().__init__()");
             for (const auto* f : fields) {
                 const auto init = f->value.empty() ? std::string("None") : core_.expression(f->value);
@@ -370,6 +479,7 @@ void Construct::cls(const LangAPI::Class& value) {
             }
             if (ctor.statements.empty() && fields.empty() && !has_lib_base) line("pass");
             else statements(ctor.statements);
+            core_.leave_scope();
             inside_function_ = saved_inside;
             core_.set_method_members({});
             --indentation_;
@@ -484,7 +594,8 @@ void Construct::declarations(const LangAPI::Declarations& decls) {
             repeated.insert(d.getFunction().name);
     overloaded_scopes_.push_back(std::move(repeated));
     std::unordered_set<std::string> emitted_namespaces;
-    for (const auto& d : decls) {
+    for (const auto* ordered : order_by_inheritance(decls)) {
+        const auto& d = *ordered;
         if (!d.isNamespace()) {
             declaration(d);
             continue;
@@ -514,6 +625,8 @@ void Construct::construct() {
     line("import enum");
     line("import sys as _sys");
     line("import typing");
+    // Before `import ispa_std`: the Python bootstrap rewrites that line to add its own custom_failure import.
+    line("from ispa_std import custom_failure, custom_failure_decision");
     line("import ispa_std");
     line("_ISPA_UNSET = object()");
     line();
@@ -521,9 +634,18 @@ void Construct::construct() {
     line();
     rewritten_source_ = rewriter_.run(*source);
     declarations(rewritten_source_);
+    // C++ cursor snapshots are value copies. Python cursors are mutable, so
+    // generated fail blocks must snapshot them explicitly before sync/skip.
+    replace_all(output_, "start_pos = pos\n", "start_pos = pos.copy()\n");
+    replace_all(output_, "before_failure = failed_pos\n", "before_failure = failed_pos.copy()\n");
     line();
-    line("Parser.lexer_type = Lexer");
-    line("Parser.parser_ws_type = Types._ispa__WS");
+    // Only wire what this grammar actually defines (a lexer-only or parser-less module has neither).
+    const bool has_lexer = output_.find("\nclass Lexer(") != std::string::npos;
+    const bool has_parser = output_.find("\nclass Parser(") != std::string::npos;
+    if (has_parser && has_lexer) line("Parser.lexer_type = Lexer");
+    if (has_parser && output_.find("\nclass Types:") != std::string::npos &&
+        output_.find("_ispa__WS") != std::string::npos)
+        line("Parser.parser_ws_type = Types._ispa__WS");
     if (!deferred_aliases_.empty()) {
         line();
         line("# Qualified classes (e.g. Types.rule.STRING) defined after their parents");
@@ -532,14 +654,12 @@ void Construct::construct() {
     }
     // The Python grammar's advanced layout tokens are lowered through the C++
     // lexer API. Emit runnable Python operations and connect the generated DFA
-    // to the Python bootstrap's EOF/comment/string handling.
+    // to the Python standard runtime's EOF/comment/string handling.
     if (output_.find("ispa_shared_indents") != std::string::npos &&
         output_.find("Types.modules.tokens.NEWLINE()") != std::string::npos) {
         const auto newline_action = bootstrap_newline_action(output_);
         if (newline_action.empty())
             throw std::runtime_error("Python bootstrap NEWLINE action was not generated");
-        replace_all(output_, "import ispa_std\n",
-                    "import ispa_std\nfrom bootstrap_runtime import custom_failure, make_lexer\n");
         replace_all(output_, "std.string(start, start + length)",
                     "start[start_pos:start_pos + length]");
         replace_all(output_, "_ispa__next_char(((start) + (length)))",
@@ -557,7 +677,7 @@ void Construct::construct() {
         replace_all(output_, "== (\"\\\\n\")", "== (\"\\n\")");
         replace_all(output_, "== (\"\\\\t\")", "== (\"\\t\")");
         replace_all(output_, "Parser.lexer_type = Lexer",
-                    "Parser.lexer_type = make_lexer(_sys.modules[__name__], " + newline_action + ")");
+                    "Parser.lexer_type = ispa_std.make_python_lexer(_sys.modules[__name__], " + newline_action + ")");
     }
     // Python is already module-incremental: avoid generating 800 import fragments.
     // The incremental flag is accepted so the host may use the same C ABI.

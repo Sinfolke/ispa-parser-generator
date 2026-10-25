@@ -44,7 +44,7 @@ export namespace Python {
         void do_while_stmt(const LangAPI::DoWhile& value);
         void switch_stmt(const LangAPI::Switch& value);
         void body_or_pass(const LangAPI::Statements& stmts);
-        std::string statements_inline(const LangAPI::Statements& stmts);
+        std::string statements_inline(const LangAPI::Statements& stmts, const std::vector<std::string>& params);
         void comment(const std::string& text);
     public:
         Construct(const LangAPI::Declarations* src, const char* module_name, bool incremental);

@@ -1,5 +1,4 @@
 from pathlib import Path
-from bootstrap_runtime import custom_failure, make_lexer
 import sys
 
 root = Path(__file__).resolve().parent
@@ -15,5 +14,7 @@ main = parser.parse((root / 'tests' / 'cls.py').read_text())
 assert len(main.data().value.data().value) == 1
 assert not parser.errors
 print(f'Python bootstrap parsed cls.py')
+for e in parser.getErrors():
+    print(f"Error: {e.message}, Mode: {e.decision.mode.name}")
 with open("result.txt", "w") as f:
         f.write(format_ast(main, indent=2))

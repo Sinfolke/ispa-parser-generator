@@ -38,6 +38,41 @@ namespace {
         }
         return out;
     }
+    bool is_name(const std::string& text) {
+        if (text.empty() || std::isdigit(static_cast<unsigned char>(text.front()))) return false;
+        for (const char c : text)
+            if (!(std::isalnum(static_cast<unsigned char>(c)) || c == '_')) return false;
+        return true;
+    }
+    // C++ `x++` / `++x` / `x--` / `--x` used as a value, applied to the rendered operand text.
+    //   local name     -> walrus: (x := x + 1), postfix: ((x := x + 1) - 1)
+    //   obj.attr       -> ispa_std.step_attr(obj, "attr", delta, post)
+    //   obj[key]       -> ispa_std.step_item(obj, key, delta, post)
+    std::string step_value(const std::string& operand, int delta, bool post) {
+        const std::string sign = delta > 0 ? " + 1" : " - 1";
+        const std::string undo = delta > 0 ? " - 1" : " + 1";
+        if (is_name(operand)) {
+            const auto updated = "(" + operand + " := " + operand + sign + ")";
+            return post ? "(" + updated + undo + ")" : updated;
+        }
+        const std::string tail = std::string(", ") + std::to_string(delta) + ", " + (post ? "True" : "False") + ")";
+        if (operand.ends_with(']')) {
+            int depth = 0;
+            for (std::size_t i = operand.size(); i-- > 0;) {
+                if (operand[i] == ']') ++depth;
+                else if (operand[i] == '[' && --depth == 0) {
+                    if (i == 0) break;
+                    return "ispa_std.step_item(" + operand.substr(0, i) + ", " +
+                           operand.substr(i + 1, operand.size() - i - 2) + tail;
+                }
+            }
+        } else {
+            const auto dot = operand.rfind('.');
+            if (dot != std::string::npos && dot > 0 && is_name(operand.substr(dot + 1)))
+                return "ispa_std.step_attr(" + operand.substr(0, dot) + ", \"" + operand.substr(dot + 1) + "\"" + tail;
+        }
+        unsupported("++/-- on an operand that is not a name, attribute or subscript");
+    }
     // Shortest round-trip text, always a valid Python float literal.
     std::string float_literal(double v) {
         if (std::isnan(v)) return "float('nan')";
@@ -62,8 +97,34 @@ namespace {
     }
 }
 Core::Core(std::string name) : module_name_(std::move(name)) {}
-void Core::set_statement_writer(std::function<std::string(const LangAPI::Statements&)> value) {
+void Core::set_statement_writer(StatementWriter value) {
     statement_writer_ = std::move(value);
+}
+void Core::enter_scope(const std::vector<std::string>& params) {
+    scopes_.emplace_back(params.begin(), params.end());
+    assigned_.emplace_back();
+}
+void Core::declare(const std::string& name) {
+    if (!scopes_.empty()) scopes_.back().insert(name);
+}
+void Core::note_assigned(const std::string& name) {
+    if (!assigned_.empty()) assigned_.back().insert(name);
+}
+std::vector<std::string> Core::leave_scope() {
+    std::vector<std::string> result;
+    if (scopes_.empty()) return result;
+    // C++ `[&]` lambdas write through to captured locals; a bare assignment inside a Python
+    // `def` would silently create a new local instead, so such names need `nonlocal`.
+    for (const auto& name : assigned_.back()) {
+        if (scopes_.back().contains(name)) continue;
+        for (std::size_t i = scopes_.size() - 1; i-- > 0;) {
+            if (scopes_[i].contains(name)) { result.push_back(name); break; }
+        }
+    }
+    std::sort(result.begin(), result.end());
+    scopes_.pop_back();
+    assigned_.pop_back();
+    return result;
 }
 std::vector<Core::LambdaDefinition> Core::take_pending_lambdas() {
     std::vector<LambdaDefinition> result;
@@ -272,52 +333,100 @@ std::string Core::lib(const LangAPI::IspaLibSymbol& s) {
         case S::ParserRangeOptional: return "self.range_optional";
         case S::ParserCounted: return "self.counted";
         case S::AssignCompatible: return "ispa_std.assign_compatible";
-        case S::LRGeneralizedParser:
-        case S::LRParser:
-        case S::LRParseGeneralized:
-        case S::LRGet:
-        case S::LRToken:
-        case S::LRPack:
-        case S::LRCaptureAssign:
-        case S::LRNode:
-        case S::LRParse: unsupported("LR backend (Python runtime requires LR table lowering)");
+        // LR backend: runtime lives in ispa_std/lr.py (port of lr_machine.hpp / lr_conflicts.hpp).
+        case S::LRParser: return "ispa_std.LRParser";
+        case S::LRGeneralizedParser: return "ispa_std.LRGeneralizedParser";
+        case S::LRParse: return "self.lr_parse";
+        case S::LRParseGeneralized: return "self.lr_parse_generalized";
+        case S::LRGet: return "ispa_std.lr_get";
+        case S::LRToken: return "ispa_std.lr_token";
+        case S::LRPack: return "ispa_std.lr_pack";
+        case S::LRNode: return "ispa_std.lr_node";
+        case S::LRCaptureAssign: return "ispa_std.lr_capture_assign";
     }
     unsupported("StdlibExports");
+}
+// Recovery::Tokens<A, B, ...> / EmptyTokens -> a Python tuple of token ids.
+std::string Core::recovery_set(const LangAPI::Type& set) {
+    if (!set.isSymbol()) throw std::runtime_error("Python target: invalid recovery token set");
+    const auto name = symbol(set.getSymbol());
+    if (name != "ISPA_STD.Recovery.Tokens" && name != "ISPA_STD.Recovery.EmptyTokens")
+        throw std::runtime_error("Python target: unsupported recovery token set");
+    std::string out = "(";
+    std::size_t values = 0;
+    for (const auto& item : set.template_parameters) {
+        std::string text = std::holds_alternative<LangAPI::Type>(item)
+            ? type(std::get<LangAPI::Type>(item))
+            : rvalue(std::get<LangAPI::RValue>(item));
+        if (text == "ISPA_STD.Recovery.EndOfInput") text = "ispa_std.EndOfInput";
+        if (values++) out += ", ";
+        out += text;
+    }
+    if (values == 1) out += ",";
+    return out + ")";
+}
+// Recovery::Policy<AllowInsertion, AllowDeletion, AllowReplacement, MaxSkip> -> (bool, bool, bool, int)
+std::string Core::recovery_policy(const LangAPI::Type& policy) {
+    if (!policy.isSymbol() || symbol(policy.getSymbol()) != "ISPA_STD.Recovery.Policy")
+        throw std::runtime_error("Python target: unsupported recovery policy");
+    std::vector<std::string> values;
+    for (const auto& item : policy.template_parameters)
+        values.push_back(std::holds_alternative<LangAPI::Type>(item)
+            ? type(std::get<LangAPI::Type>(item))
+            : rvalue(std::get<LangAPI::RValue>(item)));
+    if (values.size() > 4) throw std::runtime_error("Python target: too many recovery policy arguments");
+    static const char* const defaults[] = {"True", "True", "True", "64"};
+    for (std::size_t i = values.size(); i < 4; ++i) values.emplace_back(defaults[i]);
+    return "(" + join(values, ", ", [](const std::string& v) { return v; }) + ")";
 }
 std::string Core::call(const LangAPI::FunctionCall& c) {
     std::string fn = std::visit(overloaded{
         [this](const std::shared_ptr<LangAPI::Symbol>& name) { return symbol(*name); },
         [this](const std::shared_ptr<LangAPI::IspaLibSymbol>& name) { return lib(*name); }
     }, c.name);
+    const auto as_type = [](const auto& item) -> const LangAPI::Type& {
+        const auto* t = std::get_if<std::shared_ptr<LangAPI::Type>>(&item);
+        if (!t || !*t) throw std::runtime_error("Python target: invalid recovery template argument");
+        return **t;
+    };
     if (fn == "recover_choice") {
         if (c.args.size() != 3 || c.template_parameters.size() % 2 != 0)
             throw std::runtime_error("Python target: invalid recovery choice");
         std::string alternatives = "[";
         for (const auto& parameter : c.template_parameters) {
-            const auto* set = std::get_if<std::shared_ptr<LangAPI::Type>>(&parameter);
-            if (!set || !*set || !(**set).isSymbol())
-                throw std::runtime_error("Python target: invalid recovery token set");
-            const auto set_name = symbol((**set).getSymbol());
-            if (set_name != "ISPA_STD.Recovery.Tokens" && set_name != "ISPA_STD.Recovery.EmptyTokens")
-                throw std::runtime_error("Python target: unsupported recovery token set");
             if (alternatives.size() > 1) alternatives += ", ";
-            alternatives += "(";
-            std::size_t values = 0;
-            for (const auto& item : (**set).template_parameters) {
-                const auto* token = std::get_if<LangAPI::Type>(&item);
-                if (!token) throw std::runtime_error("Python target: invalid recovery token");
-                if (values++) alternatives += ", ";
-                const auto name = type(*token);
-                alternatives += name == "ISPA_STD.Recovery.EndOfInput" ? "None" : name;
-            }
-            if (values == 1) alternatives += ",";
-            alternatives += ")";
+            alternatives += recovery_set(as_type(parameter));
         }
         alternatives += "]";
         return "self.recover_choice(" + expression(c.args[0]) + ", " + expression(c.args[1]) +
             ", " + expression(c.args[2]) + ", " + alternatives + ")";
     }
-    if (fn == "ISPA_STD.Recovery.handler") return "None";
+    // recovery_at<Sets...>(expecting, names...): the claim sets become a list of token-id tuples.
+    if (fn == "recovery_at" || fn == "self.recovery_at") {
+        if (c.args.size() != c.template_parameters.size() + 1)
+            throw std::runtime_error("Python target: recovery_at needs an expectation and one name per claim set");
+        std::string sets = "[";
+        for (std::size_t i = 0; i < c.template_parameters.size(); ++i) {
+            if (i) sets += ", ";
+            sets += recovery_set(as_type(c.template_parameters[i]));
+        }
+        sets += "]";
+        std::string out = "self.recovery_at(" + sets;
+        for (const auto& arg : c.args) out += ", " + expression(arg);
+        return out + ")";
+    }
+    // Recovery::handler<Expected, Continuation, Follow, Synchronization, Policy>(rule, expected_text)
+    if (fn == "ISPA_STD.Recovery.handler") {
+        if (c.template_parameters.size() != 5 || c.args.size() != 2)
+            throw std::runtime_error("Python target: invalid recovery handler");
+        return "ispa_std.Recovery.handler(" +
+            recovery_set(as_type(c.template_parameters[0])) + ", " +
+            recovery_set(as_type(c.template_parameters[1])) + ", " +
+            recovery_set(as_type(c.template_parameters[2])) + ", " +
+            recovery_set(as_type(c.template_parameters[3])) + ", " +
+            recovery_policy(as_type(c.template_parameters[4])) + ", " +
+            expression(c.args[0]) + ", " + expression(c.args[1]) + ")";
+    }
     if (fn == "ISPA_STD.external_match") {
         if (c.template_parameters.size() != 1 || c.args.size() != 1)
             throw std::runtime_error("Python target: invalid external parser call");
@@ -360,17 +469,28 @@ std::string Core::lib_call(const LangAPI::IspaLibFunctionCall& c) {
         const auto target_index = (kind == S::ParserCounted) ? 2u : 1u;
         args.insert(args.begin() + std::min((std::size_t)target_index, args.size()), expected);
     }
+    // C++ lr_parse<Generated>(pos): the template argument is the generated parser class itself.
+    if (kind == S::LRParse || kind == S::LRParseGeneralized) {
+        if (c.template_parameters.empty())
+            throw std::runtime_error("Python target: lr_parse is missing its generated parser template argument");
+        const auto& first = c.template_parameters.front();
+        args.insert(args.begin(), std::holds_alternative<std::shared_ptr<LangAPI::Type>>(first)
+            ? type(*std::get<std::shared_ptr<LangAPI::Type>>(first))
+            : rvalue(*std::get<std::shared_ptr<LangAPI::RValue>>(first)));
+    }
     return fn + "(" + join(args, ", ", [](const std::string& arg) { return arg; }) + ")";
 }
 
 std::string Core::lambda(const LangAPI::Lambda& fn) {
-    const std::string params = join(fn.parameters, ", ", [](const auto& p) { return p.second; });
+    std::vector<std::string> names;
+    for (const auto& p : fn.parameters) names.push_back(identifier(p.second));  // same escaping as the body uses
+    const std::string params = join(names, ", ", [](const auto& n) { return n; });
     if (fn.statements.empty()) return "lambda " + params + ": None";
     if (!statement_writer_) throw std::runtime_error("Python target: missing lambda statement writer");
     const auto name = "_ispa_lambda_" + std::to_string(++lambda_number_);
     // Delay emission until the enclosing statement is emitted: a Python `def`
     // can contain arbitrary control flow while `lambda` cannot.
-    pending_lambdas_.push_back({name, params, statement_writer_(fn.statements)});
+    pending_lambdas_.push_back({name, params, statement_writer_(fn.statements, names)});
     return name;
 }
 
@@ -475,8 +595,27 @@ std::string Core::rvalue(const LangAPI::RValue& v) {
 std::string Core::expression(const LangAPI::Expression& e) {
     std::string out;
     const bool real_division = has_float(e);
-    for (const auto& part : e) {
+    // Value-producing ++/--: a postfix operator rewrites the operand rendered just before it,
+    // a prefix operator remembers its delta until the next operand has been rendered.
+    std::size_t operand_begin = std::string::npos;
+    int pending_prefix = 0;
+    for (std::size_t index = 0; index < e.size(); ++index) {
+        const auto& part = e[index];
         using E = LangAPI::ExpressionValueType;
+        if (part.type() == E::ExpressionElement &&
+            (part.getExpressionElement() == LangAPI::ExpressionElement::PlusPlus ||
+             part.getExpressionElement() == LangAPI::ExpressionElement::MinusMinus)) {
+            const int delta = part.getExpressionElement() == LangAPI::ExpressionElement::PlusPlus ? 1 : -1;
+            if (operand_begin != std::string::npos) {
+                const auto operand = out.substr(operand_begin);
+                if (is_name(operand)) note_assigned(operand);
+                out.erase(operand_begin);
+                out += step_value(operand, delta, true);
+                operand_begin = std::string::npos;
+            } else pending_prefix = delta;
+            continue;
+        }
+        const auto before = out.size();
         switch (part.type()) {
             case E::Empty: break;
             case E::RValue: out += rvalue(part.getRValue()); break;
@@ -486,7 +625,27 @@ std::string Core::expression(const LangAPI::Expression& e) {
             case E::Return: unsupported("return inside expression");
             case E::Break: unsupported("break inside expression");
             case E::Continue: unsupported("continue inside expression");
-            case E::VariableAssignment: unsupported("variable assignment inside expression");
+            case E::VariableAssignment: {
+                // `while ((c = next()) != x)` and friends: an assignment used as a value.
+                const auto& var = part.getVariableAssignment();
+                const auto lhs = std::holds_alternative<LangAPI::Symbol>(var.name)
+                    ? symbol(std::get<LangAPI::Symbol>(var.name))
+                    : storage(std::get<LangAPI::StorageSymbol>(var.name));
+                if (!is_name(lhs)) unsupported("assignment used as a value on a non-local target");
+                note_assigned(lhs);
+                const auto rhs = expression(var.value);
+                const char* op = nullptr;
+                switch (var.type) {
+                    case LangAPI::OperatorType::Assign: break;
+                    case LangAPI::OperatorType::Add: op = " + "; break;
+                    case LangAPI::OperatorType::Minus: op = " - "; break;
+                    case LangAPI::OperatorType::Multiply: op = " * "; break;
+                    case LangAPI::OperatorType::Divide: op = has_float(var.value) ? " / " : " // "; break;
+                    case LangAPI::OperatorType::Modulo: op = " % "; break;
+                }
+                out += "(" + lhs + " := " + (op ? lhs + op + "(" + rhs + ")" : rhs) + ")";
+                break;
+            }
             case E::CounterIncreament: unsupported("counter increment inside expression");
             case E::CounterAssignment: unsupported("counter assignment inside expression");
             case E::ResetPosCounter: unsupported("counter stack reset inside expression");
@@ -511,7 +670,17 @@ std::string Core::expression(const LangAPI::Expression& e) {
             }
             default: unsupported("ExpressionValueType");
         }
+        if (pending_prefix != 0) {
+            if (part.type() != E::RValue) unsupported("prefix ++/-- without an assignable operand");
+            const auto operand = out.substr(before);
+            if (is_name(operand)) note_assigned(operand);
+            out.erase(before);
+            out += step_value(operand, pending_prefix, false);
+            pending_prefix = 0;
+            operand_begin = std::string::npos;
+        } else operand_begin = part.type() == E::RValue ? before : std::string::npos;
     }
+    if (pending_prefix != 0) unsupported("dangling prefix ++/--");
     return out;
 }
 std::string Core::statement_expression(const LangAPI::Expression& e) {
@@ -521,6 +690,13 @@ std::string Core::statement_expression(const LangAPI::Expression& e) {
         switch (first.type()) {
             case E::IspaLibFunctionCall: {
                 const auto& call = first.getIspaLibFunctionCall();
+                if (call.symbol.exports == LangAPI::StdlibExports::LRCaptureAssign && call.args.size() == 4) {
+                    // C++ takes the destination by reference; Python returns the converted value.
+                    const auto lhs = expression(call.args[0]);
+                    if (is_name(lhs)) note_assigned(lhs);
+                    return lhs + " = ispa_std.lr_capture_assign(" + lhs + ", " + expression(call.args[1]) + ", " +
+                           expression(call.args[2]) + ", " + expression(call.args[3]) + ")";
+                }
                 if (call.symbol.exports == LangAPI::StdlibExports::AssignCompatible && call.args.size() == 2) {
                     const auto lhs = expression(call.args[0]);
                     return lhs + " = ispa_std.assign_compatible(" + lhs + ", " + expression(call.args[1]) + ")";
@@ -544,14 +720,16 @@ std::string Core::statement_expression(const LangAPI::Expression& e) {
                     case LangAPI::OperatorType::Divide: op = has_float(var.value) ? "/=" : "//="; break;
                     case LangAPI::OperatorType::Modulo: op = "%="; break;
                 }
+                if (is_name(lhs)) note_assigned(lhs);
                 return lhs + " " + op + " " + expression(var.value);
             }
-            case E::CounterIncreament: return counter() + " += 1";
-            case E::CounterAssignment: return counter() + " = " + expression(*first.getCounterAssignment().v);
+            case E::CounterIncreament: note_assigned(counter()); return counter() + " += 1";
+            case E::CounterAssignment: note_assigned(counter()); return counter() + " = " + expression(*first.getCounterAssignment().v);
             case E::PushPosCounter: {
                 const auto& p = first.getPushPosCounter();
                 const auto current = counter();
                 counters_.push_back(p.name);
+                declare(p.name);  // a fresh local of this def, never an outer binding
                 return p.name + " = " + current + ".copy()";
             }
             case E::PopPosCounter: {

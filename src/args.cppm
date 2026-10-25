@@ -22,12 +22,8 @@ export struct Args {
     bool no_dep = false;
     // Internal: keep every exported module when generating a dependency.
     bool dependency_build = false;
-    // debug set to true by default in debug builds
-#ifdef DEBUG
-    bool debug = true;
-#else
     bool debug = false;
-#endif
+    bool logs = false;
     bool version = false;
     bool nfa_debug = false;
     std::string output;

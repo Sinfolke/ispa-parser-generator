@@ -24,7 +24,7 @@ endif()
 # =============================================
 add_compile_definitions(
         __SOURCE_ROOT__="${CMAKE_CURRENT_SOURCE_DIR}"
-        PROGRAM_VERSION="0.1.0 beta"
+        PROGRAM_VERSION="v1.1.1"
         O_LEVEL=${O_LEVEL}
         DSTD_NO_DEBUG=1
 )

@@ -302,6 +302,26 @@ def concat(*values: Any) -> str:
     return ''.join(map(str, values))
 
 
+def step_attr(obj: Any, name: str, delta: int, post: bool) -> Any:
+    """C++ `obj.name++` / `++obj.name` (and `--`) used as a *value*.
+
+    Plain local names are lowered to a walrus by the generator; attributes and
+    subscripts cannot be, so they go through these helpers.
+    """
+    old = getattr(obj, name)
+    new = old + delta
+    setattr(obj, name, new)
+    return old if post else new
+
+
+def step_item(obj: Any, key: Any, delta: int, post: bool) -> Any:
+    """Subscript form of step_attr: `a[i]++` as a value."""
+    old = obj[key]
+    new = old + delta
+    obj[key] = new
+    return old if post else new
+
+
 @dataclass(slots=True)
 class Position:
     source: str

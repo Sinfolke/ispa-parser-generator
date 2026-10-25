@@ -147,6 +147,11 @@ class Lexer(Generic[T]):
     def _line_prefix(self, pos: Position) -> str:
         return self.source[self.source.rfind('\n', 0, pos.index) + 1:pos.index]
 
+    def panic_mode(self, pos: Position) -> None:
+        """Lexer-level recovery: drop one character so lexing can make progress."""
+        if not pos.at_end():
+            pos.advance()
+
     def skip_spaces(self, pos: Position) -> int:
         before = pos.index
         while not pos.at_end() and pos.peek().isspace():
@@ -186,6 +191,21 @@ class Cursor(Generic[T]):
         if token is not None and hasattr(token, 'startpos'):
             return token.startpos
         return self.lexer._cursor.index
+
+    def consume_external(self, end: int) -> None:
+        """Skip source up to `end` without tokenizing it (recovery `ctx.sync`).
+        Cached tokens that start inside the skipped span are dropped; if the lexer has not
+        finished, everything cached from this cursor on is dropped and lexing resumes at `end`."""
+        lex = self.lexer
+        if not lex._finished:
+            del lex.tokens[self.index:]
+            del lex._token_offsets[self.index:]
+            lex._cursor.index = max(lex._cursor.index, 0)
+            lex._cursor.index = end
+            lex.line = lex._line(end)
+        else:
+            while self.index < len(lex.tokens) and 0 <= lex.tokens[self.index].startpos < end:
+                del lex.tokens[self.index]
 
     def distance(self, other: 'Cursor[T]') -> int:
         return self.index - other.index

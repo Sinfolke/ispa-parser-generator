@@ -7,7 +7,7 @@ import dstd;
 export namespace Python {
     // A semantic LangAPI->LangAPI lowering pass, independent of text emission.
     // run() clones the tree, including Class::data pointer-owned declarations.
-    // Unsupported value-producing ++/-- are diagnosed rather than silently changing semantics.
+    // Standalone ++/-- become +=/-=; value-producing ++/-- are left for Python.Core to lower.
     class Rewriter {
     public:
         struct Statistics {

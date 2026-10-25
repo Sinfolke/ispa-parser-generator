@@ -4,13 +4,13 @@ NUMBER:
     @ [0-9]+ ('.' @ % [0-9]+)?
 
     @{full, dec}
-    %{NUMBER.no_prevision_after_dot}
+    %{NUMBER_no_prevision_after_dot}
 ;
 #[inline]
 STRING<quote>:
     &q quote @ ( '\\' @ [*] | !(${q} | [\n\r]) )* % ${q}
     {@}
-    %{STRING.inclosed_quote}
+    %{STRING_inclosed_quote}
 ;
 #[inline]
 ID:
@@ -18,7 +18,7 @@ ID:
     {@}
 ;
 
-fail NUMBER.no_prevision_after_dot {
+fail NUMBER_no_prevision_after_dot {
     if ctx.at(','):
         ctx.error("There should not be comma after '.'")
         ctx.delete()
@@ -26,7 +26,7 @@ fail NUMBER.no_prevision_after_dot {
         ctx.error("Dublicate dot")
         ctx.delete()
 }
-fail STRING.inclosed_quote {
+fail STRING_inclosed_quote {
     ctx.pos = ctx.start;
     while(!ctx.at(' ') and !ctx.at('\t') and !ctx.at('\r')):
         ctx.pos += 1

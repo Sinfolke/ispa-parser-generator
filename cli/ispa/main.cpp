@@ -325,11 +325,7 @@ int generate(Args args) {
     if (args.no_dep) generateDependencies(args);
     dumper.setArgsPointer(&args);
     dumper.initDumpDirectory();
-    logger.clearLogDirectory();
-    if (args.version) {
-        cpuf::printf("%$\n", PROGRAM_VERSION);
-        return 0;
-    }
+    if (logger.enabled()) logger.clearLogDirectory();
 
     if (args.files.empty() && args.dir.empty())
         throw UError("No input files");
@@ -574,6 +570,21 @@ int generate(Args args) {
 int main(int argc, char** argv) {
     try {
         auto args = init(argc, argv);
+        if (args.logs || args.debug) logger.includeAll();
+        else logger.excludeAll();
+        if (args.version) {
+            cpuf::printf(
+                "{};\n"
+                        "ISPA is an open source parser generator (https://github.com/Sinfolke/ispa-parser-generator)\n"
+                        "ISPA responsibility is to generate everything, so your work belongs only writing grammar and sometimes python scripts alongside it\n"
+                        "All your error messages are also part of .isc files, unless you want to put them outside\n"
+                        "You can output different target languages. See --help for more\n"
+                        "And different parsing algorithms can be used, like LL (recursive descent top-level) and LR (bottom-up)\n"
+                        "GOOD LUCK!\n",
+                        PROGRAM_VERSION
+            );
+            return 0;
+        }
         const auto executable = executablePath(argv[0]);
         args.executable_dir = executable.parent_path().string();
         if (!args.version) {

@@ -111,11 +111,13 @@ export namespace Tlog {
         }
         template<typename Format, typename... Args>
         void log(Format str, Args&&... args) {
+            if (!enabled()) return;
             //branches_stack.back().oss.vprintf("[{}, {}] ", file, line);
             branches_stack.back().oss.print(str, std::forward<Args>(args)...);
         }
         template<typename Format, typename ...Args>
         void dlog(Format str, Args ...args) {
+            if (!enabled()) return;
             //branches_stack.back().oss.vprintf("[{}, {}] ", file, line);
             branches_stack.back().oss.dprint(str, std::forward<Args>(args)...);
         }
@@ -128,12 +130,14 @@ export namespace Tlog {
             branches[name].oss.dprint(str, args...);
         }
         void increaseIndentLevel() {
+            if (!enabled()) return;
             branches_stack.back().oss.increaseIndentLevel();
         }
         void increaseIndentLevel(std::string branch) {
             branches.at(branch).oss.increaseIndentLevel();
         }
         void decreaseIndentLevel() {
+            if (!enabled()) return;
             branches_stack.back().oss.decreaseIndentLevel();
         }
         void decreaseIndentLevel(std::string branch) {
@@ -179,7 +183,9 @@ export namespace Tlog {
     class Branch {
         Logger *logger = nullptr;
     public:
-        Branch(Logger &logger, std::string path, bool append = true, std::source_location loc = std::source_location::current()) : logger(&logger) {
+        Branch(Logger &logger, std::string path, bool append = true, std::source_location loc = std::source_location::current()) {
+            if (!logger.enabled()) return;
+            this->logger = &logger;
             logger.set_location(loc.file_name(), loc.line());
             this->logger->pushBranch(path, append);
         }
@@ -190,6 +196,7 @@ export namespace Tlog {
             logger->popBranch();
         }
         void open(Logger &logger, std::string path, bool append = true, std::source_location loc = std::source_location::current()) {
+            if (!logger.enabled()) return;
             this->logger = &logger;
             this->logger->pushBranch(path, append);
         }

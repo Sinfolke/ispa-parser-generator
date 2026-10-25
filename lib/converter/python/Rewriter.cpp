@@ -176,11 +176,11 @@ bool Rewriter::increment_as_assignment(const LangAPI::Expression& input,
 }
 
 void Rewriter::expression(LangAPI::Expression& expr, const std::string& context) {
-    for (auto& part : expr) {
-        if (is_increment(part))
-            cannot_lower(context, "value-producing ++/-- cannot be converted to +=/-= without changing prefix/postfix semantics; only standalone increments are lowered");
-        expr_value(part, context);
-    }
+    // Standalone `x++;` was already turned into `x += 1` by statement(). A ++/-- that remains
+    // here produces a value, so it is left in place: Python.Core lowers it (walrus for a local
+    // name, ispa_std.step_attr / step_item for attributes and subscripts) and reports operands
+    // it cannot express.
+    for (auto& part : expr) expr_value(part, context);
 }
 
 void Rewriter::expr_value(LangAPI::ExpressionValue& part, const std::string& context) {

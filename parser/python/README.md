@@ -75,8 +75,8 @@ cmake-build-release/ispa -l python -a LL --no-incremental \
 ```
 
 The generated `bootstrappedPy/Parser.py` runs the grammar's generated lexer and
-its advanced `INDENT`/`DEDENT` actions. `generate_python.py` translates the
-remaining C++ style expressions in those actions, while `bootstrap_runtime.py`
-flushes emitted tokens, handles the same comment/string cases as `PyLexer`,
-and closes indentation at EOF. The Python target does not yet execute the
-grammar's custom error-recovery actions; invalid input raises `ParseError`.
+its advanced `INDENT`/`DEDENT` actions. The Python target translates the
+remaining C++ style expressions in those actions. The `ispa_std` Python lexer
+helper flushes emitted tokens, handles comments and strings, and closes
+indentation at EOF. Generated fail blocks report diagnostics and recover from
+missing syntax, including a missing compound-header colon.

@@ -1,24 +1,11 @@
-"""Runtime hooks for the Python grammar's generated lexer and parser."""
+"""Python layout and literal support for a generated Python grammar lexer."""
 
 from __future__ import annotations
 
 import re
 
 
-class CustomFailure:
-    """Marks a generated recovery callback as a failure handler, not a rule."""
-
-    _ispa_custom_failure = True
-
-    def __init__(self, action):
-        self.action = action
-
-
-def custom_failure(action):
-    return CustomFailure(action)
-
-
-def make_lexer(generated, newline_state):
+def make_python_lexer(generated, newline_state):
     """Run the generated DFA and its advanced token actions with EOF layout."""
 
     class BootstrapLexer(generated.Lexer):
