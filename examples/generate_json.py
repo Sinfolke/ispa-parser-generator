@@ -109,7 +109,7 @@ def generate_large_json(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fast JSON Benchmark Generator")
     parser.add_argument("-o", "--output", default="test_500mb.json", help="Output filename")
-    parser.add_argument("-s", "--size", type=float, default=500.0, help="Target size in MB")
+    parser.add_argument("-s", "--size", type=float, default=5, help="Target size in MB")
     parser.add_argument("-d", "--depth", type=int, default=1, help="Structural complexity factor (1-5)")
     parser.add_argument("--seed", type=int, default=None, help="Random seed for deterministic output")
 

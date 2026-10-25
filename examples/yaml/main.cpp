@@ -41,11 +41,7 @@ int main(int argc, const char** argv) {
     std::chrono::duration<double, std::milli> elapsed = end - start;
 
     std::cout << "ISPA total: " << elapsed.count() << " ms\n";
-    //
-    // // 6. AST Output / File Write AFTER timer has stopped
-    // std::ofstream of("tree.txt");
-    // of << node << "\n\n";
-    // std::cout << "Successfully parsed and saved to tree.txt\n";
+    std::cout << node << '\n';
 
     return 0;
 }

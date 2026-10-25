@@ -31,8 +31,7 @@ INDENT: '';
 DEDENT: '';
 CR { match '\r'; ctx.skip() }
 
-// Layout actions are attached to accepted tokens. The bootstrapped Python
-// parser still uses PyLexer for string scanning and other compatibility behavior.
+// Python indentation
 NEWLINE {
     match '\n' ('\n' | '\r' '\n')* [ \t]*;
     ctx.shared.indents: list[int]

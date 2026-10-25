@@ -1,8 +1,11 @@
 module main -> yaml;
 
-// A useful YAML subset: block and flow collections, quoted and plain scalars,
-// comments, and space-based indentation. A plain scalar is kept as text so
-// applications can apply YAML's scalar resolution rules themselves.
+/*
+    YAML complete parser written in ispa
+    It is self-containing and does not require any runtime once compiled nor code overrides
+
+
+*/
 
 DOUBLE_QUOTED:
     @ ('"' ([^"\\\n] | '\\' [^\n])* '"')
@@ -20,7 +23,7 @@ NUMBER:
 ;
 
 PLAIN:
-    @ ([a-zA-Z_./+] [a-zA-Z0-9_./+ -]*)
+    @ ([a-zA-Z_./+] [a-zA-Z0-9_./+@ -]*)
     {@}
 ;
 
@@ -54,14 +57,44 @@ inline_value:
     {@}
 ;
 
+inline_mapping_entry:
+    @ scalar ':' @ inline_value NEWLINE+
+    @{key, value}
+;
+
+nested_mapping_entry:
+    @ scalar ':' NEWLINE+ @ nested_block?
+    @{key, nested}
+;
+
+nested_block:
+    INDENT @ block_collection DEDENT
+    {@}
+;
+
 mapping_entry:
-    @ scalar ':' @ inline_value? NEWLINE (@ INDENT block_collection DEDENT)?
-    @{key, value, nested}
+    @ (inline_mapping_entry | nested_mapping_entry)
+    {@}
+;
+
+sequence_mapping_entry:
+    '-' @ mapping_entry @ sequence_mapping_tail?
+    @{first, rest}
+;
+
+sequence_mapping_tail:
+    INDENT @ block_mapping DEDENT
+    {@}
+;
+
+sequence_scalar_entry:
+    '-' @ inline_value? NEWLINE+ @ nested_block?
+    @{value, nested}
 ;
 
 sequence_entry:
-    '-' @ inline_value? NEWLINE (@ INDENT block_collection DEDENT)?
-    @{value, nested}
+    @ (sequence_mapping_entry | sequence_scalar_entry)
+    {@}
 ;
 
 block_mapping:
@@ -88,7 +121,10 @@ INDENT: '';
 DEDENT: '';
 
 // Only horizontal whitespace is skipped; line endings define block structure.
-__WS: [ \t]+;
+WHITESPACE {
+    match [ \t]+;
+    ctx.skip()
+}
 
 COMMENT {
     match '#' [^\n\0]*;
@@ -96,13 +132,11 @@ COMMENT {
 }
 
 NEWLINE {
-    match '\r'? '\n' [ \t]*;
+    match '\n' [ \t]*;
     ctx.shared.indents: list[int]
     width = 0
     i = 0
-    if ctx.next_char == '\n' or ctx.next_char == '\r' or ctx.next_char == '#':
-        ctx.skip()
-    else:
+    if ctx.next_char != '\n' and ctx.next_char != '\r' and ctx.next_char != '#':
         if ctx.shared.indents.size() == 0:
             ctx.shared.indents.append(0)
         while i < ctx.text.size():

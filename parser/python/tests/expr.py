@@ -47,8 +47,3 @@ b |= 8
 c ^= 3
 d <<= 1
 e >>= 2
-
-pass
-return result
-break
-continue

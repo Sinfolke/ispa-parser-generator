@@ -4,6 +4,8 @@
 
 The [wiki](https://github.com/Sinfolke/ispa-parser-generator/wiki) covers setup, grammar syntax, generated APIs, algorithms, recovery, external parsers, packages, and debugging.
 
+[Watch the usage demo](assets/usage.mp4).
+
 It is built around one idea: **easy to use, without giving up performance, extensibility, or features.** In benchmarks it is about 12x faster than ANTLR; see [Performance](#-performance).
 
 ---

@@ -1,4 +1,18 @@
 #include "parser.hpp"
+auto line_and_column(const std::string &str, std::size_t offset) {
+    std::size_t line = 1;
+    std::size_t column = 0;
+    for (std::size_t i =0; i < offset; ++i) {
+        const auto &c = str[i];
+        if (str[i] == '\n') {
+            ++line;
+            column = 0;
+        } else {
+            ++column;
+        }
+    }
+    return std::make_pair(line, column);
+}
 int main(int argc, const char** argv) {
     if (argc < 2) {
         std::cout << "Usage: " << argv[0] << " \"<input>\"\n";
@@ -24,9 +38,10 @@ int main(int argc, const char** argv) {
     PyRawParser::Parser parser;
     PyRawParser::Types::main node = parser.parse(i.c_str());
     for (const auto &e : parser.getErrors()) {
-        std::cout << "Error: " << e.message << std::endl;
+        auto [line, column] = line_and_column(i, e.offset);
+        std::cout << "Error[" << line << ":" << column << "]: " << e.message << std::endl;
     }
     std::ofstream of("tree.txt");
     of << node << "\n\n";
-    std::cout << "Successfully parsed and saved to tree.txt\n";
+    std::cout << "Parsed. AST dump saved to tree.txt\n";
 }

@@ -179,7 +179,7 @@ namespace {
         return std::nullopt;
     }
 
-    enum class TK { Unknown, None, Bool, Int, Float, Str, List, Tuple, Dict, Function, Module, Rule, Token, Union };
+    enum class TK { Unknown, None, Bool, Int, Float, Str, List, Tuple, Dict, Function, Module, Rule, Token, Context, Union };
     struct Ty {
         TK kind = TK::Unknown;
         std::string name;
@@ -198,6 +198,7 @@ namespace {
             case TK::Dict: return "dict"; case TK::Function: return "callable";
             case TK::Module: return "module " + t.name;
             case TK::Rule: return "rule"; case TK::Token: return "token";
+            case TK::Context: return "ctx";
             case TK::Union: return "union";
         }
         return "unknown";
@@ -475,6 +476,18 @@ namespace {
                     return type(TK::Unknown);
                 } else if constexpr (std::is_same_v<T,py::Attribute>) {
                     const auto base = eval(v.value, s);
+                    if (base.kind == TK::Context) {
+                        if (v.attr == "pos" || v.attr == "start_pos") return type(TK::Int);
+                        if (v.attr == "rule" || v.attr == "failed_rule" || v.attr == "text" ||
+                            v.attr == "line_prefix" || v.attr == "next_char") return type(TK::Str);
+                        if (v.attr == "ast" || v.attr == "shared") return type(TK::Unknown);
+                        static const std::set<std::string> methods{
+                            "at", "mark", "restore", "commit", "collect_braced", "error", "note",
+                            "sync", "sync_tokens", "skip", "insert", "replace", "retry", "abort", "emit"};
+                        if (methods.contains(v.attr)) return type(TK::Function);
+                        error("PY261", "unknown ctx member '" + v.attr + "'", p);
+                        return type(TK::Unknown);
+                    }
                     if (base.kind == TK::Module) {
                         auto mod = modules_.find(base.name);
                         if (mod != modules_.end()) {
@@ -856,6 +869,8 @@ struct AST::Semantic::Impl {
     Symbols ruleSymbols(const SemanticRuleInfo& info) const {
         Symbols symbols;
         if (!info.rule) return symbols;
+        Symbol context; context.ty = type(TK::Context); context.isParam = true;
+        symbols.emplace("ctx", std::move(context));
         for (const auto& imported : info.pythonImports) {
             std::string alias = imported.substr(imported.find_last_of('.') == std::string::npos ?
                                                 0 : imported.find_last_of('.') + 1);
