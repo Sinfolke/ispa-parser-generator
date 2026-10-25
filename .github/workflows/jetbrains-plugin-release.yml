@@ -133,7 +133,7 @@ jobs:
           done
       - name: Test and package universal plugin
         working-directory: plugins/jebtrains
-        run: ./gradlew test buildPlugin -PispaReleaseBridges=release-bridges --no-daemon
+        run: bash ./gradlew test buildPlugin -PispaReleaseBridges=release-bridges --no-daemon
       - name: Verify packaged platforms
         working-directory: plugins/jebtrains
         shell: bash
@@ -172,4 +172,4 @@ jobs:
             echo 'JETBRAINS_MARKETPLACE_TOKEN is unset; skipping Marketplace upload.'
             exit 0
           fi
-          ./gradlew publishPlugin -PispaReleaseBridges=release-bridges --no-daemon
+          bash ./gradlew publishPlugin -PispaReleaseBridges=release-bridges --no-daemon
