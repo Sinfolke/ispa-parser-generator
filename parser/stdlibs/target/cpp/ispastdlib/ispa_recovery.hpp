@@ -1,5 +1,5 @@
 /**
- * ISPA LL recovery runtime (C++20).
+ * ISPA LL recovery runtime (C++17).
  * Only invoked after a committed required match fails.  Never invoke from
  * optional/probing/backtracking alternatives.
  */
@@ -127,7 +127,7 @@ TokenId tokenId(const Token& token) {
 template<class IT, class TokenKind>
 Decision recover(IT& pos, State& state, const Plan& plan, TokenKind&& token_kind) {
     const auto kind = [&](const IT& p) -> TokenId {
-        if constexpr (requires { p.isEnd(); })
+        if constexpr (detail::detected_v<detail::is_end, IT>)
             return p.isEnd() ? eof_token : token_kind(*p);
         else
             return p->isEnd() ? eof_token : token_kind(*p);
@@ -142,17 +142,19 @@ Decision recover(IT& pos, State& state, const Plan& plan, TokenKind&& token_kind
     std::size_t offset = std::numeric_limits<std::size_t>::max(), length = 0;
     std::string actual = "end of input";
     if (at != eof_token) {
-        if constexpr (requires { (*pos).meta().startpos(); (*pos).meta().length(); }) {
+        if constexpr (detail::detected_v<detail::meta_startpos_length, decltype(*pos)>) {
             offset = (*pos).meta().startpos();
             length = (*pos).meta().length();
         }
-        if constexpr (requires { (*pos).meta().start(); (*pos).meta().length(); }) {
+        if constexpr (detail::detected_v<detail::meta_start_length, decltype(*pos)>) {
             if ((*pos).meta().start())
                 actual = "'" + std::string((*pos).meta().start(), (*pos).meta().length()) + "'";
             else actual = "token " + std::to_string(at);
         } else actual = "token " + std::to_string(at);
     }
-    Decision decision{.mode = Mode::Propagate, .unexpected = at};
+    Decision decision;
+    decision.mode = Mode::Propagate;
+    decision.unexpected = at;
 
     if (state.exhausted()) {
         decision.mode = Mode::Abort;

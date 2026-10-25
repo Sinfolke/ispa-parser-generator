@@ -1,0 +1,133 @@
+module main -> yaml;
+
+// A useful YAML subset: block and flow collections, quoted and plain scalars,
+// comments, and space-based indentation. A plain scalar is kept as text so
+// applications can apply YAML's scalar resolution rules themselves.
+
+DOUBLE_QUOTED:
+    @ ('"' ([^"\\\n] | '\\' [^\n])* '"')
+    {@}
+;
+
+SINGLE_QUOTED:
+    @ ('\'' ([^'\n] | '\'\'')* '\'')
+    {@}
+;
+
+NUMBER:
+    @ ('-'? [0-9]+ ('.' [0-9]+)? ([eE] [+-]? [0-9]+)?)
+    {@}
+;
+
+PLAIN:
+    @ ([a-zA-Z_./+] [a-zA-Z0-9_./+ -]*)
+    {@}
+;
+
+plain_scalar:
+    @ (NUMBER | PLAIN)
+    {@}
+;
+
+scalar:
+    @ (DOUBLE_QUOTED | SINGLE_QUOTED | plain_scalar)
+    {@}
+;
+
+flow_sequence:
+    '[' (@ inline_value (',' @ inline_value)* ','?)? ']'
+    @{first, rest}
+;
+
+flow_mapping_entry:
+    @ scalar ':' @ inline_value?
+    @{key, value}
+;
+
+flow_mapping:
+    '{' (@ flow_mapping_entry (',' @ flow_mapping_entry)* ','?)? '}'
+    @{first, rest}
+;
+
+inline_value:
+    @ (flow_sequence | flow_mapping | scalar)
+    {@}
+;
+
+mapping_entry:
+    @ scalar ':' @ inline_value? NEWLINE (@ INDENT block_collection DEDENT)?
+    @{key, value, nested}
+;
+
+sequence_entry:
+    '-' @ inline_value? NEWLINE (@ INDENT block_collection DEDENT)?
+    @{value, nested}
+;
+
+block_mapping:
+    @ mapping_entry+
+    @{entries}
+;
+
+block_sequence:
+    @ sequence_entry+
+    @{values}
+;
+
+block_collection:
+    @ (block_mapping | block_sequence)
+    {@}
+;
+
+yaml:
+    @ (block_collection | inline_value)? NEWLINE* END_INPUT?
+    {@}
+;
+
+INDENT: '';
+DEDENT: '';
+
+// Only horizontal whitespace is skipped; line endings define block structure.
+__WS: [ \t]+;
+
+COMMENT {
+    match '#' [^\n\0]*;
+    ctx.skip()
+}
+
+NEWLINE {
+    match '\r'? '\n' [ \t]*;
+    ctx.shared.indents: list[int]
+    width = 0
+    i = 0
+    if ctx.next_char == '\n' or ctx.next_char == '\r' or ctx.next_char == '#':
+        ctx.skip()
+    else:
+        if ctx.shared.indents.size() == 0:
+            ctx.shared.indents.append(0)
+        while i < ctx.text.size():
+            if ctx.text.substr(i, 1) == ' ':
+                width += 1
+            if ctx.text.substr(i, 1) == '\t':
+                width = (width / 8 + 1) * 8
+            i += 1
+        if width > ctx.shared.indents[ctx.shared.indents.size() - 1]:
+            ctx.shared.indents.append(width)
+            ctx.emit('INDENT')
+        else:
+            while ctx.shared.indents.size() > 1 and width < ctx.shared.indents[ctx.shared.indents.size() - 1]:
+                ctx.shared.indents.pop()
+                ctx.emit('DEDENT')
+            if width != ctx.shared.indents[ctx.shared.indents.size() - 1]:
+                ctx.error('invalid dedent')
+}
+
+END_INPUT {
+    match '';
+    ctx.shared.indents: list[int]
+    if ctx.line_prefix != '':
+        ctx.emit('NEWLINE')
+    while ctx.shared.indents.size() > 1:
+        ctx.shared.indents.pop()
+        ctx.emit('DEDENT')
+}

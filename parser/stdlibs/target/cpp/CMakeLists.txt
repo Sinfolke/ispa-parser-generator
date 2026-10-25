@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 project(ispastdlib LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -47,7 +47,7 @@ if(TARGET ispastdlib)
             $<INSTALL_INTERFACE:include>
     )
 
-    target_compile_features(ispastdlib PUBLIC cxx_std_20)
+    target_compile_features(ispastdlib PUBLIC cxx_std_17)
 
     # Consumers may import std; injecting this PCH mixes textual standard
     # library declarations with the module's declarations (notably on Clang 20).

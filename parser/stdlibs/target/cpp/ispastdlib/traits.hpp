@@ -155,4 +155,35 @@ namespace ISPA_STD {
     template <typename T>
     inline constexpr bool has_index_v = has_index<T>::value;
 
+    namespace detail {
+        template<template<class...> class Op, class, class... Args>
+        struct detector : std::false_type {};
+
+        template<template<class...> class Op, class... Args>
+        struct detector<Op, std::void_t<Op<Args...>>, Args...> : std::true_type {};
+
+        template<template<class...> class Op, class... Args>
+        inline constexpr bool detected_v = detector<Op, void, Args...>::value;
+
+        template<class T> using data_value = decltype(std::declval<const T&>().data().value);
+        template<class T> using start_length = decltype(std::declval<const T&>().start(),
+                                                         std::declval<const T&>().length());
+        template<class T> using meta_start_length = decltype(std::declval<const T&>().meta().start(),
+                                                              std::declval<const T&>().meta().length());
+        template<class T> using meta_startpos_length = decltype(std::declval<const T&>().meta().startpos(),
+                                                                 std::declval<const T&>().meta().length());
+        template<class T> using meta_startpos = decltype(std::declval<const T&>().meta().startpos());
+        template<class T> using is_end = decltype(std::declval<const T&>().isEnd());
+        template<class T> using size = decltype(std::declval<const T&>().size());
+        template<class T> using distance = decltype(std::declval<const T&>().distance());
+        template<class T> using source_position = decltype(std::declval<const T&>().sourcePosition());
+        template<class T> using source_origin_position = decltype(std::declval<const T&>().sourceOrigin(),
+                                                                   std::declval<const T&>().sourcePosition());
+        template<class T> using consume_external = decltype(std::declval<T&>().consumeExternal(
+            std::declval<const T&>().sourcePosition()));
+        template<class T> using is_ambiguous = decltype(std::declval<const T&>().isAmbiguous());
+        template<class T> using ambiguous_id = decltype(T::ambiguous_id);
+        template<class T> using custom_action = decltype(T::custom_action);
+    }
+
 } // namespace ISPA_STD

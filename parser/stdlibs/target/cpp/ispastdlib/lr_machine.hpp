@@ -41,6 +41,20 @@ struct LRRegionFrame {
         : pos(std::move(start)) { control.continuation = continuation; }
 };
 
+namespace detail {
+    template<class G, class IT> using lr_is_space = decltype(G::lr_is_space(*std::declval<IT&>()));
+    template<class G> using lr_space = decltype(G::lr_space(std::declval<std::size_t>(), std::declval<std::size_t>()));
+    template<class G> using lr_expected = decltype(G::lr_expected(std::declval<std::size_t>()));
+    template<class G> using lr_context = decltype(G::lr_context(std::declval<std::size_t>()));
+    template<class G> using lr_token_name = decltype(G::lr_token_name(std::declval<std::size_t>()));
+    template<class G> using lr_rule_label = decltype(G::lr_rule_label(std::declval<std::size_t>()));
+    template<class G, class IT> using lr_recover = decltype(std::declval<G&>().lr_recover(
+        std::declval<LRRegionFrame<IT>&>(), std::declval<Recovery::Diagnostic&>()));
+    template<class G, class IT> using lr_semantic_reduce = decltype(std::declval<G&>().lr_semantic_reduce(
+        std::declval<std::size_t>(), std::declval<LRRegionFrame<IT>&>(),
+        std::declval<LRRuleSpan&>(), std::declval<const std::vector<std::any>&>()));
+}
+
 // Generated callbacks use a signed action: shift = state+1, reduce = -rule-1,
 // accept = 0. Missing cells throw before any stack mutation.
 template<class MainNode, class Token>
@@ -58,6 +72,21 @@ protected:
         return LRTokenValue{std::any(std::move(node)), std::move(text)};
     }
     struct LRCaptures { std::vector<std::vector<std::any>> columns; bool repeated = false; };
+
+    template<class T, std::size_t... I>
+    static bool lr_convert_tuple(T& target, const LRCaptures& captures, std::index_sequence<I...>) {
+        return (lr_convert(std::get<I>(target), std::any(LRCaptures{{captures.columns[I]}})) && ...);
+    }
+
+    template<class T, std::size_t... I>
+    static bool lr_convert_variant(T& target, const std::any& value, std::index_sequence<I...>) {
+        return ([&] {
+            std::variant_alternative_t<I, T> alternative{};
+            if (!lr_convert(alternative, value)) return false;
+            target.template emplace<I>(std::move(alternative));
+            return true;
+        }() || ...);
+    }
 
     static std::any lr_pack(const std::vector<std::any>& values,
                             const std::vector<std::size_t>& indices,
@@ -124,11 +153,9 @@ protected:
                     }
                 }
                 return true;
-            } else if constexpr (requires { std::tuple_size<T>::value; } && !is_variant_v<T>) {
+            } else if constexpr (is_tuple_like_v<T> && !is_variant_v<T>) {
                 if (captures->columns.size() != std::tuple_size_v<T>) return false;
-                return [&]<std::size_t... I>(std::index_sequence<I...>) {
-                    return (lr_convert(std::get<I>(target), std::any(LRCaptures{{captures->columns[I]}})) && ...);
-                }(std::make_index_sequence<std::tuple_size_v<T>>{});
+                return lr_convert_tuple(target, *captures, std::make_index_sequence<std::tuple_size_v<T>>{});
             } else {
                 const std::any* selected = nullptr;
                 for (const auto& column : captures->columns) for (const auto& item : column) {
@@ -140,14 +167,7 @@ protected:
             }
         }
         if constexpr (is_variant_v<T>) {
-            return [&]<std::size_t... I>(std::index_sequence<I...>) {
-                return ([&] {
-                    std::variant_alternative_t<I, T> alternative{};
-                    if (!lr_convert(alternative, value)) return false;
-                    target.template emplace<I>(std::move(alternative));
-                    return true;
-                }() || ...);
-            }(std::make_index_sequence<std::variant_size_v<T>>{});
+            return lr_convert_variant(target, value, std::make_index_sequence<std::variant_size_v<T>>{});
         }
         return false;
     }
@@ -184,7 +204,7 @@ protected:
         auto& control = region.control;
         auto& position = region.pos;
         auto skip = [](IT& it, std::size_t* offset) {
-            if constexpr (requires { Generated::lr_is_space(*it); }) {
+            if constexpr (detail::detected_v<detail::lr_is_space, Generated, IT>) {
                 while (!it.isEnd() && Generated::lr_is_space(*it)) {
                     ++it;
                     if (offset) ++*offset;
@@ -192,7 +212,7 @@ protected:
             }
         };
         auto gap = [](std::size_t rule, std::size_t index) {
-            if constexpr (requires { Generated::lr_space(rule, index); })
+            if constexpr (detail::detected_v<detail::lr_space, Generated>)
                 return Generated::lr_space(rule, index);
             else return false;
         };
@@ -211,20 +231,20 @@ protected:
             if (action == -std::numeric_limits<long long>::max()) {
                 Recovery::Diagnostic diagnostic;
                 diagnostic.unexpected = window.front();
-                if constexpr (requires { Generated::lr_expected(states.back()); })
+                if constexpr (detail::detected_v<detail::lr_expected, Generated>)
                     diagnostic.expected = Generated::lr_expected(states.back());
-                if constexpr (requires { Generated::lr_context(states.back()); })
+                if constexpr (detail::detected_v<detail::lr_context, Generated>)
                     diagnostic.rule = Generated::lr_context(states.back());
                 else diagnostic.rule = "<rule>";
                 if (!position.isEnd()) {
-                    if constexpr (requires { (*position).meta().startpos(); (*position).meta().length(); }) {
+                    if constexpr (detail::detected_v<detail::meta_startpos_length, decltype(*position)>) {
                         diagnostic.offset = (*position).meta().startpos();
                         diagnostic.length = (*position).meta().length();
                     }
                 }
                 std::ostringstream message;
                 message << "Unexpected ";
-                if constexpr (requires { Generated::lr_token_name(diagnostic.unexpected); })
+                if constexpr (detail::detected_v<detail::lr_token_name, Generated>)
                     message << Generated::lr_token_name(diagnostic.unexpected);
                 else message << "token " << diagnostic.unexpected;
                 if (diagnostic.offset != std::numeric_limits<std::size_t>::max())
@@ -234,7 +254,7 @@ protected:
                     message << "; expected ";
                     for (std::size_t i = 0; i < diagnostic.expected.size(); ++i) {
                         if (i) message << ", ";
-                        if constexpr (requires { Generated::lr_token_name(diagnostic.expected[i]); })
+                        if constexpr (detail::detected_v<detail::lr_token_name, Generated>)
                             message << Generated::lr_token_name(diagnostic.expected[i]);
                         else message << "token " << diagnostic.expected[i];
                     }
@@ -242,10 +262,7 @@ protected:
                 diagnostic.message = message.str();
                 diagnostic.code = "lr-unexpected-token";
                 errors_.push_back(std::move(diagnostic));
-                if constexpr (requires(Generated& parser, LRRegionFrame<IT>& frame,
-                                       Recovery::Diagnostic& error) {
-                    parser.lr_recover(frame, error);
-                }) {
+                if constexpr (detail::detected_v<detail::lr_recover, Generated, IT>) {
                     control.phase = LRControlPhase::Recover;
                     const auto old_cursor = cursor;
                     const auto old_stack_size = states.size();
@@ -311,10 +328,7 @@ protected:
                 span.trailing = allowed;
                 if (span.empty) span.leading = allowed;
                 std::any value;
-                if constexpr (requires(Generated& parser, LRRegionFrame<IT>& frame,
-                                       LRRuleSpan& reduced_span, const std::vector<std::any>& parts) {
-                    parser.lr_semantic_reduce(rule, frame, reduced_span, parts);
-                }) {
+                if constexpr (detail::detected_v<detail::lr_semantic_reduce, Generated, IT>) {
                     // Semantic reductions run at the ACTION table's exact
                     // reduce point. The callback may update the cursor and
                     // span, and may enter an independent nested LR region.

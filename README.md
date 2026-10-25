@@ -215,6 +215,30 @@ ispa-pkg catalog update
 ispa-pkg catalog list
 ```
 
+Run `ispa-pkg --export-permanent` once, then open a new bash, zsh, or PowerShell
+session. This installs a small shell function and loads the exports on startup.
+In that shell, `ispa-pkg --export` refreshes the exports in the current session
+without an `eval` command. The standalone executable prints shell code when the
+function is not loaded, because a child process cannot change its parent shell.
+Exports add C++ header and library directories to compiler and
+linker search paths, shared library directories to the runtime loader path,
+and Python target directories to `PYTHONPATH`. Existing search paths are
+preserved. The generated `ISPA_TARGETS_CMAKE` file defines `ISPA::Targets`
+with installed headers and libraries for CMake projects. During installation,
+`ispa-pkg` compiles each package's `ispatarget/cpp/**/*.cpp` files as C++17
+and archives them in `ispatarget/cpp/lib` (`lib<name>.a`, or `<name>.lib` with
+MSVC). This requires a C++ compiler and archiver; set `CXX`, `CXXFLAGS`, and
+`AR` to select the toolchain. Export also builds archives missing from older
+installations. The archive directory is added to `LIBRARY_PATH` (or `LIB` on
+Windows), and the archive path appears in `ISPA_CPP_LIBRARIES` and
+`ISPA_TARGETS_CMAKE`.
+For GCC and Clang, the C++ header search variables are `CPATH` and
+`CPLUS_INCLUDE_PATH`; `CPLUSPLUS_PATH` is not recognized. Generated C++ code
+and the target runtime build with C++17, for example
+`clang++ -std=c++17 -c Parser.cpp` after loading the exports. An already
+installed `ispa-pkg` executable and `std` library package must be updated to
+receive changes made in this source checkout.
+
 The catalog is [`ispa-libraries.yaml`](ispa-libraries.yaml) at the repository
 root. `catalog update` fetches the current file from GitHub into the local
 package root; `--catalog FILE` selects another YAML catalog. A catalog entry

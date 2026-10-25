@@ -28,7 +28,9 @@ protected:
         struct Alternative {
             std::size_t rule;
             std::vector<std::size_t> children;
-            bool operator==(const Alternative&) const = default;
+            bool operator==(const Alternative& other) const {
+                return rule == other.rule && children == other.children;
+            }
         };
         struct Forest {
             BranchSpan span;
@@ -60,12 +62,12 @@ protected:
             return it->second;
         };
         auto skip = [](IT& it, std::size_t* offset) {
-            if constexpr (requires { Generated::lr_is_space(*it); }) {
+            if constexpr (detail::detected_v<detail::lr_is_space, Generated, IT>) {
                 while (!it.isEnd() && Generated::lr_is_space(*it)) { ++it; if (offset) ++*offset; }
             }
         };
         auto gap = [](std::size_t rule, std::size_t index) {
-            if constexpr (requires { Generated::lr_space(rule, index); }) return Generated::lr_space(rule, index);
+            if constexpr (detail::detected_v<detail::lr_space, Generated>) return Generated::lr_space(rule, index);
             else return false;
         };
         std::set<std::size_t> active{0}, roots;
@@ -195,7 +197,7 @@ protected:
                 const auto& node = forest[ambiguous];
                 message += " at tokens " + std::to_string(node.span.begin) + ".." + std::to_string(node.span.end);
                 for (const auto& alternative : node.alternatives) {
-                    if constexpr (requires { Generated::lr_rule_label(alternative.rule); })
+                    if constexpr (detail::detected_v<detail::lr_rule_label, Generated>)
                         message += "\n  " + Generated::lr_rule_label(alternative.rule);
                     else message += "\n  production " + std::to_string(alternative.rule);
                 }

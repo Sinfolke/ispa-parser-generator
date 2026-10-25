@@ -115,13 +115,14 @@ namespace ISPA_STD {
             const auto& meta = candidate->meta();
             if (meta.start() && std::string_view(meta.start(), meta.length()) == spelling) return true;
             if (!token_name) return false;
-            if constexpr (requires { Token::ambiguous_id; })
+            if constexpr (detail::detected_v<detail::ambiguous_id, Token>)
                 if (Recovery::tokenId(*candidate) == Token::ambiguous_id) return false;
             std::string name(spelling);
             for (std::size_t i = 0; (i = name.find("::", i)) != std::string::npos;)
                 name.replace(i, 2, ".");
             const std::string_view actual = token_name(Recovery::tokenId(*candidate));
-            return actual == name || (actual.size() > name.size() && actual.ends_with(name) &&
+            return actual == name || (actual.size() > name.size() &&
+                actual.compare(actual.size() - name.size(), name.size(), name) == 0 &&
                 actual[actual.size() - name.size() - 1] == '.');
         }
 
@@ -174,7 +175,7 @@ namespace ISPA_STD {
             // included in the returned stream. Nested braces are preserved.
             TokenFlow<Token> collect_braced() {
                 TokenFlow<Token> collected;
-                if constexpr (requires { pos.sourcePosition(); }) {
+                if constexpr (detail::detected_v<detail::source_position, IT>) {
                     const char* begin = pos.sourcePosition();
                     const std::string_view stops[]{"}"};
                     const auto scanned = Recovery::scanBalanced(begin, stops, std::strlen(begin));
@@ -235,7 +236,7 @@ namespace ISPA_STD {
                 diagnostic.expected_text = failed_rule;
                 diagnostic.message = message;
                 diagnostic.code = code;
-                if constexpr (requires { pos.sourcePosition(); pos.sourceOrigin(); }) {
+                if constexpr (detail::detected_v<detail::source_origin_position, IT>) {
                     // Do not force host tokenization of a broken foreign payload.
                     const auto* p = pos.sourcePosition();
                     if (p) {
@@ -270,7 +271,7 @@ namespace ISPA_STD {
                 const std::string_view stops[]{boundaries...};
                 for (auto stop : stops) if (stop.empty())
                     throw std::invalid_argument("ctx.sync requires nonempty boundaries");
-                if constexpr (requires { pos.sourcePosition(); pos.consumeExternal(pos.sourcePosition()); }) {
+                if constexpr (detail::detected_v<detail::consume_external, IT>) {
                     const char* begin = pos.sourcePosition();
                     const auto budget = std::min<std::size_t>(4096,
                         recovery.max_total_skipped - recovery.total_skipped);
@@ -388,7 +389,7 @@ namespace ISPA_STD {
         template<class Value>
         void bind_counter(std::string_view name, const Value& value) {
             const auto count = [&]() -> std::size_t {
-                if constexpr (requires { value.size(); }) return value.size();
+                if constexpr (detail::detected_v<detail::size, Value>) return value.size();
                 else return value.empty() ? 0 : 1;
             }();
             const auto [it, inserted] = counters_.try_emplace(std::string(name), count);
@@ -462,7 +463,7 @@ namespace ISPA_STD {
 
         template<typename IT>
         static auto cursor_position(const IT& pos) -> std::size_t {
-            if constexpr (requires { pos.distance(); }) return pos.distance();
+            if constexpr (detail::detected_v<detail::distance, IT>) return pos.distance();
             else return reinterpret_cast<std::size_t>(std::addressof(*pos));
         }
 
@@ -493,6 +494,12 @@ namespace ISPA_STD {
         }
 
         // Emitted before each child member of the current rule.
+        template<typename Set>
+        static void append_claim_values(std::vector<Recovery::TokenId>& anchors) {
+            const auto values = Set::values();
+            anchors.insert(anchors.end(), values.begin(), values.end());
+        }
+
         template<typename... Sets, typename... Names>
         void recovery_at(std::string_view expecting, Names... names) {
             static_assert(sizeof...(Sets) == sizeof...(Names),
@@ -503,11 +510,7 @@ namespace ISPA_STD {
             frame.claims.clear();
             auto& anchors = recovery_state_.anchors.back();
             anchors.clear();
-            const auto add = [&]<class Set>() {
-                const auto values = Set::values();
-                anchors.insert(anchors.end(), values.begin(), values.end());
-            };
-            (add.template operator()<Sets>(), ...);
+            (append_claim_values<Sets>(anchors), ...);
             const std::string_view n[] = {std::string_view(names)..., std::string_view{}};
             std::size_t i = 0;
             (frame.claims.push_back({n[i++], &LLParser::claim_matches<Sets>}), ...);
@@ -520,7 +523,7 @@ namespace ISPA_STD {
         static std::string describe_token(const IT& pos) {
             if (pos.isEnd()) return "end of input";
             [[maybe_unused]] const auto& tok = *pos;
-            if constexpr (requires { tok.meta().start(); tok.meta().length(); }) {
+            if constexpr (detail::detected_v<detail::meta_start_length, decltype(tok)>) {
                 if (tok.meta().start())
                     return "'" + std::string(std::string_view(tok.meta().start(),
                                                               tok.meta().length())) + "'";
@@ -571,13 +574,13 @@ namespace ISPA_STD {
             Recovery::ContextDiagnostic d;
             d.kind = kind;
             d.position = cursor_position(pos);
-            if constexpr (requires { pos.sourcePosition(); pos.sourceOrigin(); }) {
+            if constexpr (detail::detected_v<detail::source_origin_position, IT>) {
                 if (const auto* at = pos.sourcePosition()) {
                     d.offset = at - pos.sourceOrigin();
                     d.length = *at ? 1 : 0;
                 }
             } else if (!pos.isEnd()) {
-                if constexpr (requires { pos->meta().startpos(); pos->meta().length(); }) {
+                if constexpr (detail::detected_v<detail::meta_startpos_length, decltype(*pos)>) {
                     d.offset = pos->meta().startpos();
                     d.length = pos->meta().length();
                 }
@@ -651,7 +654,7 @@ namespace ISPA_STD {
             if (candidate.isEnd()) return;
             // External FIRST sets are predicates over source text. A boundary
             // token cannot be classified by the host recovery token sets.
-            if constexpr (requires { candidate->isAmbiguous(); }) {
+            if constexpr (detail::detected_v<detail::is_ambiguous, decltype(*candidate)>) {
                 if (candidate->isAmbiguous()) return;
             }
             const void* tok = std::addressof(*candidate);
@@ -682,7 +685,7 @@ namespace ISPA_STD {
                 std::string(rule) + "; expected one of: " + std::string(expected);
             if (!pos.isEnd()) {
                 diagnostic.unexpected = Recovery::tokenId(*pos);
-                if constexpr (requires { pos->meta().startpos(); pos->meta().length(); }) {
+                if constexpr (detail::detected_v<detail::meta_startpos_length, decltype(*pos)>) {
                     diagnostic.offset = pos->meta().startpos();
                     diagnostic.length = pos->meta().length();
                 }
@@ -800,7 +803,7 @@ namespace ISPA_STD {
                 // before failing. Never let a failed probe mutate pos.
                 IT attempt = pos;
                 auto match = [&] {
-                    if constexpr (requires { std::decay_t<Fail>::custom_action; }) {
+                    if constexpr (detail::detected_v<detail::custom_action, std::decay_t<Fail>>) {
                         decltype(rec(attempt)) result{};
                         RuleProbe probe(*this, cursor_position(attempt));
                         try { result = rec(attempt); }
@@ -849,7 +852,7 @@ namespace ISPA_STD {
         }
         template <typename SpaceTokenType, typename IT>
         void skip_external_spaces(IT& pos) {
-            if constexpr (requires { pos.sourcePosition(); pos.consumeExternal(pos.sourcePosition()); }) {
+            if constexpr (detail::detected_v<detail::consume_external, IT>) {
                 const char* begin = pos.sourcePosition();
                 const char* end = begin;
                 while (end && *end && std::isspace(static_cast<unsigned char>(*end))) ++end;
@@ -861,7 +864,7 @@ namespace ISPA_STD {
             Recovery::Diagnostic diagnostic;
             diagnostic.rule = frames_.empty() ? "<rule>" : std::string(frames_.back().rule);
             diagnostic.message = message;
-            if constexpr (requires { node.meta().startpos(); node.meta().length(); }) {
+            if constexpr (detail::detected_v<detail::meta_startpos_length, Token>) {
                 diagnostic.offset = node.meta().startpos();
                 diagnostic.length = node.meta().length();
             }
@@ -979,7 +982,7 @@ namespace ISPA_STD {
                     " matches, got " + std::to_string(nodes.size());
                 if (!cursor.isEnd()) {
                     diagnostic.unexpected = Recovery::tokenId(*cursor);
-                    if constexpr (requires { cursor->meta().startpos(); })
+                    if constexpr (detail::detected_v<detail::meta_startpos, decltype(*cursor)>)
                         diagnostic.offset = cursor->meta().startpos();
                 }
                 const auto message = diagnostic.message;

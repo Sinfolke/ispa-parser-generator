@@ -71,17 +71,17 @@ namespace ISPA_STD {
                     assign_compatible(target, value);
             }, source);
 
-        } else if constexpr (requires { source.data().value; }) {
+        } else if constexpr (detail::detected_v<detail::data_value, From>) {
             assign_compatible(target, source.data().value);
 
         } else if constexpr (std::is_same_v<To, char> &&
-                             requires { source.start(); source.length(); }) {
+                             detail::detected_v<detail::start_length, From>) {
             if (source.length() != 1 || !source.start())
                 throw IspaInternalExcept("assign_compatible: expected one character", "Parser", true);
             target = *source.start();
 
         } else if constexpr (std::is_same_v<To, std::string> &&
-                             requires { source.start(); source.length(); }) {
+                             detail::detected_v<detail::start_length, From>) {
             target.assign(source.start(), source.length());
 
         } else {

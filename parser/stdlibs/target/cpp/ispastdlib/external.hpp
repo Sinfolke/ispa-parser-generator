@@ -26,14 +26,14 @@ Node<Data> external_node(const char* origin, const char* start, const char* end,
 
 template<class Binding, class IT>
 bool external_starts(const IT& pos) {
-    if constexpr (requires { pos.sourceOrigin(); pos.sourcePosition(); })
+    if constexpr (detail::detected_v<detail::source_origin_position, IT>)
         return Binding::starts(pos.sourceOrigin(), pos.sourcePosition());
     else throw std::logic_error("AMBIGUOUS eager token stream: external parsers require lazy tokenization");
 }
 
 template<class Binding, class IT>
 auto external_match(IT pos) -> MatchResult<typename Binding::node_type, IT> {
-    if constexpr (requires { pos.sourceOrigin(); pos.sourcePosition(); }) {
+    if constexpr (detail::detected_v<detail::source_origin_position, IT>) {
         if (!Binding::starts(pos.sourceOrigin(), pos.sourcePosition())) return {};
         auto result = [&] {
             try { return Binding::parse(pos.sourceOrigin(), pos.sourcePosition()); }

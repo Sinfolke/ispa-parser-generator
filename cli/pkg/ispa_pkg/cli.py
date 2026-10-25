@@ -187,6 +187,60 @@ def layout_entries(config):
     return root, result, file_entries
 
 
+def build_cpp_library(package, name, root):
+    """Compile a package's C++ sources into a static archive beside its headers."""
+    cpp = package / 'ispatarget' / 'cpp'
+    sources = sorted(source for source in cpp.rglob('*.cpp') if source.is_file())
+    if not sources:
+        return None
+    default_compiler = 'cl' if os.name == 'nt' and not shutil.which('c++') else 'c++'
+    compiler = shlex.split(os.environ.get('CXX', default_compiler))
+    msvc = bool(compiler and Path(compiler[0]).name.lower() in ('cl', 'cl.exe', 'clang-cl', 'clang-cl.exe'))
+    archiver = shlex.split(os.environ.get('AR', 'lib' if msvc else 'ar'))
+    if not compiler or not archiver or not shutil.which(compiler[0]) or not shutil.which(archiver[0]):
+        raise PackageError('Building C++ libraries requires a C++ compiler and archiver (set CXX and AR)')
+    flags = shlex.split(os.environ.get('CXXFLAGS', ''))
+    includes = [cpp, cpp / 'include']
+    for other in discover_exports(root).get('cpp', []):
+        includes.extend((other, other / 'include'))
+    include_flags = [flag for directory in dict.fromkeys(includes) if directory.is_dir()
+                     for flag in (('/I' if msvc else '-I'), str(directory))]
+    with tempfile.TemporaryDirectory(prefix='.ispa-cpp-', dir=root) as temporary:
+        work = Path(temporary)
+        objects = []
+        for index, source in enumerate(sources):
+            obj = work / f'{index}{".obj" if msvc else ".o"}'
+            if msvc:
+                command = [*compiler, '/nologo', '/std:c++17', '/EHsc', *flags,
+                           *include_flags, '/c', str(source), f'/Fo{obj}']
+            else:
+                command = [*compiler, '-std=c++17', *flags, *include_flags,
+                           '-c', str(source), '-o', str(obj)]
+            subprocess.run(command, check=True)
+            objects.append(obj)
+        archive_name = f'{name}.lib' if msvc else f'lib{name}.a'
+        archive = work / archive_name
+        if msvc:
+            command = [*archiver, '/nologo', f'/OUT:{archive}', *(str(obj) for obj in objects)]
+        else:
+            command = [*archiver, 'rcs', str(archive), *(str(obj) for obj in objects)]
+        subprocess.run(command, check=True)
+        destination = cpp / 'lib' / archive.name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        archive.replace(destination)
+    return destination
+
+
+def build_missing_cpp_library(package, name, root):
+    cpp = package / 'ispatarget' / 'cpp'
+    if not any(cpp.rglob('*.cpp')):
+        return None
+    library_dir = cpp / 'lib'
+    if not (library_dir / f'lib{name}.a').is_file() and not (library_dir / f'{name}.lib').is_file():
+        return build_cpp_library(package, name, root)
+    return None
+
+
 def install(name, spec, root, allow_scripts=False, force=False, from_catalog=False):
     if not NAME.fullmatch(name):
         raise PackageError(f"Invalid package name: {name}")
@@ -249,6 +303,8 @@ def install(name, spec, root, allow_scripts=False, force=False, from_catalog=Fal
         if marker.is_file() and not force:
             try:
                 if json.loads(marker.read_text())["fingerprint"] == fingerprint:
+                    if build_missing_cpp_library(target, name, root):
+                        refresh_saved_exports(root)
                     print(f"{name}: up to date ({revision[:12]})")
                     return
             except (ValueError, KeyError):
@@ -288,6 +344,7 @@ def install(name, spec, root, allow_scripts=False, force=False, from_catalog=Fal
             else:
                 command = ["sh", str(script_path), str(stage)]
             subprocess.run(command, cwd=config_tree, check=True)
+        build_cpp_library(stage, name, root)
         marker_data = {"name": name, "source": spec, "revision": revision, "fingerprint": fingerprint,
                        "from_catalog": from_catalog}
         (stage / ".ispa-package.json").write_text(json.dumps(marker_data, indent=2) + "\n")
@@ -347,8 +404,20 @@ def export_data(root):
         if directory.is_dir()
     ))
     sources = sorted({source.resolve() for target in cpp_dirs
-                      for source in (target / "src").rglob("*.cpp") if source.is_file()})
-    return targets, includes, sources
+                      for source in target.rglob("*.cpp") if source.is_file()})
+    libraries = sorted({file.resolve() for target in cpp_dirs for file in target.rglob('*')
+                        if file.is_file() and (file.suffix in ('.a', '.so', '.dylib', '.lib')
+                                               or '.so.' in file.name)})
+    library_dirs = sorted({file.parent for file in libraries})
+    runtime_dirs = sorted({file.parent for target in cpp_dirs for file in target.rglob('*')
+                           if file.is_file() and (file.suffix in ('.so', '.dylib', '.dll')
+                                                  or '.so.' in file.name)})
+    python_roots = sorted({target.parent for target in targets.get('python', [])})
+    python_roots += sorted({marker.parent / 'ispatarget' for marker in root.glob('*/.ispa-package.json')
+                            if (marker.parent / 'ispatarget').is_dir()
+                            and any((marker.parent / 'ispatarget').glob('*.py'))})
+    python_dirs = list(dict.fromkeys(python_roots + targets.get('python', [])))
+    return targets, includes, sources, libraries, library_dirs, runtime_dirs, python_dirs
 
 
 def cmake_quote(path):
@@ -357,14 +426,22 @@ def cmake_quote(path):
 
 def write_export_files(root):
     """Write a CMake import and JSON manifest, refreshing them on every export."""
-    targets, includes, sources = export_data(root)
+    root.mkdir(parents=True, exist_ok=True)
+    # Older installations may contain sources from before ispa-pkg built archives.
+    for marker in sorted(root.glob('*/.ispa-package.json')):
+        package = marker.parent
+        build_missing_cpp_library(package, package.name, root)
+    targets, includes, sources, libraries, library_dirs, runtime_dirs, python_dirs = export_data(root)
     output = root / '.ispa-exports'
     output.mkdir(parents=True, exist_ok=True)
     manifest = {
         'targets': {name: [str(path) for path in paths] for name, paths in sorted(targets.items())},
         'cpp': {'include_dirs': [str(path) for path in includes],
-                'sources': [str(path) for path in sources]},
-        'python': {'interpreter_dirs': [str(path) for path in targets.get('python', [])]},
+                'sources': [str(path) for path in sources],
+                'library_dirs': [str(path) for path in library_dirs],
+                'runtime_dirs': [str(path) for path in runtime_dirs],
+                'libraries': [str(path) for path in libraries]},
+        'python': {'interpreter_dirs': [str(path) for path in python_dirs]},
     }
     (output / 'targets.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
     lines = [
@@ -376,9 +453,12 @@ def write_export_files(root):
     if includes:
         lines += ['  target_include_directories(ispa_targets INTERFACE',
                   *('    ' + cmake_quote(path) for path in includes), '  )']
-    if sources:
-        lines += ['  target_sources(ispa_targets INTERFACE',
-                  *('    ' + cmake_quote(path) for path in sources), '  )']
+    if library_dirs:
+        lines += ['  target_link_directories(ispa_targets INTERFACE',
+                  *('    ' + cmake_quote(path) for path in library_dirs), '  )']
+    if libraries:
+        lines += ['  target_link_libraries(ispa_targets INTERFACE',
+                  *('    ' + cmake_quote(path) for path in libraries), '  )']
     lines += ['endif()']
     for name, paths in sorted(targets.items()):
         var = re.sub('[^A-Za-z0-9_]', '_', name).upper()
@@ -393,6 +473,8 @@ def export_variables(root, output, manifest):
         'ISPA_TARGETS_CMAKE': str(output / 'targets.cmake'),
         'ISPA_CPP_INCLUDE_DIRS': os.pathsep.join(manifest['cpp']['include_dirs']),
         'ISPA_CPP_SOURCES': os.pathsep.join(manifest['cpp']['sources']),
+        'ISPA_CPP_LIBRARY_DIRS': os.pathsep.join(manifest['cpp']['library_dirs']),
+        'ISPA_CPP_LIBRARIES': os.pathsep.join(manifest['cpp']['libraries']),
         'ISPA_PYTHON_INTERPRETER_DIRS': os.pathsep.join(manifest['python']['interpreter_dirs']),
     }
     for name, paths in sorted(manifest['targets'].items()):
@@ -401,33 +483,53 @@ def export_variables(root, output, manifest):
     return variables
 
 
-def shell_exports(variables, shell):
+def path_exports(manifest, shell):
+    cpp = manifest['cpp']
+    includes = cpp['include_dirs']
+    libraries = cpp['library_dirs']
+    runtime = cpp['runtime_dirs']
+    python = manifest['python']['interpreter_dirs']
+    if shell == 'powershell':
+        return {'INCLUDE': includes, 'LIB': libraries, 'PATH': runtime,
+                'CPLUS_INCLUDE_PATH': includes, 'LIBRARY_PATH': libraries,
+                'PYTHONPATH': python}
+    loader = 'DYLD_LIBRARY_PATH' if sys.platform == 'darwin' else 'LD_LIBRARY_PATH'
+    return {'CPLUS_INCLUDE_PATH': includes, 'CPATH': includes,
+            'LIBRARY_PATH': libraries, loader: runtime,
+            'CMAKE_INCLUDE_PATH': includes, 'CMAKE_LIBRARY_PATH': libraries,
+            'PYTHONPATH': python}
+
+
+def shell_exports(variables, shell, manifest):
     if shell in ('bash', 'zsh'):
         lines = ['# Generated by ispa-pkg --export.']
         for name, value in variables.items():
             lines.append(f'export {name}={shlex.quote(value)}')
-        # GCC/Clang find C++ headers through CPLUS_INCLUDE_PATH. Preserve existing entries.
-        lines += [
-            'if [ -n "${ISPA_CPP_INCLUDE_DIRS:-}" ]; then',
-            '  case ":${CPLUS_INCLUDE_PATH:-}:" in',
-            '    *":${ISPA_CPP_INCLUDE_DIRS}:"*) ;;',
-            '    *) export CPLUS_INCLUDE_PATH="${ISPA_CPP_INCLUDE_DIRS}${CPLUS_INCLUDE_PATH:+:${CPLUS_INCLUDE_PATH}}" ;;',
-            '  esac',
-            'fi',
-        ]
+        for name, paths in path_exports(manifest, shell).items():
+            for path in reversed(paths):
+                lines += [
+                    f'_ispa_path_entry={shlex.quote(path)}',
+                    f'case ":${{{name}:-}}:" in',
+                    '  *":${_ispa_path_entry}:"*) ;;',
+                    f'  *) export {name}="${{_ispa_path_entry}}${{{name}:+:${{{name}}}}}" ;;',
+                    'esac',
+                ]
+        lines.append('unset _ispa_path_entry')
         return '\n'.join(lines) + '\n'
     if shell == 'powershell':
         lines = ['# Generated by ispa-pkg --export.']
         for name, value in variables.items():
             lines.append(f"$env:{name} = '{value.replace(chr(39), chr(39)*2)}'")
-        lines += [
-            'if ($env:ISPA_CPP_INCLUDE_DIRS) {',
-            '  $old = $env:CPLUS_INCLUDE_PATH',
-            "  if (-not (($old -split ';') -contains $env:ISPA_CPP_INCLUDE_DIRS)) {",
-            "    $env:CPLUS_INCLUDE_PATH = $env:ISPA_CPP_INCLUDE_DIRS + $(if ($old) { ';' + $old })",
-            '  }',
-            '}',
-        ]
+        for name, paths in path_exports(manifest, shell).items():
+            for path in reversed(paths):
+                escaped = path.replace("'", "''")
+                lines += [
+                    f"$ispaPathEntry = '{escaped}'",
+                    f"if (-not (($env:{name} -split ';') -contains $ispaPathEntry)) {{",
+                    f"  $env:{name} = $ispaPathEntry + $(if ($env:{name}) {{ ';' + $env:{name} }})",
+                    '}',
+                ]
+        lines.append('Remove-Variable ispaPathEntry -ErrorAction SilentlyContinue')
         return '\n'.join(lines) + '\n'
     raise PackageError(f'Unsupported shell: {shell}')
 
@@ -439,23 +541,58 @@ def default_shell():
     return name if name in ('bash', 'zsh') else 'bash'
 
 
-def permanent_export(root, shell, variables):
+def write_shell_export(root, shell, variables, manifest):
+    script = root / '.ispa-exports' / ('env.ps1' if shell == 'powershell' else 'env.sh')
+    script.write_text(shell_exports(variables, shell, manifest), encoding='utf-8')
+    return script
+
+
+def permanent_export(root, shell, variables, manifest):
     if shell in ('bash', 'zsh'):
         profile = Path.home() / ('.bashrc' if shell == 'bash' else '.zshrc')
-        script = root / '.ispa-exports' / 'env.sh'
-        script.write_text(shell_exports(variables, shell), encoding='utf-8')
+        script = write_shell_export(root, shell, variables, manifest)
         start = '# >>> ispa-pkg exports >>>'
         end = '# <<< ispa-pkg exports <<<' 
-        block = f'{start}\n[ -f {shlex.quote(str(script))} ] && . {shlex.quote(str(script))}\n{end}'
+        block = '\n'.join((
+            start,
+            f'[ -f {shlex.quote(str(script))} ] && . {shlex.quote(str(script))}',
+            'ispa-pkg() {',
+            '  local _ispa_pkg_arg _ispa_pkg_file',
+            '  for _ispa_pkg_arg in "$@"; do',
+            '    if [ "$_ispa_pkg_arg" = "--export" ]; then',
+            '      _ispa_pkg_file=$(command ispa-pkg "$@" --export-path) || return $?',
+            '      [ -n "$_ispa_pkg_file" ] || return 1',
+            '      . "$_ispa_pkg_file"',
+            '      return $?',
+            '    fi',
+            '  done',
+            '  command ispa-pkg "$@"',
+            '}',
+            end,
+        ))
     elif shell == 'powershell':
         # Use the standard per-user cross-platform PowerShell profile location.
         profile = (Path.home() / 'Documents' / 'PowerShell' / 'Microsoft.PowerShell_profile.ps1')
-        script = root / '.ispa-exports' / 'env.ps1'
-        script.write_text(shell_exports(variables, shell), encoding='utf-8')
+        script = write_shell_export(root, shell, variables, manifest)
         start = '# >>> ispa-pkg exports >>>'
         end = '# <<< ispa-pkg exports <<<' 
         escaped = str(script).replace("'", "''")
-        block = f"{start}\nif (Test-Path '{escaped}') {{ . '{escaped}' }}\n{end}"
+        block = '\n'.join((
+            start,
+            f"if (Test-Path '{escaped}') {{ . '{escaped}' }}",
+            'function global:ispa-pkg {',
+            '  $ispaCommand = (Get-Command ispa-pkg -CommandType Application | Select-Object -First 1).Source',
+            "  if ($args -contains '--export') {",
+            "    $ispaArgs = @($args) + @('--export-path')",
+            '    $ispaFile = & $ispaCommand @ispaArgs',
+            '    if ($LASTEXITCODE -ne 0) { return }',
+            '    . $ispaFile',
+            '  } else {',
+            '    & $ispaCommand @args',
+            '  }',
+            '}',
+            end,
+        ))
     else:
         raise PackageError(f'Unsupported shell: {shell}')
     profile.parent.mkdir(parents=True, exist_ok=True)
@@ -473,7 +610,7 @@ def permanent_export(root, shell, variables):
 
 
 def refresh_saved_exports(root):
-    """Keep installed permanent export scripts current after installs and updates."""
+    """Keep saved export scripts current after installs and updates."""
     output = root / '.ispa-exports'
     sh = output / 'env.sh'
     ps = output / 'env.ps1'
@@ -482,9 +619,9 @@ def refresh_saved_exports(root):
     output, manifest = write_export_files(root)
     variables = export_variables(root, output, manifest)
     if sh.exists():
-        sh.write_text(shell_exports(variables, 'bash'), encoding='utf-8')
+        sh.write_text(shell_exports(variables, 'bash', manifest), encoding='utf-8')
     if ps.exists():
-        ps.write_text(shell_exports(variables, 'powershell'), encoding='utf-8')
+        ps.write_text(shell_exports(variables, 'powershell', manifest), encoding='utf-8')
 
 
 def main(argv=None):
@@ -494,6 +631,7 @@ def main(argv=None):
     exports = parser.add_mutually_exclusive_group()
     exports.add_argument("--export", action="store_true", help="Print shell exports and generate target manifests")
     exports.add_argument("--export-permanent", action="store_true", help="Persist exports in the user shell profile")
+    parser.add_argument("--export-path", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--shell", choices=("bash", "zsh", "powershell"), help="Shell used for exports")
     sub = parser.add_subparsers(dest="command")
     add = sub.add_parser("install", help="Install a catalog name, GitHub repository, or archive")
@@ -510,6 +648,8 @@ def main(argv=None):
     catalog_cmd.add_argument("action", choices=["update", "list"])
     catalog_cmd.add_argument("--url", default=CATALOG_URL, help="GitHub raw YAML URL")
     args = parser.parse_args(argv)
+    if args.export_path and not args.export:
+        parser.error("--export-path requires --export")
     root = args.root.expanduser().resolve()
     if args.command is None and not (args.export or args.export_permanent):
         parser.error("Specify a command, --export, or --export-permanent")
@@ -521,12 +661,17 @@ def main(argv=None):
             variables = export_variables(root, output, manifest)
             shell = args.shell or default_shell()
             if args.export_permanent:
-                profile, script = permanent_export(root, shell, variables)
+                profile, script = permanent_export(root, shell, variables, manifest)
                 print(f"Saved export script: {script}")
                 print(f"Updated shell profile: {profile}")
                 print(f"CMake targets: {output / 'targets.cmake'}")
+                print("Open a new shell to use ispa-pkg --export in the current session.")
             else:
-                print(shell_exports(variables, shell), end='')
+                script = write_shell_export(root, shell, variables, manifest)
+                if args.export_path:
+                    print(script)
+                else:
+                    print(shell_exports(variables, shell, manifest), end='')
             return 0
         if args.command == "catalog":
             if args.action == "update":

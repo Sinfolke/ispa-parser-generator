@@ -1,6 +1,5 @@
 #pragma once
 #include <algorithm>
-#include <span>
 #include <string_view>
 #include <vector>
 
@@ -12,7 +11,8 @@ struct ScanResult {
 
 // Scan opaque Python payloads without asking the host lexer to tokenize them.
 // The budget is in source bytes, including strings and comments.
-inline ScanResult scanBalanced(const char* begin, std::span<const std::string_view> boundaries,
+template<class Boundaries>
+inline ScanResult scanBalanced(const char* begin, const Boundaries& boundaries,
                                std::size_t budget) {
     const char* p = begin;
     std::vector<char> closers;
