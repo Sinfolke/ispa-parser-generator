@@ -4,10 +4,9 @@
 
 The [wiki](https://github.com/Sinfolke/ispa-parser-generator/wiki) covers setup, grammar syntax, generated APIs, algorithms, recovery, external parsers, packages, and debugging.
 
+**Usage demo**
 
 https://github.com/user-attachments/assets/97d0214b-8807-493c-8a55-3b1fb4ea41aa
-
-
 
 It is built around one idea: **easy to use, without giving up performance, extensibility, or features.** In benchmarks it is about 12x faster than ANTLR; see [Performance](#-performance).
 
@@ -369,8 +368,10 @@ irm https://raw.githubusercontent.com/Sinfolke/ispa-parser-generator/main/script
 On Linux/macOS, set `ISPA_INSTALL_DIR` and/or `ISPA_BIN_DIR` before running the installer. On Windows, set the same environment variables in PowerShell before executing the script.
 
 ### Updating and removing
-
-Rerun the installer to switch the launcher to the latest release. Previously installed versions are retained under `versions/` for rollback.
+Update:
+```sh
+ispa-update
+```
 
 To remove ISPA on Linux/macOS (with default paths):
 
@@ -380,14 +381,6 @@ rm -rf "${XDG_DATA_HOME:-$HOME/.local/share}/ispa"
 ```
 
 On Windows (with default paths), remove `%LOCALAPPDATA%\Programs\ISPA`, and delete that folder's `bin` entry from your user PATH.
-
-### Important limitations
-
-- The installer does **not** build LLVM, libc++, Python, or other target-language toolchains. Users who generate C++ will still need a compatible C++ compiler.
-- Archives currently contain the ISPA executable and detected converter shared libraries. Package ISPA's grammar stdlibs, target resources, and any necessary dynamic runtime dependencies in the release workflow before advertising the archives as a complete standalone distribution.
-- A GitHub Release can become public after the first platform finishes building. If an archive for your platform has not been uploaded yet, rerun the installer once it appears.
-- For stronger supply-chain verification, publish a SHA-256 checksum manifest (or signed attestations) alongside each release and verify it inside the installers.
-
 
 ---
 
