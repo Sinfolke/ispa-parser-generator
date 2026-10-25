@@ -1,5 +1,5 @@
 module tokens;
-
+import std.collections;
 COLON: ':';
 COMMA: ',';
 SEMICOLON: ';';
@@ -91,6 +91,7 @@ COMMENT {
     has_newline = False
     width = 0
     i = 0
+
     while i < prefix.size():
         if prefix.substr(i, 1) != ' ' and prefix.substr(i, 1) != '\t' and prefix.substr(i, 1) != '\f':
             has_code_before = True
@@ -106,6 +107,7 @@ COMMENT {
             width = (width / 8 + 1) * 8
         i += 1
     ctx.skip()
+
     if has_code_before and ctx.shared.bracket_depth == 0 and (has_newline or ctx.next_char == ''):
         ctx.emit('NEWLINE')
         if not has_newline:

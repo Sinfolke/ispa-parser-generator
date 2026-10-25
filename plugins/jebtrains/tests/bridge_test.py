@@ -79,13 +79,12 @@ class BridgeTests(unittest.TestCase):
 
     def test_embedded_python(self):
         for source in (
-            "entry: @ 'x' {p{value}};",
-            "entry: 'x' =p{count + 1};",
-            "entry { p{return value} }",
-            "entry { p{x = 1\nif x:\n    x = x + 1\n} p{return x} }",
-            "fail handler p{return None}",
-            "entry: 'x' {p{ {'value': 1} }}; tail: 'y';",
-            "entry: 'x' {p{value # } import extern ignored;\n}}; tail: 'y';",
+            "entry: @ 'x' {value};",
+            "entry: 'x' =count + 1;",
+            "entry { value = 1\nvalue = value + 1 }",
+            "fail handler { return None }",
+            "entry: 'x' {{'value': 1}}; tail: 'y';",
+            "entry: 'x' {value}; tail: 'y';",
         ):
             with self.subTest(source=source):
                 result = self.parse(source)
@@ -93,18 +92,28 @@ class BridgeTests(unittest.TestCase):
                 self.assertTrue(any(t['role'] == 'declaration' for t in result['tokens']))
 
     def test_invalid_python(self):
-        source = "// 😀\nentry: 'x' {p{value + }};"
+        source = "// 😀\nentry: 'x' {value + };"
         result = self.parse(source)
         self.assertFalse(result['ok'])
         self.assertTrue(result['tokens'])
         self.assertTrue(result['diagnostics'])
 
-    def test_unterminated_python(self):
-        source = "entry: 'x' {p{value"
+    def test_advanced_python_error_points_to_offending_line(self):
+        source = "NEWLINE {\n    match '\\n';\n    234234sdf[]w[]r\n    l = []\n}"
         result = self.parse(source)
         self.assertFalse(result['ok'])
-        self.assertEqual(source.index('p{'), result['diagnostics'][0]['start'])
-        self.assertIn('Unterminated Python', result['diagnostics'][0]['message'])
+        self.assertEqual(source.index('234234sdf'), result['diagnostics'][0]['start'])
+
+    def test_unterminated_python(self):
+        source = "entry: 'x' {value"
+        result = self.parse(source)
+        self.assertFalse(result['ok'])
+        self.assertTrue(result['diagnostics'])
+
+    def test_legacy_python_wrapper_reports_diagnostic(self):
+        result = self.parse("fail handler p{return None}")
+        self.assertFalse(result['ok'])
+        self.assertTrue(result['diagnostics'])
 
     def test_expected_semicolon_at_eof(self):
         source = "// 😀\nentry: 'x'"

@@ -104,6 +104,37 @@ namespace {
         reporter.printSummary(std::cerr);
     }
 
+    void printCheckJson(const diagnostics::Reporter& reporter) {
+        auto quote = [](std::string_view value) {
+            std::string result = "\"";
+            constexpr char hex[] = "0123456789abcdef";
+            for (unsigned char c : value) {
+                if (c == '"' || c == '\\') { result += '\\'; result += c; }
+                else if (c < 0x20) { result += "\\u00"; result += hex[c >> 4]; result += hex[c & 15]; }
+                else result += c;
+            }
+            return result + '"';
+        };
+        std::cout << "{\"diagnostics\":[";
+        bool first = true;
+        std::set<std::tuple<std::string, std::string, std::string, std::size_t>> seen;
+        for (const auto& entry : reporter.diagnostics()) {
+            if (!seen.emplace(entry.code, entry.message, entry.location.file, entry.location.offset).second) continue;
+            if (!first) std::cout << ',';
+            first = false;
+            std::cout << "{\"severity\":" << quote(entry.severity == diagnostics::Severity::Error ? "error" :
+                entry.severity == diagnostics::Severity::Warning ? "warning" : "info")
+                << ",\"code\":" << quote(entry.code)
+                << ",\"message\":" << quote(entry.message)
+                << ",\"file\":" << quote(entry.location.file)
+                << ",\"offset\":" << (entry.location.offset == std::string::npos ? -1 : static_cast<long long>(entry.location.offset))
+                << ",\"length\":" << entry.location.length
+                << ",\"line\":" << entry.location.line
+                << ",\"column\":" << entry.location.column << '}';
+        }
+        std::cout << "]}\n";
+    }
+
     void printExceptionDiagnostic(std::string code, const std::exception& error) {
         const std::string message = error.what();
         diagnostics::Reporter reporter;
@@ -360,7 +391,7 @@ void generateDependencies(Args& args) {
 int generate(Args args) {
     UAST::main modules;
     std::vector<std::string> source_files;
-    if (args.no_dep) generateDependencies(args);
+    if (args.no_dep && !args.check_only) generateDependencies(args);
     dumper.setArgsPointer(&args);
     dumper.initDumpDirectory();
     if (logger.enabled()) logger.clearLogDirectory();
@@ -510,6 +541,10 @@ int generate(Args args) {
         semantic_checker.addRule(std::move(info));
     }
     semantic_checker.check();
+    if (args.check_only) {
+        printCheckJson(semantic_checker.diagnostics());
+        return semantic_checker.diagnostics().hasErrors() ? 1 : 0;
+    }
     if (!semantic_checker.diagnostics().diagnostics().empty())
         printDiagnostics(semantic_checker.diagnostics());
     if (semantic_checker.diagnostics().hasErrors()) return 1;

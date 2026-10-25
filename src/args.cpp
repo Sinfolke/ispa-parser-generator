@@ -16,6 +16,7 @@ Args parse_args(int argc, char** argv) {
     app.add_option("-o", args.output, "Directory where to output generated files");
     app.add_option("--dep", args.dependencies, "Use an external parser: NAME OUTPUT_PREFIX")->type_size(2)->expected(1)->take_all()->allow_extra_args(false);
     app.add_flag("--no-dep", args.no_dep, "Generate external dependencies as separate parsers in the output directory");
+    app.add_flag("--check-only", args.check_only, "Run parsing and semantic checks without generating output");
     app.add_option("-l,--lang", args.language_str, "Set build language")->required();
     app.add_option("-a,--algorithm", algorithm, "Set one of algorithms: LL, LR(0), LR(1), LALR, LR(*)");
     app.add_option("--debug", args.debug, "Output debug logs into Logs directory");

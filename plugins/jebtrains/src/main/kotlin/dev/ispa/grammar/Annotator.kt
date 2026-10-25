@@ -2,11 +2,13 @@ package dev.ispa.grammar
 
 import com.google.gson.JsonParser
 import com.intellij.lang.annotation.AnnotationHolder
+import com.intellij.lang.annotation.Annotator
 import com.intellij.lang.annotation.ExternalAnnotator
 import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiFile
+import com.intellij.psi.PsiElement
 import com.intellij.psi.tree.IElementType
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.Files
@@ -20,8 +22,21 @@ data class BridgeResult(val source: String, val tokens: List<BridgeToken>, val d
 object NativeParserBridge {
     private val executable: java.io.File? by lazy {
         try {
-            val suffix = if (System.getProperty("os.name").lowercase().contains("windows")) ".exe" else ""
-            val stream = IspaLexer::class.java.getResourceAsStream("/native/ispa-grammar-bridge$suffix") ?: return@lazy null
+            val os = System.getProperty("os.name").lowercase()
+            val arch = when (System.getProperty("os.arch").lowercase()) {
+                "amd64", "x86_64" -> "x64"
+                "aarch64", "arm64" -> "arm64"
+                else -> return@lazy null
+            }
+            val platform = when {
+                os.contains("windows") -> "windows-$arch"
+                os.contains("mac") -> "macos-$arch"
+                os.contains("linux") -> "linux-$arch"
+                else -> return@lazy null
+            }
+            val suffix = if (os.contains("windows")) ".exe" else ""
+            val resource = "/native/$platform/ispa-grammar-bridge$suffix"
+            val stream = IspaLexer::class.java.getResourceAsStream(resource) ?: return@lazy null
             val file = Files.createTempFile("ispa-grammar-bridge-", suffix).toFile()
             stream.use { input -> file.outputStream().use(input::copyTo) }
             file.setExecutable(true); file.deleteOnExit(); file
@@ -117,6 +132,18 @@ class IspaNativeAnnotator : ExternalAnnotator<String, BridgeResult>() {
                 .range(TextRange(error.start, error.end))
             if (error.start == result.source.length) annotation.afterEndOfLine()
             annotation.create()
+        }
+    }
+}
+
+class IspaLiveAnnotator : Annotator {
+    override fun annotate(element: PsiElement, holder: AnnotationHolder) {
+        val file = element as? PsiFile ?: return
+        if (file.language != IspaLanguage.INSTANCE) return
+        val source = file.text
+        for (problem in IspaEditorModel.syntaxProblems(source) + IspaEditorModel.problems(source)) {
+            holder.newAnnotation(if (problem.warning) HighlightSeverity.WARNING else HighlightSeverity.ERROR, problem.message)
+                .range(TextRange(problem.start, problem.end)).create()
         }
     }
 }

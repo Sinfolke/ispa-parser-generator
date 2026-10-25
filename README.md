@@ -386,7 +386,7 @@ On Windows (with default paths), remove `%LOCALAPPDATA%\Programs\ISPA`, and dele
 
 ## 🛠️ Build & Requirements
 1. Clang with libc++ on the latest Ubuntu
-2. MSVC `cl` on Windows
+2. MSVC `clang-cl` on Windows
 3. CMake 4.5.0-rc1, plus dependencies in `vcpkg.json`
 
 **Note: you will not be able to build ISPA with GCC yet.**

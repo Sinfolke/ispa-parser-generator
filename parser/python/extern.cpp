@@ -105,8 +105,14 @@ ISPA_STD::ExternalResult<RawStatements::node_type> RawStatements::parse(const ch
     auto result = parser.main(PyLexer::lazy_iterator(lexer, origin, start));
     if (!result.status || !result.it.isEnd() || !parser.getErrors().empty() || !parser.getContextErrors().empty()) {
         std::string message = "invalid Python action";
-        if (!parser.getErrors().empty()) message += ": " + parser.getErrors().front().message;
-        throw std::runtime_error("Python action at line " + std::to_string(1 + std::count(origin, start, '\n')) + ": " + message);
+        auto location = start;
+        if (!parser.getErrors().empty()) {
+            const auto& error = parser.getErrors().front();
+            message += ": " + error.message;
+            if (error.offset != std::string::npos && error.offset <= std::char_traits<char>::length(origin))
+                location = origin + error.offset;
+        }
+        throw std::runtime_error("Python action at line " + std::to_string(1 + std::count(origin, location, '\n')) + ": " + message);
     }
     return {true, ISPA_STD::external_node(origin, start, end, std::move(result.node)), end};
 }

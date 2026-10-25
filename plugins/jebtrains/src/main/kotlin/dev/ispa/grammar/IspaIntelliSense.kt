@@ -4,6 +4,7 @@ import com.intellij.codeInsight.completion.CompletionContributor
 import com.intellij.codeInsight.completion.CompletionParameters
 import com.intellij.codeInsight.completion.CompletionResultSet
 import com.intellij.codeInsight.lookup.LookupElementBuilder
+import com.intellij.icons.AllIcons
 import com.intellij.patterns.PlatformPatterns.psiElement
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiReference
@@ -12,6 +13,7 @@ import com.intellij.psi.PsiReferenceContributor
 import com.intellij.psi.PsiReferenceProvider
 import com.intellij.psi.PsiReferenceRegistrar
 import com.intellij.util.ProcessingContext
+import java.nio.file.Path
 
 class IspaCompletionContributor : CompletionContributor() {
     override fun fillCompletionVariants(parameters: CompletionParameters, result: CompletionResultSet) {
@@ -19,9 +21,19 @@ class IspaCompletionContributor : CompletionContributor() {
         if (file.language != IspaLanguage.INSTANCE) return
         val source = file.text
         val offset = parameters.offset.coerceAtMost(source.length)
-        if (!IspaSymbols.acceptsCompletion(source, offset)) return
-        for (symbol in IspaSymbols.declarations(source).distinctBy { it.name }) {
-            result.addElement(LookupElementBuilder.create(symbol.name).withTypeText(if (symbol.token) "token" else "rule"))
+        val path = file.virtualFile?.path?.let { runCatching { Path.of(it) }.getOrNull() }
+        val root = file.project.basePath?.let { runCatching { Path.of(it) }.getOrNull() }
+        for (symbol in IspaEditorModel.suggestions(source, offset, path, root)) {
+            val icon = when (symbol.kind) {
+                "module" -> AllIcons.Nodes.Package
+                "rule", "function", "builtin", "method" -> AllIcons.Nodes.Method
+                "token" -> AllIcons.Nodes.Constant
+                "class", "type" -> AllIcons.Nodes.Class
+                "capture", "parameter" -> AllIcons.Nodes.Parameter
+                "ctx member" -> AllIcons.Nodes.Field
+                else -> AllIcons.Nodes.Variable
+            }
+            result.addElement(LookupElementBuilder.create(symbol.name).withTypeText(symbol.detail ?: symbol.kind).withIcon(icon))
         }
     }
 }

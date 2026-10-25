@@ -25,6 +25,21 @@ void add(std::vector<Diagnostic>& errors, std::string message, std::size_t offse
     for (const auto& error : errors) if (error.start == offset && error.message == message) return;
     errors.push_back({std::move(message), offset, length});
 }
+std::size_t diagnosticOffset(const std::string& message, const std::string& source, std::size_t fallback) {
+    static const std::regex linePattern("Python action at line ([0-9]+):");
+    std::smatch match;
+    if (!std::regex_search(message, match, linePattern)) return fallback;
+    const auto line = std::stoull(match[1].str());
+    if (line == 0) return fallback;
+    std::size_t start = 0;
+    for (std::size_t current = 1; current < line; ++current) {
+        const auto next = source.find('\n', start);
+        if (next == std::string::npos) return fallback;
+        start = next + 1;
+    }
+    while (start < source.size() && (source[start] == ' ' || source[start] == '\t')) ++start;
+    return start;
+}
 // Editor validation is file-local: strip preprocessing syntax without resolving
 // imports against the filesystem. Spaces preserve the parser's byte offsets.
 std::string prepare(const std::string& source, std::vector<Diagnostic>& errors) {
@@ -68,6 +83,7 @@ std::string prepare(const std::string& source, std::vector<Diagnostic>& errors) 
             blank(i, end); i = end; continue;
         }
         if (source.compare(i, 2, "p{") == 0) {
+            add(errors, "Legacy p{...} wrapper is unsupported; use direct Python", i, 2, size);
             std::size_t depth = 1; i += 2;
             while (i < size && depth) {
                 if (source[i] == '\'' || source[i] == '"') { i = quoted(i, source[i], true); continue; }
@@ -215,11 +231,14 @@ int main() {
                     cursor = IspaSyntax::scanPythonBlock(cursor);
                     continue;
                 }
-                lexer.push(lexer.makeToken(cursor));
+                try { lexer.push(lexer.makeToken(cursor)); }
+                catch (const std::exception&) { ++cursor; }
+                catch (const char*) { ++cursor; }
             }
             lexed = true;
         }
         catch (const std::exception& e) { add(errors, e.what(), lexer.stopped, 1, source.size()); }
+        catch (const char* e) { add(errors, e, lexer.stopped, 1, source.size()); }
         for (const auto& token : lexer.getTokens()) {
             if (token.empty()) continue;
             const auto& meta = token.meta();
@@ -229,7 +248,10 @@ int main() {
             if (start < text.size() && meta.length())
                 spans.push_back({::Parser::TokensToString(token.kind()), {}, start, std::min(meta.length(), text.size() - start)});
         }
-        if (lexed) {
+        const bool legacyPython = std::any_of(errors.begin(), errors.end(), [](const auto& error) {
+            return error.message.starts_with("Legacy p{...}");
+        });
+        if (lexed && !legacyPython) {
             BridgeParser parser;
             Lexer parserLexer(text);
             try {
@@ -243,7 +265,9 @@ int main() {
                     Semantics{text, spans}.visit(result.node);
                 } else add(errors, "Parsing stopped: expected a rule declaration", begin.isEnd() ? source.size() : begin->meta().startpos(), 1, source.size());
             } catch (const std::exception& e) {
-                if (parser.getErrors().empty()) add(errors, e.what(), parserLexer.stopped, 1, source.size());
+                if (parser.getErrors().empty()) add(errors, e.what(), diagnosticOffset(e.what(), source, parserLexer.stopped), 1, source.size());
+            } catch (const char* e) {
+                if (parser.getErrors().empty()) add(errors, e, parserLexer.stopped, 1, source.size());
             }
             for (const auto& error : parser.getErrors()) {
                 std::string expected = error.expected_text;

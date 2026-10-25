@@ -20,6 +20,7 @@ export struct Args {
     std::vector<std::string> files;
     std::vector<std::pair<std::string, std::string>> dependencies;
     bool no_dep = false;
+    bool check_only = false;
     // Internal: keep every exported module when generating a dependency.
     bool dependency_build = false;
     bool debug = false;
