@@ -1,6 +1,8 @@
 # ISPA Parser Generator
 
-**ISPA** is a static parser and lexer generator written from scratch in modern C++ (C++20/C++23). You describe a grammar once; ISPA compiles it ahead of time into a standalone, dependency-free parser that builds a fully typed AST for you.
+**ISPA** is a static parser and lexer generator written from scratch in modern C++ (C++23). You describe a grammar once; ISPA compiles it ahead of time into a lexer and parser that build a fully typed AST. Generated C++ targets C++17; Python output is also available.
+
+The [wiki](https://github.com/Sinfolke/ispa-parser-generator/wiki) covers setup, grammar syntax, generated APIs, algorithms, recovery, external parsers, packages, and debugging.
 
 It is built around one idea: **easy to use, without giving up performance, extensibility, or features.** In benchmarks it is about 12x faster than ANTLR; see [Performance](#-performance).
 
@@ -9,10 +11,10 @@ It is built around one idea: **easy to use, without giving up performance, exten
 ## Why ISPA
 
 1. **Static generation.** Everything is computed at generation time. The grammar is compiled to DFA tables and plain code. Nothing is generated, interpreted, or compiled at runtime.
-2. **No dependencies.** A generated parser is self-contained. Drop the output into your project and build it; there is no runtime library to link or install.
-3. **Multi-language output.** Code generation goes through **LangAPI**, a language-agnostic IR, so the same grammar can target different languages. **C++17** is the only emitter today; Python is next.
+2. **Small target runtime.** Generated C++ uses headers and `core.cpp` from `parser/stdlibs`; generated Python imports `ispa_std`. Package exports can put these on your build or module path.
+3. **Multi-language output.** Code generation goes through **LangAPI**, a language-agnostic IR. **C++17 and Python** emitters are implemented; Python currently uses LL generation.
 4. **Extensible grammar descriptions.** Rules describe language structure and connect to generated parser code.
-5. **Scales from trivial to very large projects.** Incremental compilation regenerates only the parts that changed, and the planned module system lets you import, parametrize, and disable features of large shared grammars.
+5. **Scales from trivial to larger projects.** Incremental generation and grammar imports help organize and rebuild shared grammars. Feature-gated and parametrized module work remains on the roadmap.
 6. **Works out of the box.** Generate, include, call. The generated API returns a typed AST with no post-parsing step or callbacks required.
 
 ---
@@ -24,14 +26,15 @@ It is built around one idea: **easy to use, without giving up performance, exten
 | Compiler (frontend + backend) | Implemented; builds on **Windows** and **Linux** |
 | Bootstrap | **Done.** ISPA's own grammar is parsed by an ISPA-generated parser, which fully replaced the hand-written one |
 | Lexer (TDFA, AST-building tokens) | **Done** |
-| Parser (default mode) | Mostly correct; needs some changes and more tests |
-| Parser (LR-family modes) | Experimental; see [LR backend status](docs/LR_STATUS.md) |
+| Parser (LL) | Production target; actively growing, with further work and testing ongoing |
+| Parser (LR-family modes) | Less capable and experimental for now; see [LR backend status](docs/LR_STATUS.md) |
 | Incremental generation | Implemented (regenerates changed parts only) |
 | C++17 target | Implemented; output compiles and runs |
+| Python target | Implemented for LL generation; generated modules use `ispa_std` from the target runtime |
 | Dynamic regex (back-references, counts from earlier captures) | Syntax parsed, **not yet lowered to output** |
 | Grammar syntax error reporting | Automatic LL recovery and source diagnostics; syntax errors stop generation |
 
-The backend lowers **plain EBNF plus AST captures** to C++. The remaining grammar features above are being integrated into lowering.
+The backends lower grammar structure and AST captures to C++ or Python. Support for advanced actions and recovery differs by algorithm; see [LR backend status](docs/LR_STATUS.md).
 
 ## Debugging generated parsers
 
@@ -80,7 +83,7 @@ Live parser sessions currently require POSIX file descriptors; the Windows
 
 ISPA is self-hosting for its own grammar. The `.isc` grammar that describes ISPA's input language was compiled by ISPA into the parser that ISPA now uses to read grammars, replacing the original hand-written parser. A Python-subset parser and a small module-scanner parser are generated the same way.
 
-The generated bootstrap parser is committed to the repository in `parser/ispa/bootstrapped_0`. It consists of two monolithic files (not incrementally compiled) that ship with the repo and are compiled as part of the ISPA build, before ISPA can compile any other grammar.
+The generated bootstrap parser is committed under `parser/ispa/bootstrapped_0` and is built with ISPA before the generator processes other grammars.
 
 <!-- TODO: optional, add the generated grammar's size (rules, tokens, lines) -->
 
@@ -171,7 +174,7 @@ Flex + bison figures are steady state over 10 iterations.
 - Matches non-terminals inside terminals during lexing, separately from parsing *(not yet implemented)*
 
 ## Parser Capabilities
-- Generates parsers from the grammar ahead of time. The default parser mode is the stability target; alternative LR-family modes are experimental
+- LL is the production parser target and is actively growing; alternative LR-family modes currently support fewer grammar features and remain experimental
 - Builds a fully typed, easy-to-traverse AST during parsing. No post-parsing pass or callbacks required
 
 ## Advanced rules and fail blocks
@@ -182,38 +185,55 @@ See the separate [Advanced Rules and Fail Blocks guide](concept/ADVANCED_RULES_A
 
 ## Quick start
 
-Ispa json grammar example:
-![Syntax Example](assets/json.png)
-you can find it [here](tests/input/parser/basic/json.isc)
+Install ISPA from a release, install its standard library package, and enable
+the package exports for future shells:
 
-Generate a parser from a grammar:
 ```sh
-ispa tests/input/parser/basic/json.isc --lang cpp -o output/json
-```
-
-Compile it without cmake:
-```sh
-clang++ -std=c++17 -I parser/stdlibs -I output parser/stdlibs/src/core.cpp output/Parser.cpp examples/main.cpp
+ispa-pkg install std
+ispa-pkg --export-permanent
 ```
 
-Run it:
-```sh
-./a.out --file your_json_file.json
+Open a new shell. The installed shell helper exposes the include paths and
+CMake targets; run `ispa-pkg --export` in that shell whenever you want to
+refresh them. Then create `grammar.isc`:
+
+```isc
+module main -> demo;
+
+NUMBER: @ [0-9]+ {@};
+main: @ NUMBER {@};
 ```
-Note that you can generate test json with:
+
+Generate the C++ parser:
+
 ```sh
-python3 examples/json/generate_json.py -o huge_100mb.json -s 100 -d 2
+ispa -l cpp -a LL grammar.isc -o generated/Parser
 ```
+
+Use the generated parser in your application and link the installed targets
+through CMake. In `CMakeLists.txt`:
+
+```cmake
+cmake_minimum_required(VERSION 3.20)
+project(demo LANGUAGES CXX)
+include("$ENV{ISPA_TARGETS_CMAKE}")
+add_executable(demo main.cpp generated/Parser.cpp)
+target_link_libraries(demo PRIVATE ISPA::Targets)
+```
+
+This target supplies the installed ISPA headers and runtime libraries. See the
+[wiki](https://github.com/Sinfolke/ispa-parser-generator/wiki/Getting-Started)
+for a complete installed-user walkthrough, including Python output.
 
 ---
 
 ## 🔮 Future Roadmap
 
 - [ ] **Lexer/LR actions and dynamic regex** in generated code
-- [ ] **Clean grammar syntax error reporting**
+- [x] **Grammar syntax diagnostics with LL recovery** (further improvements ongoing)
 - [ ] **PLL algorithm**: finalize the custom Predictive LL algorithm to resolve left recursion in LL parsers while keeping structural parity with LR parsers
 - [ ] **Multi-target code generation**
-  - [ ] Python target emitter
+  - [x] Python target emitter for LL
 - [ ] **Full LR parser stabilization**: LR(1), LALR, and related modes
 - [ ] **Modules**: feature-gated modules, `disable feature X`, parametrized modules
 - [ ] **Grammar standard library**: JSON, XML, math expressions, C-like statements
@@ -369,7 +389,7 @@ On Windows (with default paths), remove `%LOCALAPPDATA%\Programs\ISPA`, and dele
 ## 🛠️ Build & Requirements
 1. Clang with libc++ on the latest Ubuntu
 2. MSVC `cl` on Windows
-3. CMake, exact version 4.3.2
+3. CMake 4.5.0-rc1, plus dependencies in `vcpkg.json`
 
 **Note: you will not be able to build ISPA with GCC yet.**
 **Note: the Clang build is not tested on Windows.**
@@ -386,7 +406,7 @@ export LDFLAGS="-stdlib=libc++"
 cmake -B cmake-build-release \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_TOOLCHAIN_FILE=~/vcpkg/scripts/buildsystems/vcpkg.cmake \
-  -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$ISPA_SOURCE_DIR/cmake/toolchains/clang-libcpp.cmake \
+  -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$ISPA_SOURCE_DIR/cmake/toolchains/clang-libcxx.cmake \
   -DVCPKG_TARGET_TRIPLET=x64-linux-libcxx \
   -DVCPKG_OVERLAY_TRIPLETS=$ISPA_SOURCE_DIR/cmake/triplets
 ```

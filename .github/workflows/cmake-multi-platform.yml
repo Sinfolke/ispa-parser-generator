@@ -499,15 +499,13 @@ jobs:
       - name: Setup sccache
         uses: mozilla-actions/sccache-action@v0.0.8
 
-      - name: Restore / Save sccache cache
-        uses: actions/cache@v4
+      - name: Restore sccache
+        uses: actions/cache/restore@v4
         with:
           path: ${{ env.SCCACHE_DIR }}
-          key: >-
-            sccache-${{ matrix.os }}-${{ matrix.triplet }}-${{ github.sha }}
+          key: sccache-${{ matrix.os }}-${{ matrix.triplet }}-${{ github.sha }}
           restore-keys: |
             sccache-${{ matrix.os }}-${{ matrix.triplet }}-
-            sccache-${{ matrix.os }}-
 
       - name: Export GitHub Actions Cache Token
         uses: actions/github-script@v7
@@ -569,6 +567,7 @@ jobs:
       - name: Configure CMake
         shell: bash
         env:
+          PROGRAM_VERSION: ${{ inputs.release_tag || (github.ref_type == 'tag' && github.ref_name) || 'dev' }}
           MATRIX_CC: ${{ matrix.c_compiler }}
           MATRIX_CXX: ${{ matrix.cpp_compiler }}
           MATRIX_TRIPLET: ${{ matrix.triplet }}
@@ -629,6 +628,7 @@ jobs:
             -S "$GITHUB_WORKSPACE"
             -B build
             -G Ninja
+            "-DPROGRAM_VERSION=$PROGRAM_VERSION"
             
             "-DCMAKE_C_COMPILER=$CC"
             "-DCMAKE_CXX_COMPILER=$CXX"
@@ -866,9 +866,21 @@ jobs:
         shell: bash
         run: |
           sccache --show-stats || true
-
-      - name: Stop sccache daemon
+      - name: Diagnose compiler cache
         if: always()
         shell: bash
         run: |
-          sccache --stop-server || true
+          sccache --show-stats
+          ninja -C build -t commands | grep -E '\.modmap|\.pcm' | head -20 || true
+
+      - name: Stop sccache
+        if: always()
+        shell: bash
+        run: sccache --stop-server || true
+
+      - name: Save sccache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.SCCACHE_DIR }}
+          key: sccache-${{ matrix.os }}-${{ matrix.triplet }}-${{ github.sha }}
