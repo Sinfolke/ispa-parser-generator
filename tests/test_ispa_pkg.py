@@ -22,7 +22,7 @@ class PackageTests(unittest.TestCase):
                          and shutil.which('bash'), 'requires a POSIX C++ toolchain')
     def test_install_builds_static_library_and_exports_it_for_linking(self):
         with tempfile.TemporaryDirectory() as temp:
-            base = Path(temp)
+            base = Path(temp).resolve()
             source = base / 'source'
             cpp = source / 'ispatarget' / 'cpp'
             (cpp / 'src').mkdir(parents=True)
@@ -72,7 +72,7 @@ class PackageTests(unittest.TestCase):
                      'requires a POSIX shell')
     def test_exports_reach_compiler_linker_and_python_runtime(self):
         with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp) / 'libraries'
+            root = Path(temp).resolve() / 'libraries'
             package = root / 'example'
             cpp = package / 'ispatarget' / 'cpp'
             python = package / 'ispatarget' / 'python'
@@ -125,7 +125,7 @@ class PackageTests(unittest.TestCase):
                      'requires a POSIX shell')
     def test_export_function_updates_current_shell_without_eval(self):
         with tempfile.TemporaryDirectory() as temp:
-            base = Path(temp)
+            base = Path(temp).resolve()
             root = base / 'library root'
             cpp = root / 'example' / 'ispatarget' / 'cpp'
             cpp.mkdir(parents=True)
