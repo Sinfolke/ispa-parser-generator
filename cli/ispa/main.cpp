@@ -478,9 +478,11 @@ int generate(Args args) {
     AST::TreePass pass(ast);
     pass.work();
     {
-        std::ofstream treeAPIO("treeAPI.txt");
-        for (const auto &[name, value] : ast.getTreeMap())
-            treeAPIO << "name<" << corelib::text::join(name, "_") << "> : " << value;
+        if (dumper.shouldDump("treeAPI")) {
+            std::ofstream treeAPIO(dumper.makeDumpPath("treeAPI.txt"));
+            for (const auto &[name, value] : ast.getTreeMap())
+                treeAPIO << "name<" << corelib::text::join(name, "_") << "> : " << value;
+        }
     }
 
     std::filesystem::path output_path = args.output;

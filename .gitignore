@@ -78,3 +78,4 @@ parser/python/bootstrapped/.codegen-*
 parser/ispa_dep_scanner/bootstrapped/.codegen-*
 tree.txt
 treeAPI.txt
+__pycache__
