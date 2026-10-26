@@ -1,0 +1,25 @@
+{
+  "name": "ispa-grammar",
+  "displayName": "ISPA Grammar",
+  "description": "Language support for ISPA .isc grammars",
+  "version": "0.1.0",
+  "publisher": "ispa",
+  "license": "Apache-2.0",
+  "engines": {"vscode": "^1.85.0"},
+  "categories": ["Programming Languages"],
+  "main": "./extension.js",
+  "activationEvents": ["onLanguage:ispa"],
+  "contributes": {
+    "languages": [{"id": "ispa", "aliases": ["ISPA"], "extensions": [".isc"], "configuration": "./language-configuration.json"}],
+    "grammars": [{"language": "ispa", "scopeName": "source.ispa", "path": "./syntaxes/ispa.tmLanguage.json"}],
+    "configuration": {
+      "title": "ISPA",
+      "properties": {
+        "ispa.server.python": {"type": "string", "default": "python3", "description": "Python executable used to start ispa-lsp"},
+        "ispa.server.command": {"type": "string", "default": "ispa-lsp", "description": "Path to the ispa-lsp command"},
+        "ispa.compiler.path": {"type": "string", "default": "ispa", "description": "Path to the ISPA compiler"}
+      }
+    }
+  },
+  "dependencies": {"vscode-languageclient": "^9.0.1"}
+}

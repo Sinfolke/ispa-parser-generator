@@ -32,16 +32,16 @@ int main(int argc, const char** argv) {
     auto start = std::chrono::steady_clock::now();
 
     Parser::Parser parser;
-    Parser::Lexer lex;
-    lex.makeTokens(input_buffer.c_str());
-    Parser::Types::main node = parser.parse(lex);
+    Parser::Types::main node = parser.parse(input_buffer.c_str());
 
     auto end = std::chrono::steady_clock::now();
 
     std::chrono::duration<double, std::milli> elapsed = end - start;
 
     std::cout << "ISPA total: " << elapsed.count() << " ms\n";
-    //
+    for (const auto &e : parser.getErrors()) {
+        std::cout << "Error: " << e.message << "\n";
+    }
     // 6. AST Output / File Write AFTER timer has stopped
     std::ofstream of("tree.txt");
     of << node << "\n\n";

@@ -36,6 +36,8 @@ void check(const AST::RuleMember& member, bool token, bool actions) {
         if (actions && !token && (std::holds_alternative<AST::PythonAction>(f) ||
             std::holds_alternative<AST::VariableCapture>(f) || std::holds_alternative<AST::FailMarker>(f) ||
             std::holds_alternative<AST::AdvancedRule>(f) || std::holds_alternative<AST::StreamMatch>(f))) continue;
+        if (actions && token && (std::holds_alternative<AST::VariableCapture>(f) ||
+                                 std::holds_alternative<AST::FailMarker>(f))) continue;
         if (const auto* counter = std::get_if<AST::Counter>(&f); counter && !token) {
             if (!(member.isName() || member.isString()) ||
                 (member.quantifier != '*' && member.quantifier != '+'))
@@ -97,7 +99,7 @@ void AST::requireCppSupport(const Tree& tree, bool ll_actions) {
             if (ll_actions && (std::holds_alternative<AST::AdvancedRule>(feature) ||
                 std::holds_alternative<AST::PythonAction>(feature) ||
                 std::holds_alternative<AST::DeclarationSyntax>(feature))) continue;
-            if (ll_actions && !token && std::holds_alternative<AST::FailBinding>(feature)) continue;
+            if (ll_actions && std::holds_alternative<AST::FailBinding>(feature)) continue;
             check(feature);
         }
         for (const auto& member : rule.rule_members) check(*member, token, ll_actions);

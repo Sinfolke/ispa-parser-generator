@@ -37,6 +37,17 @@ struct PythonConverter {
     std::string localName(const std::string& name) const {
         return action_context && locals.contains(name) ? "ispa_action_" + name : name;
     }
+    std::string tokenName(const py::ExprPtr& value) const {
+        if (!value) return {};
+        if (auto name = value->template get<py::Name>())
+            return locals.contains(name->id) || objects.contains(name->id) ||
+                class_names.contains(name->id) || name->id == "ctx" ? "" : name->id;
+        if (auto attribute = value->template get<py::Attribute>()) {
+            auto prefix = tokenName(attribute->value);
+            return prefix.empty() ? "" : prefix + "." + attribute->attr;
+        }
+        return {};
+    }
     std::size_t block_depth = 0, loop_depth = 0;
     la::Statements nested(const py::StmtList& list, bool loop = false) {
         ++block_depth;
@@ -171,7 +182,7 @@ struct PythonConverter {
         return std::visit([&](const auto& x) -> la::Expression {
             using T = std::decay_t<decltype(x)>;
             if constexpr (std::is_same_v<T, py::Name>) {
-                if (!token_rule.empty() && x.id == "ctx") unsupported(e.pos, "token context needs a property");
+                if (!token_rule.empty() && !failure_context && x.id == "ctx") unsupported(e.pos, "token context needs a property");
                 return la::Symbol::createExpression(pythonSymbol(x.id == self_name ? "__ispa_python_self" : localName(x.id)));
             }
             else if constexpr (std::is_same_v<T, py::Constant>) {
@@ -223,14 +234,15 @@ struct PythonConverter {
                 }
             } else if constexpr (std::is_same_v<T, py::Attribute> || std::is_same_v<T, py::Subscript>) {
                 if constexpr (std::is_same_v<T, py::Attribute>) {
-                    if (!token_rule.empty() && x.value)
+                    if (!token_rule.empty() && !failure_context && x.value)
                         if (auto shared = x.value->template get<py::Attribute>(); shared && shared->attr == "shared" && shared->value)
                             if (auto ctx = shared->value->template get<py::Name>(); ctx && ctx->id == "ctx")
                                 return la::Symbol::createExpression(la::Symbol{"ispa_shared_" + x.attr});
-                    if (!token_rule.empty() && x.value) if (auto n = x.value->template get<py::Name>(); n && n->id == "ctx") {
+                    if (!token_rule.empty() && !failure_context && x.value) if (auto n = x.value->template get<py::Name>(); n && n->id == "ctx") {
                         if (x.attr == "ast") return la::Symbol::createExpression(la::Symbol{"ispa_token_result"});
                         if (x.attr == "start_pos") return la::Symbol::createExpression(la::Symbol{"start_pos"});
                         if (x.attr == "rule") return la::String::createExpression(la::String{.value = token_rule});
+                        if (x.attr == "failed_rule") return la::String::createExpression(la::String{.value = token_rule});
                         if (x.attr == "text") return la::Symbol::createExpression(la::Symbol{"ispa_token_text"});
                         if (x.attr == "line_prefix") return la::FunctionCall::createExpression(la::FunctionCall{
                             .name = std::make_shared<la::Symbol>(la::Symbol{"__line_prefix"}),
@@ -253,7 +265,7 @@ struct PythonConverter {
                 else s.path.emplace_back(la::StorageOffset{.offset = expr(x.slice)});
                 return la::StorageSymbol::createExpression(s);
             } else if constexpr (std::is_same_v<T, py::Call>) {
-                if (!token_rule.empty()) if (auto method = x.func ? x.func->template get<py::Attribute>() : nullptr)
+                if (!token_rule.empty() && !failure_context) if (auto method = x.func ? x.func->template get<py::Attribute>() : nullptr)
                     if (auto owner = method->value ? method->value->template get<py::Name>() : nullptr;
                         owner && owner->id == "ctx") {
                         if (method->attr == "skip" && x.args.empty() && x.keywords.empty()) {
@@ -367,17 +379,24 @@ struct PythonConverter {
                     if (auto owner = method->value ? method->value->template get<py::Name>() : nullptr; owner && owner->id == "ctx") {
                         const auto& name = method->attr;
                         const bool failure_method = name == "error" || name == "note" || name == "sync" || name == "sync_tokens" ||
-                            name == "skip" || name == "insert" || name == "replace" || name == "retry" || name == "abort";
-                        const bool action_method = name == "at" || name == "mark" || name == "restore" || name == "commit" ||
-                            name == "collect_braced";
+                            name == "skip" || name == "delete" || name == "insert" || name == "replace" || name == "retry" || name == "abort";
+                        const bool action_method = name == "at" || name == "peek" || name == "take" || name == "prev" ||
+                            name == "mark" || name == "restore" || name == "commit" || name == "collect_braced";
                         if ((failure_method && !failure_context) || (!failure_method && !action_method))
                             unsupported(e.pos, "unknown context method: " + name);
+                        if (failure_context && !token_rule.empty() &&
+                            name != "at" && name != "error" && name != "delete" && name != "skip" &&
+                            name != "insert" && name != "abort")
+                            unsupported(e.pos, "unsupported lexer failure method: " + name);
                         if (name == "sync" || name == "sync_tokens") {
                             if (x.args.empty()) unsupported(e.pos, "ctx." + name + " requires at least one boundary");
                             for (const auto& arg : x.args) {
                                 auto literal = arg ? arg->template get<py::Constant>() : nullptr;
-                                if (!literal || literal->kind != py::ConstantKind::Str || literal->value.empty())
-                                    unsupported(e.pos, "ctx." + name + " boundaries must be nonempty string literals");
+                                if (literal && literal->kind == py::ConstantKind::Str && !literal->value.empty()) continue;
+                                if (name == "sync_tokens" && !tokenName(arg).empty()) continue;
+                                if (name == "sync_tokens") if (auto variable = arg ? arg->template get<py::Name>() : nullptr;
+                                    variable && locals.contains(variable->id)) continue;
+                                unsupported(e.pos, "ctx." + name + " boundaries must be nonempty strings or token identifiers");
                             }
                         } else if (name == "error") {
                             if (x.args.empty() || x.args.size() == 3 || x.args.size() > 4)
@@ -391,6 +410,8 @@ struct PythonConverter {
                             if (x.args.size() != 1) unsupported(e.pos, "ctx.note requires one message");
                         } else if (name == "at") {
                             if (x.args.empty() || x.args.size() > 2) unsupported(e.pos, "ctx.at requires a token and optional lookahead offset");
+                        } else if (name == "peek") {
+                            if (x.args.size() > 1) unsupported(e.pos, "ctx.peek takes at most one lookahead offset");
                         } else if (name == "mark" || name == "restore" || name == "commit") {
                             if (x.args.size() != 1) unsupported(e.pos, "ctx." + name + " requires one checkpoint name");
                             auto label = x.args.front() ? x.args.front()->template get<py::Constant>() : nullptr;
@@ -398,22 +419,10 @@ struct PythonConverter {
                                 unsupported(e.pos, "ctx." + name + " checkpoint name must be a nonempty string literal");
                         } else if (x.args.size() != 0) unsupported(e.pos, "ctx." + name + " takes no arguments");
                         if (name == "at") {
-                            // Bare and dotted token names are strings in this API;
-                            // ordinary bound variables remain ordinary expressions.
-                            std::function<std::string(const py::ExprPtr&)> tokenName = [&](const py::ExprPtr& arg) -> std::string {
-                                if (!arg) return {};
-                                if (auto n = arg->template get<py::Name>())
-                                    return locals.contains(n->id) || n->id == "ctx" ? "" : n->id;
-                                if (auto a = arg->template get<py::Attribute>()) {
-                                    auto prefix = tokenName(a->value);
-                                    return prefix.empty() ? "" : prefix + "." + a->attr;
-                                }
-                                return {};
-                            };
                             const auto token = tokenName(x.args.front());
                             if (!token.empty()) {
                                 la::FunctionCall call;
-                                call.name = std::make_shared<la::Symbol>("at");
+                                call.name = std::make_shared<la::Symbol>("at_token");
                                 call.args = {la::String::createExpression(la::String{.value = token})};
                                 if (x.args.size() == 2) call.args.push_back(expr(x.args[1]));
                                 la::StorageSymbol storage;
@@ -421,6 +430,32 @@ struct PythonConverter {
                                 storage.path.emplace_back(call);
                                 return la::StorageSymbol::createExpression(storage);
                             }
+                        }
+                        if (name == "delete" && failure_context && !token_rule.empty()) {
+                            la::StorageSymbol storage;
+                            storage.what = group(expr(method->value));
+                            storage.path.emplace_back(la::FunctionCall{
+                                .name = std::make_shared<la::Symbol>("erase")});
+                            return la::StorageSymbol::createExpression(storage);
+                        }
+                        if (name == "sync_tokens") {
+                            la::FunctionCall call;
+                            call.name = std::make_shared<la::Symbol>("sync_tokens");
+                            for (const auto& arg : x.args) {
+                                const auto token = tokenName(arg);
+                                if (token.empty()) { call.args.push_back(expr(arg)); continue; }
+                                la::FunctionCall boundary;
+                                boundary.name = std::make_shared<la::Symbol>("token_boundary");
+                                boundary.args.push_back(la::String::createExpression(la::String{.value = token}));
+                                la::StorageSymbol tagged;
+                                tagged.what = group(expr(method->value));
+                                tagged.path.emplace_back(boundary);
+                                call.args.push_back(la::StorageSymbol::createExpression(tagged));
+                            }
+                            la::StorageSymbol storage;
+                            storage.what = group(expr(method->value));
+                            storage.path.emplace_back(call);
+                            return la::StorageSymbol::createExpression(storage);
                         }
                     }
                 }
@@ -472,6 +507,36 @@ struct PythonConverter {
                     case py::CmpOp::Gt: op = la::ExpressionElement::Higher; break;
                     case py::CmpOp::GtE: op = la::ExpressionElement::HigherOrEqual; break;
                     default: unsupported(e.pos, "identity and membership comparisons are unsupported");
+                }
+                if (action_context && (x.ops[0] == py::CmpOp::Eq || x.ops[0] == py::CmpOp::NotEq)) {
+                    auto tokenCompare = [&](const py::ExprPtr& property, const py::ExprPtr& other) -> std::optional<la::Expression> {
+                        auto attribute = property ? property->template get<py::Attribute>() : nullptr;
+                        if (!attribute || attribute->attr != "name") return {};
+                        if (const auto token = tokenName(other); !token.empty()) {
+                            la::FunctionCall call;
+                            call.name = std::make_shared<la::Symbol>("matches_name");
+                            call.args.push_back(la::String::createExpression(la::String{.value = token}));
+                            la::StorageSymbol storage;
+                            storage.what = group(expr(attribute->value));
+                            storage.path.emplace_back(call);
+                            auto result = la::StorageSymbol::createExpression(storage);
+                            if (x.ops[0] == py::CmpOp::NotEq) {
+                                result = group(std::move(result));
+                                result.insert(result.begin(), la::ExpressionElement::Not);
+                            }
+                            return result;
+                        }
+                        if (auto literal = other ? other->template get<py::Constant>() : nullptr;
+                            literal && literal->kind == py::ConstantKind::Str) {
+                            la::StorageSymbol text;
+                            text.what = group(expr(attribute->value));
+                            text.path.emplace_back("text");
+                            return binary(la::StorageSymbol::createExpression(text), op, expr(other));
+                        }
+                        return {};
+                    };
+                    if (auto converted = tokenCompare(x.left, x.comparators[0])) return *converted;
+                    if (auto converted = tokenCompare(x.comparators[0], x.left)) return *converted;
                 }
                 return binary(expr(x.left), op, expr(x.comparators[0]));
             } else if constexpr (std::is_same_v<T, py::Tuple>) {

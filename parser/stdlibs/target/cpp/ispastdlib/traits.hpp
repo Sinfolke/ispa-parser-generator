@@ -176,6 +176,7 @@ namespace ISPA_STD {
         template<class T> using is_end = decltype(std::declval<const T&>().isEnd());
         template<class T> using size = decltype(std::declval<const T&>().size());
         template<class T> using distance = decltype(std::declval<const T&>().distance());
+        template<class T> using decrement = decltype(--std::declval<T&>());
         template<class T> using source_position = decltype(std::declval<const T&>().sourcePosition());
         template<class T> using source_origin_position = decltype(std::declval<const T&>().sourceOrigin(),
                                                                    std::declval<const T&>().sourcePosition());

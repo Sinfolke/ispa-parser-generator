@@ -8,6 +8,12 @@ import std;
 namespace {
     std::deque<TokenID> capture_anchor_pool;
 
+    bool hasVariableCapture(const AST::RuleMember& member) {
+        return std::ranges::any_of(member.features, [](const auto& feature) {
+            return std::holds_alternative<AST::VariableCapture>(feature);
+        });
+    }
+
     TokenID *makeCaptureAnchor(AST::RuleMember &member,
                                const AST::RuleMember& original_member,
                                const stdu::vector<std::string> &token_name,
@@ -41,6 +47,8 @@ auto NFA::captureOf(AST::RuleMember &member,
                     std::size_t position_in_token) -> stdu::vector<TokenID *> {
     stdu::vector<TokenID *> captures;
     if (!member.prefix.empty())
+        captures.push_back(makeCaptureAnchor(member, original_member, token_name, position_in_token));
+    else if (hasVariableCapture(member))
         captures.push_back(makeCaptureAnchor(member, original_member, token_name, position_in_token));
     return captures;
 }
@@ -143,14 +151,14 @@ namespace NFA {
 
             if (group.values.size() == 1) {
                 AST::RuleMember *child = &*group.values[0];
-                const bool group_captures = !member.prefix.empty();
+                const bool group_captures = !member.prefix.empty() || hasVariableCapture(member);
                 const bool child_captures = !child->prefix.empty();
 
                 // Folding the prefix onto the child is only valid for a leaf or
                 // a plain sequence. An op child would spread the prefix over its
                 // options as separate anchors, splitting one logical capture
                 // (e.g. `@ (('\\' .) | [^'\\])*`) into unrelated ones.
-                if (group_captures && !child_captures && !child->isOp()) {
+                if (group_captures && !hasVariableCapture(member) && !child_captures && !child->isOp()) {
                     child = synthesize(*child, member.prefix, std::nullopt);
                     return expandMember(*child, original_member, prev_leaf, token_name,
                                         position_in_token, site_counter, token, next,
@@ -169,7 +177,7 @@ namespace NFA {
                                     captures, alt_path);
             }
 
-            if (!member.prefix.empty()) {
+            if (!member.prefix.empty() || hasVariableCapture(member)) {
                 active_captures.push_back(makeCaptureAnchor(member, original_member, token_name,
                                                             position_in_token, site_counter++));
             }
@@ -191,7 +199,7 @@ namespace NFA {
             return Fragment{parts.front().entries, parts.back().tails};
         }
 
-        if (!member.prefix.empty()) {
+        if (!member.prefix.empty() || hasVariableCapture(member)) {
             active_captures.push_back(makeCaptureAnchor(member, original_member, token_name,
                                                         position_in_token, site_counter));
         }

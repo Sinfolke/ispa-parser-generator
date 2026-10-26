@@ -9,6 +9,7 @@ namespace ISPA_STD {
     namespace DFA::API {
         struct DFADebug;
         inline auto null_state = std::numeric_limits<std::size_t>::max();
+        inline auto lexer_delete_state = null_state - 1;
         // Same numbering as NFA::TNFA::Action, so the converter emits the value as is.
         enum class Action { UNDEF, SET, SET_NEXT, COPY, APPEND, APPEND_NEXT };
         template<std::size_t Classes>

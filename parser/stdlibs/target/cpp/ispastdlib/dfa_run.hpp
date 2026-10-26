@@ -237,6 +237,11 @@ namespace DFA {
                     captures, start_pos, start, static_cast<long long>(pos - start), start_line
                 );
                 state = static_cast<std::size_t>(std::get<0>(result));
+                if (state == API::lexer_delete_state) {
+                    if (*pos != '\0') ++pos;
+                    debug_scan.success();
+                    return Token {};
+                }
                 if (state == API::null_state) {
                     debug_scan.success();
                     return std::get<1>(std::move(result));

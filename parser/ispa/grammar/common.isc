@@ -5,9 +5,10 @@ ID:
     {@}
 ;
 NUMBER:
-    @ [0-9]+ ('.' @ [0-9]+)?
+    @ [0-9]+ ('.' @ % [0-9]+)?
 
     @{full, floating}
+    %{empty_after_dot}
 ;
 name<params>:
     @ ID ('.' @ ID)* @ template_params? @ params?

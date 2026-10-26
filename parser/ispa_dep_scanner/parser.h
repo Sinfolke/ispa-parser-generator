@@ -82,7 +82,7 @@ public:
 };
 
 class IspaDepParser : public DepParser::Parser {
-    template<class IT> void parseSource(IT begin) {
+    template<class IT> auto parseSource(IT begin) {
         while (!begin.isEnd() && (*begin).template holds<DepParser::Types::__WS>()) ++begin;
         auto result = main(begin);
         auto end = result.it;
@@ -91,20 +91,21 @@ class IspaDepParser : public DepParser::Parser {
             offset = end.isEnd() ? (text ? std::strlen(text) : 0) : (*end).meta().startpos();
             throw std::runtime_error("invalid ISPA dependency syntax");
         }
-        tree = std::move(result.node.data());
+        return std::move(result);
     }
 public:
     std::vector<IspaDependency::Span> comments;
     std::size_t offset = 0;
 
-    void lazyParse() override {
+    ISPA_STD::MatchResult<DepParser::Types::main, DepParser::Lexer::lazy_iterator> lazyParse() override {
         comments.clear();
         offset = 0;
         IspaDepLexer lexer;
         lexer.setInput(text);
         try {
-            parseSource(IspaDepLexer::lazy_iterator(lexer, text));
+            auto r = parseSource(IspaDepLexer::lazy_iterator(lexer, text));
             comments = std::move(lexer.comments);
+            return r;
         } catch (...) {
             if (!offset) offset = lexer.offset;
             throw;

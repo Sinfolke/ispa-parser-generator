@@ -1,11 +1,18 @@
 name: JetBrains plugin release
 
 on:
-  push:
-    branches: [main]
-    paths: [plugins/jebtrains/build.gradle.kts]
+  workflow_call:
+    inputs:
+      release_tag:
+        description: Existing ISPA GitHub Release tag
+        type: string
+        required: true
   workflow_dispatch:
     inputs:
+      release_tag:
+        description: Existing ISPA GitHub Release tag
+        type: string
+        required: true
       publish_marketplace:
         description: Upload to JetBrains Marketplace when PUBLISH_TOKEN is configured
         type: boolean
@@ -18,23 +25,18 @@ jobs:
   version:
     runs-on: ubuntu-latest
     outputs:
-      changed: ${{ steps.check.outputs.changed }}
       version: ${{ steps.check.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
-      - name: Check plugin version
+          ref: ${{ inputs.release_tag }}
+      - name: Read plugin version
         id: check
         shell: bash
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BEFORE: ${{ github.event.before }}
         run: |
           python3 - <<'PY'
           import os
           import re
-          import subprocess
           from pathlib import Path
 
           path = 'plugins/jebtrains/build.gradle.kts'
@@ -45,22 +47,13 @@ jobs:
                   raise SystemExit('Cannot find plugin version')
               return match.group(1)
           current = version(Path(path).read_text())
-          previous = None
-          if os.environ['EVENT_NAME'] == 'push':
-              try:
-                  previous = version(subprocess.check_output(
-                      ['git', 'show', os.environ['BEFORE'] + ':' + path], text=True))
-              except subprocess.CalledProcessError:
-                  pass
-          changed = os.environ['EVENT_NAME'] == 'workflow_dispatch' or previous != current
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
-              output.write(f'version={current}\nchanged={str(changed).lower()}\n')
-          print(f'Plugin version: {current}; previous: {previous}; release: {changed}')
+              output.write(f'version={current}\n')
+          print(f'Plugin version: {current}')
           PY
 
   native:
     needs: version
-    if: needs.version.outputs.changed == 'true'
     name: Bridge ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -73,6 +66,8 @@ jobs:
           - { os: macos-26-intel, platform: macos-x64, binary: ispa-grammar-bridge }
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag }}
       - name: Build native parser bridge
         shell: bash
         run: |
@@ -112,6 +107,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag }}
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -150,19 +147,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.release_tag }}
           VERSION: ${{ needs.version.outputs.version }}
         run: |
           set -euo pipefail
-          tag="jetbrains-v$VERSION"
           asset="plugins/jebtrains/build/distributions/ispa-grammar-$VERSION.zip"
-          if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" "$asset" --clobber
-          else
-            gh release create "$tag" "$asset" --target "$GITHUB_SHA" \
-              --title "ISPA Grammar $VERSION" --generate-notes
-          fi
+          gh release upload "$TAG" "$asset" --clobber
       - name: Publish JetBrains Marketplace update
-        if: github.event_name == 'push' || inputs.publish_marketplace
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_marketplace
         working-directory: plugins/jebtrains
         env:
           PUBLISH_TOKEN: ${{ secrets.JETBRAINS_MARKETPLACE_TOKEN }}

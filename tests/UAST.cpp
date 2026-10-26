@@ -288,6 +288,46 @@ TEST(UAST, PythonExpressionInDynamicPatternAndCounter) {
     EXPECT_EQ(feature<AST::Counter>(*members[1]).expression.python.kind, "BinaryExpr");
 }
 
+TEST(UAST, NegatedLexerPatternConsumesOneAllowedCharacter) {
+    IspaParser parser;
+    const auto& syntax = parser.parse(R"(QUOTE: '"'; STRING<quote>: !(${quote} | [\n\r])+; main: STRING<QUOTE>;)" );
+    ASSERT_TRUE(parser.getErrors().empty()) << parser.getErrors().front().message;
+    AST::Builder builder(syntax, "feature.isc");
+    builder.build();
+    auto tree = builder.get();
+    const AST::Rule* instance = nullptr;
+    for (const auto& [_, rule] : tree.getTreeMap())
+        if (rule.templateOrigin && !rule.templateOrigin->name.empty() && rule.templateOrigin->name.back() == "STRING")
+            instance = &rule;
+    ASSERT_NE(instance, nullptr);
+    ASSERT_EQ(instance->rule_members.size(), 1u);
+    const auto& member = *instance->rule_members.front();
+    ASSERT_TRUE(member.isCsequence());
+    EXPECT_TRUE(member.getCsequence().negative);
+    const auto& excluded = member.getCsequence().characters;
+    EXPECT_NE(std::ranges::find(excluded, '\"'), excluded.end());
+    EXPECT_NE(std::ranges::find(excluded, '\n'), excluded.end());
+    EXPECT_NE(std::ranges::find(excluded, '\r'), excluded.end());
+}
+
+TEST(UAST, NegatedParserPatternSelectsOtherTokens) {
+    auto tree = convert("A: 'a'; B: 'b'; main: @ !A {@};");
+    AST::TreePass pass(tree);
+    pass.work();
+    const auto& rule = tree.getTreeMap().at({"main"});
+    const auto& member = *rule.rule_members.front();
+    ASSERT_TRUE(member.isOp());
+    bool found_b = false;
+    for (const auto& option : member.getOp().options) {
+        ASSERT_TRUE(option->isName());
+        EXPECT_NE(option->getName().name, (stdu::vector<std::string>{"A"}));
+        found_b |= option->getName().name == stdu::vector<std::string>{"B"};
+    }
+    EXPECT_TRUE(found_b);
+    ASSERT_TRUE(rule.data_block.type.has_value());
+    EXPECT_EQ(rule.data_block.type->name, (stdu::vector<std::string>{"B"}));
+}
+
 TEST(UAST, ConvertsBootstrapGrammar) {
     const auto root = std::string(ROOT_DIR);
     const auto project = Modules::preprocess({root + "/parser/ispa/grammar"},

@@ -195,7 +195,7 @@ public:
 };
 class IspaParser : public Parser::Parser {
     public:
-        auto lazyParse() -> void override {
+        auto lazyParse() -> ISPA_STD::MatchResult<::Parser::Types::main, ::Parser::Lexer::lazy_iterator> override {
             IspaLexer lexer;
             auto begin = IspaLexer::lazy_iterator(lexer, text);
             skip_spaces<::Parser::Types::__WS>(begin);
@@ -208,5 +208,6 @@ class IspaParser : public Parser::Parser {
                 throw ISPA_STD::IspaAPIExcept("Could not parse ISPA grammar");
             }
             tree = res.node.data();
+            return res;
         }
 };

@@ -1,0 +1,5 @@
+module std.insensitive -> insensitive;
+
+insensitive<pattern> {
+    if pattern.
+}

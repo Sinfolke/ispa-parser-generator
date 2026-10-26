@@ -347,10 +347,14 @@ void Builder::specializeModules() {
             collect(collect, canonical(path));
         }
         for (const auto& [local, target] : visible.at(root.name)) collect(collect, target);
+        if (project.entry) {
+            collect(collect, canonical(*project.entry));
+        }
         for (auto it = tree_map.begin(); it != tree_map.end();) {
             if (!keep.contains(it->first)) it = tree_map.erase(it);
             else ++it;
         }
+
     }
     if (project.entry) {
         const auto entry = canonical(*project.entry);

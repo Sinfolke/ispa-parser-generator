@@ -500,7 +500,7 @@ namespace LangRepr {
             }
         }
 
-        auto add_parse_wrapper = [&](
+        auto add_stream_parse_wrapper = [&](
             std::string name,
             std::string iterator_type,
             stdu::vector<LangAPI::Expression> iterator_args,
@@ -557,18 +557,63 @@ namespace LangRepr {
                 LangAPI::Visibility::Public
             );
         };
+        auto add_lazy_parse_wrapper = [&](
+            std::string name,
+            std::string iterator_type,
+            stdu::vector<LangAPI::Expression> iterator_args,
+            LangAPI::Statements pre_statements = {}
+        ) {
+            auto iterator = LangAPI::FunctionCall::createExpression(
+                LangAPI::FunctionCall{
+                    .name = std::make_shared<LangAPI::Symbol>(
+                        LangAPI::Symbol{"Lexer", std::move(iterator_type)}
+                    ),
+                    .args = std::move(iterator_args)
+                }
+            );
+            auto main_call = LangAPI::FunctionCall::createExpression(
+                LangAPI::FunctionCall{
+                    .name = std::make_shared<LangAPI::Symbol>("main"),
+                    .args = {std::move(iterator)}
+                }
+            );
+            pre_statements.push_back(LangAPI::Return::createStatement(LangAPI::Return {
+                    .value = std::move(main_call)
+                }
+            ));
+            auto parse_wrapper = LangAPI::Function{
+                .type = LangAPI::Type{LangAPI::ValueType::RuleResult, LangAPI::Type {LangAPI::Symbol {"Types", "main"}}, LangAPI::Type {LangAPI::Symbol {"Lexer", "lazy_iterator"}}},
+                .name = std::move(name),
+                .statements = {
+                    std::move(pre_statements),
+                },
+                .override = true,
+                .is_wrap_function = true
+            };
+
+            parser.data.emplace_back(
+                std::make_shared<LangAPI::Declaration>(
+                    LangAPI::Function::createDeclaration(
+                        std::move(parse_wrapper)
+                    )
+                ),
+                LangAPI::Visibility::Public
+            );
+        };
         LangAPI::Expression lexer_reference;
         lexer_reference.push_back(LangAPI::Symbol::createRValue(LangAPI::Symbol {"lexer"}));
-        add_parse_wrapper("parseFromTokens", "iterator", {lexer_reference});
+        add_stream_parse_wrapper("parseFromTokens", "iterator", {lexer_reference});
+        parser.data.emplace_back(std::make_shared<LangAPI::Declaration>(
+            LangAPI::Variable::createDeclaration(LangAPI::Variable{
+                .name = "lazy_lexer_", .type = LangAPI::Type{LangAPI::Symbol{"Lexer"}}
+            })), LangAPI::Visibility::Private);
         LangAPI::Statements pre_statements;
-        pre_statements.push_back(
-             LangAPI::Variable {
-                 .name = "lexer",
-                 .type = LangAPI::Type {LangAPI::Symbol {"Lexer"}},
-             }
-         );
-        add_parse_wrapper("lazyParse", "lazy_iterator", {
-            LangAPI::Symbol::createExpression(LangAPI::Symbol {"lexer"}),
+        LangAPI::StorageSymbol ss {
+            LangAPI::Symbol::createExpression(LangAPI::Symbol {"lazy_lexer_"}), stdu::vector<LangAPI::StorageSymbol::PathPart> {LangAPI::FunctionCall {.name = std::make_shared<LangAPI::Symbol>("clearTokens")}}
+        };
+        pre_statements.push_back(LangAPI::StorageSymbol::createStatement(ss));
+        add_lazy_parse_wrapper("lazyParse", "lazy_iterator", {
+            LangAPI::Symbol::createExpression(LangAPI::Symbol {"lazy_lexer_"}),
             LangAPI::Symbol::createExpression(LangAPI::Symbol {"text"})
         }, pre_statements);
         holder.push(parser);

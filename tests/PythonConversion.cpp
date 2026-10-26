@@ -182,6 +182,7 @@ TEST(PythonConversion, ActionContextValidatesMetadataAndPreservesLocals) {
     EXPECT_NO_THROW(Parser::ParserBase::convertPythonAction(action("ctx.sync('}', ';')\nctx.insert()\n"), locals, true));
     EXPECT_NO_THROW(Parser::ParserBase::convertPythonAction(action("x = ctx.at(ID) or ctx.at(common.ID) or ctx.at('=')\n"), locals, true));
     EXPECT_NO_THROW(Parser::ParserBase::convertPythonAction(action("ctx.sync_tokens('NEWLINE', 'DEDENT')\nctx.insert()\n"), locals, true));
+    EXPECT_NO_THROW(Parser::ParserBase::convertPythonAction(action("ctx.sync_tokens(NEWLINE, DEDENT)\n"), locals, true));
     for (const auto* source : {"ctx.sync()\n", "ctx.sync('')\n", "ctx.sync(42)\n",
                                "ctx.sync_tokens()\n", "ctx.sync_tokens('')\n", "ctx.sync_tokens(42)\n"})
         EXPECT_THROW(Parser::ParserBase::convertPythonAction(action(source), locals, true), std::invalid_argument);
@@ -193,6 +194,25 @@ TEST(PythonConversion, ActionContextValidatesMetadataAndPreservesLocals) {
                                "return\n", "ctx.emit('bad-name')\n"})
         EXPECT_THROW(Parser::ParserBase::convertPythonAction(
             action(source), token_locals, false, {}, nullptr, "TOKEN"), std::invalid_argument);
+}
+
+TEST(PythonConversion, ActionContextCanReadAndConsumeLookaheadTokens) {
+    const auto action = [](const std::string& source) {
+        AST::PythonAction result;
+        result.code = UAST::parsePythonModule(source, position);
+        return result;
+    };
+    std::set<std::string> locals;
+    EXPECT_NO_THROW(Parser::ParserBase::convertPythonAction(
+        action("next_token = ctx.peek(1)\ntext = next_token.text\ncurrent = ctx.take()\n"), locals, true));
+    EXPECT_THROW(Parser::ParserBase::convertPythonAction(action("ctx.peek(1, 2)\n"), locals, true), std::invalid_argument);
+    EXPECT_THROW(Parser::ParserBase::convertPythonAction(action("ctx.take(1)\n"), locals, true), std::invalid_argument);
+    EXPECT_NO_THROW(Parser::ParserBase::convertPythonAction(action("previous = ctx.prev()\n"), locals, true));
+    EXPECT_THROW(Parser::ParserBase::convertPythonAction(action("ctx.prev(1)\n"), locals, true), std::invalid_argument);
+    EXPECT_NO_THROW(Parser::ParserBase::convertPythonAction(
+        action("same = previous.name == ID\nliteral = previous.name == 'id'\n"), locals, true));
+    locals.insert("ID");
+    EXPECT_NO_THROW(Parser::ParserBase::convertPythonAction(action("same = previous.name == ID\n"), locals, true));
 }
 
 TEST(PythonConversion, CollectionMethodsUsePortableIR) {

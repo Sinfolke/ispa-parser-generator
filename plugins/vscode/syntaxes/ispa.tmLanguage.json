@@ -1,0 +1,13 @@
+{
+  "name": "ISPA",
+  "scopeName": "source.ispa",
+  "patterns": [
+    {"name": "comment.line.double-slash.ispa", "match": "//.*$"},
+    {"name": "string.quoted.double.ispa", "begin": "\"", "end": "\"", "patterns": [{"name": "constant.character.escape.ispa", "match": "\\\\."}]},
+    {"name": "string.quoted.single.ispa", "begin": "'", "end": "'", "patterns": [{"name": "constant.character.escape.ispa", "match": "\\\\."}]},
+    {"name": "keyword.control.ispa", "match": "\\b(?:module|import|extern|as|from|detach|fail|disable|feature)\\b"},
+    {"name": "entity.name.function.ispa", "match": "^\\s*([A-Za-z_][A-Za-z_0-9]*)(?=\\s*(?:\\([^\\n;]*\\))?\\s*:)"},
+    {"name": "variable.other.ispa", "match": "@[A-Za-z_][A-Za-z_0-9]*"},
+    {"name": "constant.numeric.ispa", "match": "\\b[0-9]+\\b"}
+  ]
+}

@@ -13,6 +13,7 @@ dependencies = ["PyYAML>=6,<7"]
 ispa-pkg = "ispa_pkg.cli:main"
 ispadbg = "ispa_pkg.debugger:main"
 ispadbg-gui = "ispa_pkg.debugger_gui:main"
+ispa-lsp = "ispa_pkg.lsp:main"
 
 [tool.setuptools.packages.find]
 where = ["cli/pkg"]

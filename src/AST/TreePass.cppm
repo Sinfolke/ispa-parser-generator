@@ -66,6 +66,7 @@ export namespace AST {
         void removeEmptyRule();
         void inlineSingleGroups();
         void literalsToToken();
+        void lowerParserNegations();
         void sortByPriority();
         void addSpaceToken();
         void work() {
@@ -73,6 +74,7 @@ export namespace AST {
             inlineSingleGroups();
             // sortByPriority();
             literalsToToken();
+            lowerParserNegations();
             addSpaceToken();
         }
     };

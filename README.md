@@ -42,6 +42,10 @@ The backends lower grammar structure and AST captures to C++ or Python. Support 
 
 ## Debugging generated parsers
 
+For `.isc` editor diagnostics and navigation, see the [ISPA language server](docs/LSP.md),
+the [VS Code extension](plugins/vscode/README.md), and the
+[JetBrains plugin](plugins/jebtrains/README.md).
+
 Generate and build a parser with the current generator, then run its existing
 executable under `ispadbg`:
 

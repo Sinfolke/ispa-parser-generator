@@ -11423,6 +11423,7 @@ namespace PyRawParser {
 } // namespace PyRawParser
 namespace PyRawParser {
 	class Parser : public ::ISPA_STD::LLParser<Types::main, Token> {
+		Lexer lazy_lexer_;
 	protected:
 		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::PyRawParser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::PyRawParser::Lexer::lazy_iterator>>> auto shift_tail(IT pos) -> ::ISPA_STD::MatchResult<Types::shift_tail, IT>;
 		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::PyRawParser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::PyRawParser::Lexer::lazy_iterator>>> auto nonlocal_stmt(IT pos) -> ::ISPA_STD::MatchResult<Types::nonlocal_stmt, IT>;
@@ -11541,7 +11542,7 @@ namespace PyRawParser {
 		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::PyRawParser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::PyRawParser::Lexer::lazy_iterator>>> auto ispa_match_stmt(IT pos) -> ::ISPA_STD::MatchResult<Types::ispa_match_stmt, IT>;
 	public:
 		auto parseFromTokens() -> void override;
-		auto lazyParse() -> void override;
+		auto lazyParse() -> ISPA_STD::MatchResult<Types::main, ISPA_STD::Lexer_base<Token>::lazy_iterator> override;
 		constexpr auto members() {
 			return std::tie();
 		}

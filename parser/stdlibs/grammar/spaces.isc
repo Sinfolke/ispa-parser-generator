@@ -1,0 +1,108 @@
+module spaces -> __WS;
+
+__WS:
+    @ [ \t\n\r\f\v]+
+    {@}
+;
+/*
+    Small compiler-level hacks since there is no way to extern a token right now
+*/
+INDENT: '';
+DEDENT: '';
+// Python, yaml and other languages indentation
+NEWLINE<space> {
+    match '\n' ('\n' | '\r' '\n')* space*;
+    ctx.shared.indents: list[int]
+    ctx.shared.bracket_depth: int
+    width = 0
+    i = 0
+    if ctx.shared.bracket_depth > 0:
+        ctx.skip()
+    else:
+        if ctx.next_char != '#':
+            if ctx.shared.indents.size() == 0:
+                ctx.shared.indents.append(0)
+            while i < ctx.text.size():
+                if ctx.text.substr(i, 1) == '\n':
+                    width = 0
+                if ctx.text.substr(i, 1) == ' ':
+                    width += 1
+                if ctx.text.substr(i, 1) == '\t':
+                    width = (width / 8 + 1) * 8
+                i += 1
+            if width > ctx.shared.indents[ctx.shared.indents.size() - 1]:
+                ctx.shared.indents.append(width)
+                ctx.emit('INDENT')
+            else:
+                while width < ctx.shared.indents[ctx.shared.indents.size() - 1] and ctx.shared.indents.size() > 1:
+                    ctx.shared.indents.pop()
+                    ctx.emit('DEDENT')
+                if width != ctx.shared.indents[ctx.shared.indents.size() - 1]:
+                    ctx.error('invalid dedent')
+}
+END_INPUT {
+    match '';
+    ctx.shared.indents: list[int]
+    ctx.shared.eof_newline_emitted: bool
+    prefix = ctx.line_prefix
+    has_code = False
+    i = 0
+    while i < prefix.size():
+        if prefix.substr(i, 1) == '#':
+            break
+        if prefix.substr(i, 1) != ' ' and prefix.substr(i, 1) != '\t' and prefix.substr(i, 1) != '\f':
+            has_code = True
+        i += 1
+    if has_code and not ctx.shared.eof_newline_emitted:
+        ctx.emit('NEWLINE')
+    while ctx.shared.indents.size() > 1:
+        ctx.shared.indents.pop()
+        ctx.emit('DEDENT')
+}
+/*
+    Must be without a newline on the end
+*/
+INDENT_COMMENT<COMMENT_BODY> {
+    match COMMENT_BODY '\n'? [ \t]*;
+    ctx.shared.indents: list[int]
+    ctx.shared.bracket_depth: int
+    ctx.shared.eof_newline_emitted: bool
+    prefix = ctx.line_prefix
+    has_code_before = False
+    has_newline = False
+    width = 0
+    i = 0
+
+    while i < prefix.size():
+        if prefix.substr(i, 1) != ' ' and prefix.substr(i, 1) != '\t' and prefix.substr(i, 1) != '\f':
+            has_code_before = True
+        i += 1
+    i = 0
+    while i < ctx.text.size():
+        if ctx.text.substr(i, 1) == '\n':
+            has_newline = True
+            width = 0
+        if has_newline and ctx.text.substr(i, 1) == ' ':
+            width += 1
+        if has_newline and ctx.text.substr(i, 1) == '\t':
+            width = (width / 8 + 1) * 8
+        i += 1
+    ctx.skip()
+
+    if has_code_before and ctx.shared.bracket_depth == 0 and (has_newline or ctx.next_char == ''):
+        ctx.emit('NEWLINE')
+        if not has_newline:
+            ctx.shared.eof_newline_emitted = True
+    if has_newline and ctx.shared.bracket_depth == 0 and ctx.next_char != '#':
+        if ctx.shared.indents.size() == 0:
+            ctx.shared.indents.append(0)
+        if width > ctx.shared.indents[ctx.shared.indents.size() - 1]:
+            ctx.shared.indents.append(width)
+            ctx.emit('INDENT')
+        else:
+            while width < ctx.shared.indents[ctx.shared.indents.size() - 1] and ctx.shared.indents.size() > 1:
+                ctx.shared.indents.pop()
+                ctx.emit('DEDENT')
+            if width != ctx.shared.indents[ctx.shared.indents.size() - 1]:
+                ctx.error('invalid dedent')
+}

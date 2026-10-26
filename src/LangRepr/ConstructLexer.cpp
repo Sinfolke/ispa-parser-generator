@@ -60,6 +60,98 @@ import std;
 // -----------------------------------------------------------------------
 namespace {
 
+    struct LexerFailureCall {
+        const AST::FailBlock* block = nullptr;
+        stdu::vector<std::string> arguments;
+        bool operator==(const LexerFailureCall&) const = default;
+    };
+    struct LexerFailureSite {
+        stdu::vector<std::string> token_name;
+        stdu::vector<LexerFailureCall> calls;
+        bool operator==(const LexerFailureSite&) const = default;
+    };
+
+    std::optional<LexerFailureSite> resolveLexerFailure(const AST::Tree& tree,
+                                                        const stdu::vector<std::string>& token_name,
+                                                        const AST::RuleMember* member = nullptr) {
+        const auto rule = tree.getTreeMap().find(token_name);
+        if (rule == tree.getTreeMap().end()) return std::nullopt;
+        stdu::vector<std::pair<stdu::vector<std::string>, stdu::vector<std::string>>> handlers;
+        bool marked = false;
+        if (member) for (const auto& feature : member->features)
+            if (const auto* marker = std::get_if<AST::FailMarker>(&feature)) {
+                marked = true;
+                if (!marker->name.empty()) handlers.emplace_back(marker->name, marker->parameters);
+                break;
+            }
+        if (handlers.empty()) for (const auto& feature : rule->second.features)
+            if (const auto* binding = std::get_if<AST::FailBinding>(&feature);
+                binding && !binding->names.empty()) {
+                for (const auto& name : binding->names) handlers.push_back({{name}, {}});
+                break;
+            }
+        if (marked && handlers.empty())
+            throw Error("Fail marker in {} has no bound fail block", token_name);
+        if (handlers.empty()) return std::nullopt;
+        LexerFailureSite site{token_name, {}};
+        for (const auto& [handler, arguments] : handlers) {
+            const AST::FailBlock* resolved = nullptr;
+            for (std::size_t size = token_name.size();; --size) {
+                stdu::vector<std::string> candidate(token_name.begin(), token_name.begin() + size);
+                candidate.insert(candidate.end(), handler.begin(), handler.end());
+                for (const auto& block : tree.getFailBlocks())
+                    if (block.name == candidate) { resolved = &block; break; }
+                if (resolved || size == 0) break;
+            }
+            if (!resolved && !arguments.empty())
+                throw Error("Unknown parameterized lexer fail block {} in {}", handler, token_name);
+            if (!resolved) { site.calls.push_back({nullptr, {}}); continue; }
+            if (resolved->parameters.size() != arguments.size())
+                throw Error("Lexer fail block {} expects {} arguments, got {}", handler,
+                            resolved->parameters.size(), arguments.size());
+            site.calls.push_back({resolved, arguments});
+        }
+        return site;
+    }
+
+    stdu::vector<LexerFailureSite> lexerFailureSites(const AST::Tree& tree) {
+        stdu::vector<LexerFailureSite> selected;
+        const auto add = [&](std::optional<LexerFailureSite> site) {
+            if (site && std::ranges::find(selected, *site) == selected.end()) selected.push_back(*site);
+        };
+        const auto visit = [&](auto&& self, const AST::RuleMember& member,
+                               const stdu::vector<std::string>& token_name) -> void {
+            if (std::ranges::any_of(member.features, [](const auto& feature) {
+                return std::holds_alternative<AST::FailMarker>(feature);
+            })) add(resolveLexerFailure(tree, token_name, &member));
+            if (member.isGroup()) for (const auto& child : member.getGroup().values) self(self, *child, token_name);
+            if (member.isOp()) for (const auto& child : member.getOp().options) self(self, *child, token_name);
+        };
+        for (const auto& [name, rule] : tree.getTreeMap()) {
+            if (name.empty() || !AST::RuleMemberName{.name = name}.isTerminal()) continue;
+            add(resolveLexerFailure(tree, name));
+            for (const auto& member : rule.rule_members) visit(visit, *member, name);
+        }
+        return selected;
+    }
+
+    std::size_t failureAt(const AST::Tree& tree,
+                          const DFA::State<DFA::ClassTransitions>& state,
+                          const stdu::vector<LexerFailureSite>& sites) {
+        std::size_t chosen = NFA::NULL_STATE;
+        for (const auto& origin : state.debug) {
+            const auto site = resolveLexerFailure(tree, origin.token_name, &origin.member);
+            if (!site) continue;
+            const auto found = std::ranges::find(sites, *site);
+            if (found == sites.end()) continue;
+            const auto index = static_cast<std::size_t>(found - sites.begin());
+            if (chosen != NFA::NULL_STATE && chosen != index) return sites.size();
+            chosen = index;
+        }
+        if (chosen != NFA::NULL_STATE) return chosen;
+        return sites.size() == 1 ? 0 : sites.size();
+    }
+
     std::set<std::string> pythonClasses(const LangAPI::Declarations& declarations, const std::string& prefix = "") {
         std::set<std::string> names;
         for (const auto& declaration : declarations) {
@@ -241,9 +333,17 @@ namespace LangRepr {
 
         stdu::vector<LangAPI::Expression> rows;
         rows.reserve(state_count);
+        const auto failures = lexerFailureSites(tree);
         for (const auto &state : states) {
             stdu::vector<LangAPI::Expression> row;
             row.reserve(class_count);
+            const auto failure_index = failures.empty() ? NFA::NULL_STATE : failureAt(tree, state, failures);
+            const auto dead_transition = [&]() -> LangAPI::RValue {
+                if (failure_index == NFA::NULL_STATE)
+                    return LangAPI::IspaLibSymbol{.exports = LangAPI::StdlibExports::DfaNullState};
+                return LangAPI::Int{.value = static_cast<long long>(state_count +
+                    lexer_builder.getActionTable().size() + lexer_builder.getSemanticTable().size() + failure_index)};
+            };
 
             for (std::size_t cls = 0; cls < class_count; ++cls) {
                 LangAPI::RValue encoded;
@@ -252,7 +352,7 @@ namespace LangRepr {
                     const auto &t = state.transitions[cls];
                     if (std::holds_alternative<NFA::TNFA::DFATarget>(t)) {
                         if (std::get<NFA::TNFA::DFATarget>(t).id == NFA::NULL_STATE) {
-                            encoded = LangAPI::RValue {LangAPI::IspaLibSymbol {.exports = LangAPI::StdlibExports::DfaNullState}};
+                            encoded = dead_transition();
                         } else {
                             encoded = LangAPI::Int::createRValue(LangAPI::Int {.value = static_cast<long long>(std::get<NFA::TNFA::DFATarget>(t).id)});
                         }
@@ -281,6 +381,8 @@ namespace LangRepr {
                     } else {
                         throw Error("Unknown table type {}", t.index());
                     }
+                } else {
+                    encoded = dead_transition();
                 }
                 row.push_back(LangAPI::Int::createExpression(encoded));
             }
@@ -408,6 +510,17 @@ namespace LangRepr {
             if (auto found = tree.getTreeMap().find(token_name); found != tree.getTreeMap().end()) {
                 std::set<std::string> locals;
                 std::set<std::string> objects;
+                const auto collect_variable_captures = [&](auto&& self, const AST::RuleMember& member) -> void {
+                    for (const auto& feature : member.features)
+                        if (const auto* capture = std::get_if<AST::VariableCapture>(&feature))
+                            locals.insert(capture->name);
+                    if (member.isGroup())
+                        for (const auto& child : member.getGroup().values) self(self, *child);
+                    if (member.isOp())
+                        for (const auto& child : member.getOp().options) self(self, *child);
+                };
+                for (const auto& member : found->second.rule_members)
+                    collect_variable_captures(collect_variable_captures, *member);
                 if (auto bindings = parameter_bindings.find(token_name); bindings != parameter_bindings.end())
                     for (const auto& binding : bindings->second) {
                         locals.insert(binding.name);
@@ -478,6 +591,71 @@ namespace LangRepr {
                 }}
             )}));
             semantic_table_statements.push_back(std::move(statements));
+        }
+        const auto lexer_failures = lexerFailureSites(tree);
+        for (const auto& site : lexer_failures) {
+            LangAPI::Statements failure;
+            auto current = LangAPI::Symbol::createExpression(LangAPI::Symbol{"start"});
+            current.emplace_back(LangAPI::ExpressionElement::Add);
+            const auto offset = LangAPI::Symbol::createExpression(LangAPI::Symbol{"length"});
+            current.insert(current.end(), offset.begin(), offset.end());
+            failure.push_back(LangAPI::Variable::createStatement(LangAPI::Variable{
+                .name = "ctx", .type = LangAPI::ValueType::Undef,
+                .value = LangAPI::FunctionCall::createExpression(LangAPI::FunctionCall{
+                    .name = std::make_shared<LangAPI::Symbol>("lexer_failure_context"),
+                    .args = {current,
+                        LangAPI::String::createExpression(LangAPI::String{.value = corelib::text::join(site.token_name, ".")}),
+                        LangAPI::String::createExpression(LangAPI::String{.value = corelib::text::join(site.token_name, ".")})}})}));
+            const auto classes = pythonClasses(tree.getPythonDeclarations());
+            for (const auto& call : site.calls) {
+                if (!call.block) continue;
+                std::set<std::string> locals, objects;
+                for (std::size_t i = 0; i < call.arguments.size(); ++i) {
+                    const auto bindings = parameter_bindings.find(site.token_name);
+                    if (bindings == parameter_bindings.end())
+                        throw Error("Unknown lexer fail argument {} in {}", call.arguments[i], site.token_name);
+                    const auto binding = std::ranges::find_if(bindings->second, [&](const auto& value) {
+                        return value.name == call.arguments[i];
+                    });
+                    if (binding == bindings->second.end())
+                        throw Error("Unknown lexer fail argument {} in {}", call.arguments[i], site.token_name);
+                    failure.push_back(LangAPI::Variable::createStatement(LangAPI::Variable{
+                        .name = "ispa_action_" + call.block->parameters[i], .type = binding->field.type,
+                        .value = LangAPI::Symbol::createExpression(LangAPI::Symbol{binding->field.name})}));
+                    locals.insert(call.block->parameters[i]);
+                }
+                auto code = Parser::ParserBase::convertPythonAction(call.block->action, locals, true, classes, &objects,
+                    corelib::text::join(site.token_name, "."));
+                failure.insert(failure.end(), code.begin(), code.end());
+            }
+            LangAPI::Symbol node_type{site.token_name};
+            node_type.path.insert(node_type.path.begin(), "Types");
+            LangAPI::Symbol token_id{site.token_name};
+            token_id.path.insert(token_id.path.begin(), "Tokens");
+            token_id.path.emplace_back("id");
+            auto inserted = LangAPI::IspaLibFunctionCall::createExpression(LangAPI::IspaLibFunctionCall{
+                .symbol = LangAPI::IspaLibSymbol{
+                    .exports = LangAPI::StdlibExports::RawTokenNodeConstruct,
+                    .template_parameters = {std::make_shared<LangAPI::Type>(node_type)}},
+                .args = {LangAPI::Symbol::createExpression(LangAPI::Symbol{"start_pos"}),
+                    LangAPI::Symbol::createExpression(LangAPI::Symbol{"start"}),
+                    LangAPI::Symbol::createExpression(LangAPI::Symbol{"length"}),
+                    LangAPI::Symbol::createExpression(LangAPI::Symbol{"line"}),
+                    LangAPI::Symbol::createExpression(token_id),
+                    LangAPI::Inheritance::createExpression(LangAPI::Inheritance{.name = node_type})}});
+            failure.push_back(LangAPI::Return::createStatement(LangAPI::Return{
+                .value = LangAPI::FunctionCall::createExpression(LangAPI::FunctionCall{
+                    .name = std::make_shared<LangAPI::Symbol>("lexer_failure_result"),
+                    .args = {LangAPI::Symbol::createExpression(LangAPI::Symbol{"ctx"}), inserted}})}));
+            semantic_table_statements.push_back(std::move(failure));
+        }
+        if (!lexer_failures.empty()) {
+            LangAPI::Statements failure;
+            failure.push_back(LangAPI::Expression::createStatement(
+                LangAPI::FunctionCall::createExpression(LangAPI::FunctionCall{
+                    .name = std::make_shared<LangAPI::Symbol>("ispa_token_error"),
+                    .args = {LangAPI::String::createExpression(LangAPI::String{.value = "unmatched lexer input"})}})));
+            semantic_table_statements.push_back(std::move(failure));
         }
         LangAPI::Function fun {
             .type = LangAPI::Type {LangAPI::ValueType::Tuple, LangAPI::Type {LangAPI::ValueType::Int}, LangAPI::Type {LangAPI::Symbol {"Token"}}},

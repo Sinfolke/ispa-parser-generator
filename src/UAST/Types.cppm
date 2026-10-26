@@ -101,6 +101,7 @@ using rule_params = ::Parser::Types::modules::common::rule_params;
 using rule_ast_full = ::Parser::Types::modules::rule::regular::ast::full;
 using rule_value_counter = ::Parser::Types::modules::rule::regular::value::counter;
 using rule_value_dyn = ::Parser::Types::modules::rule::regular::value::dyn;
+using rule_value_not_a = ::Parser::Types::modules::rule::regular::value::not_a;
 using advanced_rule = ::Parser::Types::modules::rule::advanced::advanced_rule;
 using rule_name = ::Parser::Types::modules::common::name<Parser::Types::modules::common::rule_params>;
 using call_name = ::Parser::Types::modules::common::name<Parser::Types::modules::common::call_params>;

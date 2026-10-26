@@ -223,7 +223,7 @@ namespace NFA::TNFA {
     }
     auto TNFABuilder::wireAny(std::size_t current_state, const TokenID &source) -> std::size_t {
         const std::size_t next = allocStateIn(states);
-        for (int c = 0; c < ALPHABET_SIZE; ++c) {
+        for (int c = 1; c < ALPHABET_SIZE; ++c) {
             states[current_state].transitions[c].emplace_back(
                 TransitionValue{
                     .next = next,
@@ -260,7 +260,9 @@ namespace NFA::TNFA {
         }
 
         const std::size_t next = allocStateIn(states);
-        for (int c = 0; c < ALPHABET_SIZE; ++c) {
+        // NUL marks end of input and must never be consumed by a negated set.
+        chars_to_wire[0] = false;
+        for (int c = 1; c < ALPHABET_SIZE; ++c) {
             if (chars_to_wire[c]) {
                 states[current_state].transitions[(char) c].emplace_back(
                     TransitionValue{
@@ -796,7 +798,8 @@ namespace NFA::TNFA {
         const auto collect_fields = [&]() {
             std::vector<const TokenID *> fields;
             for (const auto &[sym, _] : token.transitions) {
-                if (sym.token_name != type_name || sym.member.empty() || !own_capture(sym))
+                if (sym.token_name != type_name || sym.member.empty() ||
+                    !own_capture(sym) || own_capture(sym)->member.prefix.empty())
                     continue;
                 fields.push_back(&sym);
             }
@@ -987,6 +990,26 @@ namespace NFA::TNFA {
             state.instance_value = LangAPI::Inheritance{
                 .name = LangAPI::Symbol{type_name}
             };
+        }
+
+        // Variable captures are action locals, independent of AST fields.
+        if (!nested) {
+            std::set<std::string> declared;
+            for (const auto &[sym, _] : token.transitions) {
+                if (sym.token_name != type_name || sym.member.empty()) continue;
+                for (const auto *cap : sym.capture) {
+                    if (cap->token_name != type_name) continue;
+                    for (const auto& feature : cap->member.features) {
+                        const auto *variable = std::get_if<AST::VariableCapture>(&feature);
+                        if (!variable || !declared.insert(variable->name).second) continue;
+                        state.statements.push_back(LangAPI::Variable::createStatement(LangAPI::Variable{
+                            .name = "ispa_action_" + variable->name,
+                            .type = LangAPI::ValueType::String,
+                            .value = capture_call("text", captureId(*cap)),
+                        }));
+                    }
+                }
+            }
         }
 
         // Preserve the existing semantic ABI.

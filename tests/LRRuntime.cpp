@@ -17,7 +17,7 @@ struct Iter {
 };
 struct Parser : ISPA_STD::LRParser<Root, Token> {
     void parseFromTokens() override {}
-    void lazyParse() override {}
+    auto lazyParse() -> ISPA_STD::MatchResult<Root, ISPA_STD::Lexer_base<Token>::lazy_iterator> override { return {}; }
     static std::size_t lr_k() { return 2; }
     static long long lr_action(std::size_t s, const std::vector<std::size_t>& w) {
         const auto eof = std::numeric_limits<std::size_t>::max();

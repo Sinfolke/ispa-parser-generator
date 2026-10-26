@@ -12151,9 +12151,9 @@ template auto PyRawParser::Parser::ispa_match_stmt<::PyRawParser::Lexer::lazy_it
 auto PyRawParser::Parser::parseFromTokens() -> void {
 	tree = main(Lexer::iterator(lexer)).node.data();
 }
-auto PyRawParser::Parser::lazyParse() -> void {
-	Lexer lexer;
-	tree = main(Lexer::lazy_iterator(lexer, text)).node.data();
+auto PyRawParser::Parser::lazyParse() -> ISPA_STD::MatchResult<Types::main, ISPA_STD::Lexer_base<Token>::lazy_iterator> {
+	lazy_lexer_.clearTokens();
+	return main(Lexer::lazy_iterator(lazy_lexer_, text));
 }
 
 #include "PyRawParser.h"

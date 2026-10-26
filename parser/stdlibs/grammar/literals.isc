@@ -1,24 +1,24 @@
 module std.literals;
 
-NUMBER:
+SIMPLE_NUMBER:
     @ [0-9]+ ('.' @ % [0-9]+)?
 
     @{full, dec}
-    %{NUMBER_no_prevision_after_dot}
+    %{no_prevision_after_dot}
 ;
 #[inline]
 STRING<quote>:
-    &q quote @ ( '\\' @ [*] | !(${q} | [\n\r]) )* % ${q}
+    &q quote @ ( '\\' @ [*] | !($q | [\n\r]) )* % $q
     {@}
-    %{STRING_inclosed_quote}
+    %{inclosed_quote}
 ;
 #[inline]
 ID:
-    @ [a-zA-Z_] @ [a-zA-Z0-9_]*
+    @ ([a-zA-Z_] [a-zA-Z0-9_]*)
     {@}
 ;
 
-fail NUMBER_no_prevision_after_dot {
+fail SIMPLE_NUMBER.no_prevision_after_dot {
     if ctx.at(','):
         ctx.error("There should not be comma after '.'")
         ctx.delete()
@@ -26,9 +26,9 @@ fail NUMBER_no_prevision_after_dot {
         ctx.error("Dublicate dot")
         ctx.delete()
 }
-fail STRING_inclosed_quote {
-    ctx.pos = ctx.start;
-    while(!ctx.at(' ') and !ctx.at('\t') and !ctx.at('\r')):
+fail STRING.inclosed_quote {
+    ctx.pos = ctx.start_pos
+    while not ctx.at(' ') and not ctx.at('\t') and not ctx.at('\r'):
         ctx.pos += 1
     ctx.error("Incloded quote")
     ctx.insert()

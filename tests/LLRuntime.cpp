@@ -15,6 +15,7 @@ struct Iter {
     const Token& operator*() const { return tokens[index]; }
     const Token* operator->() const { return &tokens[index]; }
     Iter& operator++() { ++index; return *this; }
+    Iter& operator--() { if (index) --index; return *this; }
 };
 struct Parser : ISPA_STD::LLParser<Leaf, Token> {
     using LLParser::optional;
@@ -26,7 +27,7 @@ struct Parser : ISPA_STD::LLParser<Leaf, Token> {
     using LLParser::bind_counter;
     int failures = 0;
     void parseFromTokens() override {}
-    void lazyParse() override {}
+    auto lazyParse() -> ISPA_STD::MatchResult<Leaf, ISPA_STD::Lexer_base<Token>::lazy_iterator> override { return {true, {}, {}}; }
     auto leaf(Iter pos) -> ISPA_STD::MatchResult<Leaf, Iter> {
         auto node = required<Leaf>(pos, [this](Iter&) { ++failures; });
         return {true, node, pos};
@@ -43,7 +44,7 @@ struct Parser : ISPA_STD::LLParser<Leaf, Token> {
 
 struct RecoveryParser : Parser {
     const Token* input = nullptr;
-    void lazyParse() override {
+    auto lazyParse() -> ISPA_STD::MatchResult<Leaf, ISPA_STD::Lexer_base<Token>::lazy_iterator> override {
         Iter pos{input};
         required<Leaf>(pos, [](Iter& cursor, ISPA_STD::Recovery::State& state) {
             const ISPA_STD::Recovery::Plan plan{
@@ -54,6 +55,7 @@ struct RecoveryParser : Parser {
                 return token.holds<Leaf>() ? 1u : 2u;
             });
         });
+        return {true, {}, {}};
     }
     void run(const Token* tokens) {
         input = tokens;
@@ -65,6 +67,7 @@ struct RecoveryParser : Parser {
 };
 
 struct AnchorParser : Parser {
+    using LLParser::rule_context;
     using LLParser::recovery_frame;
     using LLParser::recovery_at;
     using LLParser::recovery_state_;
@@ -72,6 +75,42 @@ struct AnchorParser : Parser {
     using LLParser::required_rule_recovering;
     using LLParser::custom_failure;
 };
+
+TEST(LLRuntime, ActionLookaheadReturnsOwnedTokenAndRestoresWithinRule) {
+    const char source[] = "ab";
+    const Token tokens[]{
+        Token{{0, source, source + 1, 1, 1, 1, 1}, Leaf{}},
+        Token{{1, source + 1, source + 2, 1, 1, 2, 2}, Other{}},
+        Token{}
+    };
+    Iter pos{tokens};
+    AnchorParser parser;
+    Leaf ast;
+    auto ctx = parser.rule_context(pos, ast, pos, "item",
+        +[](std::size_t kind) -> const char* { return kind == 1 ? "A" : "B"; });
+    const auto ahead = ctx.peek(1);
+    EXPECT_EQ(ahead.text, "b");
+    EXPECT_EQ(ahead.name, "B");
+    EXPECT_EQ(ahead.offset, 1u);
+    EXPECT_TRUE(ahead.raw.holds<Other>());
+    EXPECT_EQ(pos.index, 0u);
+    ctx.mark("choice");
+    const auto first = ctx.take();
+    EXPECT_EQ(first.text, "a");
+    EXPECT_EQ(pos.index, 1u);
+    const auto previous = ctx.prev();
+    EXPECT_EQ(previous.text, "a");
+    EXPECT_EQ(pos.index, 0u);
+    EXPECT_TRUE(ctx.prev().empty());
+    EXPECT_EQ(pos.index, 0u);
+    ctx.take();
+    ctx.restore("choice");
+    EXPECT_EQ(pos.index, 0u);
+    EXPECT_EQ(first.text, "a");
+    ctx.commit("choice");
+    EXPECT_TRUE(ctx.peek(2).empty());
+    EXPECT_THROW(ctx.peek(65), std::out_of_range);
+}
 struct HandoffLexer : ISPA_STD::Lexer_base<Token> {
     std::size_t scanned = 0;
     Token makeToken(const char*& p) override {
@@ -96,6 +135,22 @@ struct ExternalLeaf {
         return {true, ISPA_STD::external_node(origin, start, end, std::move(node)), end};
     }
 };
+}
+
+TEST(LLRuntime, LazyFailContextPrevRewindsOneTokenWithinRule) {
+    HandoffLexer lexer;
+    const char* source = "ab";
+    HandoffLexer::lazy_iterator pos(lexer, source);
+    AnchorParser parser;
+    Leaf ast;
+    const auto start = pos;
+    ++pos;
+    auto ctx = parser.fail_context(pos, ast, start, "item", "B",
+        +[](std::size_t kind) -> const char* { return kind == 1 ? "A" : "B"; });
+    EXPECT_EQ(ctx.prev().text, "a");
+    EXPECT_EQ(pos.distance(), start.distance());
+    EXPECT_TRUE(ctx.prev().empty());
+    EXPECT_EQ(pos.distance(), start.distance());
 }
 
 TEST(LLRuntime, PanicRetriesExpectedTerminalBeyondOneTokenLookahead) {
@@ -369,13 +424,27 @@ TEST(LLRuntime, FailContextMatchesTokenNamesAndLiteralSpellings) {
     auto ctx = parser.fail_context(pos, ast, pos, "owner", "expected",
         +[](std::size_t) -> const char* { return "modules.common.ID"; });
     EXPECT_TRUE(ctx.at("abc"));
-    EXPECT_TRUE(ctx.at("ID"));
-    EXPECT_TRUE(ctx.at("common.ID"));
-    EXPECT_TRUE(ctx.at("modules::common::ID"));
+    EXPECT_TRUE(ctx.at_token("ID"));
+    EXPECT_TRUE(ctx.at_token("common.ID"));
+    EXPECT_TRUE(ctx.at_token("modules::common::ID"));
+    EXPECT_FALSE(ctx.at("ID"));
     EXPECT_FALSE(ctx.at("OTHER"));
     EXPECT_FALSE(ctx.at("D"));
-    ++pos;
+    EXPECT_EQ(ctx.peek().text, "abc");
+    EXPECT_TRUE(ctx.peek().matches_name("ID"));
+    EXPECT_TRUE(ctx.peek().matches_name("common.ID"));
+    EXPECT_FALSE(ctx.peek().matches_name("D"));
+    ctx.mark("retry");
+    EXPECT_EQ(ctx.take().name, "modules.common.ID");
     EXPECT_FALSE(ctx.at("ID"));
+    EXPECT_EQ(ctx.prev().text, "abc");
+    EXPECT_TRUE(ctx.prev().empty());
+    EXPECT_TRUE(ctx.at_token("ID"));
+    ctx.restore("retry");
+    ctx.commit("retry");
+    EXPECT_TRUE(ctx.at_token("ID"));
+    ++pos;
+    EXPECT_FALSE(ctx.at_token("ID"));
 }
 
 TEST(LLRuntime, FailSyncSkipsPythonContainersStringsAndCommentsWithoutLexing) {
@@ -441,7 +510,7 @@ TEST(LLRuntime, FailSyncTokensPreservesBoundaryAndStopsAtEof) {
         auto ctx = parser.fail_context(pos, ast, pos, "owner", "expression",
             +[](std::size_t id) -> const char* { return id == 2 ? "python.DEDENT" : "python.ID"; });
         ctx.error("missing expression");
-        if (named) ctx.sync_tokens("NEWLINE", "DEDENT");
+        if (named) ctx.sync_tokens(ctx.token_boundary("NEWLINE"), ctx.token_boundary("DEDENT"));
         else ctx.sync_tokens(";");
         EXPECT_EQ(pos.index, 2u);
         ctx.insert();

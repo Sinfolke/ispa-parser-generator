@@ -51,7 +51,8 @@ value:
         {@}
     ;
     #pattern:
-        @ name<call_params> | group | dyn | STRING | CGROUP | ANY | SPACE | NOSPACE
+        @ name<call_params> | group | dyn | not_a | STRING | CGROUP | ANY | SPACE | NOSPACE
+
         {@}
     ;
     #one_capture:
@@ -81,6 +82,10 @@ value:
     ;
     #NOSPACE:
         '\\s0'
+    ;
+    #not_a:
+        '!' @ (name<call_params> | group | dyn | STRING | CGROUP | ANY | SPACE | NOSPACE)
+        {@}
     ;
     #group:
         '(' @ value+ ')'

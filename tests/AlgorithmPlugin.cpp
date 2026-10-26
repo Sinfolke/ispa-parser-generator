@@ -237,6 +237,191 @@ int main() {
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
 }
 
+TEST(AlgorithmPlugin, LLTokenVariableCaptureFeedsAction) {
+    dlib library("libispa-algorithm-LL");
+    const auto* descriptor = library.load<Algorithm::EntryFn*>("ispa_algorithm_v1")();
+    auto tree = pluginGrammar(R"(
+WORD {
+    match &captured [a-z]+;
+    ctx.ast.text = captured
+}
+PAIR {
+    match &captured ('1' '2');
+    ctx.ast.text = captured
+}
+main: WORD | PAIR;
+)");
+    const auto directory = std::filesystem::temp_directory_path() /
+        ("ispa-lexer-capture-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    struct Cleanup {
+        std::filesystem::path path;
+        ~Cleanup() { std::filesystem::remove_all(path); }
+    } cleanup{directory};
+    Algorithm::Metadata metadata;
+    convert(*descriptor, tree, metadata, directory);
+    std::ofstream(directory / "run.cpp") << R"(
+#include "PluginTest.h"
+int main() {
+    PluginTest::Lexer lexer;
+    const char* pos = "hello";
+    lexer.setInput(pos);
+    const auto token = lexer.makeToken(pos).to_node<PluginTest::Types::WORD>();
+    if (token.data().text != "hello") return 1;
+    const char* pair = "12";
+    lexer.setInput(pair);
+    const auto grouped = lexer.makeToken(pair).to_node<PluginTest::Types::PAIR>();
+    return grouped.data().text == "12" ? 0 : 2;
+}
+)";
+    const auto command = std::string("clang++ -std=c++23 -I\"") + ROOT_DIR +
+        "/parser/stdlibs/target/cpp\" -I\"" + directory.string() + "\" \"" +
+        (directory / "PluginTest.cpp").string() + "\" \"" + (directory / "run.cpp").string() +
+        "\" \"" + ROOT_DIR + "/parser/stdlibs/target/cpp/src/core.cpp\" -o \"" +
+        (directory / "run").string() + "\"";
+    ASSERT_EQ(std::system(command.c_str()), 0);
+    EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
+}
+
+TEST(AlgorithmPlugin, LLLexerFailBlockHandlesDeadDfaTransition) {
+    dlib library("libispa-algorithm-LL");
+    const auto* descriptor = library.load<Algorithm::EntryFn*>("ispa_algorithm_v1")();
+    auto tree = pluginGrammar(R"(
+WORD: %invalid [a-z]+;
+main: WORD;
+fail invalid {
+    ctx.error("invalid character")
+}
+)");
+    const auto directory = std::filesystem::temp_directory_path() /
+        ("ispa-lexer-failure-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    struct Cleanup {
+        std::filesystem::path path;
+        ~Cleanup() { std::filesystem::remove_all(path); }
+    } cleanup{directory};
+    Algorithm::Metadata metadata;
+    convert(*descriptor, tree, metadata, directory);
+    std::ofstream(directory / "run.cpp") << R"(
+#include "PluginTest.h"
+#include <string>
+int main() {
+    PluginTest::Lexer lexer;
+    const char* pos = "?";
+    lexer.setInput(pos);
+    try { lexer.makeToken(pos); }
+    catch (const std::exception& error) {
+        return std::string(error.what()).find("invalid character") != std::string::npos ? 0 : 2;
+    }
+    return 1;
+}
+)";
+    const auto command = std::string("clang++ -std=c++23 -I\"") + ROOT_DIR +
+        "/parser/stdlibs/target/cpp\" -I\"" + directory.string() + "\" \"" +
+        (directory / "PluginTest.cpp").string() + "\" \"" + (directory / "run.cpp").string() +
+        "\" \"" + ROOT_DIR + "/parser/stdlibs/target/cpp/src/core.cpp\" -o \"" +
+        (directory / "run").string() + "\"";
+    ASSERT_EQ(std::system(command.c_str()), 0);
+    EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
+}
+
+TEST(AlgorithmPlugin, LLLexerRuleFailureBindingResolvesBareMarker) {
+    dlib library("libispa-algorithm-LL");
+    const auto* descriptor = library.load<Algorithm::EntryFn*>("ispa_algorithm_v1")();
+    auto tree = pluginGrammar(R"(
+WORD: % [a-z]+ %{invalid, another};
+main: WORD;
+fail invalid { ctx.error("bound lexer failure") }
+fail another { ctx.error("second lexer failure") }
+)");
+    Algorithm::Metadata metadata;
+    const auto generated = convert(*descriptor, tree, metadata);
+    EXPECT_NE(generated.find("bound lexer failure"), std::string::npos);
+    EXPECT_NE(generated.find("second lexer failure"), std::string::npos);
+    EXPECT_NE(generated.find("semantic_action_exec"), std::string::npos);
+}
+
+TEST(AlgorithmPlugin, LLLexerFailBlockReceivesTokenParameter) {
+    dlib library("libispa-algorithm-LL");
+    const auto* descriptor = library.load<Algorithm::EntryFn*>("ispa_algorithm_v1")();
+    auto tree = pluginGrammar(R"(
+WORD&(message: str): %invalid>(message) [a-z]+;
+main: WORD;
+fail invalid>(reason) { ctx.error(reason) }
+)");
+    const auto directory = std::filesystem::temp_directory_path() /
+        ("ispa-lexer-failure-param-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    struct Cleanup {
+        std::filesystem::path path;
+        ~Cleanup() { std::filesystem::remove_all(path); }
+    } cleanup{directory};
+    Algorithm::Metadata metadata;
+    convert(*descriptor, tree, metadata, directory);
+    std::ofstream(directory / "run.cpp") << R"(
+#include "PluginTest.h"
+#include <string>
+int main() {
+    PluginTest::Lexer lexer;
+    lexer.setWORDParameters("parameterized failure");
+    const char* pos = "?";
+    lexer.setInput(pos);
+    try { lexer.makeToken(pos); }
+    catch (const std::exception& error) {
+        return std::string(error.what()).find("parameterized failure") != std::string::npos ? 0 : 2;
+    }
+    return 1;
+}
+)";
+    const auto command = std::string("clang++ -std=c++23 -I\"") + ROOT_DIR +
+        "/parser/stdlibs/target/cpp\" -I\"" + directory.string() + "\" \"" +
+        (directory / "PluginTest.cpp").string() + "\" \"" + (directory / "run.cpp").string() +
+        "\" \"" + ROOT_DIR + "/parser/stdlibs/target/cpp/src/core.cpp\" -o \"" +
+        (directory / "run").string() + "\"";
+    ASSERT_EQ(std::system(command.c_str()), 0);
+    EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
+}
+
+TEST(AlgorithmPlugin, LLLexerFailBlockDeletesOrInserts) {
+    dlib library("libispa-algorithm-LL");
+    const auto* descriptor = library.load<Algorithm::EntryFn*>("ispa_algorithm_v1")();
+    auto tree = pluginGrammar(R"(
+TOKEN: 'a' %recover 'b';
+main: TOKEN;
+fail recover {
+    ctx.error("incomplete token")
+    if ctx.at('?'):
+        ctx.delete()
+    else:
+        ctx.insert()
+}
+)");
+    const auto directory = std::filesystem::temp_directory_path() /
+        ("ispa-lexer-recover-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    struct Cleanup {
+        std::filesystem::path path;
+        ~Cleanup() { std::filesystem::remove_all(path); }
+    } cleanup{directory};
+    Algorithm::Metadata metadata;
+    convert(*descriptor, tree, metadata, directory);
+    std::ofstream(directory / "run.cpp") << R"(
+#include "PluginTest.h"
+int main() {
+    PluginTest::Lexer inserted;
+    inserted.makeTokens("a");
+    if (inserted.getErrors().size() != 1 || inserted.getTokens().size() != 2) return 1;
+    PluginTest::Lexer deleted;
+    deleted.makeTokens("a?");
+    if (deleted.getErrors().size() != 1 || deleted.getTokens().size() != 1) return 2;
+    return 0;
+}
+)";
+    const auto command = std::string("clang++ -std=c++23 -I\"") + ROOT_DIR +
+        "/parser/stdlibs/target/cpp\" -I\"" + directory.string() + "\" \"" +
+        (directory / "PluginTest.cpp").string() + "\" \"" + (directory / "run.cpp").string() +
+        "\" \"" + ROOT_DIR + "/parser/stdlibs/target/cpp/src/core.cpp\" -o \"" +
+        (directory / "run").string() + "\"";
+    ASSERT_EQ(std::system(command.c_str()), 0);
+    EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
+}
+
 TEST(AlgorithmPlugin, LLAdvancedContextsExecuteAndReturnTheirAst) {
     dlib library("libispa-algorithm-LL");
     const auto* descriptor = library.load<Algorithm::EntryFn*>("ispa_algorithm_v1")();
@@ -264,7 +449,8 @@ fail oops>(previous) {
     ctx.ast.recovered = True
     ctx.ast.had_previous = not previous.empty()
     ctx.ast.named: bool = ctx.at(X)
-    ctx.ast.named_string: bool = ctx.at("X")
+    ctx.ast.named_string: bool = ctx.at("x")
+    ctx.ast.wrong_literal: bool = ctx.at("X")
     ctx.pos += 1
 }
 regular: @ A suffix @{token} %{missing};
@@ -272,6 +458,10 @@ suffix: B;
 fail missing {
     ctx.ast.saw_token = not ctx.ast.token.empty()
     ctx.ast.expected = ctx.failed_rule
+    prior = ctx.prev()
+    ctx.ast.prior_is_a: bool = prior.name == A
+    ctx.ast.prior_literal: bool = prior.name == "a"
+    ctx.take()
 }
 starts: @ start_failure {@};
 optional_rule: @ start_failure? {@};
@@ -312,7 +502,7 @@ int main() {
     if (good.total != 7 || good.first.empty() || !good.failed.empty()) return 1;
     const auto& repaired = parser.parse("axb").value.data();
     if (repaired.total != 7 || !repaired.recovered || !repaired.had_previous || repaired.failed != "B" || repaired.owner != "item") return 2;
-    if (!repaired.named || !repaired.named_string) return 8;
+    if (!repaired.named || !repaired.named_string || repaired.wrong_literal) return 8;
     const auto& again = parser.parse("ab").value.data();
     if (again.total != 7 || !again.failed.empty()) return 3;
     PluginTest::Lexer lexer;
@@ -321,7 +511,8 @@ int main() {
     if (parser.parse(lexer).value.data().total != 7) return 4;
     Harness harness;
     const auto partial = harness.parseRegular("a");
-    if (!partial.status || !partial.node.data().saw_token || partial.node.data().expected != "suffix") return 5;
+    if (!partial.status || !partial.node.data().saw_token || partial.node.data().expected != "suffix" ||
+        !partial.node.data().prior_is_a || !partial.node.data().prior_literal) return 5;
     const auto initial = harness.parseStarts("xa");
     if (!initial.status || !initial.node.data().value.data().recovered || !initial.node.data().value.data().finished) return 6;
     const auto absent = harness.parseOptional("b");
@@ -332,6 +523,94 @@ int main() {
         "/parser/stdlibs/target/cpp\" -I\"" + directory.string() + "\" \"" + (directory / "PluginTest.cpp").string() +
         "\" \"" + (directory / "run.cpp").string() + "\" \"" + ROOT_DIR +
         "/parser/stdlibs/target/cpp/src/core.cpp\" -o \"" + (directory / "run").string() + "\"";
+    ASSERT_EQ(std::system(command.c_str()), 0);
+    EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
+}
+
+TEST(AlgorithmPlugin, LLAdvancedLookaheadCanInspectThenRestoreTokens) {
+    dlib library("libispa-algorithm-LL");
+    const auto* descriptor = library.load<Algorithm::EntryFn*>("ispa_algorithm_v1")();
+    auto tree = pluginGrammar(R"(
+A: 'a'; B: 'b';
+main {
+    ctx.mark("start")
+    first = ctx.take()
+    second = ctx.peek()
+    ctx.ast.first: str = first.text
+    ctx.ast.second: str = second.text
+    ctx.ast.first_id: bool = first.name == A
+    ctx.ast.first_literal: bool = first.name == "a"
+    ctx.ast.first_wrong_literal: bool = first.name == "A"
+    ctx.restore("start")
+    ctx.commit("start")
+    ctx.ast.at_id: bool = ctx.at(A)
+    ctx.ast.at_literal: bool = ctx.at("a")
+    ctx.ast.at_wrong_literal: bool = ctx.at("A")
+    A = "a"
+    ctx.ast.local_literal: bool = ctx.at(A)
+    ctx.ast.local_name_equal: bool = first.name == A
+    match A;
+    match B;
+}
+
+)");
+    const auto directory = std::filesystem::temp_directory_path() /
+        ("ispa-action-lookahead-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    struct Cleanup { std::filesystem::path path; ~Cleanup() { std::filesystem::remove_all(path); } } cleanup{directory};
+    Algorithm::Metadata metadata;
+    convert(*descriptor, tree, metadata, directory);
+    std::ofstream(directory / "run.cpp") << R"(
+#include "PluginTest.h"
+int main() {
+    PluginTest::Parser parser;
+    const auto& value = parser.parse("ab");
+    return value.first == "a" && value.second == "b" && value.first_id &&
+        value.first_literal && !value.first_wrong_literal && value.at_id &&
+        value.at_literal && !value.at_wrong_literal && value.local_literal &&
+        !value.local_name_equal ? 0 : 1;
+}
+)";
+    const auto command = std::string("clang++ -std=c++23 -I\"") + ROOT_DIR +
+        "/parser/stdlibs/target/cpp\" -I\"" + directory.string() + "\" \"" +
+        (directory / "PluginTest.cpp").string() + "\" \"" + (directory / "run.cpp").string() +
+        "\" \"" + ROOT_DIR + "/parser/stdlibs/target/cpp/src/core.cpp\" -o \"" +
+        (directory / "run").string() + "\"";
+    ASSERT_EQ(std::system(command.c_str()), 0);
+    EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
+}
+
+TEST(AlgorithmPlugin, LLRegularFailBlockCanInspectPreviousToken) {
+    dlib library("libispa-algorithm-LL");
+    const auto* descriptor = library.load<Algorithm::EntryFn*>("ispa_algorithm_v1")();
+    auto tree = pluginGrammar(R"(
+A: 'a'; B: 'b';
+main: @ A B %{missing};
+fail missing {
+    prior = ctx.prev()
+    ctx.ast.prior_id: bool = prior.name == A
+    ctx.ast.prior_text: bool = prior.name == "a"
+    ctx.take()
+    ctx.insert()
+}
+)");
+    const auto directory = std::filesystem::temp_directory_path() /
+        ("ispa-regular-prev-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    struct Cleanup { std::filesystem::path path; ~Cleanup() { std::filesystem::remove_all(path); } } cleanup{directory};
+    Algorithm::Metadata metadata;
+    convert(*descriptor, tree, metadata, directory);
+    std::ofstream(directory / "run.cpp") << R"(
+#include "PluginTest.h"
+int main() {
+    PluginTest::Parser parser;
+    const auto& result = parser.parse("a");
+    return result.prior_id && result.prior_text ? 0 : 1;
+}
+)";
+    const auto command = std::string("clang++ -std=c++23 -I\"") + ROOT_DIR +
+        "/parser/stdlibs/target/cpp\" -I\"" + directory.string() + "\" \"" +
+        (directory / "PluginTest.cpp").string() + "\" \"" + (directory / "run.cpp").string() +
+        "\" \"" + ROOT_DIR + "/parser/stdlibs/target/cpp/src/core.cpp\" -o \"" +
+        (directory / "run").string() + "\"";
     ASSERT_EQ(std::system(command.c_str()), 0);
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
 }

@@ -367,6 +367,12 @@ AST::RuleMember AST::Builder::convertPattern(const Pattern& pattern) {
         else if constexpr (std::is_same_v<T, UAST::Node<UAST::rule_value_ANY>>) {
             output.value = AST::RuleMemberAny{};
         }
+        else if constexpr (std::is_same_v<T, UAST::Node<std::shared_ptr<UAST::rule_value_not_a>>>) {
+            UAST::rule_value_pattern operand;
+            std::visit([&](const auto& value) { operand.value = value; }, payload(item).value);
+            output = convertPattern(operand);
+            output.negative_match = !output.negative_match;
+        }
         else {
             AST::DynamicPattern dynamic;
             dynamic.position = position(item);
@@ -923,6 +929,92 @@ void AST::Builder::build() {
         inferDataTypes(rule);
     }
     for (auto& [name, rule] : lexer_instances) tree_map.emplace(std::move(name), std::move(rule));
+
+    // A lexer negation consumes exactly one character outside the operand's
+    // single-character language. Resolve template arguments before computing
+    // that language (for example !(${q} | [\n\r]) in STRING<q>).
+    const auto negatedCharacters = [&](const auto& self, const AST::RuleMember& member,
+                                       std::set<TemplateName>& visiting) -> std::set<unsigned char> {
+        constexpr int alphabet_size = std::numeric_limits<char>::max() + 1;
+        if (member.negative_match || member.quantifier != '\0')
+            throw std::runtime_error("negated lexer pattern must contain only single-character alternatives");
+        if (member.isString()) {
+            const auto& text = member.getString().value;
+            if (text.size() != 1) throw std::runtime_error("negated lexer string must be one character");
+            if (static_cast<unsigned char>(text.front()) >= alphabet_size)
+                throw std::runtime_error("negated lexer pattern contains a character outside the lexer alphabet");
+            return {static_cast<unsigned char>(text.front())};
+        }
+        if (member.isCsequence()) {
+            const auto& chars = member.getCsequence();
+            std::set<unsigned char> result;
+            for (char ch : chars.characters) if (static_cast<unsigned char>(ch) < alphabet_size)
+                result.insert(static_cast<unsigned char>(ch));
+            for (char ch : chars.escaped) {
+                const auto value = static_cast<unsigned char>(corelib::text::getEscapedFromChar(ch));
+                if (value < alphabet_size) result.insert(value);
+            }
+            for (const auto& [first, last] : chars.diapasons)
+                for (int ch = static_cast<unsigned char>(first); ch <= static_cast<unsigned char>(last); ++ch)
+                    if (ch < alphabet_size) result.insert(static_cast<unsigned char>(ch));
+            if (chars.negative) {
+                std::set<unsigned char> complement;
+                for (int ch = 0; ch < alphabet_size; ++ch) if (!result.contains(static_cast<unsigned char>(ch)))
+                    complement.insert(static_cast<unsigned char>(ch));
+                return complement;
+            }
+            return result;
+        }
+        if (member.isAny()) {
+            std::set<unsigned char> result;
+            for (int ch = 0; ch < alphabet_size; ++ch) result.insert(static_cast<unsigned char>(ch));
+            return result;
+        }
+        if (member.isOp()) {
+            std::set<unsigned char> result;
+            for (const auto& option : member.getOp().options) {
+                auto part = self(self, *option, visiting);
+                result.insert(part.begin(), part.end());
+            }
+            return result;
+        }
+        if (member.isGroup()) {
+            const auto& values = member.getGroup().values;
+            if (values.size() != 1) throw std::runtime_error("negated lexer group must match one character");
+            return self(self, *values.front(), visiting);
+        }
+        if (member.isName()) {
+            const auto& name = member.getName().name;
+            if (!tree_map.contains(name) || !visiting.insert(name).second)
+                throw std::runtime_error("negated lexer pattern has an unresolved or recursive rule");
+            const auto& rule = tree_map.at(name);
+            if (rule.rule_members.size() != 1)
+                throw std::runtime_error("negated lexer rule must match one character");
+            auto result = self(self, *rule.rule_members.front(), visiting);
+            visiting.erase(name);
+            return result;
+        }
+        throw std::runtime_error("negated lexer pattern must match one character");
+    };
+    const auto lowerNegations = [&](const auto& self, AST::RuleMember& member, bool lexer) -> void {
+        if (member.negative_match && lexer) {
+            auto operand = member;
+            operand.negative_match = false;
+            operand.quantifier = '\0';
+            std::set<TemplateName> visiting;
+            const auto excluded = negatedCharacters(negatedCharacters, operand, visiting);
+            AST::RuleMemberCsequence complement;
+            complement.negative = true;
+            for (unsigned char ch : excluded) complement.characters.push_back(static_cast<char>(ch));
+            member.value = std::move(complement);
+            member.negative_match = false;
+        }
+        if (member.isGroup()) for (auto& child : member.getGroup().values) self(self, *child, lexer);
+        if (member.isOp()) for (auto& child : member.getOp().options) self(self, *child, lexer);
+    };
+    for (auto& [name, rule] : tree_map) if (!rule.isTemplateDefinition)
+        for (auto& member : rule.rule_members)
+            lowerNegations(lowerNegations, *member, AST::RuleMemberName{.name = name}.isTerminal());
 
     // Grammar template names need FIRST sets during LL lowering. Give each
     // placeholder a lightweight analysis rule whose alternatives are the

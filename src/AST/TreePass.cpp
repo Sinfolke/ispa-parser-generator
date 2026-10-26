@@ -39,7 +39,7 @@ void AST::TreePass::inlineGroupsInSequence(stdu::vector<std::shared_ptr<AST::Rul
     for (auto it = members.begin(); it != members.end(); /* no auto-increment */) {
         auto &member = *it;
 
-        if (member->isGroup() && member->quantifier == '\0' && member->prefix.empty() && member->features.empty()) {
+        if (member->isGroup() && !member->negative_match && member->quantifier == '\0' && member->prefix.empty() && member->features.empty()) {
             auto group = member->getGroup(); // copy before erase
             it = members.erase(it);
             it = inlineGroup(group, members, it);
@@ -193,6 +193,7 @@ void AST::TreePass::literalsToToken(AST::Tree &ast) {
 
         identity.prefix.clear();
         identity.quantifier = '\0';
+        identity.negative_match = false;
         std::erase_if(identity.features, [](const auto& feature) {
             return std::holds_alternative<Counter>(feature) || std::holds_alternative<SharedCounterRegistration>(feature) ||
                    std::holds_alternative<VariableCapture>(feature) || std::holds_alternative<FailMarker>(feature);
@@ -271,6 +272,7 @@ void AST::TreePass::literalsToToken(AST::Tree &ast) {
                 AST::RuleMember token_member = member;
                 token_member.prefix.clear();
                 token_member.quantifier = '\0';
+                token_member.negative_match = false;
                 std::erase_if(token_member.features, [](const auto& feature) {
                     return std::holds_alternative<Counter>(feature) || std::holds_alternative<SharedCounterRegistration>(feature) ||
                            std::holds_alternative<VariableCapture>(feature) || std::holds_alternative<FailMarker>(feature);
@@ -638,6 +640,52 @@ void AST::TreePass::inlineSingleGroups() {
 }
 void AST::TreePass::literalsToToken() {
     literalsToToken(*ast);
+}
+void AST::TreePass::lowerParserNegations() {
+    using Name = stdu::vector<std::string>;
+    const auto& rules = ast->getTreeMap();
+    const auto exclusions = [&](const auto& self, const AST::RuleMember& member,
+                                std::set<Name>& result) -> void {
+        if (member.isGroup()) {
+            const auto& values = member.getGroup().values;
+            if (values.size() != 1)
+                throw Error("negated parser pattern must match one token");
+            self(self, *values.front(), result);
+        } else if (member.isOp()) {
+            for (const auto& option : member.getOp().options) self(self, *option, result);
+        } else if (member.isName() && member.getName().isTerminal()) {
+            result.insert(member.getName().name);
+        } else {
+            throw Error("negated parser pattern must name a token or a choice of tokens");
+        }
+    };
+    const auto lower = [&](const auto& self, AST::RuleMember& member) -> void {
+        if (member.negative_match) {
+            AST::RuleMember operand = member;
+            operand.negative_match = false;
+            operand.quantifier = '\0';
+            std::set<Name> excluded;
+            exclusions(exclusions, operand, excluded);
+            AST::RuleMemberOp choices;
+            for (const auto& [name, rule] : rules) {
+                if (name.empty() || !AST::RuleMemberName{.name = name}.isTerminal() ||
+                    !rule.isTopLevel || rule.isTemplateDefinition || rule.isTemplatePlaceholder || excluded.contains(name)) continue;
+                choices.options.push_back(std::make_shared<AST::RuleMember>(AST::RuleMember{
+                    .value = AST::RuleMemberName{.name = name}}));
+            }
+            if (choices.options.empty()) throw Error("negated parser pattern excludes every token");
+            member.value = std::move(choices);
+            member.negative_match = false;
+            return;
+        }
+        if (member.isGroup()) for (auto& child : member.getGroup().values) self(self, *child);
+        if (member.isOp()) for (auto& child : member.getOp().options) self(self, *child);
+    };
+    for (auto& [name, rule] : ast->getTreeMap()) {
+        if (name.empty() || AST::RuleMemberName{.name = name}.isTerminal() || rule.isTemplateDefinition) continue;
+        for (auto& member : rule.rule_members) lower(lower, *member);
+        inferDataTypes(rule);
+    }
 }
 void AST::TreePass::sortByPriority() {
     sortByPriority(*ast);

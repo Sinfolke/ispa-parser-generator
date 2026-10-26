@@ -14,12 +14,42 @@
 
 namespace ISPA_STD {
 
+    template<class T, class = void> struct has_empty_method : std::false_type {};
+    template<class T> struct has_empty_method<T, std::void_t<decltype(std::declval<const T&>().empty())>>
+        : std::true_type {};
+    template<class T> struct is_std_variant : std::false_type {};
+    template<class... T> struct is_std_variant<std::variant<T...>> : std::true_type {};
+
+    struct LexerFailureContext {
+        enum class Decision { None, Delete, Insert, Abort };
+        const char* cursor;
+        std::vector<std::string>& diagnostics;
+        std::string rule;
+        std::string failed_rule;
+        Decision decision = Decision::None;
+
+        bool at(const std::string& value, std::size_t offset = 0) const {
+            const char* current = cursor;
+            while (offset-- && *current) ++current;
+            return value == (*current ? std::string(1, *current) : std::string{});
+        }
+        void error(const std::string& message) { diagnostics.push_back(message); }
+        void erase() { decision = Decision::Delete; }
+        void skip() { erase(); }
+        void insert() { decision = Decision::Insert; }
+        void abort() { decision = Decision::Abort; }
+    };
+
     template<typename Token>
     constexpr bool is_token_end(const Token& token) {
         if constexpr (is_raw_token_v<Token>) {
             return token.empty() && !token.isAmbiguous();
-        } else {
+        } else if constexpr (has_empty_method<Token>::value) {
+            return token.empty();
+        } else if constexpr (is_std_variant<std::decay_t<Token>>::value) {
             return std::holds_alternative<std::monostate>(token);
+        } else {
+            return false;
         }
     }
 
@@ -29,8 +59,21 @@ namespace ISPA_STD {
         const char* _in = nullptr;
         std::string _owned_input;
         TokenFlow<Token> tokens;
+        std::vector<std::string> errors;
         long long line = 1;
         bool external_boundary = false;
+
+        LexerFailureContext lexer_failure_context(const char* cursor, std::string rule,
+                                                   std::string failed_rule) {
+            return {cursor, errors, std::move(rule), std::move(failed_rule)};
+        }
+        std::pair<std::size_t, Token> lexer_failure_result(LexerFailureContext& ctx, Token inserted) {
+            if (ctx.decision == LexerFailureContext::Decision::Delete)
+                return {DFA::API::lexer_delete_state, Token{}};
+            if (ctx.decision == LexerFailureContext::Decision::Insert)
+                return {DFA::API::null_state, std::move(inserted)};
+            throw std::runtime_error(errors.empty() ? "unmatched lexer input" : errors.back());
+        }
 
         std::size_t getCurrentPos(const char* pos) const {
             return pos - _in;
@@ -176,7 +219,7 @@ namespace ISPA_STD {
                     }
 
                     // Must dispatch through the derived lexer.
-                    owner->push(std::move(raw));
+                    if (!is_token_end(raw)) owner->push(std::move(raw));
                     while (state->checkpoints.size() < owner->tokens.size()) state->checkpoints.push_back(checkpoint);
 
                     // push() may emit zero, one, or multiple tokens.
@@ -206,6 +249,10 @@ namespace ISPA_STD {
             }
 
             const char* sourceOrigin() const { return owner ? owner->_in : nullptr; }
+            const std::vector<std::string>& getErrors() const {
+                static const std::vector<std::string> empty;
+                return owner ? owner->getErrors() : empty;
+            }
             const char* sourcePosition() const {
                 if (!owner || !state) return nullptr;
                 if (token_index < owner->tokens.size()) {
@@ -251,6 +298,11 @@ namespace ISPA_STD {
                     ++token_index;
                 }
 
+                return *this;
+            }
+
+            lazy_iterator& operator--() {
+                if (token_index > 0) --token_index;
                 return *this;
             }
 
@@ -394,6 +446,7 @@ namespace ISPA_STD {
             iterator& operator=(const iterator& other) = default;
             void operator+=(std::size_t count) { pos += count; }
             iterator& operator++() { pos += 1; return *this; }
+            iterator& operator--() { if (pos != owner->tokens.begin()) pos -= 1; return *this; }
             iterator operator++(int) { auto tmp = *this; pos += 1; return tmp; }
             std::size_t operator-(const iterator& other) const { return pos - other.pos; }
             iterator operator+(std::size_t count) const { auto tmp = *this; tmp += count; return tmp; }
@@ -466,12 +519,14 @@ namespace ISPA_STD {
         bool hasTokens() const { return !tokens.empty(); }
 
         Lexer_base& setInput(const std::string& in) {
+            errors.clear();
             _owned_input = in;
             _in = _owned_input.c_str();
             return *this;
         }
 
         Lexer_base& setInput(const char* in) {
+            errors.clear();
             _owned_input.clear();
             _in = in;
             return *this;
@@ -502,7 +557,7 @@ namespace ISPA_STD {
                         "Lexer TDFA generation", true, getCurrentPos(pos), *pos
                     );
                 }
-                push(std::move(t));
+                if (!is_token_end(t)) push(std::move(t));
             }
             push();
 
@@ -536,7 +591,7 @@ namespace ISPA_STD {
         }
 
         virtual auto getErrors() -> const std::vector<std::string>& {
-            throw IspaInternalExcept("Ispa is not yet able to generate errors and expose their API", "Not implemented", false);
+            return errors;
         }
 
         virtual void append_token(const Token& token) {
@@ -546,6 +601,7 @@ namespace ISPA_STD {
         Lexer_base& operator=(const Lexer_base& other) {
             if (this != &other) {
                 tokens = other.tokens;
+                errors = other.errors;
                 _owned_input = other._owned_input;
                 _in = _owned_input.empty() ? other._in : _owned_input.c_str();
             }

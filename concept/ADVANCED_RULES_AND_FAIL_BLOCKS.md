@@ -80,9 +80,36 @@ action invocation.
 
 `ctx.at(value, offset)` checks the token at `offset` positions ahead without
 moving the cursor. The offset is optional and defaults to zero (the current
-token); values above 64 throw. It accepts the same token spelling/name forms
-as the fail-block `ctx.at(value)`. It is available in advanced parser rules
+token); values above 64 throw. Bare token identifiers such as `ID` match the
+token name, while quoted strings such as `"="` match source text. A bound
+variable takes precedence over a token identifier and is used as a source
+text value. It is available in advanced parser rules
 and fail blocks, and checks return false at or beyond EOF.
+
+`ctx.peek(offset)` returns a copy of the current token or a token up to 64
+positions ahead without moving the cursor. `ctx.take()` returns the current
+token and advances by one; at EOF both return an empty result. `ctx.prev()`
+rewinds one token and returns it. At the start of the current rule it returns
+an empty result and leaves the cursor unchanged. The returned
+value has `text`, `name`, `kind`, `offset`, `length`, `line`, `column`, and `raw`
+fields plus `empty()`. `text` and `raw` remain available after restoring a
+checkpoint. These methods are available in advanced parser rules and fail
+blocks. In comparisons, `token.name == ID` checks the token identity, while
+`token.name == "word"` checks the token's source text. A bound variable named
+`ID` is evaluated as a runtime value. Use a checkpoint to try a
+production-local interpretation:
+
+```isc
+item {
+    ctx.mark("start")
+    token = ctx.take()
+    if token.text == "name":
+        ctx.commit("start")
+        ctx.ast.name = token.text
+    else:
+        ctx.restore("start")
+}
+```
 
 `ctx.collect_braced()` starts after a matched opening `{`, copies tokens up to
 the matching `}`, and advances the original cursor past that closing token.
@@ -128,8 +155,10 @@ probe {
 checkpoint available for another attempt, while discarding newer checkpoints.
 `commit(label)` discards that checkpoint and any newer ones. Checkpoints are
 local to one action context, may be nested, and are limited to 32 live entries;
-unknown labels and limit overflow are errors. Use distinct labels for nested
-choices so their lifetime is clear.
+unknown labels and limit overflow are errors. Restoring rewinds the cursor;
+it does not undo AST writes or diagnostics, so defer those writes until a
+branch is committed. Use distinct labels for nested choices so their lifetime
+is clear.
 
 The `depends` declaration is accepted by advanced-rule grammar syntax, but the
 current AST/backend guard rejects advanced-rule dependencies. Treat external
@@ -195,12 +224,11 @@ movement means retry. Use explicit operations when intent is not obvious.
 when more input must be discarded. After `ctx.abort()`, later recovery calls
 cannot reverse the abort.
 
-`ctx.at(value)` checks the current token's source spelling and token name. A
-spelling such as `"="` checks literal text; `ID` or `"ID"` can check a token
-name. Qualified names accept `.` or `::`; unqualified names match the final
-component, and qualified names match the corresponding suffix. A bound
-variable passed to `at` is evaluated as a value rather than reinterpreted as
-a token identifier.
+`ctx.at(value)` checks the current token. Quoted strings and bound runtime
+variables match source text; bare token identifiers match token names.
+Qualified token names accept `.`; unqualified names match the final component,
+and qualified names match the corresponding suffix. Bound variables take
+precedence over token identifiers.
 
 `ctx.sync("}", ";")` scans source text to a boundary while balancing nested
 delimiters and respecting quoted strings and comments. It is for lazy source
@@ -209,10 +237,10 @@ budget. A listed semicolon is a hard stop, including inside an unclosed
 container. The boundary is left for its owner. Follow with `insert()` to
 accept a missing value at that boundary, or `retry()` to try matching there.
 
-`ctx.sync_tokens("NEWLINE", "DEDENT")` performs the analogous operation over
+`ctx.sync_tokens(NEWLINE, DEDENT)` performs the analogous operation over
 tokens. It works with eager and lazy streams and can preserve synthetic tokens
-such as indentation markers. Boundaries may be token spellings or names using
-the same matching rules as `at`. It does not balance delimiters, stops at EOF,
+such as indentation markers. Bare identifiers match token names; quoted strings
+and bound variables match source text. It does not balance delimiters, stops at EOF,
 and leaves the matching boundary in place. Both synchronization methods require
 one or more nonempty string literals. Exhausting scan or skip limits aborts
 recovery.

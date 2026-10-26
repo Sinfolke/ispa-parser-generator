@@ -113,9 +113,95 @@ namespace ISPA_STD {
         static constexpr std::size_t max_action_lookahead = 64;
         static constexpr std::size_t max_action_checkpoints = 32;
 
+        struct ActionToken {
+            Token raw;
+            std::string text;
+            std::string name;
+            std::size_t kind = std::numeric_limits<std::size_t>::max();
+            std::size_t offset = 0;
+            std::size_t length = 0;
+            std::size_t line = 0;
+            std::size_t column = 0;
+            bool present = false;
+
+            bool empty() const { return !present; }
+            bool matches_name(std::string_view expected) const {
+                if (!present) return false;
+                std::string normalized(expected);
+                for (std::size_t i = 0; (i = normalized.find("::", i)) != std::string::npos;)
+                    normalized.replace(i, 2, ".");
+                return name == normalized || (name.size() > normalized.size() &&
+                    name.compare(name.size() - normalized.size(), normalized.size(), normalized) == 0 &&
+                    name[name.size() - normalized.size() - 1] == '.');
+            }
+        };
+        struct TokenBoundary {
+            std::string_view value;
+            bool token_name = false;
+            TokenBoundary(const char* text) : value(text) {}
+            TokenBoundary(const std::string& text) : value(text) {}
+            TokenBoundary(std::string_view text) : value(text) {}
+            TokenBoundary(std::string_view text, bool is_name) : value(text), token_name(is_name) {}
+        };
+
+        template<class IT>
+        static ActionToken context_peek(IT candidate, std::size_t lookahead,
+                                        const char* (*token_name)(std::size_t)) {
+            if (lookahead > max_action_lookahead)
+                throw std::out_of_range("ctx.peek lookahead exceeds 64 tokens");
+            for (std::size_t i = 0; i < lookahead; ++i) {
+                if (candidate.isEnd()) return {};
+                ++candidate;
+            }
+            if (candidate.isEnd()) return {};
+            const auto& token = *candidate;
+            const auto& meta = token.meta();
+            ActionToken result;
+            result.raw = token;
+            result.kind = Recovery::tokenId(token);
+            result.offset = meta.startpos();
+            result.length = meta.length();
+            result.line = meta.line();
+            result.column = meta.column();
+            result.present = true;
+            if (meta.start()) result.text.assign(meta.start(), meta.length());
+            if (token_name) {
+                bool ambiguous = false;
+                if constexpr (detail::detected_v<detail::ambiguous_id, Token>)
+                    ambiguous = result.kind == Token::ambiguous_id;
+                if (!ambiguous) if (const char* spelling = token_name(result.kind)) result.name = spelling;
+            }
+            return result;
+        }
+
+        template<class IT>
+        static ActionToken context_prev(IT& pos, const IT& start_pos,
+                                        const char* (*token_name)(std::size_t)) {
+            if (cursor_position(pos) <= cursor_position(start_pos)) return {};
+            auto previous = pos;
+            if constexpr (detail::detected_v<detail::decrement, IT>) {
+                --previous;
+            } else {
+                previous = start_pos;
+                auto next = previous;
+                while (cursor_position(next) < cursor_position(pos)) {
+                    auto current = next;
+                    ++next;
+                    if (cursor_position(next) >= cursor_position(pos)) {
+                        previous = current;
+                        break;
+                    }
+                }
+            }
+            if (cursor_position(previous) >= cursor_position(pos) ||
+                cursor_position(previous) < cursor_position(start_pos)) return {};
+            pos = previous;
+            return context_peek(pos, 0, token_name);
+        }
+
         template<class IT>
         static bool context_at(IT candidate, std::string_view spelling, std::size_t lookahead,
-                               const char* (*token_name)(std::size_t)) {
+                               const char* (*token_name)(std::size_t), bool match_name = false) {
             if (lookahead > max_action_lookahead)
                 throw std::out_of_range("ctx.at lookahead exceeds 64 tokens");
             for (std::size_t i = 0; i < lookahead; ++i) {
@@ -124,7 +210,7 @@ namespace ISPA_STD {
             }
             if (candidate.isEnd()) return false;
             const auto& meta = candidate->meta();
-            if (meta.start() && std::string_view(meta.start(), meta.length()) == spelling) return true;
+            if (!match_name) return meta.start() && std::string_view(meta.start(), meta.length()) == spelling;
             if (!token_name) return false;
             if constexpr (detail::detected_v<detail::ambiguous_id, Token>)
                 if (Recovery::tokenId(*candidate) == Token::ambiguous_id) return false;
@@ -181,6 +267,25 @@ namespace ISPA_STD {
                 return LLParser::template context_at<IT>(pos, spelling, lookahead, token_name);
             }
 
+            bool at_token(std::string_view name, std::size_t lookahead = 0) const {
+                return LLParser::template context_at<IT>(pos, name, lookahead, token_name, true);
+            }
+
+            ActionToken peek(std::size_t lookahead = 0) const {
+                return LLParser::template context_peek<IT>(pos, lookahead, token_name);
+            }
+
+            ActionToken take() {
+                auto token = peek();
+                if (!token.empty()) ++pos;
+                return token;
+            }
+
+
+            ActionToken prev() {
+                return LLParser::template context_prev<IT>(pos, start_pos, token_name);
+            }
+
             // Collect the contents of a braced region after its opening token
             // has been consumed. The closing token is consumed, but is not
             // included in the returned stream. Nested braces are preserved.
@@ -233,6 +338,25 @@ namespace ISPA_STD {
 
             bool at(std::string_view spelling, std::size_t lookahead = 0) const {
                 return LLParser::template context_at<IT>(pos, spelling, lookahead, token_name);
+            }
+
+            bool at_token(std::string_view name, std::size_t lookahead = 0) const {
+                return LLParser::template context_at<IT>(pos, name, lookahead, token_name, true);
+            }
+
+            ActionToken peek(std::size_t lookahead = 0) const {
+                return LLParser::template context_peek<IT>(pos, lookahead, token_name);
+            }
+
+            ActionToken take() {
+                auto token = peek();
+                if (!token.empty()) ++pos;
+                return token;
+            }
+
+
+            ActionToken prev() {
+                return LLParser::template context_prev<IT>(pos, start_pos, token_name);
             }
 
             // Custom diagnostics use the same collection as automatic repairs.
@@ -298,16 +422,18 @@ namespace ISPA_STD {
             }
             // Preserve token-stream structure (including synthetic indentation)
             // instead of bypassing the lexer as source-level sync does.
+            TokenBoundary token_boundary(std::string_view name) const { return {name, true}; }
             template<class... Boundaries>
             void sync_tokens(Boundaries... boundaries) {
                 static_assert(sizeof...(Boundaries) > 0);
-                const std::string_view stops[]{boundaries...};
-                for (auto stop : stops) if (stop.empty())
+                const TokenBoundary stops[]{boundaries...};
+                for (auto stop : stops) if (stop.value.empty())
                     throw std::invalid_argument("ctx.sync_tokens requires nonempty boundaries");
                 while (true) {
                     if (recovery.exhausted() || requested == Recovery::Mode::Abort) { abort(); return; }
                     if (pos.isEnd()) return;
-                    for (auto stop : stops) if (at(stop)) return;
+                    for (auto stop : stops)
+                        if (stop.token_name ? at_token(stop.value) : at(stop.value)) return;
                     skip();
                 }
             }
@@ -455,7 +581,31 @@ namespace ISPA_STD {
         }
         MainNode& parseLazy() override {
             reset_recovery();
-            return Parser_base<MainNode, Token>::parseLazy();
+            if (this->text == nullptr)
+                throw IspaAPIExcept("Can't parse because no input text is provided");
+            auto result = this->lazyParse();
+            const bool at_end = result.it.isEnd();
+            for (const auto& message : result.it.getErrors()) {
+                Recovery::Diagnostic diagnostic;
+                diagnostic.rule = "lexer";
+                diagnostic.message = message;
+                recovery_state_.diagnostics.push_back(std::move(diagnostic));
+            }
+            if (!result.status || !at_end) {
+                Recovery::Diagnostic diagnostic;
+                diagnostic.rule = "main";
+                diagnostic.message = result.status ? "unexpected trailing input" : "could not match main rule";
+                if (!at_end) {
+                    const auto& token = *result.it;
+                    diagnostic.offset = token.meta().startpos();
+                    diagnostic.length = token.meta().length();
+                } else {
+                    diagnostic.offset = std::strlen(this->text);
+                }
+                recovery_state_.diagnostics.push_back(std::move(diagnostic));
+            }
+            if (result.status) this->tree = std::move(result.node.data());
+            return this->tree;
         }
 
         struct NoMatch {};

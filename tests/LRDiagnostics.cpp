@@ -253,7 +253,7 @@ struct ResolutionDriver : ISPA_STD::LRGeneralizedParser<ResolutionValue, Resolut
     static inline std::vector<LRBase::Name> terminals, nonterminals;
     static inline std::size_t semantic_calls = 0;
     void parseFromTokens() override {}
-    void lazyParse() override {}
+    auto lazyParse() -> ISPA_STD::MatchResult<ResolutionValue, ISPA_STD::Lexer_base<ResolutionToken>::lazy_iterator> override { return {}; }
     static auto lr_k() { return table->getDecisionLookaheadK(); }
     static auto window(const std::vector<std::size_t>& input, std::size_t n) -> LRBase::Lookahead {
         LRBase::Lookahead result;

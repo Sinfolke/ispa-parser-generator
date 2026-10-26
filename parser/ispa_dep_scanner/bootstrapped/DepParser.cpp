@@ -3803,9 +3803,9 @@ template auto DepParser::Parser::ispa_match_template<::DepParser::Lexer::lazy_it
 auto DepParser::Parser::parseFromTokens() -> void {
 	tree = main(Lexer::iterator(lexer)).node.data();
 }
-auto DepParser::Parser::lazyParse() -> void {
-	Lexer lexer;
-	tree = main(Lexer::lazy_iterator(lexer, text)).node.data();
+auto DepParser::Parser::lazyParse() -> ISPA_STD::MatchResult<Types::main, ISPA_STD::Lexer_base<Token>::lazy_iterator> {
+	lazy_lexer_.clearTokens();
+	return main(Lexer::lazy_iterator(lazy_lexer_, text));
 }
 
 #include "DepParser.h"

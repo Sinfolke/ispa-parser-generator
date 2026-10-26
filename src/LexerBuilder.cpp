@@ -135,6 +135,16 @@ auto LexerBuilder::getDataBlocks() const -> ParserIR::DataBlockList {
                     if (const auto* annotation = std::get_if<py::Expr>(&syntax->parameterAnnotations[i].code))
                         locals.emplace(syntax->parameters[i],
                             Parser::ParserBase::convertPythonType(std::make_shared<py::Expr>(*annotation)));
+        const auto capture_locals = [&](auto&& self, const AST::RuleMember& member) -> void {
+            for (const auto& feature : member.features)
+                if (const auto* capture = std::get_if<AST::VariableCapture>(&feature))
+                    locals.insert_or_assign(capture->name, LangAPI::ValueType::String);
+            if (member.isGroup())
+                for (const auto& child : member.getGroup().values) self(self, *child);
+            if (member.isOp())
+                for (const auto& child : member.getOp().options) self(self, *child);
+        };
+        for (const auto& member : rule.rule_members) capture_locals(capture_locals, *member);
         auto infer = [&](auto&& self, const py::ExprPtr& value) -> LangAPI::Type {
             if (!value) return LangAPI::ValueType::Undef;
             if (auto literal = value->get<py::Constant>()) {

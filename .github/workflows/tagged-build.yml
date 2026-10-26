@@ -88,3 +88,12 @@ jobs:
       checkout_ref: ${{ needs.resolve-tag.outputs.tag }}
       release_tag: ${{ needs.resolve-tag.outputs.tag }}
 
+  jetbrains:
+    name: Package JetBrains plugin for release
+    needs: [resolve-tag, prepare-release]
+    permissions:
+      contents: write
+    uses: ./.github/workflows/jetbrains-plugin-release.yml
+    with:
+      release_tag: ${{ needs.resolve-tag.outputs.tag }}
+

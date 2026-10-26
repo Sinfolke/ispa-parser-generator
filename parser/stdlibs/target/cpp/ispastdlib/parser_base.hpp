@@ -64,7 +64,8 @@ namespace ISPA_STD {
         virtual MainNode& parseLazy() {
             if (text == nullptr)
                 throw IspaAPIExcept("Can't parse because no input text is provided");
-            lazyParse();
+            auto result = lazyParse();
+            if (result.status) tree = std::move(result.node.data());
             return tree;
         }
         /*
@@ -78,6 +79,6 @@ namespace ISPA_STD {
          * This function is used internally as bridge between generator and std lib
          * you should override Lexer::parseLazy() instead
          */
-        virtual void lazyParse() = 0;
+        virtual MatchResult<MainNode, typename Lexer_base<Token>::lazy_iterator> lazyParse() = 0;
     };
 } // namespace ISPA_STD
