@@ -2,6 +2,10 @@
 
 ISPA turns an `.isc` grammar into a lexer and parser that build a typed AST. It generates C++17 or Python code ahead of time; the generated parser does not need the ISPA compiler at runtime.
 
+**Usage demo**
+
+https://github.com/user-attachments/assets/97d0214b-8807-493c-8a55-3b1fb4ea41aa
+
 ## Why ISPA
 
 - **Static generation:** grammars are compiled into lexer tables and target code ahead of time.
