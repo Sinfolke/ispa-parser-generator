@@ -33,9 +33,10 @@ private:
     stdu::vector<NFA::TNFA::SemanticState> semantic_table;
     std::size_t registers_count = 0;
     std::size_t output_count = 0;
+    bool debug = false;
     bool isTopLevel(const stdu::vector<std::string> &name);
 public:
-    LexerBuilder(AST::Tree &ast) : ast(ast) {};
+    LexerBuilder(AST::Tree &ast, bool debug = false) : ast(ast), debug(debug) {};
     void build();
     auto& getDFA() { return dfa; }
     auto& getDFA() const { return dfa; }

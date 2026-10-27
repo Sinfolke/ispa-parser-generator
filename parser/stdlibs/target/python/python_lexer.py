@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from inspect import signature
 
 
 def make_python_lexer(generated, newline_state):
@@ -25,6 +26,12 @@ def make_python_lexer(generated, newline_state):
         def _next_char_at(self, offset):
             return self.source[offset:offset + 1]
 
+        def _layout_semantic(self, state, start, length, pos):
+            args = (state, None, start, self.source, length, self._line(start))
+            if len(signature(self.semantic_action_exec).parameters) >= 7:
+                return self.semantic_action_exec(*args, pos)
+            return self.semantic_action_exec(*args)
+
         def makeToken(self, pos):
             start = pos.index
             rest = self.source[start:]
@@ -34,8 +41,7 @@ def make_python_lexer(generated, newline_state):
             if blank_lines:
                 width = len(blank_lines.group())
                 pos.advance(width)
-                return self.semantic_action_exec(
-                    newline_state, None, start, self.source, width, self._line(start))[1]
+                return self._layout_semantic(newline_state, start, width, pos)[1]
             if rest.startswith('#'):
                 end = rest.find('\n')
                 if end < 0:
@@ -46,8 +52,7 @@ def make_python_lexer(generated, newline_state):
                     after = newline + 1
                     while after < len(self.source) and self.source[after] in ' \t':
                         after += 1
-                    self.semantic_action_exec(newline_state, None, newline, self.source,
-                                              after - newline, self._line(newline))
+                    self._layout_semantic(newline_state, newline, after - newline, pos)
                     self.tokens.extend(self.ispa_pending_tokens)
                     self.ispa_pending_tokens.clear()
                     self.ispa_skip_token = False

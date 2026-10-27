@@ -37,7 +37,8 @@ void check(const AST::RuleMember& member, bool token, bool actions) {
             std::holds_alternative<AST::VariableCapture>(f) || std::holds_alternative<AST::FailMarker>(f) ||
             std::holds_alternative<AST::AdvancedRule>(f) || std::holds_alternative<AST::StreamMatch>(f))) continue;
         if (actions && token && (std::holds_alternative<AST::VariableCapture>(f) ||
-                                 std::holds_alternative<AST::FailMarker>(f))) continue;
+                                 std::holds_alternative<AST::FailMarker>(f) ||
+                                 std::holds_alternative<AST::DynamicPattern>(f))) continue;
         if (const auto* counter = std::get_if<AST::Counter>(&f); counter && !token) {
             if (!(member.isName() || member.isString()) ||
                 (member.quantifier != '*' && member.quantifier != '+'))

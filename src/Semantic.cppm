@@ -125,6 +125,11 @@ namespace {
     }
     Nullable baseNullable(const RuleMember& m, const std::map<std::string, Nullable>& known,
                           std::set<const RuleMember*>& active) {
+        // Lexer negation consumes a character, and a dynamic pattern only
+        // succeeds for a nonempty runtime string.
+        if (m.negative_match || std::ranges::any_of(m.features, [](const auto& feature) {
+            return std::holds_alternative<AST::DynamicPattern>(feature);
+        })) return Nullable::No;
         if (auto* s = std::get_if<AST::String>(&m.value)) return s->value.empty() ? Nullable::Yes : Nullable::No;
         if (std::holds_alternative<RuleMemberNospace>(m.value)) return Nullable::Yes;
         if (auto* n = std::get_if<RuleMemberName>(&m.value)) {

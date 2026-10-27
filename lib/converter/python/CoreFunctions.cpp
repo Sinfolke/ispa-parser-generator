@@ -321,6 +321,7 @@ std::string Core::lib(const LangAPI::IspaLibSymbol& s) {
         case S::DfaNullState: return "ispa_std.NULL_STATE";
         case S::TdfaLayout: return "ispa_std.TdfaLayout(" + templates(s.template_parameters) + ")";
         case S::DfaCaptures: return "ispa_std.Captures";
+        case S::DfaDynamicMatch: return "ispa_std.dynamic_match";
         case S::DFADebug: return "ispa_std.DFADebug";
         case S::Error: return "RuntimeError";
         case S::ASTPrinter: return "ispa_std.ASTPrinter";

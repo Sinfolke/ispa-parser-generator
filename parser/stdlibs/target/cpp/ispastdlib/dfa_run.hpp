@@ -232,10 +232,26 @@ namespace DFA {
                           << " pos_off=" << (pos - start);
                 dump_regs("pre-semantic");
 #endif
-                auto result = semantic(
-                    state - table.size() - action_table.size(),
-                    captures, start_pos, start, static_cast<long long>(pos - start), start_line
-                );
+                const char *const semantic_pos = pos;
+                auto result = [&] {
+                    if constexpr (std::is_invocable_v<SemanticFunc, std::size_t,
+                        const API::Captures&, long long, const char*, long long,
+                        long long, const char*&>) {
+                        return semantic(state - table.size() - action_table.size(),
+                            captures, start_pos, start,
+                            static_cast<long long>(pos - start), start_line, pos);
+                    } else {
+                        return semantic(state - table.size() - action_table.size(),
+                            captures, start_pos, start,
+                            static_cast<long long>(pos - start), start_line);
+                    }
+                }();
+                if (pos != semantic_pos) {
+                    if (pos < semantic_pos)
+                        throw std::runtime_error("DFA: semantic matcher moved the cursor backwards");
+                    scanning_line += std::count(semantic_pos, pos, '\n');
+                    immediate_action = false;
+                }
                 state = static_cast<std::size_t>(std::get<0>(result));
                 if (state == API::lexer_delete_state) {
                     if (*pos != '\0') ++pos;

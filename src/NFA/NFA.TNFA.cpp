@@ -306,6 +306,32 @@ namespace NFA::TNFA {
         );
         return next;
     }
+    auto TNFABuilder::wireDynamic(std::size_t current_state, const TokenID &source) -> std::size_t {
+        const auto next = allocStateIn(states);
+        SemanticState semantic;
+        semantic.dynamic_source = source;
+        if (const auto token = ir.get().find(source.token_name); token != ir.get().end()) {
+            for (const auto &[id, _] : token->second.transitions)
+                for (const auto *capture : id.capture)
+                    for (const auto &feature : capture->member.features)
+                        if (const auto *variable = std::get_if<AST::VariableCapture>(&feature)) {
+                            const auto id = captureId(*capture);
+                            const auto found = std::ranges::find_if(semantic.dynamic_captures,
+                                [&](const auto &entry) { return entry.first == variable->name; });
+                            if (found == semantic.dynamic_captures.end())
+                                semantic.dynamic_captures.emplace_back(variable->name, id);
+                        }
+        }
+        for (int c = 1; c < ALPHABET_SIZE; ++c) {
+            states[current_state].transitions[static_cast<char>(c)].emplace_back(TransitionValue{
+                .next = next,
+                .priority = next_priority(),
+                .actions = {semantic},
+                .source = source,
+            });
+        }
+        return next;
+    }
     // Fires `actions` once, without consuming input, then continues from a
     // fresh state. Kept in its own table (not `transitions`) so cloning
     // operations that only walk the char-indexed table — e.g. wireSelfLoop —
@@ -344,6 +370,11 @@ namespace NFA::TNFA {
             end_state = wireCsequence(current_state, source);
         } else if (source.member.isEscaped()) {
             end_state = wireEscaped(current_state, source);
+        } else if (source.member.negative_match ||
+                   std::ranges::any_of(source.member.features, [](const auto &feature) {
+                       return std::holds_alternative<AST::DynamicPattern>(feature);
+                   })) {
+            end_state = wireDynamic(current_state, source);
         } else if (source.member.isNospace()) {
             return current_state;
         } else throw Error("NFA.TNFA.cpp: wireMember: cannot wire member {}", source.member);
@@ -493,7 +524,10 @@ namespace NFA::TNFA {
                 id.member.isAny() ||
                 id.member.isCsequence() ||
                 id.member.isEscaped() ||
-                id.member.isNospace();
+                id.member.isNospace() || id.member.negative_match ||
+                std::ranges::any_of(id.member.features, [](const auto &feature) {
+                    return std::holds_alternative<AST::DynamicPattern>(feature);
+                });
 
             if (const auto cached = end_of.find(key); cached != end_of.end()) {
                 // `id` is already wired: join this predecessor to it.

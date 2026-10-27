@@ -27,6 +27,39 @@ namespace ISPA_STD {
         using DFADebugTable = std::array<DFADebug, Size>;
         using DebugIndex = std::unordered_map<long long, std::unordered_map<long long, long long>>;
 
+        // A semantic transition tests the whole runtime string. Negation
+        // consumes one character, or a run when the pattern has `*`.
+        inline bool dynamic_match(const char*& cursor,
+                                  const std::vector<std::string>& alternatives,
+                                  bool negative, std::string_view quantifier = {}) {
+            const std::string_view remaining(cursor);
+            const auto starts_with = [&](const std::string& value) {
+                return remaining.size() >= value.size() &&
+                    remaining.compare(0, value.size(), value) == 0;
+            };
+            if (negative) {
+                const auto excluded = [&](std::string_view input) {
+                    for (const auto& value : alternatives)
+                        if (input.size() >= value.size() &&
+                            input.compare(0, value.size(), value) == 0) return true;
+                    return false;
+                };
+                if (quantifier == "*") {
+                    while (*cursor && !excluded(std::string_view(cursor))) ++cursor;
+                    return true;
+                }
+                if (remaining.empty() || excluded(remaining)) return false;
+                ++cursor;
+                return true;
+            }
+            for (const auto& value : alternatives) {
+                if (value.empty() || !starts_with(value)) continue;
+                cursor += value.size();
+                return true;
+            }
+            return false;
+        }
+
         /*
          * Can be emit by parser generator.
          * This turns the DFA walker from class -> next state into something can be reversed to actual grammar structures
@@ -75,10 +108,13 @@ namespace ISPA_STD {
                 : base_(base), out_(out), history_(history), first_line_(first_line) {}
 
             // scalar capture: both boundaries were recorded
-            auto is_set(std::size_t k) const -> bool { return begin_off(k) != unset && end_off(k) != unset; }
+            auto is_set(std::size_t k) const -> bool {
+                return begin_off(k) != unset && end_off(k) != unset && end_off(k) >= begin_off(k);
+            }
             auto begin(std::size_t k) const -> const char * { return base_ + begin_off(k); }
             auto end(std::size_t k) const -> const char * { return base_ + end_off(k); }
             auto view(std::size_t k) const -> std::string_view {
+                if (!is_set(k)) return {};
                 return std::string_view(begin(k), static_cast<std::size_t>(end_off(k) - begin_off(k)));
             }
             auto text(std::size_t k) const -> std::string { return std::string(view(k)); }

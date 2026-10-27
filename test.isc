@@ -1,0 +1,13 @@
+STRING<quote>:
+    &q ${quote} @ !([\n\r] | $q)* $q
+
+    {@}
+;
+
+QUOTE_1: '"';
+QUOTE_2: '\'';
+main:
+    @ STRING<QUOTE_1>
+
+    @{str1}
+;

@@ -7,10 +7,31 @@ transitions require additional lowering by the generator.
 """
 from __future__ import annotations
 from dataclasses import dataclass
+from inspect import signature
 from typing import Any, Callable, Sequence
 from .model import Position
 
 NULL_STATE = -1
+
+
+def dynamic_match(cursor: Position, alternatives: Sequence[str], negative: bool,
+                  quantifier: str = '') -> bool:
+    remaining = cursor.source[cursor.index:]
+    if negative:
+        if quantifier == '*':
+            while cursor.peek() != '\0' and not any(
+                    cursor.source[cursor.index:].startswith(value) for value in alternatives):
+                cursor.advance()
+            return True
+        if not remaining or any(remaining.startswith(value) for value in alternatives):
+            return False
+        cursor.advance()
+        return True
+    for value in alternatives:
+        if value and remaining.startswith(value):
+            cursor.advance(len(value))
+            return True
+    return False
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,6 +183,7 @@ def run_tdfa(source: str, pos: Position, table: Sequence[Sequence[int]],
     idle_steps = 0
     nstates = len(table)
     nactions = len(action_table)
+    semantic_accepts_cursor = len(signature(semantic).parameters) >= 7
     while state != NULL_STATE:
         if state < nstates:
             if immediate_action:
@@ -203,8 +225,16 @@ def run_tdfa(source: str, pos: Position, table: Sequence[Sequence[int]],
             state = next_state
         else:
             captures = Captures(source, start, regs, {}, first_line, history_nodes)
-            next_state, token = semantic(state - nstates - nactions,
-                                         captures, start, source, pos.index - start, first_line)
+            semantic_start = pos.index
+            semantic_args = (state - nstates - nactions, captures, start, source,
+                             pos.index - start, first_line)
+            next_state, token = (semantic(*semantic_args, pos) if semantic_accepts_cursor
+                                 else semantic(*semantic_args))
+            if pos.index < semantic_start:
+                raise RuntimeError('TDFA semantic matcher moved the cursor backwards')
+            if pos.index != semantic_start:
+                line += source[semantic_start:pos.index].count('\n')
+                immediate_action = False
             state = next_state
             if state == NULL_STATE:
                 if token is None and pos.index == start:

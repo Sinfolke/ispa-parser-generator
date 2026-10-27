@@ -58,7 +58,7 @@ namespace NFA {
                                                const AST::RuleMember& original_member,
                                                const stdu::vector<std::string> &name, std::size_t i) {
         stdu::vector<TokenID> states;
-        if (!member.isOp()) {
+        if (!member.isOp() || member.negative_match) {
             states.push_back(TokenID{.member = member, .original_member = original_member, .token_name = name, .position_in_token = i,
                                      .capture = NFA::captureOf(member, original_member, name, i)});
             return states;
@@ -100,7 +100,7 @@ namespace NFA {
                                                    stdu::vector<TokenID *> active_captures,
                                                    const stdu::vector<std::size_t> &alt_path
                                                    ) {
-        if (member.quantifier != '\0') {
+        if (member.quantifier != '\0' && !(member.negative_match && member.quantifier == '*')) {
             auto core_copy = std::make_unique<AST::RuleMember>(member);
             core_copy->quantifier = '\0';
             synthesized_members.push_back(std::move(core_copy));
@@ -125,7 +125,7 @@ namespace NFA {
             return result;
         }
 
-        if (member.isOp()) {
+        if (member.isOp() && !member.negative_match) {
             Fragment result;
             std::size_t alt_num = 0;
             for (const auto &option : member.getOp().options) {
@@ -146,7 +146,7 @@ namespace NFA {
             return result;
         }
 
-        if (member.isGroup()) {
+        if (member.isGroup() && !member.negative_match) {
             auto &group = member.getGroup();
 
             if (group.values.size() == 1) {
@@ -215,7 +215,10 @@ namespace NFA {
             .prev = prev_leaf,
         };
         token.transitions[leaf_id] = next;
-        return Fragment{{leaf_id}, {leaf_id}};
+        Fragment result{{leaf_id}, {leaf_id}};
+        if (member.negative_match && member.quantifier == '*')
+            result.entries.insert(result.entries.end(), next.begin(), next.end());
+        return result;
     }
 
     stdu::vector<AST::RuleMember *> InitialNFA::resolveTransparent(AST::RuleMember &member) {

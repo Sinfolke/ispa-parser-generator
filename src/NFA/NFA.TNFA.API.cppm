@@ -152,8 +152,13 @@ export namespace NFA::TNFA {
         std::variant<DFATarget, ActionTarget, SemanticTarget> next_state;
         std::size_t nfa_index = NULL_STATE;
         std::string debug_note;
+        // A mid-token matcher. Reduction states leave this empty.
+        std::optional<IR::TokenID> dynamic_source;
+        stdu::vector<std::pair<std::string, std::size_t>> dynamic_captures;
         auto operator==(const SemanticState &other) const -> bool = default;
         auto operator<(const SemanticState &other) const -> bool {
+            if (dynamic_source != other.dynamic_source)
+                return dynamic_source < other.dynamic_source;
             if (instance_value != other.instance_value) {
                 return instance_value < other.instance_value;
             }
@@ -162,7 +167,7 @@ export namespace NFA::TNFA {
 
     private:
         friend struct ::uhash;
-        auto members() const { return std::tie(instance_value, next_state); }
+        auto members() const { return std::tie(instance_value, next_state, dynamic_source, dynamic_captures); }
     };
     using RawAction = std::variant<ActionState, SemanticState>;
     using ActionChain = stdu::vector<RawAction>;

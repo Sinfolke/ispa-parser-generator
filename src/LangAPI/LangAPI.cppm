@@ -111,7 +111,7 @@ export namespace LangAPI {
         DfaState, DfaTable, DfaClassTable, DfaAcceptTable, DfaLRTable, DfaNullState,
         ParserFunctionParameter, Error,
         TokenNodeConstruct, RawTokenNodeConstruct, ParserNodeConstructor,
-        DFADebug, TdfaLayout, DfaCaptures,
+        DFADebug, TdfaLayout, DfaCaptures, DfaDynamicMatch,
         ASTPrinter, Concat,
         MatchResultValue, VariantIndex, AssignCompatible,
         LexerTokenIterator, LexerLazyIterator,

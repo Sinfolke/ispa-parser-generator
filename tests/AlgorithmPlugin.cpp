@@ -3,6 +3,7 @@
 import Algorithm.API;
 import Algorithm.Cache;
 import AST.Builder;
+import AST.API;
 import AST.Pass;
 import AST.Tree;
 import AST.types;
@@ -375,6 +376,99 @@ int main() {
         (directory / "PluginTest.cpp").string() + "\" \"" + (directory / "run.cpp").string() +
         "\" \"" + ROOT_DIR + "/parser/stdlibs/target/cpp/src/core.cpp\" -o \"" +
         (directory / "run").string() + "\"";
+    ASSERT_EQ(std::system(command.c_str()), 0);
+    EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
+}
+
+TEST(AlgorithmPlugin, LLMidTokenDynamicPatternAndNegatedGroup) {
+    dlib library("libispa-algorithm-LL");
+    const auto* descriptor = library.load<Algorithm::EntryFn*>("ispa_algorithm_v1")();
+    Parser::Parser syntax;
+    AST::Builder builder(syntax.parse("REPEAT: &q [a-z]+ ':' $q;"), "plugin.isc");
+    builder.build();
+    auto tree = builder.get();
+    Parser::Parser quote_syntax;
+    AST::Builder quote_builder(quote_syntax.parse("QUOTED: '#' &q [a-z]+ ':' !($q | '!')* $q;"), "plugin.isc");
+    quote_builder.build();
+    auto quote_tree = quote_builder.get();
+    for (auto &[name, rule] : quote_tree.getTreeMap())
+        tree.getTreeMap().emplace(name, std::move(rule));
+    Parser::Parser negative_syntax;
+    AST::Builder negative_builder(negative_syntax.parse("NEGATED: '~' &q [a-z]+ ':' !$q;"), "plugin.isc");
+    negative_builder.build();
+    auto negative_tree = negative_builder.get();
+    for (auto &[name, rule] : negative_tree.getTreeMap())
+        tree.getTreeMap().emplace(name, std::move(rule));
+    Parser::Parser capture_syntax;
+    AST::Builder capture_builder(capture_syntax.parse("DYNAMIC_CAPTURE: '^' &q [a-z]+ ':' &copy $q ':' $copy;"), "plugin.isc");
+    capture_builder.build();
+    auto capture_tree = capture_builder.get();
+    for (auto &[name, rule] : capture_tree.getTreeMap())
+        tree.getTreeMap().emplace(name, std::move(rule));
+    ASSERT_TRUE(tree.getTreeMap().contains({"REPEAT"}));
+    ASSERT_TRUE(tree.getTreeMap().contains({"QUOTED"}));
+    ASSERT_TRUE(tree.getTreeMap().contains({"NEGATED"}));
+    ASSERT_TRUE(tree.getTreeMap().contains({"DYNAMIC_CAPTURE"}));
+    AST::Rule main;
+    AST::RuleMemberOp choices;
+    for (const auto* name : {"REPEAT", "QUOTED", "NEGATED", "DYNAMIC_CAPTURE"})
+        choices.options.push_back(std::make_shared<AST::RuleMember>(AST::RuleMember{
+            .value = AST::RuleMemberName{.name = {name}}}));
+    main.rule_members.push_back(std::make_shared<AST::RuleMember>(AST::RuleMember{
+        .value = std::move(choices)}));
+    tree.getTreeMap()[{"main"}] = std::move(main);
+    AST::TreePass pass(tree);
+    pass.work();
+    const auto directory = std::filesystem::temp_directory_path() /
+        ("ispa-dynamic-lexer-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    struct Cleanup {
+        std::filesystem::path path;
+        ~Cleanup() { std::filesystem::remove_all(path); }
+    } cleanup{directory};
+    Algorithm::Metadata metadata;
+    convert(*descriptor, tree, metadata, directory);
+    std::ofstream(directory / "run.cpp") << R"(
+#include "PluginTest.h"
+int main() {
+    PluginTest::Lexer lexer;
+    const char* first = "abc:abc";
+    const char* pos = first;
+    lexer.setInput(first);
+    if (lexer.makeToken(pos).empty() || pos - first != 7) return 1;
+    const char* second = "#abc:yyyabc";
+    pos = second;
+    lexer.setInput(second);
+    if (lexer.makeToken(pos).empty() || pos - second != 11) return 2;
+    const char* adjacent = "#abc:abc";
+    pos = adjacent;
+    lexer.setInput(adjacent);
+    if (lexer.makeToken(pos).empty() || pos - adjacent != 8) return 3;
+    const char* single = "~abc:x";
+    pos = single;
+    lexer.setInput(single);
+    if (lexer.makeToken(pos).empty() || pos - single != 6) return 4;
+    const char* captured = "^abc:abc:abc";
+    pos = captured;
+    lexer.setInput(captured);
+    if (lexer.makeToken(pos).empty() || pos - captured != 12) return 5;
+    int rejected_index = 6;
+    for (const char* rejected : {"abc:abd", "#abc:!abc", "~abc:abc", "^abc:abc:abd"}) {
+        pos = rejected;
+        lexer.setInput(rejected);
+        try {
+            if (!lexer.makeToken(pos).empty()) return rejected_index;
+        } catch (const std::exception&) {
+        }
+        ++rejected_index;
+    }
+    return 0;
+}
+)";
+    const auto command = std::string("clang++ -std=c++23 -I\"") + ROOT_DIR +
+        "/parser/stdlibs/target/cpp\" -I\"" + directory.string() + "\" \"" +
+        (directory / "PluginTest.cpp").string() + "\" \"" +
+        (directory / "run.cpp").string() + "\" \"" + ROOT_DIR +
+        "/parser/stdlibs/target/cpp/src/core.cpp\" -o \"" + (directory / "run").string() + "\"";
     ASSERT_EQ(std::system(command.c_str()), 0);
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
 }

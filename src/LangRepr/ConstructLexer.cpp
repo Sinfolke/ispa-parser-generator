@@ -291,7 +291,13 @@ namespace LangRepr {
             }
         }
 
-        if (debug_array.values.empty()) return std::nullopt;   // avoid zero-size array
+        if (debug_array.values.empty()) {
+            // Action-only transitions have no provenance cells, but lookup
+            // still needs a table argument. An unindexed placeholder keeps
+            // the generated declaration valid.
+            debug_array.values.push_back(LangAPI::DFADebug::createExpression(
+                LangAPI::DFADebug{.position_in_token = 0}));
+        }
 
         using LangAPI::Type;
         using LangAPI::ValueType;
@@ -500,6 +506,120 @@ namespace LangRepr {
         // change semantic table to raw Statements
         for (const auto &semantic_state : semantic_table) {
             LangAPI::Statements statements = semantic_state.statements;
+            if (semantic_state.dynamic_source) {
+                const auto &source = *semantic_state.dynamic_source;
+                const auto symbol = [](const std::string &name) {
+                    return LangAPI::Symbol::createExpression(LangAPI::Symbol{name});
+                };
+                const auto integer = [](std::size_t value) {
+                    return LangAPI::Int::createExpression(LangAPI::Int{.value = static_cast<long long>(value)});
+                };
+                const auto escaped = [](const std::string& value) {
+                    std::string result;
+                    for (char c : value) result += corelib::text::getEscapedAsStr(c, true);
+                    return result;
+                };
+                std::set<std::string> declared;
+                for (const auto &[name, id] : semantic_state.dynamic_captures) {
+                    if (!declared.insert(name).second) continue;
+                    LangAPI::StorageSymbol capture;
+                    capture.what = symbol("captures");
+                    capture.path.emplace_back(LangAPI::FunctionCall{
+                        .name = std::make_shared<LangAPI::Symbol>(LangAPI::Symbol{"text"}),
+                        .args = {integer(id)}});
+                    statements.push_back(LangAPI::Variable::createStatement(LangAPI::Variable{
+                        .name = name, .type = LangAPI::ValueType::String,
+                        .value = LangAPI::StorageSymbol::createExpression(capture)}));
+                }
+                if (auto bindings = parameter_bindings.find(source.token_name); bindings != parameter_bindings.end())
+                    for (const auto &binding : bindings->second) {
+                        if (!declared.insert(binding.name).second) continue;
+                        statements.push_back(LangAPI::Variable::createStatement(LangAPI::Variable{
+                            .name = binding.name, .type = binding.field.type,
+                            .value = symbol(binding.field.name)}));
+                    }
+
+                LangAPI::Array choices;
+                std::set<stdu::vector<std::string>> visiting;
+                const auto collect = [&](const auto &self, const AST::RuleMember &member) -> void {
+                    for (const auto &feature : member.features)
+                        if (const auto *dynamic = std::get_if<AST::DynamicPattern>(&feature)) {
+                            if (!dynamic->name.empty()) choices.values.push_back(symbol(dynamic->name));
+                            else if (const auto *expression = std::get_if<UAST::py::Expr>(&dynamic->expression.code))
+                                choices.values.push_back(Parser::ParserBase::convertPython(*expression));
+                            else throw Error("Dynamic lexer pattern has no expression");
+                            return;
+                        }
+                    if (member.isString()) {
+                        choices.values.push_back(LangAPI::String::createExpression(
+                            LangAPI::String{.value = escaped(member.getString().value)}));
+                    } else if (member.isCsequence()) {
+                        const auto &set = member.getCsequence();
+                        std::set<unsigned char> chars;
+                        for (unsigned char c : set.characters) chars.insert(c);
+                        for (char c : set.escaped)
+                            chars.insert(static_cast<unsigned char>(corelib::text::getEscapedFromChar(c)));
+                        for (const auto &[first, last] : set.diapasons)
+                            for (int c = static_cast<unsigned char>(first); c <= static_cast<unsigned char>(last); ++c)
+                                chars.insert(static_cast<unsigned char>(c));
+                        for (int c = 1; c < 128; ++c)
+                            if (set.negative ? !chars.contains(static_cast<unsigned char>(c)) :
+                                chars.contains(static_cast<unsigned char>(c)))
+                                choices.values.push_back(LangAPI::String::createExpression(
+                                    LangAPI::String{.value = corelib::text::getEscapedAsStr(
+                                        static_cast<char>(c), true)}));
+                    } else if (member.isGroup()) {
+                        if (member.getGroup().values.size() != 1)
+                            throw Error("negated dynamic lexer group must match one character");
+                        self(self, *member.getGroup().values.front());
+                    } else if (member.isOp()) {
+                        for (const auto &option : member.getOp().options) self(self, *option);
+                    } else if (member.isName()) {
+                        const auto &name = member.getName().name;
+                        if (!visiting.insert(name).second || !tree.getTreeMap().contains(name))
+                            throw Error("unresolved or recursive dynamic lexer exclusion");
+                        const auto &rule = tree.getTreeMap().at(name);
+                        if (rule.rule_members.size() != 1)
+                            throw Error("negated dynamic lexer rule must match one character");
+                        self(self, *rule.rule_members.front());
+                        visiting.erase(name);
+                    } else throw Error("unsupported dynamic lexer pattern");
+                };
+                collect(collect, source.member);
+                LangAPI::Type strings{LangAPI::ValueType::Array};
+                strings.template_parameters.push_back(LangAPI::ValueType::String);
+                statements.push_back(LangAPI::Variable::createStatement(LangAPI::Variable{
+                    .name = "ispa_dynamic_choices", .type = strings,
+                    .value = LangAPI::Array::createExpression(std::move(choices))}));
+                const auto result = [&](std::size_t target) -> LangAPI::Statements {
+                    LangAPI::Expression next = target == NFA::NULL_STATE
+                        ? LangAPI::IspaLibSymbol::createExpression(LangAPI::IspaLibSymbol{
+                            .exports = LangAPI::StdlibExports::DfaNullState})
+                        : integer(target);
+                    return LangAPI::Return::createStatements(LangAPI::Return{
+                        .value = LangAPI::MakeTuple::createExpression(LangAPI::MakeTuple{
+                            .args = {next, LangAPI::Inheritance::createExpression(
+                                LangAPI::Inheritance{.name = LangAPI::Symbol{"Token"}})}})});
+                };
+                std::size_t next = NFA::NULL_STATE;
+                std::visit([&](const auto &target) {
+                    using T = std::decay_t<decltype(target)>;
+                    if constexpr (std::is_same_v<T, NFA::DFATarget>) next = target.id;
+                    else if constexpr (std::is_same_v<T, NFA::ActionTarget>)
+                        next = target.id + lexer_builder.getDFA().states.size();
+                    else next = target.id + lexer_builder.getDFA().states.size() + lexer_builder.getActionTable().size();
+                }, semantic_state.next_state);
+                auto match = LangAPI::IspaLibFunctionCall::createExpression(LangAPI::IspaLibFunctionCall{
+                    .symbol = LangAPI::IspaLibSymbol{.exports = LangAPI::StdlibExports::DfaDynamicMatch},
+                    .args = {symbol("cursor"), symbol("ispa_dynamic_choices"),
+                        LangAPI::Bool::createExpression(LangAPI::Bool{.value = source.member.negative_match}),
+                        LangAPI::String::createExpression(LangAPI::String{
+                            .value = source.member.quantifier == '*' ? "*" : ""})}});
+                statements.push_back(LangAPI::If::createStatement(LangAPI::If{
+                    std::move(match), result(next), result(NFA::NULL_STATE)}));
+                semantic_table_statements.push_back(std::move(statements));
+                continue;
+            }
             const auto &instance_symbol = std::get<LangAPI::Symbol>(semantic_state.instance_value.name);
             stdu::vector<std::string> token_name;
             for (const auto& part : instance_symbol.path) {
@@ -667,6 +787,8 @@ namespace LangRepr {
                 std::make_pair(LangAPI::Type {LangAPI::ValueType::NonOwnedString}, "start"),
                 std::make_pair(LangAPI::Type {LangAPI::ValueType::Int}, "length"),
                 std::make_pair(LangAPI::Type {LangAPI::ValueType::Int}, "line"),
+                std::make_pair(LangAPI::Type {LangAPI::ValueType::BorrowSemantic,
+                    LangAPI::Type{LangAPI::ValueType::NonOwnedString}}, "cursor"),
             },
             .is_static = false
         };
@@ -1016,6 +1138,8 @@ namespace LangRepr {
             {LangAPI::Type{LangAPI::ValueType::NonOwnedString}, "start"},
             {LangAPI::Type{LangAPI::ValueType::Int}, "length"},
             {LangAPI::Type{LangAPI::ValueType::Int}, "line"}
+            ,{LangAPI::Type{LangAPI::ValueType::BorrowSemantic,
+                LangAPI::Type{LangAPI::ValueType::NonOwnedString}}, "cursor"}
         };
         semantic_callback.statements = LangAPI::Return::createStatements(LangAPI::Return{
             .value = LangAPI::FunctionCall::createExpression(LangAPI::FunctionCall{
@@ -1025,7 +1149,8 @@ namespace LangRepr {
                     LangAPI::Symbol::createExpression(LangAPI::Symbol{"start_pos"}),
                     LangAPI::Symbol::createExpression(LangAPI::Symbol{"start"}),
                     LangAPI::Symbol::createExpression(LangAPI::Symbol{"length"}),
-                    LangAPI::Symbol::createExpression(LangAPI::Symbol{"line"})}})});
+                    LangAPI::Symbol::createExpression(LangAPI::Symbol{"line"}),
+                    LangAPI::Symbol::createExpression(LangAPI::Symbol{"cursor"})}})});
 
         lexer.data.push_back(
             std::make_pair(

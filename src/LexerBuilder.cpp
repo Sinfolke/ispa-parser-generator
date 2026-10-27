@@ -76,7 +76,7 @@ void LexerBuilder::build() {
     }
 
     // build actual NFA from NFA IR
-    NFA::TNFA::TNFABuilder builder(initial_nfa, dumper.isNfaDebug());
+    NFA::TNFA::TNFABuilder builder(initial_nfa, debug);
     builder.build();
     if (dumper.shouldDump("NFA")) {
         std::ofstream dumpNFAFile(dumper.makeDumpPath("NFA"));

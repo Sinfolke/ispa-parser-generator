@@ -1,0 +1,6 @@
+ISPA_EXTERN 1
+header "Parser.h"
+module "test" "main"
+symbol "test" "QUOTE_1" "Parser::Types::QUOTE_1" "Parser::Exports::symbol_0"
+symbol "test" "QUOTE_2" "Parser::Types::QUOTE_2" "Parser::Exports::symbol_1"
+symbol "test" "main" "Parser::Types::main" "Parser::Exports::symbol_2"

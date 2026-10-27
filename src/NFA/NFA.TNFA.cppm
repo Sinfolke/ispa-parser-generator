@@ -78,6 +78,7 @@ export namespace NFA::TNFA {
     auto wireAny(std::size_t current_state, const TokenID &source) -> std::size_t;
     auto wireCsequence(std::size_t current_state, const TokenID &source) -> std::size_t;
     auto wireEscaped(std::size_t current_state, const TokenID &source) -> std::size_t;
+    auto wireDynamic(std::size_t current_state, const TokenID &source) -> std::size_t;
     auto wireEpsilonActions(
         std::size_t current_state,
         ActionChain actions

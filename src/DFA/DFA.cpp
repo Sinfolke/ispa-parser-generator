@@ -183,7 +183,9 @@ void DFA::optimizeSemanticTable() {
       if (compacted[j].next_state == entry.next_state &&
           compacted[j].statements == entry.statements &&
           compacted[j].instance_value == entry.instance_value &&
-          compacted[j].nfa_index == entry.nfa_index) {
+          compacted[j].nfa_index == entry.nfa_index &&
+          compacted[j].dynamic_source == entry.dynamic_source &&
+          compacted[j].dynamic_captures == entry.dynamic_captures) {
         canonical_idx = j;
         break;
       }
@@ -343,6 +345,12 @@ auto DFA::minimize() -> States<State<>> {
     hash_combine(hash, uhash{}(semantic.instance_value));
 
     hash_combine(hash, uhash{}(semantic.statements));
+    if (semantic.dynamic_source)
+      hash_combine(hash, uhash{}(*semantic.dynamic_source));
+    for (const auto &capture : semantic.dynamic_captures) {
+      hash_combine(hash, uhash{}(capture.first));
+      hash_combine(hash, uhash{}(capture.second));
+    }
 
     // next_state is deliberately not used here.
     //

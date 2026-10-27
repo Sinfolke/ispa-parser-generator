@@ -303,6 +303,10 @@ public:
         for (const auto *path : {&closure.getActionsForState(best_state), &terminal})
             for (const auto &fired : *path) {
                 const auto *a = std::get_if<TNFA::ActionState>(&fired.raw);
+                if (path != &terminal) {
+                    const auto *semantic = std::get_if<TNFA::SemanticState>(&fired.raw);
+                    if (semantic && semantic->dynamic_source) continue;
+                }
                 if (!a || !isTagAction(*a))
                     add_unique(fired.raw);
             }
@@ -342,10 +346,22 @@ auto toRaw(const tdfa::Op &op) -> RawAction {
 auto toActions(const std::vector<tdfa::Op> &ops, const std::vector<RawAction> &passthrough)
     -> stdu::vector<RawAction> {
     stdu::vector<RawAction> out;
+    const bool dynamic = std::ranges::any_of(passthrough, [](const RawAction &raw) {
+        const auto *semantic = std::get_if<TNFA::SemanticState>(&raw);
+        return semantic && semantic->dynamic_source;
+    });
     for (const auto &op : ops)
-        out.push_back(toRaw(op));
+        if (!dynamic || !op.next) out.push_back(toRaw(op));
     for (const auto &raw : passthrough)
         out.push_back(raw);
+    if (dynamic)
+        for (auto op : ops)
+            if (op.next) {
+                // The semantic matcher has already advanced by the full
+                // runtime string. Record that boundary without another +1.
+                op.next = false;
+                out.push_back(toRaw(op));
+            }
     return out;
 }
 

@@ -996,8 +996,23 @@ void AST::Builder::build() {
         }
         throw std::runtime_error("negated lexer pattern must match one character");
     };
+    const auto containsDynamic = [&](const auto& self, const AST::RuleMember& member) -> bool {
+        if (std::ranges::any_of(member.features, [](const auto& feature) {
+            return std::holds_alternative<AST::DynamicPattern>(feature);
+        })) return true;
+        if (member.isGroup())
+            for (const auto& child : member.getGroup().values)
+                if (self(self, *child)) return true;
+        if (member.isOp())
+            for (const auto& child : member.getOp().options)
+                if (self(self, *child)) return true;
+        return false;
+    };
     const auto lowerNegations = [&](const auto& self, AST::RuleMember& member, bool lexer) -> void {
         if (member.negative_match && lexer) {
+            // A runtime operand cannot be complemented into a compile-time
+            // character set. Keep this group intact for the semantic matcher.
+            if (containsDynamic(containsDynamic, member)) return;
             auto operand = member;
             operand.negative_match = false;
             operand.quantifier = '\0';

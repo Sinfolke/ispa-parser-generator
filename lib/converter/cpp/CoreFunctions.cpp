@@ -296,6 +296,8 @@ auto Core::convertIspaLibSymbol(const LangAPI::IspaLibSymbol &symbol) -> std::st
             return "::ISPA_STD::DFA::API::TdfaLayout<" + convertTemplates(symbol.template_parameters) + ">";
         case LangAPI::StdlibExports::DfaCaptures:
             return (symbol.Const ? "const " : "") + std::string("::ISPA_STD::DFA::API::Captures") + (symbol.Reference ? "&" : "");
+        case LangAPI::StdlibExports::DfaDynamicMatch:
+            return "::ISPA_STD::DFA::API::dynamic_match";
         case LangAPI::StdlibExports::ASTPrinter:
             return "::ISPA_STD::ASTPrinter<std::ostream>";
         case LangAPI::StdlibExports::Concat:

@@ -559,7 +559,7 @@ int generate(Args args) {
     }
 
     std::filesystem::path output_path = args.output;
-    LexerBuilder lexer_data(ast);
+    LexerBuilder lexer_data(ast, args.nfa_debug);
     lexer_data.build();
 
     std::string name;
