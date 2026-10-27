@@ -8,11 +8,11 @@
 namespace ISPA_STD {
     namespace DFA::API {
         struct DFADebug;
-        inline auto null_state = std::numeric_limits<std::size_t>::max();
-        inline auto lexer_delete_state = null_state - 1;
+        inline constexpr auto null_state = std::numeric_limits<std::size_t>::max();
+        inline constexpr auto lexer_delete_state = null_state - 1;
         // Returned by a dynamic matcher (`$var`, `!(...)`) whose match failed: the lexer gives up
         // on this token exactly like a dead end in the table.
-        inline auto dynamic_fail_state = null_state - 2;
+        inline constexpr auto dynamic_fail_state = null_state - 2;
         // Same numbering as NFA::TNFA::Action, so the converter emits the value as is.
         enum class Action { UNDEF, SET, SET_NEXT, COPY, APPEND, APPEND_NEXT };
         template<std::size_t Classes>
