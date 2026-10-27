@@ -1,433 +1,181 @@
 # ISPA Parser Generator
 
-**ISPA** is a static parser and lexer generator written from scratch in modern C++ (C++23). You describe a grammar once; ISPA compiles it ahead of time into a lexer and parser that build a fully typed AST. Generated C++ targets C++17; Python output is also available.
-
-The [wiki](https://github.com/Sinfolke/ispa-parser-generator/wiki) covers setup, grammar syntax, generated APIs, algorithms, recovery, external parsers, packages, and debugging.
-
-**Usage demo**
-
-https://github.com/user-attachments/assets/97d0214b-8807-493c-8a55-3b1fb4ea41aa
-
-It is built around one idea: **easy to use, without giving up performance, extensibility, or features.** In benchmarks it is about 12x faster than ANTLR; see [Performance](#-performance).
-
----
+ISPA turns an `.isc` grammar into a lexer and parser that build a typed AST. It generates C++17 or Python code ahead of time; the generated parser does not need the ISPA compiler at runtime.
 
 ## Why ISPA
 
-1. **Static generation.** Everything is computed at generation time. The grammar is compiled to DFA tables and plain code. Nothing is generated, interpreted, or compiled at runtime.
-2. **Small target runtime.** Generated C++ uses headers and `core.cpp` from `parser/stdlibs`; generated Python imports `ispa_std`. Package exports can put these on your build or module path.
-3. **Multi-language output.** Code generation goes through **LangAPI**, a language-agnostic IR. **C++17 and Python** emitters are implemented; Python currently uses LL generation.
-4. **Extensible grammar descriptions.** Rules describe language structure and connect to generated parser code.
-5. **Scales from trivial to larger projects.** Incremental generation and grammar imports help organize and rebuild shared grammars. Feature-gated and parametrized module work remains on the roadmap.
-6. **Works out of the box.** Generate, include, call. The generated API returns a typed AST with no post-parsing step or callbacks required.
+- **Static generation:** grammars are compiled into lexer tables and target code ahead of time.
+- **Small target runtime:** C++ uses the installed ISPA runtime; Python uses the `ispa_std` package.
+- **C++ and Python output:** generate parsers in either language from the same grammar. Python currently supports LL generation.
+- **Typed ASTs:** generated parsers build typed syntax trees directly during parsing.
+- **Reusable grammars:** imports, external parsers, and incremental generation help organize larger grammars.
+- **Performance:** see the benchmark comparison below for the measured workloads and limits.
 
----
+## Install
 
-## 🚀 Current State
+Install the latest published release for your platform using the command for your OS. The installers are for the current user and do not need administrator access.
 
-| Area | Status |
-|---|---|
-| Compiler (frontend + backend) | Implemented; builds on **Windows** and **Linux** |
-| Bootstrap | **Done.** ISPA's own grammar is parsed by an ISPA-generated parser, which fully replaced the hand-written one |
-| Lexer (TDFA, AST-building tokens) | **Done** |
-| Lexer dynamic pattern matching | **Done** — dynamic patterns and negative matching |
-| Lexer variable capture | **Done** |
-| Parser (LL) | **Done** |
-| Parser (LR-family modes) | Less capable and experimental for now; see [LR backend status](docs/LR_STATUS.md) |
-| Incremental generation | Implemented (regenerates changed parts only) |
-| C++17 target | **Done**. New targets may temporary come without |
-| Python target | Implemented for LL generation; generated modules use `ispa_std` from the target runtime |
-| Dynamic regex (back-references, counts from earlier captures) | **Done** for lexer and parser |
-| Advanced rules | **Done** — LL C++ backend, match statements, embedded Python actions |
-| Fail blocks | **Done** — error recovery with skip, insert, replace, retry, abort |
-| Grammar syntax error reporting | Automatic LL recovery and source diagnostics; syntax errors stop generation |
-
-The backends lower grammar structure and AST captures to C++ or Python. Support for advanced actions and recovery differs by algorithm; see [LR backend status](docs/LR_STATUS.md).
-
----
-
-## Debugging generated parsers
-
-Generate and build a parser with the current generator, then run its existing executable under `ispadbg`:
+**Linux and macOS** (Linux x86_64 and macOS Apple Silicon releases are published):
 
 ```sh
-./ispadbg --purpose matching --purpose ast -b grammar.isc:12 \
-  --record parser-trace.json -- ./my-parser input.txt
-./ispadbg --replay parser-trace.json
+curl -fsSL https://raw.githubusercontent.com/Sinfolke/ispa-parser-generator/main/scripts/install.sh | sh
 ```
 
-For a graphical view, run `./ispadbg-gui` (or the installed `ispadbg-gui`).
-Choose a parser program, enter an input string, then click **Run**. The input
-is passed as one command-line argument by default, as in `examples/main.cpp`;
-choose **Standard input** for parsers that read stdin. Use **Step**, **Next**,
-**Finish**, and **Continue** while paused. Select any trace row to inspect its
-variables, including `ctx` and AST values, in the expandable tree. **Open
-trace** and **Save trace** use the same JSON format as `ispadbg --replay` and
-`--record`. The GUI uses Python's Tkinter and needs a desktop display.
+**Windows PowerShell**:
 
-Debug instrumentation is enabled by default when generating parsers. Pass
-`--no-debug-instrumentation` to `ispa` to omit generated source checkpoints,
-scope events, and value serialization. Pass `--debug-instrumentation` to
-explicitly enable them.
-
-Purpose IDs are `matching`, `failure`, and `ast`; `failure` is the default.
-The debugger prints the selected IDs at startup. The interactive commands are
-`s` (step), `n` (next), `f` (finish), `c` (continue), `b file:line` (breakpoint),
-`p [name]` (inspect a value), `ctx`, `back`, `forward`, and `live`. `back` and
-`forward` inspect recorded snapshots while the parser is paused; execution
-resumes from the live pause. Use `--no-interactive` to record without pausing.
-
-C++ generated code emits rule and production scopes, match outcomes, typed
-captures, source checkpoints for converted Python statements, and typed AST
-snapshots. The Python target uses the same v2 event protocol through
-`parser/stdlibs/target/ispa_debug.py`; include that directory in `PYTHONPATH`
-alongside `ispa_std.py` when running a generated Python parser. Traces are JSON
-and can be replayed after the parser exits.
-Live parser sessions currently require POSIX file descriptors; the Windows
-`ispadbg` executable supports offline `--replay` and help.
-
----
-
-## 🔁 Bootstrap
-
-ISPA is self-hosting for its own grammar. The `.isc` grammar that describes ISPA's input language was compiled by ISPA into the parser that ISPA now uses to read grammars, replacing the original hand-written parser. A Python-subset parser and a small module-scanner parser are generated the same way.
-
-The generated bootstrap parser is committed under `parser/ispa/bootstrapped_0` and is built with ISPA before the generator processes other grammars.
-
----
-
-## Editor support
-
-JetBrains plugin recognizes `.isc` files with semantic colors, completion, go-to-declaration, native parser diagnostics, and fail-block support. It is published on the JetBrains Marketplace. VS Code, Neovim, and Emacs extensions provide syntax highlighting and language features for `.isc` files. See the wiki for details.
-
----
-
-## External parsers
-
-An external import calls a separately generated parser and captures its original node type:
-
-```isc
-import extern python ispa_python as python;
-expr: @ python.expr {@};
+```powershell
+irm https://raw.githubusercontent.com/Sinfolke/ispa-parser-generator/main/scripts/install.ps1 | iex
 ```
 
-Use `--dep NAME PREFIX` to select an existing parser. `PREFIX` has no extension;
-ISPA reads `PREFIX.ispa-export` for exported symbols and uses `PREFIX.h` as its
-public header for C++ output or `PREFIX.py` for Python output. For example:
+Open a new terminal if needed, then check that `ispa` is available:
 
 ```sh
-ispa -l cpp -a LL --dir parser/ispa/grammar parser/ispa/entry.isc \
-  --dep python parser/python/bootstrapped/PyRawParser -o build/Parser
+ispa --help
 ```
 
-The generated C++ includes `<PyRawParser.h>` and uses `PyRawParser::Types`
-directly. Add the dependency directory to the compiler's include path and link
-its implementation as a static or shared library. The host does not generate
-copies of the imported parser's productions or types. Export entry declarations
-live in the dependency header; their definitions live in its `.cpp` file.
+The release also provides `ispa-pkg` for target libraries and `ispadbg` for parser debugging. To update ISPA, run `ispa-update`.
 
-With `--no-dep`, ISPA discovers external grammar modules in the supplied `--dir`
-directories and generates each dependency beside the host, using the external
-dependency name as its output prefix. C++ dependencies remain separate `.h`/`.cpp`
-files and must be compiled and linked by the build system. Nested dependencies
-are generated before their consumers; dependency cycles are diagnosed. Explicit
-`--dep` bindings may supply existing libraries while `--no-dep` builds the rest.
+## Install the standard library
 
-External parser calls currently require LL generation and lazy tokenization.
-An eager lexer rejects grammars containing external calls with an `AMBIGUOUS`
-diagnostic. Lazy calls re-lex the imported span with the target lexer so token
-payloads match the target parser, then resume the host lexer at the returned
-source position.
-
-For the Python target, generate with `-l python -a LL`. Put the generated
-modules and `parser/stdlibs/target` on `PYTHONPATH` so `ispa_std` is available:
-
-```sh
-PYTHONPATH=build:parser/stdlibs/target python3 -c 'import Parser; print(Parser.Parser().parse("input"))'
-```
-
-Python external imports use the generated dependency module (for example,
-`import Foreign`) and its exported parser bindings. Keep dependencies on
-`PYTHONPATH` beside the host parser. `--dep` and `--no-dep` work as above.
-
----
-
-## ⚡ Performance
-
-Lex + parse of the same input, compared against flex + bison (LALR(1)) and ANTLR (C++ target). Lower is better; the multiplier is relative to flex + bison without an AST.
-
-| Configuration | Notes | Time per iteration | Relative |
-|---|---|---|---|
-| flex + bison, no AST | Lex + LALR(1) parse, recognizes only | 119 ms | 1.0x |
-| flex + bison, AST, arena allocator | 3.36 M nodes, bump allocation | 151 ms | 1.3x |
-| flex + bison, AST, malloc | 3.36 M nodes; parse 219 ms + tree release 40 ms | 259 ms | 2.2x |
-| **ISPA**, allocations stripped | | 400 ms | 3.4x |
-| **ISPA**, full AST | | 1528 ms | 12.8x |
-| ANTLR (C++), CST construction disabled | | 18,573 ms | 156x |
-
-What this shows:
-- ISPA with a full AST is about **12x faster than ANTLR**, which was benchmarked with CST construction disabled.
-- ISPA is currently **slower than flex + bison**, roughly 6-10x when the latter builds a comparable AST. Closing that gap is ongoing work.
-
-Flex + bison figures are steady state over 10 iterations.
-
-- input: 9.7 MB
-- machine processor: intel core i5 12450h laptop
-- compiler: clang18, -O3
-- OS: GNU Linux – Linux Mint
-- ANTLR: 4.13.2
-- flex: 2.6.4
-- bison: 3.8.2
-- single run
----
-
-## Lexer Capabilities
-- Matches tokens with a compact **TDFA** (tagged DFA) table, which keeps captures and actions inside a single automaton
-- Builds AST-like tokens natively during lexing. **Capture only what you need**
-- Matches tokens inside other tokens without losing structure, preserving each capture's data type
-- Matches non-terminals inside terminals during lexing, separately from parsing *(not yet implemented)*
-
-## Parser Capabilities
-- LL is the production parser target and is actively growing; alternative LR-family modes currently support fewer grammar features and remain experimental
-- Builds a fully typed, easy-to-traverse AST during parsing. No post-parsing pass or callbacks required
-
----
-
-## Quick start
-
-Install ISPA from a release, install its standard library package, and enable
-the package exports for future shells:
+Install the `std` package once, then enable its environment exports:
 
 ```sh
 ispa-pkg install std
 ispa-pkg --export-permanent
 ```
 
-Open a new shell. The installed shell helper exposes the include paths and
-CMake targets; run `ispa-pkg --export` in that shell whenever you want to
-refresh them. Then create `grammar.isc`:
+Open a new bash, zsh, or PowerShell session. Package exports set the C++ header and library paths and Python module path. In a shell that was already open, refresh them with `ispa-pkg --export`. The package provides target runtime files such as the C++ headers and the Python `ispa_std` module. Installing `std` builds its C++ runtime archive, so a C++ compiler and archiver must be available.
+
+`ispa-pkg` also supports `list`, `update`, and installing libraries from GitHub or an archive. Run `ispa-pkg --help` for options. The default package root is under the current user's data directory; `ISPA_PKG_ROOT` can select another location.
+
+## Generate and run a parser
+
+Create `grammar.isc`:
 
 ```isc
-module main -> demo;
+module main -> main;
 
 NUMBER: @ [0-9]+ {@};
 main: @ NUMBER {@};
 ```
 
-Generate the C++ parser:
+The `main` rule is the entry rule. Generate C++ output:
 
 ```sh
-ispa -l cpp -a LL grammar.isc -o generated/Parser
+ispa -l cpp -a LL grammar.isc -o build/Parser
 ```
 
-Use the generated parser in your application and link the installed targets
-through CMake. In `CMakeLists.txt`:
+This produces `build/Parser.h` and `build/Parser.cpp`. A minimal `main.cpp` can parse a string and print the resulting AST:
+
+```cpp
+#include <iostream>
+#include <Parser.h>
+
+int main() {
+    Parser::Parser parser;
+    auto tree = parser.parse("123");
+    std::cout << tree << '\n';
+    for (const auto& error : parser.getErrors()) {
+        std::cerr << error.message << '\n';
+    }
+}
+```
+
+Compile with C++17 and link the installed runtime. With CMake, create `CMakeLists.txt`:
 
 ```cmake
 cmake_minimum_required(VERSION 3.20)
 project(demo LANGUAGES CXX)
 include("$ENV{ISPA_TARGETS_CMAKE}")
-add_executable(demo main.cpp generated/Parser.cpp)
+add_executable(demo main.cpp build/Parser.cpp)
 target_link_libraries(demo PRIVATE ISPA::Targets)
 ```
 
-This target supplies the installed ISPA headers and runtime libraries. See the
-[wiki](https://github.com/Sinfolke/ispa-parser-generator/wiki/Getting-Started)
-for a complete installed-user walkthrough, including Python output.
-
----
-
-## 🔮 Future Roadmap
-
-- [ ] **LR-family action and recovery support**; LL-only features need broader backend parity
-- [x] **Grammar syntax diagnostics with LL recovery** (further improvements ongoing)
-- [ ] **PLL algorithm**: finalize the custom Predictive LL algorithm to resolve left recursion in LL parsers while keeping structural parity with LR parsers
-- [ ] **Multi-target code generation**
-  - [x] Python target emitter for LL
-- [ ] **Full LR parser stabilization**: LR(1), LALR, and related modes
-- [ ] **Modules**: feature-gated modules, `disable feature X`, parametrized modules
-- [ ] **Grammar standard library**: JSON, XML, math expressions, C-like statements
-- [ ] Additional language and grammar-library features; see the [wiki roadmap](https://github.com/Sinfolke/ispa-parser-generator/wiki/Roadmap-and-Status)
-
----
-
-## Install ISPA
-
-ISPA has prebuilt GitHub Release archives for Linux x86_64, Windows x64, and macOS Apple Silicon (ARM64). macOS Intel is supported by the installer **only if** its release archive exists. All commands install for the current user, with no administrator privileges needed.
-
-### Library packages (`ispa-pkg`)
-
-Release installers provide `ispa-pkg` and `ispadbg` alongside `ispa`. For a
-source checkout, install both Python CLIs with `python3 -m pip install .`
-(Python 3.9+ and PyYAML). Tagged releases also publish standalone Nuitka builds
-named `ispa-pkg-<platform>` and `ispadbg-<platform>` (`.tar.gz`, or `.zip` on
-Windows) for the four supported Linux, Windows, and macOS targets. The ISPA
-platform archives include both executables, which the installers and updaters
-activate.
-The CLI lives in `cli/pkg`. Libraries are installed under
-`~/.local/share/ispa/libraries` by default on Linux and macOS, or under the
-ISPA installation directory when launched from an installed release; use
-`ISPA_PKG_ROOT` to choose another location for both commands (`ispa-pkg --root`
-changes only the package command). `ispa` searches the matching directory for
-grammar and `import py` libraries automatically.
-It also loads its bundled algorithm and converter plugins beside the executable.
-The installed package has `ispalib/grammar`,
-`ispalib/python`, `ispatarget/<language>`, and `ispaalgorithm` directories.
-When compiling generated target code, add its `ispatarget/<language>` directory
-to your compiler or interpreter search path.
-Installed external parser manifests (`NAME.ispa-export` beside `NAME.h` or
-`NAME.py`) also provide `--dep` bindings automatically. A package with one
-manifest can be referenced by its package name; an explicit `--dep` wins.
+Then build and run:
 
 ```sh
-ispa-pkg install std
-ispa-pkg install owner/repository --ref v1.2.0
-ispa-pkg install https://example.org/mylib.tar.gz --name mylib
-ispa-pkg update
-ispa-pkg list
-ispa-pkg catalog update
-ispa-pkg catalog list
+cmake -S . -B build-cmake
+cmake --build build-cmake
+./build-cmake/demo
 ```
 
-Run `ispa-pkg --export-permanent` once, then open a new bash, zsh, or PowerShell
-session. This installs a small shell function and loads the exports on startup.
-In that shell, `ispa-pkg --export` refreshes the exports in the current session
-without an `eval` command. The standalone executable prints shell code when the
-function is not loaded, because a child process cannot change its parent shell.
-Exports add C++ header and library directories to compiler and
-linker search paths, shared library directories to the runtime loader path,
-and Python target directories to `PYTHONPATH`. Existing search paths are
-preserved. The generated `ISPA_TARGETS_CMAKE` file defines `ISPA::Targets`
-with installed headers and libraries for CMake projects. During installation,
-`ispa-pkg` compiles each package's `ispatarget/cpp/**/*.cpp` files as C++17
-and archives them in `ispatarget/cpp/lib` (`lib<name>.a`, or `<name>.lib` with
-MSVC). This requires a C++ compiler and archiver; set `CXX`, `CXXFLAGS`, and
-`AR` to select the toolchain. Export also builds archives missing from older
-installations. The archive directory is added to `LIBRARY_PATH` (or `LIB` on
-Windows), and the archive path appears in `ISPA_CPP_LIBRARIES` and
-`ISPA_TARGETS_CMAKE`.
+For a non-CMake build, compile as C++17, add the installed `ispatarget/cpp` include directory, and link the installed ISPA target runtime libraries. `ispa-pkg --export` prints the paths and library names; compiler and linker flags vary by toolchain.
 
-For GCC and Clang, the C++ header search variables are `CPATH` and
-`CPLUS_INCLUDE_PATH`; `CPLUSPLUS_PATH` is not recognized. Generated C++ code
-and the target runtime build with C++17, for example
-`clang++ -std=c++17 -c Parser.cpp` after loading the exports. An already
-installed `ispa-pkg` executable and `std` library package must be updated to
-receive changes made in this source checkout.
+### Generate Python
 
-The catalog is [`ispa-libraries.yaml`](ispa-libraries.yaml) at the repository
-root. `catalog update` fetches the current file from GitHub into the local
-package root; `--catalog FILE` selects another YAML catalog. A catalog entry
-specifies `github: owner/repository` with optional `ref`, or `archive: URL`.
-Installed GitHub packages update when their commit changes. Archives and local
-directories update when their contents change. `--force` reinstalls a package.
-
-Library repositories may provide `ispa-package.yaml` at their root. The
-[`ispa-package.yaml`](ispa-package.yaml) in this repository demonstrates the
-standard library: its source is `parser/stdlibs`, with renamed folders mapped
-to their standard destinations. Without a config, package sources are read
-from `ispalib/grammar`, `ispalib/python`, `ispatarget/cpp`,
-`ispatarget/python`, and `ispaalgorithm`. A config can also use `layout.root`
-for a `release` directory, or `archive: release/library.zip` to unpack an
-archive from the repository before applying the layout. An `install` list of
-repository relative `.py` or shell script paths runs after copying files;
-scripts receive the staged destination as their first argument. Pass
-`--allow-scripts` to install or update a package that declares scripts.
-Use `layout.files` to map individual files such as `target/ispa_std.py`.
-LL and LR algorithm plugins are bundled with ISPA; they are not part of `std`.
-
-### Linux and macOS
-
-Review [scripts/install.sh](scripts/install.sh), then install with:
+Generate Python output with the LL algorithm:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/Sinfolke/ispa-parser-generator/main/scripts/install.sh | sh
+ispa -l python -a LL grammar.isc -o build/Parser
 ```
 
-This downloads the newest **published** GitHub Release for your OS and architecture. The binary is linked as `~/.local/bin/ispa`. Make sure `~/.local/bin` is on your `PATH`, then run:
+The generated module uses `ispa_std` from the installed `std` package. With package exports loaded, run it with:
 
 ```sh
-ispa --help
+python3 -c 'import sys; sys.path.insert(0, "build"); import Parser; print(Parser.Parser().parse("123"))'
 ```
 
-For an exact version:
+If Python does not inherit `PYTHONPATH`, set it to include both the generated module directory and the installed `ispatarget/python` directory. `ispa-pkg --export` configures this path for the active shell.
+
+Use `ispa --help` to see all current generation options, including algorithm, output directory, grammar search directories, dependency bindings, and debug instrumentation settings.
+
+## What the generator supports
+
+- **C++17:** LL is the recommended and most complete parser backend.
+- **Python:** LL generation is implemented. Generated code imports the `ispa_std` target runtime.
+- **Lexing:** token patterns, captures, nested token data, dynamic patterns, and negative matching.
+- **AST:** typed AST values are built during parsing and can be traversed in the generated target language.
+- **Grammar tools:** grammar imports, incremental generation, and automatic grammar diagnostics.
+- **Recovery and actions:** LL supports advanced rules, embedded Python actions, and fail-block recovery strategies.
+- **External parsers:** a grammar can call another generated parser and keep its node type. External calls require LL and lazy tokenization. See the short overview below.
+
+## Performance
+
+Lexing and parsing the same 9.7 MB input, compared with flex + bison (LALR(1)) and ANTLR (C++ target). Lower time is faster; the relative column uses flex + bison without an AST as its baseline.
+
+| Configuration | Notes | Time per iteration | Relative |
+|---|---|---:|---:|
+| flex + bison, no AST | Recognizes input only | 119 ms | 1.0x |
+| flex + bison, AST, arena allocator | 3.36 M nodes, bump allocation | 151 ms | 1.3x |
+| flex + bison, AST, malloc | 3.36 M nodes; includes tree release | 259 ms | 2.2x |
+| **ISPA**, allocations stripped | | 400 ms | 3.4x |
+| **ISPA**, full AST | | 1528 ms | 12.8x |
+| ANTLR (C++), CST construction disabled | | 18,573 ms | 156x |
+
+In this benchmark, ISPA with a full AST was about 12x faster than ANTLR with CST construction disabled. ISPA was slower than flex + bison, roughly 6–10x when flex + bison built a comparable AST. Results are workload and machine specific; the measurements used a Core i5-12450H laptop, Clang 18 with `-O3`, Linux Mint, ANTLR 4.13.2, flex 2.6.4, and bison 3.8.2. Flex + bison numbers are steady state over 10 iterations; other figures were single runs.
+
+## Limitations
+
+- **Choose LL for applications.** LR-family modes are experimental and support fewer grammar features. Some LL actions and recovery features do not have LR equivalents.
+- **Python supports LL only.** Do not assume C++ backend options or features work in generated Python parsers.
+- **External parser calls have constraints.** They require LL and lazy tokenization; an eager lexer is rejected when the grammar contains external calls. Each dependency must be generated or supplied, and C++ dependency code must be compiled and linked.
+- **Generated code needs a target runtime.** C++ projects need the installed headers and libraries; Python projects need `ispa_std` importable. Installing the compiler alone does not install a project's build dependencies.
+- **C++ output requires C++17.** ISPA itself has stricter build requirements described under [Build from source](#build-from-source).
+- **Platform availability varies.** Release archives are provided for Linux x86_64, Windows x64, and macOS Apple Silicon. Check the releases for current artifacts; macOS Intel is supported only when an archive is published.
+- **Editor extensions vary in maturity.** The JetBrains plugin is the supported, tested editor integration. VS Code, Neovim, and Emacs extensions are not tested at all.
+
+## Editor support
+
+The JetBrains plugin is available on the JetBrains Marketplace and provides `.isc` syntax highlighting, completion, navigation, diagnostics, and fail-block support. Extensions for VS Code, Neovim, and Emacs also exist, but extensions other than the JetBrains plugin have not been tested by this project.
+
+## External parsers
+
+External imports let one grammar reuse a separately generated parser and return its native AST node. ISPA can bind a dependency that is already installed or generate discovered grammar dependencies alongside the host parser. This is useful for splitting grammars into reusable pieces. External calls currently require LL generation and lazy tokenization; C++ consumers must compile and link each dependency. See `ispa --help` for `--dep` and `--no-dep` options.
+
+## Debugging generated parsers
+
+Generated parsers include debug instrumentation by default. `ispadbg` runs a parser with breakpoints, lets you step through matching and AST construction, and can record a JSON trace for replay after the parser exits. For example:
 
 ```sh
-ISPA_VERSION=v1.1.0 sh -c "$(curl -fsSL https://raw.githubusercontent.com/Sinfolke/ispa-parser-generator/main/scripts/install.sh)"
+ispadbg --purpose matching --purpose ast -b grammar.isc:4 \
+  --record parser-trace.json -- ./demo 123
+ispadbg --replay parser-trace.json
 ```
 
-### Windows (PowerShell)
+Purpose filters include `matching`, `failure`, and `ast`; `failure` is the default. The interactive debugger can step, continue, inspect values, and navigate recorded snapshots. Python parser traces use the same protocol; make sure the installed target runtime and generated parser are on `PYTHONPATH`. Live debugger sessions require POSIX file descriptors, so on Windows use offline trace replay. Pass `--no-debug-instrumentation` to `ispa` if you want to omit generated debug events.
 
-Review [scripts/install.ps1](scripts/install.ps1), then run:
+## Build from source
 
-```powershell
-irm https://raw.githubusercontent.com/Sinfolke/ispa-parser-generator/main/scripts/install.ps1 | iex
-```
+Most users should install a release. Building the generator itself currently requires CMake, vcpkg dependencies, and Clang with libc++ on Linux. GCC is not supported for building ISPA at this time. Windows builds use the MSVC toolchain; the Clang setup is not tested on Windows. See the repository's `vcpkg.json` and CMake toolchain files for build configuration.
 
-Open a new terminal and run `ispa --help`. The installer creates `%LOCALAPPDATA%\Programs\ISPA\bin\ispa.cmd` and adds that directory to your **user** PATH.
-
-To install a particular published tag:
-
-```powershell
-$env:ISPA_VERSION = 'v1.1.0'
-irm https://raw.githubusercontent.com/Sinfolke/ispa-parser-generator/main/scripts/install.ps1 | iex
-```
-
-### Change install location
-
-On Linux/macOS, set `ISPA_INSTALL_DIR` and/or `ISPA_BIN_DIR` before running the installer. On Windows, set the same environment variables in PowerShell before executing the script.
-
-### Updating and removing
-
-Update:
-```sh
-ispa-update
-```
-
-To remove ISPA on Linux/macOS (with default paths):
-
-```sh
-rm -f "$HOME/.local/bin/ispa"
-rm -rf "${XDG_DATA_HOME:-$HOME/.local/share}/ispa"
-```
-
-On Windows (with default paths), remove `%LOCALAPPDATA%\Programs\ISPA`, and delete that folder's `bin` entry from your user PATH.
-
----
-
-## 🛠️ Build & Requirements
-1. Clang with libc++ on the latest Ubuntu
-2. MSVC `clang-cl` on Windows
-3. CMake 4.5.0-rc1, plus dependencies in `vcpkg.json`
-
-**Note: you will not be able to build ISPA with GCC yet.**
-**Note: the Clang build is not tested on Windows.**
-
-### Build on Ubuntu
-Configure. **Change `ISPA_SOURCE_DIR` to your local path:**
-```sh
-export ISPA_SOURCE_DIR=/path/to/ispa-parser
-export CC=clang-20
-export CXX=clang++-20
-export CFLAGS="-stdlib=libc++"
-export CXXFLAGS="-stdlib=libc++"
-export LDFLAGS="-stdlib=libc++"
-cmake -B cmake-build-release \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_TOOLCHAIN_FILE=~/vcpkg/scripts/buildsystems/vcpkg.cmake \
-  -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$ISPA_SOURCE_DIR/cmake/toolchains/clang-libcxx.cmake \
-  -DVCPKG_TARGET_TRIPLET=x64-linux-libcxx \
-  -DVCPKG_OVERLAY_TRIPLETS=$ISPA_SOURCE_DIR/cmake/triplets
-```
-Build:
-```sh
-cmake --build cmake-build-release
-```
-
-### Build on Windows
-- Change `CMAKE_TOOLCHAIN_FILE` to your vcpkg installation path if this does not work
-- You might need to set `CMAKE_CXX_COMPILER` to `cl.exe`
-- You might need to configure other variables MSVC requires
-```bat
-cmake -B cmake-build-release -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="%VCPKG_INSTALLATION_ROOT%/scripts/buildsystems/vcpkg.cmake"
-cmake --build cmake-build-release
-```
+For details about grammar syntax, generated APIs, algorithms, and implementation internals, see the [ISPA wiki](https://github.com/Sinfolke/ispa-parser-generator/wiki).
