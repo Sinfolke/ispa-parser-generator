@@ -309,8 +309,7 @@ jobs:
         run: |
           set -euo pipefail
           
-          conda install -y -c conda-forge llvmdev=23 clangdev=23
-          
+          conda install -y -c conda-forge llvmdev=23 clangdev=23 icu          
           # Use CONDA_PREFIX (points to the currently active environment)
           LLVM_PREFIX="$CONDA_PREFIX"
           
