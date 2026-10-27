@@ -30,24 +30,25 @@ It is built around one idea: **easy to use, without giving up performance, exten
 | Compiler (frontend + backend) | Implemented; builds on **Windows** and **Linux** |
 | Bootstrap | **Done.** ISPA's own grammar is parsed by an ISPA-generated parser, which fully replaced the hand-written one |
 | Lexer (TDFA, AST-building tokens) | **Done** |
-| Parser (LL) | Production target; actively growing, with further work and testing ongoing |
+| Lexer dynamic pattern matching | **Done** — dynamic patterns and negative matching |
+| Lexer variable capture | **Done** |
+| Parser (LL) | **Done** |
 | Parser (LR-family modes) | Less capable and experimental for now; see [LR backend status](docs/LR_STATUS.md) |
 | Incremental generation | Implemented (regenerates changed parts only) |
-| C++17 target | Implemented; output compiles and runs |
+| C++17 target | **Done**. New targets may temporary come without |
 | Python target | Implemented for LL generation; generated modules use `ispa_std` from the target runtime |
-| Dynamic regex (back-references, counts from earlier captures) | Syntax parsed, **not yet lowered to output** |
+| Dynamic regex (back-references, counts from earlier captures) | **Done** for lexer and parser |
+| Advanced rules | **Done** — LL C++ backend, match statements, embedded Python actions |
+| Fail blocks | **Done** — error recovery with skip, insert, replace, retry, abort |
 | Grammar syntax error reporting | Automatic LL recovery and source diagnostics; syntax errors stop generation |
 
 The backends lower grammar structure and AST captures to C++ or Python. Support for advanced actions and recovery differs by algorithm; see [LR backend status](docs/LR_STATUS.md).
 
+---
+
 ## Debugging generated parsers
 
-For `.isc` editor diagnostics and navigation, see the [ISPA language server](docs/LSP.md),
-the [VS Code extension](plugins/vscode/README.md), and the
-[JetBrains plugin](plugins/jebtrains/README.md).
-
-Generate and build a parser with the current generator, then run its existing
-executable under `ispadbg`:
+Generate and build a parser with the current generator, then run its existing executable under `ispadbg`:
 
 ```sh
 ./ispadbg --purpose matching --purpose ast -b grammar.isc:12 \
@@ -93,12 +94,17 @@ ISPA is self-hosting for its own grammar. The `.isc` grammar that describes ISPA
 
 The generated bootstrap parser is committed under `parser/ispa/bootstrapped_0` and is built with ISPA before the generator processes other grammars.
 
-<!-- TODO: optional, add the generated grammar's size (rules, tokens, lines) -->
+---
+
+## Editor support
+
+JetBrains plugin recognizes `.isc` files with semantic colors, completion, go-to-declaration, native parser diagnostics, and fail-block support. It is published on the JetBrains Marketplace. VS Code, Neovim, and Emacs extensions provide syntax highlighting and language features for `.isc` files. See the wiki for details.
+
+---
 
 ## External parsers
 
-An external import calls a separately generated parser and captures its original
-node type:
+An external import calls a separately generated parser and captures its original node type:
 
 ```isc
 import extern python ispa_python as python;
@@ -185,10 +191,6 @@ Flex + bison figures are steady state over 10 iterations.
 - LL is the production parser target and is actively growing; alternative LR-family modes currently support fewer grammar features and remain experimental
 - Builds a fully typed, easy-to-traverse AST during parsing. No post-parsing pass or callbacks required
 
-## Advanced rules and fail blocks
-
-See the separate [Advanced Rules and Fail Blocks guide](concept/ADVANCED_RULES_AND_FAIL_BLOCKS.md).
-
 ---
 
 ## Quick start
@@ -237,7 +239,7 @@ for a complete installed-user walkthrough, including Python output.
 
 ## 🔮 Future Roadmap
 
-- [ ] **Lexer/LR actions and dynamic regex** in generated code
+- [ ] **LR-family action and recovery support**; LL-only features need broader backend parity
 - [x] **Grammar syntax diagnostics with LL recovery** (further improvements ongoing)
 - [ ] **PLL algorithm**: finalize the custom Predictive LL algorithm to resolve left recursion in LL parsers while keeping structural parity with LR parsers
 - [ ] **Multi-target code generation**
@@ -245,7 +247,9 @@ for a complete installed-user walkthrough, including Python output.
 - [ ] **Full LR parser stabilization**: LR(1), LALR, and related modes
 - [ ] **Modules**: feature-gated modules, `disable feature X`, parametrized modules
 - [ ] **Grammar standard library**: JSON, XML, math expressions, C-like statements
-- [ ] Features described in **concepts/**
+- [ ] Additional language and grammar-library features; see the [wiki roadmap](https://github.com/Sinfolke/ispa-parser-generator/wiki/Roadmap-and-Status)
+
+---
 
 ## Install ISPA
 
@@ -302,6 +306,7 @@ MSVC). This requires a C++ compiler and archiver; set `CXX`, `CXXFLAGS`, and
 installations. The archive directory is added to `LIBRARY_PATH` (or `LIB` on
 Windows), and the archive path appears in `ISPA_CPP_LIBRARIES` and
 `ISPA_TARGETS_CMAKE`.
+
 For GCC and Clang, the C++ header search variables are `CPATH` and
 `CPLUS_INCLUDE_PATH`; `CPLUSPLUS_PATH` is not recognized. Generated C++ code
 and the target runtime build with C++17, for example
@@ -372,6 +377,7 @@ irm https://raw.githubusercontent.com/Sinfolke/ispa-parser-generator/main/script
 On Linux/macOS, set `ISPA_INSTALL_DIR` and/or `ISPA_BIN_DIR` before running the installer. On Windows, set the same environment variables in PowerShell before executing the script.
 
 ### Updating and removing
+
 Update:
 ```sh
 ispa-update

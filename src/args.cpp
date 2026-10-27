@@ -23,7 +23,8 @@ Args parse_args(int argc, char** argv) {
     app.add_flag("--debug-instrumentation,!--no-debug-instrumentation", args.debug_instrumentation,
         "Emit ispadbg source checkpoints and typed parser state");
     app.add_flag("--logs", args.logs, "Output logs into Logs directory");
-    app.add_flag("--nfa-debug,!--no-nfa-debug", args.nfa_debug, "Track debug provenance (TokenID/CharOrigin) inside the TNFA");
+    app.add_flag("--nfa-debug,!--no-nfa-debug", args.nfa_debug,
+                 "Track TNFA provenance and trace capture boundaries through TNFA/TDFA generation");
     app.add_option("--dump", args.dump, "Dump certain parts of program")->expected(0, -1);
     app.add_option("--ddall", args.dump_all, "Dump everything from program")->expected(0);
     app.add_option("--dd", args.dump_dir, "Directory where to dump");

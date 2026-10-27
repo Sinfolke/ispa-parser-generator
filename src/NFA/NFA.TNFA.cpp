@@ -88,7 +88,7 @@ namespace NFA::TNFA {
     // them per node piled the ENDs of every predecessor onto the one edge that
     // consumes the shared successor, so `"!="` reaching a joined successor
     // fired END for `"=="` too, and the join edge itself carried nothing.
-    auto generate_incoming_edges(const Token &token) -> IncomingEdges {
+    auto generate_incoming_edges(const Token &token, bool trace_captures) -> IncomingEdges {
         IncomingEdges result;
 
         utype::unordered_set<TokenID> reachable;
@@ -100,6 +100,20 @@ namespace NFA::TNFA {
         }
 
         auto add = [&](const std::string &next_key, std::string pred, BoundaryEvents events) {
+            if (trace_captures && !events.empty()) {
+                std::cerr << "[nfa-capture-boundary] token=";
+                ::operator<<(std::cerr, token.name);
+                std::cerr << " pred=" << (pred.empty() ? "<root>" : pred)
+                          << " next=" << next_key << " events=";
+                for (std::size_t i = 0; i < events.size(); ++i) {
+                    const auto &event = events[i];
+                    if (i) std::cerr << ',';
+                    std::cerr << (event.kind == CaptureBoundaries::Kind::Begin ? "BEGIN" : "END")
+                              << "#" << generateVariable(event.capture)
+                              << "(cap=" << event.capture.position_in_token << ')';
+                }
+                std::cerr << '\n';
+            }
             auto &list = result.by_next[next_key];
             for (const auto &e : list) {
                 if (e.pred == pred)
@@ -376,7 +390,7 @@ namespace NFA::TNFA {
                    })) {
             end_state = wireDynamic(current_state, source);
         } else if (source.member.isNospace()) {
-            return current_state;
+            end_state = current_state;
         } else throw Error("NFA.TNFA.cpp: wireMember: cannot wire member {}", source.member);
         ActionChain entry_actions;
         ActionChain exit_actions;
@@ -397,6 +411,7 @@ namespace NFA::TNFA {
                         : Action::END,
                     .variable = generateVariable(event.capture),
                     .operand_a = captureId(event.capture),
+                    .position_in_token = event.capture.position_in_token,
                     .before_char = event.position == CaptureBoundaries::Position::Entry,
                     .list_capture = captureIsList(event.capture),
                 };
@@ -407,6 +422,27 @@ namespace NFA::TNFA {
                     exit_actions.push_back(std::move(action));
                 }
             }
+        }
+
+        // A zero-width member has no character transition on which to place
+        // its incoming/outgoing capture events. Preserve them on an epsilon
+        // edge so closure processing records the boundary at the current
+        // input position (after a preceding dynamic matcher, if there was one).
+        if (end_state == current_state) {
+            ActionChain zero_width_actions = std::move(entry_actions);
+            zero_width_actions.insert(zero_width_actions.end(),
+                exit_actions.begin(), exit_actions.end());
+            if (zero_width_actions.empty()) return current_state;
+            if (debug) {
+                std::cerr << "[nfa-capture-zero-width] state=" << current_state
+                          << " member=" << generateVariable(source) << " actions=";
+                for (const auto &raw : zero_width_actions)
+                    if (const auto *action = std::get_if<ActionState>(&raw))
+                        std::cerr << (action->action == Action::BEGIN ? "BEGIN" : "END")
+                                  << '#' << action->operand_a << ',';
+                std::cerr << '\n';
+            }
+            return wireEpsilonActions(current_state, std::move(zero_width_actions));
         }
 
         // Entry actions belong on the transition(s) consuming this member's
@@ -482,7 +518,7 @@ namespace NFA::TNFA {
         for (const auto &transition : token.transitions) {
             outgoing.emplace(generateVariable(transition.first), &transition.second);
         }
-        const auto incoming = generate_incoming_edges(token);
+        const auto incoming = generate_incoming_edges(token, debug);
         static const BoundaryEvents no_events;
         auto events_for = [&](const std::string &key, const std::string &pred) -> const BoundaryEvents & {
             if (const auto it = incoming.by_next.find(key); it != incoming.by_next.end()) {
@@ -500,6 +536,7 @@ namespace NFA::TNFA {
                     .action = event.kind == CaptureBoundaries::Kind::Begin ? Action::BEGIN : Action::END,
                     .variable = generateVariable(event.capture),
                     .operand_a = captureId(event.capture),
+                    .position_in_token = event.capture.position_in_token,
                     .before_char = event.position == CaptureBoundaries::Position::Entry,
                     .list_capture = captureIsList(event.capture),
                 });
@@ -511,8 +548,9 @@ namespace NFA::TNFA {
         // plain epsilons: one per (from, to)
         std::set<std::pair<std::size_t, std::size_t>> epsilon_joined;
 
-        std::function<std::size_t(std::size_t, const TokenID &, const std::string &)> visit;
-        visit = [&](std::size_t current_state, const TokenID &id, const std::string &pred) -> std::size_t {
+        std::function<std::size_t(std::size_t, const TokenID &, const std::string &, BoundaryEvents)> visit;
+        visit = [&](std::size_t current_state, const TokenID &id, const std::string &pred,
+                    BoundaryEvents inherited_events) -> std::size_t {
             if (id.member.empty())
                 return current_state;
 
@@ -529,7 +567,32 @@ namespace NFA::TNFA {
                     return std::holds_alternative<AST::DynamicPattern>(feature);
                 });
 
+            if (debug && (!my_events.empty() || !inherited_events.empty())) {
+                std::cerr << "[nfa-capture-visit] token=";
+                ::operator<<(std::cerr, token.name);
+                std::cerr << " state=" << current_state << " pred="
+                          << (pred.empty() ? "<root>" : pred) << " id=" << key
+                          << " terminal=" << is_terminal << " local=" << my_events.size()
+                          << " inherited=" << inherited_events.size() << '\n';
+            }
+
             if (const auto cached = end_of.find(key); cached != end_of.end()) {
+                if (debug && (!my_events.empty() || !inherited_events.empty())) {
+                    const auto entry = entry_of.find(key);
+                    std::size_t char_edges = 0;
+                    std::size_t epsilon_edges = 0;
+                    if (entry != entry_of.end()) {
+                        for (const auto &[_, edges] : states[entry->second].transitions)
+                            char_edges += edges.size();
+                        epsilon_edges = states[entry->second].epsilon_transitions.size();
+                    }
+                    std::cerr << "[nfa-capture-cache-hit] state=" << current_state << " id=" << key
+                              << " cached_entry=" << (entry == entry_of.end() ? NULL_STATE : entry->second)
+                              << " split=" << is_split << " terminal=" << is_terminal
+                              << " local=" << my_events.size() << " inherited=" << inherited_events.size()
+                              << " cached_char_edges=" << char_edges
+                              << " cached_epsilon_edges=" << epsilon_edges << '\n';
+                }
                 // `id` is already wired: join this predecessor to it.
                 if (const auto entry = entry_of.find(key); entry != entry_of.end() && entry->second != current_state && joined.emplace(current_state, key, pred).second) {
                     if (is_split && is_terminal) {
@@ -542,6 +605,17 @@ namespace NFA::TNFA {
                         // capture). So give this predecessor its OWN copy of
                         // id's first-character edges, carrying only its events.
                         const auto entry_transitions = states[entry->second].transitions;
+                        if (debug && my_events.size()) {
+                            std::size_t copied = 0;
+                            for (const auto &[_, edges] : entry_transitions)
+                                copied += std::ranges::count_if(edges, [&](const auto &edge) {
+                                    return edge.source == id;
+                                });
+                            std::cerr << "[nfa-capture-cache-split] id=" << key
+                                      << " predecessor=" << current_state
+                                      << " first_char_edges=" << copied
+                                      << " events=" << my_events.size() << '\n';
+                        }
                         for (const auto &[c, tvs] : entry_transitions) {
                             for (const auto &t : tvs) {
                                 if (!(t.source == id))
@@ -564,8 +638,10 @@ namespace NFA::TNFA {
             // First wiring: the events of THIS predecessor go on the
             // consuming edge(s); later predecessors get their own clone.
             std::unordered_map<std::string, CaptureBoundaries> edge_boundaries;
-            if (!my_events.empty())
-                edge_boundaries[key].events = my_events;
+                if (!my_events.empty())
+                    edge_boundaries[key].events = my_events;
+                edge_boundaries[key].events.insert(edge_boundaries[key].events.end(),
+                    inherited_events.begin(), inherited_events.end());
 
             if (is_terminal) {
                 end_state = wireMember(current_state, id, edge_boundaries);
@@ -590,7 +666,10 @@ namespace NFA::TNFA {
                     if (transition.first != id)
                         continue;
                     for (const auto &alt : transition.second) {
-                        end_state = visit(current_state, alt, pred);
+                        BoundaryEvents child_entry_events = my_events;
+                        child_entry_events.insert(child_entry_events.end(),
+                            inherited_events.begin(), inherited_events.end());
+                        end_state = visit(current_state, alt, pred, std::move(child_entry_events));
                     }
                 }
 
@@ -601,9 +680,20 @@ namespace NFA::TNFA {
             end_of.emplace(key, end_state);
             entry_of.emplace(key, current_state);
 
+            // For a nested token reference, its incoming boundaries are
+            // propagated to the nested token's first consuming edge above.
             ActionChain capture_actions;
             if (!is_terminal)
-                capture_actions = to_actions(my_events);
+                for (const auto &event : my_events)
+                    if (event.kind == CaptureBoundaries::Kind::End)
+                        capture_actions.push_back(ActionState{
+                            .action = Action::END,
+                            .variable = generateVariable(event.capture),
+                            .operand_a = captureId(event.capture),
+                            .position_in_token = event.capture.position_in_token,
+                            .before_char = event.position == CaptureBoundaries::Position::Entry,
+                            .list_capture = captureIsList(event.capture),
+                        });
 
             // Only a genuine nested-token reference (`@ SYMBOL`) reduces into its own
             // Token instance here. A plain group capture (`@ ( ... )` around raw
@@ -615,6 +705,31 @@ namespace NFA::TNFA {
             if (const auto edges = outgoing.find(key); edges != outgoing.end()) {
                 for (const auto &alt : *edges->second) {
                     if (alt.nested_completion) {
+                        // A capture carried by a nested call can first appear
+                        // on its zero-width completion marker. Its BEGIN still
+                        // belongs before the call's first character, so move
+                        // those events back to the entry edges that were wired
+                        // from current_state.
+                        if (const auto completion = incoming.by_next.find(generateVariable(alt));
+                            completion != incoming.by_next.end()) {
+                            for (const auto &incoming_edge : completion->second) {
+                                if (incoming_edge.pred != key) continue;
+                                for (const auto &event : incoming_edge.events) {
+                                    if (event.kind != CaptureBoundaries::Kind::Begin) continue;
+                                    ActionState begin{
+                                        .action = Action::BEGIN,
+                                        .variable = generateVariable(event.capture),
+                                        .operand_a = captureId(event.capture),
+                                        .position_in_token = event.capture.position_in_token,
+                                        .before_char = true,
+                                        .list_capture = captureIsList(event.capture),
+                                    };
+                                    for (auto &[_, transitions] : states[current_state].transitions)
+                                        for (auto &transition : transitions)
+                                            transition.actions.push_back(begin);
+                                }
+                            }
+                        }
                         // Explicit nested completion: generate reduction statements,
                         // but DO NOT create a standalone lexer accept binding.
                         markAccept(end_state, alt, token, end_state,
@@ -631,6 +746,7 @@ namespace NFA::TNFA {
                                             .action = Action::END,
                                             .variable = generateVariable(**it),
                                             .operand_a = captureId(**it),
+                                            .position_in_token = (**it).position_in_token,
                                             .list_capture = captureIsList(**it),
                                         });
                                     }
@@ -638,7 +754,7 @@ namespace NFA::TNFA {
                                                std::move(close_host));
                                     continue;
                                 }
-                                visit(end_state, after, generateVariable(alt));
+                                visit(end_state, after, generateVariable(alt), {});
                             }
                         }
                         continue;
@@ -654,6 +770,7 @@ namespace NFA::TNFA {
                                 .action = Action::END,
                                 .variable = generateVariable(**it),
                                 .operand_a = captureId(**it),
+                                .position_in_token = (**it).position_in_token,
                                 .list_capture = captureIsList(**it),
                             });
                         }
@@ -672,14 +789,26 @@ namespace NFA::TNFA {
                         // iteration opens/closes nothing (same captures on
                         // both sides), so those must not repeat per char.
                         for (auto &[c, tvs] : states[end_state].transitions) {
+                            std::erase_if(tvs, [&](const TransitionValue &transition) {
+                                if (transition.next != end_state || transition.source != id)
+                                    return false;
+                                return std::ranges::any_of(transition.actions, [](const RawAction &raw) {
+                                    const auto *semantic = std::get_if<SemanticState>(&raw);
+                                    return semantic && semantic->dynamic_source.has_value();
+                                });
+                            });
                             for (auto &t : tvs) {
                                 if (t.next == end_state && t.source == id)
+                                    // Dynamic `*` matchers consume the whole repeated
+                                    // run themselves. Replaying their semantic action on
+                                    // the NFA self-loop starts another run after the
+                                    // delimiter has already been matched.
                                     t.actions.clear();
                             }
                         }
                         continue;
                     }
-                    visit(end_state, alt, key);
+                    visit(end_state, alt, key, {});
                 }
             }
 
@@ -698,16 +827,32 @@ namespace NFA::TNFA {
             for (const auto &alt : transition.second) {
                 // A self-loop (`[ws]+`) must not make an id look "referenced":
                 // its only referrer is itself, so it is still an entry point.
-                if (!alt.member.empty() && generateVariable(alt) != self_key) {
+                if (alt.nested_completion ||
+                    (!alt.member.empty() && generateVariable(alt) != self_key)) {
                     referenced.insert(generateVariable(alt));
                 }
             }
         }
 
-        for (const auto &transition : token.transitions) {
-            if (referenced.contains(generateVariable(transition.first)))
+        std::vector<const TokenID *> roots;
+        for (const auto &transition : token.transitions)
+            roots.push_back(&transition.first);
+        std::stable_sort(roots.begin(), roots.end(), [](const TokenID *a, const TokenID *b) {
+            if (a->position_in_token != b->position_in_token)
+                return a->position_in_token < b->position_in_token;
+            return generateVariable(*a) < generateVariable(*b);
+        });
+        for (const auto *root : roots) {
+            const std::string key = generateVariable(*root);
+            // A continuation may be reached while wiring a nested token call
+            // without appearing as a direct `alt` in this token's flattened
+            // transition map. `end_of` records that it was already wired;
+            // rooting it again here adds an epsilon edge that bypasses its
+            // actual prefix (for example, entering a dynamic body before its
+            // opening quote).
+            if (root->nested_completion || referenced.contains(key) || end_of.contains(key))
                 continue;
-            ends.insert(visit(initial_state, transition.first, std::string{}));
+            ends.insert(visit(initial_state, *root, std::string{}, {}));
         }
 
         // Entry points that are also the target of a back-edge from another
@@ -717,6 +862,8 @@ namespace NFA::TNFA {
         {
             std::vector<const TokenID *> unvisited;
             for (const auto &transition : token.transitions) {
+                if (transition.first.nested_completion)
+                    continue;
                 if (!end_of.contains(generateVariable(transition.first)))
                     unvisited.push_back(&transition.first);
             }
@@ -727,7 +874,58 @@ namespace NFA::TNFA {
             for (const auto *id : unvisited) {
                 if (end_of.contains(generateVariable(*id)))
                     continue; // reached while wiring an earlier one
-                ends.insert(visit(initial_state, *id, std::string{}));
+                ends.insert(visit(initial_state, *id, std::string{}, {}));
+            }
+        }
+
+        if (debug) {
+            std::cerr << "[nfa-capture-graph] token=";
+            ::operator<<(std::cerr, token.name);
+            std::cerr << " states=" << initial_state << ".." << states.size() << '\n';
+            for (std::size_t state_id = initial_state; state_id < states.size(); ++state_id) {
+                const auto dump_chain = [&](const ActionChain &chain) {
+                    for (const auto &raw : chain) {
+                        if (const auto *action = std::get_if<ActionState>(&raw)) {
+                            if (action->action != Action::BEGIN && action->action != Action::END) continue;
+                            std::cerr << " " << (action->action == Action::BEGIN ? "BEGIN" : "END")
+                                      << "#" << action->operand_a << '@' << action->variable
+                                      << (action->before_char ? "[entry]" : "[exit]");
+                        } else if (const auto *semantic = std::get_if<SemanticState>(&raw);
+                                   semantic && semantic->dynamic_source) {
+                            std::cerr << " DYNAMIC@" << generateVariable(*semantic->dynamic_source)
+                                      << " captures=";
+                            for (const auto &[name, capture] : semantic->dynamic_captures)
+                                std::cerr << name << '#' << capture << ',';
+                        }
+                    }
+                };
+                const auto &state = states[state_id];
+                for (const auto &[character, transitions] : state.transitions) {
+                    for (const auto &transition : transitions) {
+                        if (std::ranges::none_of(transition.actions, [](const RawAction &raw) {
+                                if (const auto *action = std::get_if<ActionState>(&raw))
+                                    return action->action == Action::BEGIN || action->action == Action::END;
+                                const auto *semantic = std::get_if<SemanticState>(&raw);
+                                return semantic && semantic->dynamic_source.has_value();
+                            })) continue;
+                        std::cerr << "[nfa-capture-edge] " << state_id << " --0x"
+                                  << std::format("{:02x}", static_cast<unsigned char>(character))
+                                  << "--> " << transition.next << " src="
+                                  << generateVariable(transition.source) << " actions=";
+                        dump_chain(transition.actions);
+                        std::cerr << '\n';
+                    }
+                }
+                for (const auto &transition : state.epsilon_transitions) {
+                    if (std::ranges::none_of(transition.actions, [](const RawAction &raw) {
+                            const auto *action = std::get_if<ActionState>(&raw);
+                            return action && (action->action == Action::BEGIN || action->action == Action::END);
+                        })) continue;
+                    std::cerr << "[nfa-capture-epsilon] " << state_id << " -> "
+                              << transition.next << " actions=";
+                    dump_chain(transition.actions);
+                    std::cerr << '\n';
+                }
             }
         }
     }

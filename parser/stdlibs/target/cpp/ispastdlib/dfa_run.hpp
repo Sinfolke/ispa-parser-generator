@@ -151,7 +151,7 @@ namespace DFA {
 
         while (state != API::null_state) {
             const char current_ch = *(immediate_action && *pos != '\0' ? pos + 1 : pos);
-            if (debug_size > 1) { // because generator emits one <UNDEFINED> table
+            if (debug_array.size() > 1 || (debug_array.size() == 1 && debug_array[0].member != "<Undefined>")) { // because generator emits one <UNDEFINED> table
                 detail::trace_step(debug_array, debug_index, state,
                                    class_table[static_cast<unsigned char>(current_ch)], current_ch, pos, immediate_action);
             }
@@ -253,6 +253,10 @@ namespace DFA {
                     immediate_action = false;
                 }
                 state = static_cast<std::size_t>(std::get<0>(result));
+                if (state == API::dynamic_fail_state) {
+                    debug_scan.outcome("dynamic matcher failed");
+                    return Token {};
+                }
                 if (state == API::lexer_delete_state) {
                     if (*pos != '\0') ++pos;
                     debug_scan.success();

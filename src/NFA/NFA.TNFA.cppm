@@ -106,6 +106,7 @@ export namespace NFA::TNFA {
 
     auto &getStates() { return states; }
     auto &getStates() const { return states; }
+    bool debugEnabled() const { return debug; }
     auto &getAcceptMap() const { return accept_map; }
     // Entry state id for a given token name, if it was built.
     auto &getTokenEntries() const { return token_entry; }

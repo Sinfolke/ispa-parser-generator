@@ -239,6 +239,7 @@ namespace LangAPI {
             case StdlibExports::DfaAcceptTable: os << "DfaAcceptTable"; break;
             case StdlibExports::DfaLRTable: os << "DfaLRTable"; break;
             case StdlibExports::DfaNullState: os << "DfaNullState"; break;
+            case StdlibExports::DfaDynamicFailState: os << "DfaDynamicFailState"; break;
             case StdlibExports::DfaDynamicMatch: os << "DfaDynamicMatch"; break;
             case StdlibExports::ParserFunctionParameter: os << "ParserFunctionParameter"; break;
             case StdlibExports::ParserCounted: os << "ParserCounted"; break;

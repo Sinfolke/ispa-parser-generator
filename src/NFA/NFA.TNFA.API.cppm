@@ -120,6 +120,9 @@ export namespace NFA::TNFA {
         // Register operands of SET .. APPEND_NEXT; on BEGIN/END operand_a is the capture number.
         std::size_t operand_a = NULL_STATE;
         std::size_t operand_b = NULL_STATE;
+        // Token member position used to order capture writes around dynamic
+        // semantic matchers that share a consuming transition.
+        std::size_t position_in_token = NULL_STATE;
         // BEGIN/END: fires before the consumed character, not after it.
         bool before_char = false;
         // BEGIN/END: the capture keeps every iteration (an Array value).
@@ -138,12 +141,18 @@ export namespace NFA::TNFA {
             if (operand_b != other.operand_b) {
                 return operand_b < other.operand_b;
             }
+            if (position_in_token != other.position_in_token) {
+                return position_in_token < other.position_in_token;
+            }
             return next_state < other.next_state;
         };
 
     private:
         friend struct ::uhash;
-        auto members() const { return std::tie(action, variable, next_state, operand_a, operand_b, before_char, list_capture); }
+        auto members() const {
+            return std::tie(action, variable, next_state, operand_a, operand_b,
+                            position_in_token, before_char, list_capture);
+        }
     };
 
     struct SemanticState {

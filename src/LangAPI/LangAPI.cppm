@@ -108,7 +108,7 @@ export namespace LangAPI {
     };
     enum class StdlibExports {
         Node, MatchResult, Lexer, Parser, LRParser, LRGeneralizedParser, LRParse, LRParseGeneralized, LRGet, LRNode, LRPack, LRCaptureAssign, LRToken, LexerMakeTokenParameter,
-        DfaState, DfaTable, DfaClassTable, DfaAcceptTable, DfaLRTable, DfaNullState,
+        DfaState, DfaTable, DfaClassTable, DfaAcceptTable, DfaLRTable, DfaNullState, DfaDynamicFailState,
         ParserFunctionParameter, Error,
         TokenNodeConstruct, RawTokenNodeConstruct, ParserNodeConstructor,
         DFADebug, TdfaLayout, DfaCaptures, DfaDynamicMatch,

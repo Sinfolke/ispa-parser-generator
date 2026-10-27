@@ -88,6 +88,38 @@ int main() {
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
 }
 
+TEST(AlgorithmPlugin, RootTestIscAccumulatesCapturedLexerText) {
+    dlib library("libispa-algorithm-LL");
+    const auto* descriptor = library.load<Algorithm::EntryFn*>("ispa_algorithm_v1")();
+    const auto directory = std::filesystem::temp_directory_path() /
+        ("ispa-root-test-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    struct Cleanup {
+        std::filesystem::path path;
+        ~Cleanup() { std::filesystem::remove_all(path); }
+    } cleanup{directory};
+    std::ifstream grammar(std::string(ROOT_DIR) + "/test.isc");
+    ASSERT_TRUE(grammar);
+    const std::string source{std::istreambuf_iterator<char>(grammar), {}};
+    auto tree = pluginGrammar(source.c_str());
+    Algorithm::Metadata metadata;
+    convert(*descriptor, tree, metadata, directory);
+    std::ofstream(directory / "run.cpp") << R"(
+#include "PluginTest.h"
+int main() {
+    PluginTest::Parser parser;
+    const auto tree = parser.parse("\"Hello\"");
+    return tree.str1.data().value == "Hello" ? 0 : 1;
+}
+)";
+    const auto command = std::string("clang++ -std=c++23 -I\"") + ROOT_DIR +
+        "/parser/stdlibs/target/cpp\" -I\"" + directory.string() + "\" \"" +
+        (directory / "PluginTest.cpp").string() + "\" \"" +
+        (directory / "run.cpp").string() + "\" \"" + ROOT_DIR +
+        "/parser/stdlibs/target/cpp/src/core.cpp\" -o \"" + (directory / "run").string() + "\"";
+    ASSERT_EQ(std::system(command.c_str()), 0);
+    EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
+}
+
 TEST(AlgorithmPlugin, LLRuleArgumentsAndIntegerBounds) {
     dlib library("libispa-algorithm-LL");
     const auto* descriptor = library.load<Algorithm::EntryFn*>("ispa_algorithm_v1")();
@@ -462,6 +494,46 @@ int main() {
         ++rejected_index;
     }
     return 0;
+}
+)";
+    const auto command = std::string("clang++ -std=c++23 -I\"") + ROOT_DIR +
+        "/parser/stdlibs/target/cpp\" -I\"" + directory.string() + "\" \"" +
+        (directory / "PluginTest.cpp").string() + "\" \"" +
+        (directory / "run.cpp").string() + "\" \"" + ROOT_DIR +
+        "/parser/stdlibs/target/cpp/src/core.cpp\" -o \"" + (directory / "run").string() + "\"";
+    ASSERT_EQ(std::system(command.c_str()), 0);
+    EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
+}
+
+TEST(AlgorithmPlugin, LLTemplateDynamicPatternsKeepEachQuoteAndCapture) {
+    dlib library("libispa-algorithm-LL");
+    const auto* descriptor = library.load<Algorithm::EntryFn*>("ispa_algorithm_v1")();
+    auto tree = pluginGrammar(R"(
+STRING<quote>:
+    &q ${quote} @ !([\n\r] | $q)* $q {@}
+;
+QUOTE_1: '"';
+QUOTE_2: '\'';
+main:
+    @ STRING<QUOTE_1> '+' @ STRING<QUOTE_2>
+    @{a, b}
+;
+)");
+    const auto directory = std::filesystem::temp_directory_path() /
+        ("ispa-template-dynamic-lexer-" +
+         std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    struct Cleanup {
+        std::filesystem::path path;
+        ~Cleanup() { std::filesystem::remove_all(path); }
+    } cleanup{directory};
+    Algorithm::Metadata metadata;
+    convert(*descriptor, tree, metadata, directory);
+    std::ofstream(directory / "run.cpp") << R"(
+#include "PluginTest.h"
+int main() {
+    PluginTest::Parser parser;
+    const auto tree = parser.parse("\"Hello\" + 'World'");
+    return tree.a.data().value == "Hello" && tree.b.data().value == "World" ? 0 : 1;
 }
 )";
     const auto command = std::string("clang++ -std=c++23 -I\"") + ROOT_DIR +

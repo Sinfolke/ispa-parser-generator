@@ -12,6 +12,7 @@ from typing import Any, Callable, Sequence
 from .model import Position
 
 NULL_STATE = -1
+DYNAMIC_FAIL_STATE = -3
 
 
 def dynamic_match(cursor: Position, alternatives: Sequence[str], negative: bool,
@@ -236,6 +237,9 @@ def run_tdfa(source: str, pos: Position, table: Sequence[Sequence[int]],
                 line += source[semantic_start:pos.index].count('\n')
                 immediate_action = False
             state = next_state
+            if state == DYNAMIC_FAIL_STATE:
+                pos.index = start
+                return None, start_line
             if state == NULL_STATE:
                 if token is None and pos.index == start:
                     return None, start_line

@@ -179,8 +179,8 @@ namespace {
         char ch = '\0';
         bool operator==(const OriginKey &) const = default;
     };
-
-    OriginKey originKey(const NFA::TNFA::DFATarget &t) {
+    template<typename Target>
+    OriginKey originKey(const Target &t) {
         if (!t.char_origin) return {};
         const auto &o = *t.char_origin;
         return { true, o.rule_run, o.offset, o.length, o.ch };
@@ -189,7 +189,8 @@ namespace {
     struct SlotEntry { OriginKey origin; std::size_t slot; };
 
     // Only called once per UNIQUE entry, so the token_name copy is paid once.
-    LangAPI::DFADebug makeDebug(const NFA::TNFA::DFATarget &target) {
+    template<typename Target>
+    LangAPI::DFADebug makeDebug(const Target &target) {
         LangAPI::DFADebug debug {
             .member = target.debug.member,
             .token_name = target.debug.token_name,
@@ -260,8 +261,11 @@ namespace LangRepr {
             for (std::size_t c = 0; c < class_count && c < states[s].transitions.size(); ++c) {
                 std::visit([&](const auto &target) {
                     using Target = std::decay_t<decltype(target)>;
-                    if constexpr (std::is_same_v<Target, NFA::TNFA::DFATarget>) {
+                    if constexpr (std::is_same_v<Target, NFA::TNFA::DFATarget> ||
+                                  std::is_same_v<Target, NFA::TNFA::ActionTarget> ||
+                                  std::is_same_v<Target, NFA::TNFA::SemanticTarget>) {
                         if (target.id == NFA::NULL_STATE) return;
+                        if (target.debug.member.empty() && !target.char_origin) return;
 
                         const OriginKey origin = originKey(target);
                         auto &bucket = slots[target.debug];
@@ -601,6 +605,16 @@ namespace LangRepr {
                             .args = {next, LangAPI::Inheritance::createExpression(
                                 LangAPI::Inheritance{.name = LangAPI::Symbol{"Token"}})}})});
                 };
+                const auto dynamic_fail = [&]() -> LangAPI::Statements {
+                    return LangAPI::Return::createStatements(LangAPI::Return{
+                        .value = LangAPI::MakeTuple::createExpression(LangAPI::MakeTuple{
+                            .args = {
+                                LangAPI::IspaLibSymbol::createExpression(LangAPI::IspaLibSymbol{
+                                    .exports = LangAPI::StdlibExports::DfaDynamicFailState}),
+                                LangAPI::Inheritance::createExpression(
+                                    LangAPI::Inheritance{.name = LangAPI::Symbol{"Token"}}),
+                            }})});
+                };
                 std::size_t next = NFA::NULL_STATE;
                 std::visit([&](const auto &target) {
                     using T = std::decay_t<decltype(target)>;
@@ -616,7 +630,7 @@ namespace LangRepr {
                         LangAPI::String::createExpression(LangAPI::String{
                             .value = source.member.quantifier == '*' ? "*" : ""})}});
                 statements.push_back(LangAPI::If::createStatement(LangAPI::If{
-                    std::move(match), result(next), result(NFA::NULL_STATE)}));
+                    std::move(match), result(next), dynamic_fail()}));
                 semantic_table_statements.push_back(std::move(statements));
                 continue;
             }

@@ -8,7 +8,7 @@ from .parser import LLParser, ParseError, CountSpec, parse_token_stream
 from . import recovery as Recovery
 from .recovery import EndOfInput
 from .recovery_context import RuleContext, FailContext, custom_failure, custom_failure_decision
-from .dfa import Captures, DFADebug, DFAResult, TdfaLayout, run_dfa, run_tdfa, dynamic_match, NULL_STATE
+from .dfa import Captures, DFADebug, DFAResult, TdfaLayout, run_dfa, run_tdfa, dynamic_match, NULL_STATE, DYNAMIC_FAIL_STATE
 from .overload import overload
 from .printer import ASTPrinter, format_ast
 from .external import ExternalRule, external_match
@@ -19,7 +19,7 @@ from .lr import (LRParser, LRGeneralizedParser, LRRegionFrame, LRRuleSpan, LRCon
 __all__ = [
     'Node', 'RawToken', 'MatchResult', 'Variant', 'Position', 'Cursor', 'Lexer', 'LexError',
     'LLParser', 'ParseError', 'CountSpec', 'parse_token_stream', 'make_python_lexer', 'Captures',
-    'DFADebug', 'DFAResult', 'TdfaLayout', 'run_dfa', 'run_tdfa', 'dynamic_match', 'NULL_STATE',
+    'DFADebug', 'DFAResult', 'TdfaLayout', 'run_dfa', 'run_tdfa', 'dynamic_match', 'NULL_STATE', 'DYNAMIC_FAIL_STATE',
     'variant_get', 'variant_holds', 'variant_index', 'assign_compatible', 'concat',
     'step_attr', 'step_item', 'overload', 'ASTPrinter', 'format_ast',
     'ExternalRule', 'external_match',

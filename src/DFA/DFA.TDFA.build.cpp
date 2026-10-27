@@ -88,6 +88,8 @@ auto collectCharOrigins(const std::vector<std::optional<TNFA::CharOrigin>> &sour
 
 struct StepExtra {
     std::vector<RawAction> passthrough; // SemanticState & co, fired order, as before
+    std::optional<std::size_t> dynamic_state;
+    std::vector<std::size_t> dynamic_captures;
     TNFA::DebugOrigins debug;
     stdu::vector<std::optional<TNFA::CharOrigin>> char_origin;
     std::optional<TNFA::TokenBinding> binding; // accept only
@@ -154,7 +156,13 @@ class TnfaProvider {
     auto eventsOf(const ActionPath &path, std::size_t edge_ops, bool after_edge) const
         -> std::vector<tdfa::Event> {
         std::vector<tdfa::Event> out;
+        std::optional<std::size_t> dynamic_position;
         for (std::size_t i = 0; i < path.size(); ++i) {
+            if (const auto *semantic = std::get_if<TNFA::SemanticState>(&path[i].raw);
+                semantic && semantic->dynamic_source) {
+                dynamic_position = semantic->dynamic_source->position_in_token;
+                continue;
+            }
             const auto *a = std::get_if<TNFA::ActionState>(&path[i].raw);
             if (!a || !isTagAction(*a))
                 continue;
@@ -167,7 +175,15 @@ class TnfaProvider {
             // character (`before_char`); actions on the epsilon path behind it
             // fire after it; the start closure and the accept path consume
             // nothing, so they fire "before".
-            ev.next = after_edge ? (i < edge_ops ? !a->before_char : true) : false;
+            // Capture boundaries for earlier token members must be published
+            // before a later dynamic matcher reads them, even if closure merged
+            // their paths in the opposite order. Same-member boundaries after
+            // the matcher stay deferred so captures begin after its prefix.
+            const bool after_dynamic = dynamic_position &&
+                (a->position_in_token == TNFA::NULL_STATE ||
+                 a->position_in_token > *dynamic_position ||
+                 (a->position_in_token == *dynamic_position && a->action == TNFA::Action::END));
+            ev.next = after_edge ? (after_dynamic || (i < edge_ops ? !a->before_char : true)) : false;
             out.push_back(ev);
         }
         return out;
@@ -191,8 +207,9 @@ public:
 
     auto start() -> tdfa::Closed<Extra> {
         std::vector<std::size_t> entries;
-        for (const auto &[_, entry] : nfa.getTokenEntries())
+        for (const auto &[_, entry] : nfa.getTokenEntries()) {
             entries.push_back(entry);
+        }
         std::ranges::sort(entries);
         entries.erase(std::unique(entries.begin(), entries.end()), entries.end());
 
@@ -202,8 +219,9 @@ public:
         Closure closure(&nfa, seeded);
 
         tdfa::Closed<Extra> out;
-        for (const std::size_t state : closure.getDiscoveryOrder())
+        for (const std::size_t state : closure.getDiscoveryOrder()) {
             out.items.push_back({state, tdfa::NIL, eventsOf(closure.getActionsForState(state), 0, false)});
+        }
         remember(std::move(closure));
         return out;
     }
@@ -222,10 +240,46 @@ public:
         if (seeds.empty())
             return {};
 
+        // Several active TNFA paths can enter the same shared destination at
+        // the same priority while closing different nested captures. Closure
+        // keeps one path per destination, so merge tag actions per capture
+        // boundary (BEGIN/END) before handing those seeds to it. For each
+        // boundary, the earliest path remains authoritative.
+        std::vector<ActionPath> seed_actions;
+        seed_actions.reserve(seeds.size());
+        for (const auto &seed : seeds)
+            seed_actions.push_back(seed.actions);
+        for (std::size_t i = 0; i < seeds.size(); ++i) {
+            std::set<std::pair<std::size_t, TNFA::Action>> boundaries_present;
+            for (const auto &fired : seed_actions[i])
+                if (const auto *action = std::get_if<TNFA::ActionState>(&fired.raw);
+                    action && isTagAction(*action))
+                    boundaries_present.emplace(action->operand_a, action->action);
+            for (std::size_t j = i + 1; j < seeds.size(); ++j) {
+                if (seeds[j].target != seeds[i].target || seeds[j].priority != seeds[i].priority)
+                    continue;
+                std::set<std::pair<std::size_t, TNFA::Action>> imported;
+                for (const auto &fired : seeds[j].actions) {
+                    const auto *action = std::get_if<TNFA::ActionState>(&fired.raw);
+                    if (!action || !isTagAction(*action))
+                        continue;
+                    const auto boundary = std::pair{action->operand_a, action->action};
+                    if (boundaries_present.contains(boundary) || !imported.insert(boundary).second)
+                        continue;
+                    for (const auto &candidate : seeds[j].actions)
+                        if (const auto *tag = std::get_if<TNFA::ActionState>(&candidate.raw);
+                            tag && isTagAction(*tag) && tag->operand_a == action->operand_a &&
+                            tag->action == action->action)
+                            seed_actions[i].push_back(candidate);
+                    boundaries_present.insert(boundary);
+                }
+            }
+        }
+
         std::vector<std::pair<std::size_t, ActionPath>> seeded;
         seeded.reserve(seeds.size());
-        for (const auto &seed : seeds)
-            seeded.emplace_back(seed.target, seed.actions);
+        for (std::size_t i = 0; i < seeds.size(); ++i)
+            seeded.emplace_back(seeds[i].target, seed_actions[i]);
         Closure closure(&nfa, seeded);
         if (closure.get().empty())
             return {};
@@ -233,9 +287,11 @@ public:
         tdfa::Closed<Extra> out;
         for (const std::size_t state : closure.getDiscoveryOrder()) {
             const auto &seed = seeds.at(closure.getSeedIndex(state));
+            const auto &path = closure.getActionsForState(state);
             out.items.push_back({state,
                                  positionOf(subset, seed.source),
-                                 eventsOf(closure.getActionsForState(state), seed.actions.size(), true)});
+                                 eventsOf(path,
+                                          seed_actions.at(closure.getSeedIndex(state)).size(), true)});
         }
 
         // Non-tag actions keep the old behaviour: fired in closure order.
@@ -250,6 +306,15 @@ public:
         for (const auto &seed : seeds) {
             origins.push_back(seed.source_link);
             char_origins.push_back(seed.char_origin);
+            for (const auto &fired : seed.actions)
+                if (const auto *semantic = std::get_if<TNFA::SemanticState>(&fired.raw);
+                    semantic && semantic->dynamic_source) {
+                    if (!out.extra.dynamic_state) out.extra.dynamic_state = seed.target;
+                    for (const auto &[_, capture] : semantic->dynamic_captures)
+                        if (std::ranges::find(out.extra.dynamic_captures, capture) ==
+                            out.extra.dynamic_captures.end())
+                            out.extra.dynamic_captures.push_back(capture);
+                }
         }
         out.extra.debug = collectDebugOrigins(origins);
         out.extra.char_origin = collectCharOrigins(char_origins);
@@ -350,16 +415,32 @@ auto toActions(const std::vector<tdfa::Op> &ops, const std::vector<RawAction> &p
         const auto *semantic = std::get_if<TNFA::SemanticState>(&raw);
         return semantic && semantic->dynamic_source;
     });
-    for (const auto &op : ops)
-        if (!dynamic || !op.next) out.push_back(toRaw(op));
+    std::vector<bool> after_dynamic(ops.size(), false);
+    std::set<std::size_t> after_dynamic_registers;
+    for (std::size_t i = 0; i < ops.size(); ++i) {
+        const auto &op = ops[i];
+        bool defer = op.next;
+        const bool reads_b = (op.kind == tdfa::OpKind::Copy || op.kind == tdfa::OpKind::Append) &&
+                             op.b != tdfa::NIL;
+        if (!defer && reads_b && after_dynamic_registers.contains(op.b))
+            defer = true;
+        after_dynamic[i] = defer;
+        if (defer)
+            after_dynamic_registers.insert(op.a);
+    }
+
+    for (std::size_t i = 0; i < ops.size(); ++i)
+        if (!dynamic || !after_dynamic[i]) out.push_back(toRaw(ops[i]));
     for (const auto &raw : passthrough)
         out.push_back(raw);
     if (dynamic)
-        for (auto op : ops)
-            if (op.next) {
-                // The semantic matcher has already advanced by the full
-                // runtime string. Record that boundary without another +1.
-                op.next = false;
+        for (std::size_t i = 0; i < ops.size(); ++i)
+            if (after_dynamic[i]) {
+                auto op = ops[i];
+                // The callback does not advance the scanner cursor. Preserve
+                // the op's next-boundary flag so SET records the boundary
+                // after the current input character once the callback returns.
+                // Keep copies that read a deferred register after its write.
                 out.push_back(toRaw(op));
             }
     return out;
@@ -426,8 +507,9 @@ auto DFA::build() -> const States<StateWithActions> & {
         }
 
         for (const auto &edge : src.edges) {
+            auto actions = toActions(edge.ops, edge.extra.passthrough);
             dst.transitions[edge.sym] = makeSequence(
-                toActions(edge.ops, edge.extra.passthrough),
+                std::move(actions),
                 edge.target,
                 edge.extra.debug,
                 edge.extra.char_origin);

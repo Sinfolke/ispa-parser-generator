@@ -282,6 +282,8 @@ auto Core::convertIspaLibSymbol(const LangAPI::IspaLibSymbol &symbol) -> std::st
             return "::ISPA_STD::DFA::API::CharToClass";
         case LangAPI::StdlibExports::DfaNullState:
             return "::ISPA_STD::DFA::API::null_state";
+        case LangAPI::StdlibExports::DfaDynamicFailState:
+            return "::ISPA_STD::DFA::API::dynamic_fail_state";
         case LangAPI::StdlibExports::Error:
             return "std::runtime_error";
         case LangAPI::StdlibExports::TokenNodeConstruct:

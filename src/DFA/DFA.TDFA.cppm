@@ -380,7 +380,15 @@ auto allocateRegisters(std::vector<StateOut<Extra>> &states, std::size_t outputs
         for (std::size_t s = n; s-- > 0;) {
             RegSet l;
             for (const auto &e : states[s].edges) {
-                const RegSet r = backward(e.ops, live_in[e.target], nullptr);
+                RegSet r = backward(e.ops, live_in[e.target], nullptr);
+                // Dynamic semantic callbacks receive Captures and can read
+                // output tags before acceptance. Keep those writes live over
+                // the edge so dead-op elimination cannot discard the snapshot.
+                if constexpr (requires { e.extra.dynamic_state; }) {
+                    if (e.extra.dynamic_state)
+                        for (std::size_t tag = 0; tag < outputs; ++tag)
+                            r.insert(tag);
+                }
                 l.insert(r.begin(), r.end());
             }
             if (states[s].accepting) {
@@ -405,8 +413,15 @@ auto allocateRegisters(std::vector<StateOut<Extra>> &states, std::size_t outputs
         ops = std::move(kept);
     };
     for (std::size_t s = 0; s < n; ++s) {
-        for (auto &e : states[s].edges)
-            strip(e.ops, live_in[e.target]);
+        for (auto &e : states[s].edges) {
+            RegSet after = live_in[e.target];
+            if constexpr (requires { e.extra.dynamic_state; }) {
+                if (e.extra.dynamic_state)
+                    for (std::size_t tag = 0; tag < outputs; ++tag)
+                        after.insert(tag);
+            }
+            strip(e.ops, after);
+        }
         if (states[s].accepting)
             strip(states[s].accept_ops, accept_live);
     }
@@ -615,6 +630,40 @@ auto determinize(P &p, const Layout &layout, std::size_t &register_count, bool a
 
             if (s == 0)
                 ops.insert(ops.begin(), entry_ops.begin(), entry_ops.end());
+
+            // Dynamic semantic callbacks run before token acceptance, while
+            // public capture outputs are normally copied only by accept_ops.
+            // Publish the target configuration's live tags before invoking
+            // the callback so `$name` patterns can read earlier captures.
+            if constexpr (requires { mv.extra.dynamic_state; }) {
+                if (mv.extra.dynamic_state) {
+                    const auto &target_configs = out[target].configs;
+                    const auto fallback = std::ranges::find(target_configs,
+                        *mv.extra.dynamic_state, &Config::nfa);
+                    std::vector<std::pair<std::size_t, std::size_t>> snapshots;
+                    std::set<std::size_t> copied_tags;
+                    for (const std::size_t capture : mv.extra.dynamic_captures) {
+                        auto config = std::ranges::find_if(target_configs, [&](const Config &candidate) {
+                            return 2 * capture + 1 < candidate.regs.size() &&
+                                   candidate.regs[2 * capture] != NONE &&
+                                   candidate.regs[2 * capture + 1] != NONE;
+                        });
+                        if (config == target_configs.end()) config = fallback;
+                        if (config == target_configs.end()) continue;
+                        for (const std::size_t tag : {2 * capture, 2 * capture + 1}) {
+                            if (tag >= config->regs.size() || config->regs[tag] == NONE ||
+                                !copied_tags.insert(tag).second)
+                                continue;
+                            const std::size_t temporary = next_reg++;
+                            ops.push_back(Op{OpKind::Copy, false, temporary,
+                                static_cast<std::size_t>(config->regs[tag])});
+                            snapshots.emplace_back(tag, temporary);
+                        }
+                    }
+                    for (const auto &[tag, temporary] : snapshots)
+                        ops.push_back(Op{OpKind::Copy, false, tag, temporary});
+                }
+            }
 
             out[s].edges.push_back(Edge<Extra>{sym, target, std::move(ops), std::move(mv.extra)});
         }
