@@ -153,6 +153,7 @@ function(add_cli dir)
     target_link_libraries(${name} PRIVATE ispacore)
 endfunction()
 add_cli(ispa)
+target_link_libraries(ispa PRIVATE yaml-cpp::yaml-cpp)
 
 # =============================================
 # ISPA ALGORITHMS/CONVERTERS FUNCTIONS

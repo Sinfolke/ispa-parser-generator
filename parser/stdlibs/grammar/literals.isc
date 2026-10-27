@@ -4,11 +4,11 @@ SIMPLE_NUMBER:
     @ [0-9]+ ('.' @ % [0-9]+)?
 
     @{full, dec}
-    %{no_prevision_after_dot}
+    %{no_precision_after_dot}
 ;
 #[inline]
 STRING<quote>:
-    &q quote @ ( '\\' @ [*] | !($q | [\n\r]) )* % $q
+    &q quote @ ( '\\' [*] | !($q | [^\n\r]) )* % $q
     {@}
     %{inclosed_quote}
 ;
@@ -18,18 +18,18 @@ ID:
     {@}
 ;
 
-fail SIMPLE_NUMBER.no_prevision_after_dot {
+fail SIMPLE_NUMBER.no_precision_after_dot {
     if ctx.at(','):
         ctx.error("There should not be comma after '.'")
         ctx.delete()
     elif ctx.at('.'):
         ctx.error("Dublicate dot")
         ctx.delete()
+    else:
+        ctx.error("Number floating-point part expected")
 }
+
 fail STRING.inclosed_quote {
-    ctx.pos = ctx.start_pos
-    while not ctx.at(' ') and not ctx.at('\t') and not ctx.at('\r'):
-        ctx.pos += 1
     ctx.error("Incloded quote")
     ctx.insert()
 }

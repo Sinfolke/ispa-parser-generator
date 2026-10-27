@@ -1,4 +1,5 @@
 #pragma once
+#include "ispastdlib/ispa_debug.hpp"
 
 #include <ispastdlib/variant_io.hpp>
 #include <ispastdlib/parser_ll.hpp>
@@ -3700,6 +3701,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const END_INPUT&) { return "PyRawParser.FlatTypes.END_INPUT"; }
+		template<class F> void ispa_debug_fields(const END_INPUT& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -3732,6 +3736,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const NEWLINE&) { return "PyRawParser.FlatTypes.NEWLINE"; }
+		template<class F> void ispa_debug_fields(const NEWLINE& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -3764,6 +3771,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const CR&) { return "PyRawParser.FlatTypes.CR"; }
+		template<class F> void ispa_debug_fields(const CR& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -3796,6 +3806,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const DEDENT&) { return "PyRawParser.FlatTypes.DEDENT"; }
+		template<class F> void ispa_debug_fields(const DEDENT& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -3828,6 +3841,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const INDENT&) { return "PyRawParser.FlatTypes.INDENT"; }
+		template<class F> void ispa_debug_fields(const INDENT& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -3860,6 +3876,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const DEL&) { return "PyRawParser.FlatTypes.DEL"; }
+		template<class F> void ispa_debug_fields(const DEL& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -3892,6 +3911,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const IS&) { return "PyRawParser.FlatTypes.IS"; }
+		template<class F> void ispa_debug_fields(const IS& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -3924,6 +3946,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const IN&) { return "PyRawParser.FlatTypes.IN"; }
+		template<class F> void ispa_debug_fields(const IN& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -3956,6 +3981,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const ELSE&) { return "PyRawParser.FlatTypes.ELSE"; }
+		template<class F> void ispa_debug_fields(const ELSE& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -3988,6 +4016,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const NOT&) { return "PyRawParser.FlatTypes.NOT"; }
+		template<class F> void ispa_debug_fields(const NOT& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4020,6 +4051,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const ASSIGN&) { return "PyRawParser.FlatTypes.ASSIGN"; }
+		template<class F> void ispa_debug_fields(const ASSIGN& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4052,6 +4086,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const COMMA&) { return "PyRawParser.FlatTypes.COMMA"; }
+		template<class F> void ispa_debug_fields(const COMMA& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4084,6 +4121,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const RPAREN&) { return "PyRawParser.FlatTypes.RPAREN"; }
+		template<class F> void ispa_debug_fields(const RPAREN& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4116,6 +4156,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const SEMICOLON&) { return "PyRawParser.FlatTypes.SEMICOLON"; }
+		template<class F> void ispa_debug_fields(const SEMICOLON& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4148,6 +4191,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const TILDE&) { return "PyRawParser.FlatTypes.TILDE"; }
+		template<class F> void ispa_debug_fields(const TILDE& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4180,6 +4226,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const LSHIFT_ASSIGN&) { return "PyRawParser.FlatTypes.LSHIFT_ASSIGN"; }
+		template<class F> void ispa_debug_fields(const LSHIFT_ASSIGN& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4212,6 +4261,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const BREAK&) { return "PyRawParser.FlatTypes.BREAK"; }
+		template<class F> void ispa_debug_fields(const BREAK& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4244,6 +4296,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const NONLOCAL&) { return "PyRawParser.FlatTypes.NONLOCAL"; }
+		template<class F> void ispa_debug_fields(const NONLOCAL& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4276,6 +4331,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const GLOBAL&) { return "PyRawParser.FlatTypes.GLOBAL"; }
+		template<class F> void ispa_debug_fields(const GLOBAL& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4308,6 +4366,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const ELIF&) { return "PyRawParser.FlatTypes.ELIF"; }
+		template<class F> void ispa_debug_fields(const ELIF& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4340,6 +4401,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const ASSERT&) { return "PyRawParser.FlatTypes.ASSERT"; }
+		template<class F> void ispa_debug_fields(const ASSERT& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4372,6 +4436,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const COMMENT&) { return "PyRawParser.FlatTypes.COMMENT"; }
+		template<class F> void ispa_debug_fields(const COMMENT& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4404,6 +4471,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const PASS&) { return "PyRawParser.FlatTypes.PASS"; }
+		template<class F> void ispa_debug_fields(const PASS& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4436,6 +4506,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const DEF&) { return "PyRawParser.FlatTypes.DEF"; }
+		template<class F> void ispa_debug_fields(const DEF& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4468,6 +4541,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const FINALLY&) { return "PyRawParser.FlatTypes.FINALLY"; }
+		template<class F> void ispa_debug_fields(const FINALLY& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4500,6 +4576,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const WHILE&) { return "PyRawParser.FlatTypes.WHILE"; }
+		template<class F> void ispa_debug_fields(const WHILE& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4532,6 +4611,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const WITH&) { return "PyRawParser.FlatTypes.WITH"; }
+		template<class F> void ispa_debug_fields(const WITH& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4564,6 +4646,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const MATMUL_ASSIGN&) { return "PyRawParser.FlatTypes.MATMUL_ASSIGN"; }
+		template<class F> void ispa_debug_fields(const MATMUL_ASSIGN& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4596,6 +4681,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const ASYNC&) { return "PyRawParser.FlatTypes.ASYNC"; }
+		template<class F> void ispa_debug_fields(const ASYNC& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4628,6 +4716,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const COLON&) { return "PyRawParser.FlatTypes.COLON"; }
+		template<class F> void ispa_debug_fields(const COLON& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4660,6 +4751,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const __WS&) { return "PyRawParser.FlatTypes.__WS"; }
+		template<class F> void ispa_debug_fields(const __WS& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4692,6 +4786,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const FOR&) { return "PyRawParser.FlatTypes.FOR"; }
+		template<class F> void ispa_debug_fields(const FOR& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4724,6 +4821,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const CONTINUE&) { return "PyRawParser.FlatTypes.CONTINUE"; }
+		template<class F> void ispa_debug_fields(const CONTINUE& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4756,6 +4856,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const RAISE&) { return "PyRawParser.FlatTypes.RAISE"; }
+		template<class F> void ispa_debug_fields(const RAISE& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4788,6 +4891,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const IF&) { return "PyRawParser.FlatTypes.IF"; }
+		template<class F> void ispa_debug_fields(const IF& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4820,6 +4926,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const MATMUL&) { return "PyRawParser.FlatTypes.MATMUL"; }
+		template<class F> void ispa_debug_fields(const MATMUL& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4852,6 +4961,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const PERCENT_ASSIGN&) { return "PyRawParser.FlatTypes.PERCENT_ASSIGN"; }
+		template<class F> void ispa_debug_fields(const PERCENT_ASSIGN& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4884,6 +4996,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const PLUS_ASSIGN&) { return "PyRawParser.FlatTypes.PLUS_ASSIGN"; }
+		template<class F> void ispa_debug_fields(const PLUS_ASSIGN& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4916,6 +5031,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const STAR_ASSIGN&) { return "PyRawParser.FlatTypes.STAR_ASSIGN"; }
+		template<class F> void ispa_debug_fields(const STAR_ASSIGN& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4948,6 +5066,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const RBRACE&) { return "PyRawParser.FlatTypes.RBRACE"; }
+		template<class F> void ispa_debug_fields(const RBRACE& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -4981,6 +5102,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const STRING&) { return "PyRawParser.FlatTypes.STRING"; }
+		template<class F> void ispa_debug_fields(const STRING& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5013,6 +5138,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const FLOOR_DIV_ASSIGN&) { return "PyRawParser.FlatTypes.FLOOR_DIV_ASSIGN"; }
+		template<class F> void ispa_debug_fields(const FLOOR_DIV_ASSIGN& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5045,6 +5173,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const TRUE_BOOL&) { return "PyRawParser.FlatTypes.TRUE_BOOL"; }
+		template<class F> void ispa_debug_fields(const TRUE_BOOL& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5077,6 +5208,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const SLASH_ASSIGN&) { return "PyRawParser.FlatTypes.SLASH_ASSIGN"; }
+		template<class F> void ispa_debug_fields(const SLASH_ASSIGN& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5109,6 +5243,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const TRY&) { return "PyRawParser.FlatTypes.TRY"; }
+		template<class F> void ispa_debug_fields(const TRY& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5141,6 +5278,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const POWER_ASSIGN&) { return "PyRawParser.FlatTypes.POWER_ASSIGN"; }
+		template<class F> void ispa_debug_fields(const POWER_ASSIGN& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5173,6 +5313,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const POWER&) { return "PyRawParser.FlatTypes.POWER"; }
+		template<class F> void ispa_debug_fields(const POWER& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5205,6 +5348,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const PIPE&) { return "PyRawParser.FlatTypes.PIPE"; }
+		template<class F> void ispa_debug_fields(const PIPE& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5237,6 +5383,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const EXCEPT&) { return "PyRawParser.FlatTypes.EXCEPT"; }
+		template<class F> void ispa_debug_fields(const EXCEPT& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5269,6 +5418,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const NONE_V&) { return "PyRawParser.FlatTypes.NONE_V"; }
+		template<class F> void ispa_debug_fields(const NONE_V& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5301,6 +5453,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const NE&) { return "PyRawParser.FlatTypes.NE"; }
+		template<class F> void ispa_debug_fields(const NE& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5333,6 +5488,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const LT&) { return "PyRawParser.FlatTypes.LT"; }
+		template<class F> void ispa_debug_fields(const LT& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5365,6 +5523,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const LE&) { return "PyRawParser.FlatTypes.LE"; }
+		template<class F> void ispa_debug_fields(const LE& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5397,6 +5558,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const STAR&) { return "PyRawParser.FlatTypes.STAR"; }
+		template<class F> void ispa_debug_fields(const STAR& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5429,6 +5593,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const SLASH&) { return "PyRawParser.FlatTypes.SLASH"; }
+		template<class F> void ispa_debug_fields(const SLASH& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5461,6 +5628,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const LBRACKET&) { return "PyRawParser.FlatTypes.LBRACKET"; }
+		template<class F> void ispa_debug_fields(const LBRACKET& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5493,6 +5663,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const GT&) { return "PyRawParser.FlatTypes.GT"; }
+		template<class F> void ispa_debug_fields(const GT& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5525,6 +5698,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const PLUS&) { return "PyRawParser.FlatTypes.PLUS"; }
+		template<class F> void ispa_debug_fields(const PLUS& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5557,6 +5733,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const LSHIFT&) { return "PyRawParser.FlatTypes.LSHIFT"; }
+		template<class F> void ispa_debug_fields(const LSHIFT& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5589,6 +5768,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const GE&) { return "PyRawParser.FlatTypes.GE"; }
+		template<class F> void ispa_debug_fields(const GE& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5621,6 +5803,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const FALSE_BOOL&) { return "PyRawParser.FlatTypes.FALSE_BOOL"; }
+		template<class F> void ispa_debug_fields(const FALSE_BOOL& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5653,6 +5838,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const EQ&) { return "PyRawParser.FlatTypes.EQ"; }
+		template<class F> void ispa_debug_fields(const EQ& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5685,6 +5873,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const CARET&) { return "PyRawParser.FlatTypes.CARET"; }
+		template<class F> void ispa_debug_fields(const CARET& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5717,6 +5908,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const AND&) { return "PyRawParser.FlatTypes.AND"; }
+		template<class F> void ispa_debug_fields(const AND& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5750,6 +5944,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const ISPA_MATCH&) { return "PyRawParser.FlatTypes.ISPA_MATCH"; }
+		template<class F> void ispa_debug_fields(const ISPA_MATCH& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5784,6 +5982,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const NUMBER&) { return "PyRawParser.FlatTypes.NUMBER"; }
+		template<class F> void ispa_debug_fields(const NUMBER& value, F&& field) {
+			field("full", value.full);
+			field("floating", value.floating);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5816,6 +6019,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const AS&) { return "PyRawParser.FlatTypes.AS"; }
+		template<class F> void ispa_debug_fields(const AS& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5848,6 +6054,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const MINUS_ASSIGN&) { return "PyRawParser.FlatTypes.MINUS_ASSIGN"; }
+		template<class F> void ispa_debug_fields(const MINUS_ASSIGN& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5880,6 +6089,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const LPAREN&) { return "PyRawParser.FlatTypes.LPAREN"; }
+		template<class F> void ispa_debug_fields(const LPAREN& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5913,6 +6125,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const ID&) { return "PyRawParser.FlatTypes.ID"; }
+		template<class F> void ispa_debug_fields(const ID& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5945,6 +6161,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const AMP&) { return "PyRawParser.FlatTypes.AMP"; }
+		template<class F> void ispa_debug_fields(const AMP& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -5977,6 +6196,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const AMP_ASSIGN&) { return "PyRawParser.FlatTypes.AMP_ASSIGN"; }
+		template<class F> void ispa_debug_fields(const AMP_ASSIGN& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6009,6 +6231,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const CLASS&) { return "PyRawParser.FlatTypes.CLASS"; }
+		template<class F> void ispa_debug_fields(const CLASS& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6041,6 +6266,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const MINUS&) { return "PyRawParser.FlatTypes.MINUS"; }
+		template<class F> void ispa_debug_fields(const MINUS& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6073,6 +6301,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const DOT&) { return "PyRawParser.FlatTypes.DOT"; }
+		template<class F> void ispa_debug_fields(const DOT& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6105,6 +6336,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const CARET_ASSIGN&) { return "PyRawParser.FlatTypes.CARET_ASSIGN"; }
+		template<class F> void ispa_debug_fields(const CARET_ASSIGN& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6137,6 +6371,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const RSHIFT_ASSIGN&) { return "PyRawParser.FlatTypes.RSHIFT_ASSIGN"; }
+		template<class F> void ispa_debug_fields(const RSHIFT_ASSIGN& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6169,6 +6406,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const PERCENT&) { return "PyRawParser.FlatTypes.PERCENT"; }
+		template<class F> void ispa_debug_fields(const PERCENT& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6201,6 +6441,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const IMPORT&) { return "PyRawParser.FlatTypes.IMPORT"; }
+		template<class F> void ispa_debug_fields(const IMPORT& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6233,6 +6476,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const FLOOR_DIV&) { return "PyRawParser.FlatTypes.FLOOR_DIV"; }
+		template<class F> void ispa_debug_fields(const FLOOR_DIV& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6265,6 +6511,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const ARROW&) { return "PyRawParser.FlatTypes.ARROW"; }
+		template<class F> void ispa_debug_fields(const ARROW& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6297,6 +6546,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const OR&) { return "PyRawParser.FlatTypes.OR"; }
+		template<class F> void ispa_debug_fields(const OR& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6329,6 +6581,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const PIPE_ASSIGN&) { return "PyRawParser.FlatTypes.PIPE_ASSIGN"; }
+		template<class F> void ispa_debug_fields(const PIPE_ASSIGN& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6361,6 +6616,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const RSHIFT&) { return "PyRawParser.FlatTypes.RSHIFT"; }
+		template<class F> void ispa_debug_fields(const RSHIFT& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6393,6 +6651,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const RETURN&) { return "PyRawParser.FlatTypes.RETURN"; }
+		template<class F> void ispa_debug_fields(const RETURN& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6425,6 +6686,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const FROM&) { return "PyRawParser.FlatTypes.FROM"; }
+		template<class F> void ispa_debug_fields(const FROM& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6457,6 +6721,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const LBRACE&) { return "PyRawParser.FlatTypes.LBRACE"; }
+		template<class F> void ispa_debug_fields(const LBRACE& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6489,6 +6756,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const RBRACKET&) { return "PyRawParser.FlatTypes.RBRACKET"; }
+		template<class F> void ispa_debug_fields(const RBRACKET& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6523,6 +6793,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const term&) { return "PyRawParser.FlatTypes.term"; }
+		template<class F> void ispa_debug_fields(const term& value, F&& field) {
+			field("first", value.first);
+			field("rest", value.rest);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6556,6 +6831,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const else_clause&) { return "PyRawParser.FlatTypes.else_clause"; }
+		template<class F> void ispa_debug_fields(const else_clause& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6589,6 +6868,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const indented_block&) { return "PyRawParser.FlatTypes.indented_block"; }
+		template<class F> void ispa_debug_fields(const indented_block& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6622,6 +6905,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const dict_expr&) { return "PyRawParser.FlatTypes.dict_expr"; }
+		template<class F> void ispa_debug_fields(const dict_expr& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6654,6 +6941,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const break_stmt&) { return "PyRawParser.FlatTypes.break_stmt"; }
+		template<class F> void ispa_debug_fields(const break_stmt& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6686,6 +6976,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const pass_stmt&) { return "PyRawParser.FlatTypes.pass_stmt"; }
+		template<class F> void ispa_debug_fields(const pass_stmt& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6720,6 +7013,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const try_stmt&) { return "PyRawParser.FlatTypes.try_stmt"; }
+		template<class F> void ispa_debug_fields(const try_stmt& value, F&& field) {
+			field("body", value.body);
+			field("handlers", value.handlers);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6753,6 +7051,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const inversion&) { return "PyRawParser.FlatTypes.inversion"; }
+		template<class F> void ispa_debug_fields(const inversion& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6786,6 +7088,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const index_suffix&) { return "PyRawParser.FlatTypes.index_suffix"; }
+		template<class F> void ispa_debug_fields(const index_suffix& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6819,6 +7125,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const finally_clause&) { return "PyRawParser.FlatTypes.finally_clause"; }
+		template<class F> void ispa_debug_fields(const finally_clause& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6853,6 +7163,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const bitwise_and&) { return "PyRawParser.FlatTypes.bitwise_and"; }
+		template<class F> void ispa_debug_fields(const bitwise_and& value, F&& field) {
+			field("first", value.first);
+			field("rest", value.rest);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6887,6 +7202,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const conjunction&) { return "PyRawParser.FlatTypes.conjunction"; }
+		template<class F> void ispa_debug_fields(const conjunction& value, F&& field) {
+			field("first", value.first);
+			field("rest", value.rest);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6921,6 +7241,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const sum&) { return "PyRawParser.FlatTypes.sum"; }
+		template<class F> void ispa_debug_fields(const sum& value, F&& field) {
+			field("first", value.first);
+			field("rest", value.rest);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6955,6 +7280,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const bitwise_xor&) { return "PyRawParser.FlatTypes.bitwise_xor"; }
+		template<class F> void ispa_debug_fields(const bitwise_xor& value, F&& field) {
+			field("first", value.first);
+			field("rest", value.rest);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -6988,6 +7318,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const parenthesized_expr&) { return "PyRawParser.FlatTypes.parenthesized_expr"; }
+		template<class F> void ispa_debug_fields(const parenthesized_expr& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7021,6 +7355,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const or_tail&) { return "PyRawParser.FlatTypes.or_tail"; }
+		template<class F> void ispa_debug_fields(const or_tail& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7053,6 +7391,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const continue_stmt&) { return "PyRawParser.FlatTypes.continue_stmt"; }
+		template<class F> void ispa_debug_fields(const continue_stmt& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7086,6 +7427,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const dict_item_tail&) { return "PyRawParser.FlatTypes.dict_item_tail"; }
+		template<class F> void ispa_debug_fields(const dict_item_tail& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7120,6 +7465,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const dict_item&) { return "PyRawParser.FlatTypes.dict_item"; }
+		template<class F> void ispa_debug_fields(const dict_item& value, F&& field) {
+			field("key", value.key);
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7154,6 +7504,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const parenthesized_content&) { return "PyRawParser.FlatTypes.parenthesized_content"; }
+		template<class F> void ispa_debug_fields(const parenthesized_content& value, F&& field) {
+			field("first", value.first);
+			field("rest", value.rest);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7188,6 +7543,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const call_args&) { return "PyRawParser.FlatTypes.call_args"; }
+		template<class F> void ispa_debug_fields(const call_args& value, F&& field) {
+			field("first", value.first);
+			field("rest", value.rest);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7222,6 +7582,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const tuple_elements&) { return "PyRawParser.FlatTypes.tuple_elements"; }
+		template<class F> void ispa_debug_fields(const tuple_elements& value, F&& field) {
+			field("first", value.first);
+			field("rest", value.rest);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7255,6 +7620,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const tuple_suffix&) { return "PyRawParser.FlatTypes.tuple_suffix"; }
+		template<class F> void ispa_debug_fields(const tuple_suffix& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7288,6 +7657,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const call_arg_tail&) { return "PyRawParser.FlatTypes.call_arg_tail"; }
+		template<class F> void ispa_debug_fields(const call_arg_tail& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7322,6 +7695,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const power&) { return "PyRawParser.FlatTypes.power"; }
+		template<class F> void ispa_debug_fields(const power& value, F&& field) {
+			field("base", value.base);
+			field("exponent", value.exponent);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7356,6 +7734,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const primary&) { return "PyRawParser.FlatTypes.primary"; }
+		template<class F> void ispa_debug_fields(const primary& value, F&& field) {
+			field("base", value.base);
+			field("suffixes", value.suffixes);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7389,6 +7772,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const bitand_tail&) { return "PyRawParser.FlatTypes.bitand_tail"; }
+		template<class F> void ispa_debug_fields(const bitand_tail& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7422,6 +7809,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const bitxor_tail&) { return "PyRawParser.FlatTypes.bitxor_tail"; }
+		template<class F> void ispa_debug_fields(const bitxor_tail& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7455,6 +7846,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const list_expr&) { return "PyRawParser.FlatTypes.list_expr"; }
+		template<class F> void ispa_debug_fields(const list_expr& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7488,6 +7883,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const call_suffix&) { return "PyRawParser.FlatTypes.call_suffix"; }
+		template<class F> void ispa_debug_fields(const call_suffix& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7521,6 +7920,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const power_tail&) { return "PyRawParser.FlatTypes.power_tail"; }
+		template<class F> void ispa_debug_fields(const power_tail& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7555,6 +7958,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const expr&) { return "PyRawParser.FlatTypes.expr"; }
+		template<class F> void ispa_debug_fields(const expr& value, F&& field) {
+			field("value", value.value);
+			field("conditional", value.conditional);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7589,6 +7997,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const shift_expr&) { return "PyRawParser.FlatTypes.shift_expr"; }
+		template<class F> void ispa_debug_fields(const shift_expr& value, F&& field) {
+			field("first", value.first);
+			field("rest", value.rest);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7622,6 +8035,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const bitor_tail&) { return "PyRawParser.FlatTypes.bitor_tail"; }
+		template<class F> void ispa_debug_fields(const bitor_tail& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7655,6 +8072,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const factor&) { return "PyRawParser.FlatTypes.factor"; }
+		template<class F> void ispa_debug_fields(const factor& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7689,6 +8110,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const expr_list&) { return "PyRawParser.FlatTypes.expr_list"; }
+		template<class F> void ispa_debug_fields(const expr_list& value, F&& field) {
+			field("first", value.first);
+			field("rest", value.rest);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7723,6 +8149,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const bitwise_or&) { return "PyRawParser.FlatTypes.bitwise_or"; }
+		template<class F> void ispa_debug_fields(const bitwise_or& value, F&& field) {
+			field("first", value.first);
+			field("rest", value.rest);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7757,6 +8188,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const disjunction&) { return "PyRawParser.FlatTypes.disjunction"; }
+		template<class F> void ispa_debug_fields(const disjunction& value, F&& field) {
+			field("first", value.first);
+			field("rest", value.rest);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7792,6 +8228,12 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const except_handlers&) { return "PyRawParser.FlatTypes.except_handlers"; }
+		template<class F> void ispa_debug_fields(const except_handlers& value, F&& field) {
+			field("handlers", value.handlers);
+			field("otherwise", value.otherwise);
+			field("finalizer", value.finalizer);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7826,6 +8268,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const comparison&) { return "PyRawParser.FlatTypes.comparison"; }
+		template<class F> void ispa_debug_fields(const comparison& value, F&& field) {
+			field("first", value.first);
+			field("rest", value.rest);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7859,6 +8306,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const not_inversion&) { return "PyRawParser.FlatTypes.not_inversion"; }
+		template<class F> void ispa_debug_fields(const not_inversion& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7892,6 +8343,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const compound_stmt&) { return "PyRawParser.FlatTypes.compound_stmt"; }
+		template<class F> void ispa_debug_fields(const compound_stmt& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7925,6 +8380,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const try_tail&) { return "PyRawParser.FlatTypes.try_tail"; }
+		template<class F> void ispa_debug_fields(const try_tail& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7958,6 +8417,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const def_header&) { return "PyRawParser.FlatTypes.def_header"; }
+		template<class F> void ispa_debug_fields(const def_header& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -7990,6 +8453,9 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const not_in&) { return "PyRawParser.FlatTypes.not_in"; }
+		template<class F> void ispa_debug_fields(const not_in& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8024,6 +8490,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const conditional_tail&) { return "PyRawParser.FlatTypes.conditional_tail"; }
+		template<class F> void ispa_debug_fields(const conditional_tail& value, F&& field) {
+			field("condition", value.condition);
+			field("otherwise", value.otherwise);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8057,6 +8528,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const call_arg&) { return "PyRawParser.FlatTypes.call_arg"; }
+		template<class F> void ispa_debug_fields(const call_arg& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8091,6 +8566,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const dict_items&) { return "PyRawParser.FlatTypes.dict_items"; }
+		template<class F> void ispa_debug_fields(const dict_items& value, F&& field) {
+			field("first", value.first);
+			field("rest", value.rest);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8124,6 +8604,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const is_op&) { return "PyRawParser.FlatTypes.is_op"; }
+		template<class F> void ispa_debug_fields(const is_op& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8157,6 +8641,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const ispa_match_stmt&) { return "PyRawParser.FlatTypes.ispa_match_stmt"; }
+		template<class F> void ispa_debug_fields(const ispa_match_stmt& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8191,6 +8679,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const nonlocal_stmt&) { return "PyRawParser.FlatTypes.nonlocal_stmt"; }
+		template<class F> void ispa_debug_fields(const nonlocal_stmt& value, F&& field) {
+			field("first", value.first);
+			field("rest", value.rest);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8224,6 +8717,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const except_alias&) { return "PyRawParser.FlatTypes.except_alias"; }
+		template<class F> void ispa_debug_fields(const except_alias& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8258,6 +8755,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const global_stmt&) { return "PyRawParser.FlatTypes.global_stmt"; }
+		template<class F> void ispa_debug_fields(const global_stmt& value, F&& field) {
+			field("first", value.first);
+			field("rest", value.rest);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8292,6 +8794,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const keyword_arg&) { return "PyRawParser.FlatTypes.keyword_arg"; }
+		template<class F> void ispa_debug_fields(const keyword_arg& value, F&& field) {
+			field("name", value.name);
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8325,6 +8832,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const import_alias&) { return "PyRawParser.FlatTypes.import_alias"; }
+		template<class F> void ispa_debug_fields(const import_alias& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8358,6 +8869,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const attribute_suffix&) { return "PyRawParser.FlatTypes.attribute_suffix"; }
+		template<class F> void ispa_debug_fields(const attribute_suffix& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8392,6 +8907,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const dotted_name&) { return "PyRawParser.FlatTypes.dotted_name"; }
+		template<class F> void ispa_debug_fields(const dotted_name& value, F&& field) {
+			field("first", value.first);
+			field("rest", value.rest);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8425,6 +8945,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const atom&) { return "PyRawParser.FlatTypes.atom"; }
+		template<class F> void ispa_debug_fields(const atom& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8459,6 +8983,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const sum_tail&) { return "PyRawParser.FlatTypes.sum_tail"; }
+		template<class F> void ispa_debug_fields(const sum_tail& value, F&& field) {
+			field("op", value.op);
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8493,6 +9022,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const unary_expr&) { return "PyRawParser.FlatTypes.unary_expr"; }
+		template<class F> void ispa_debug_fields(const unary_expr& value, F&& field) {
+			field("op", value.op);
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8527,6 +9061,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const term_tail&) { return "PyRawParser.FlatTypes.term_tail"; }
+		template<class F> void ispa_debug_fields(const term_tail& value, F&& field) {
+			field("op", value.op);
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8560,6 +9099,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const assignment_op&) { return "PyRawParser.FlatTypes.assignment_op"; }
+		template<class F> void ispa_debug_fields(const assignment_op& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8594,6 +9137,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const shift_tail&) { return "PyRawParser.FlatTypes.shift_tail"; }
+		template<class F> void ispa_debug_fields(const shift_tail& value, F&& field) {
+			field("op", value.op);
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8627,6 +9175,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const class_bases&) { return "PyRawParser.FlatTypes.class_bases"; }
+		template<class F> void ispa_debug_fields(const class_bases& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8660,6 +9212,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const decorator&) { return "PyRawParser.FlatTypes.decorator"; }
+		template<class F> void ispa_debug_fields(const decorator& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8693,6 +9249,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const parameter_default&) { return "PyRawParser.FlatTypes.parameter_default"; }
+		template<class F> void ispa_debug_fields(const parameter_default& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8726,6 +9286,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const return_annotation&) { return "PyRawParser.FlatTypes.return_annotation"; }
+		template<class F> void ispa_debug_fields(const return_annotation& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8760,6 +9324,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const elif_clause&) { return "PyRawParser.FlatTypes.elif_clause"; }
+		template<class F> void ispa_debug_fields(const elif_clause& value, F&& field) {
+			field("condition", value.condition);
+			field("body", value.body);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8794,6 +9363,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const assert_stmt&) { return "PyRawParser.FlatTypes.assert_stmt"; }
+		template<class F> void ispa_debug_fields(const assert_stmt& value, F&& field) {
+			field("condition", value.condition);
+			field("message", value.message);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8827,6 +9401,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const raise_from&) { return "PyRawParser.FlatTypes.raise_from"; }
+		template<class F> void ispa_debug_fields(const raise_from& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8860,6 +9438,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const return_stmt&) { return "PyRawParser.FlatTypes.return_stmt"; }
+		template<class F> void ispa_debug_fields(const return_stmt& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8894,6 +9476,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const annotated_assignment&) { return "PyRawParser.FlatTypes.annotated_assignment"; }
+		template<class F> void ispa_debug_fields(const annotated_assignment& value, F&& field) {
+			field("annotation", value.annotation);
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8927,6 +9514,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const parameter_annotation&) { return "PyRawParser.FlatTypes.parameter_annotation"; }
+		template<class F> void ispa_debug_fields(const parameter_annotation& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8962,6 +9553,12 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const while_stmt&) { return "PyRawParser.FlatTypes.while_stmt"; }
+		template<class F> void ispa_debug_fields(const while_stmt& value, F&& field) {
+			field("condition", value.condition);
+			field("body", value.body);
+			field("otherwise", value.otherwise);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -8998,6 +9595,13 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const if_stmt&) { return "PyRawParser.FlatTypes.if_stmt"; }
+		template<class F> void ispa_debug_fields(const if_stmt& value, F&& field) {
+			field("condition", value.condition);
+			field("body", value.body);
+			field("elifs", value.elifs);
+			field("otherwise", value.otherwise);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9031,6 +9635,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const compare_op&) { return "PyRawParser.FlatTypes.compare_op"; }
+		template<class F> void ispa_debug_fields(const compare_op& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9066,6 +9674,12 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const except_clause&) { return "PyRawParser.FlatTypes.except_clause"; }
+		template<class F> void ispa_debug_fields(const except_clause& value, F&& field) {
+			field("exception", value.exception);
+			field("alias", value.alias);
+			field("body", value.body);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9100,6 +9714,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const import_name_item&) { return "PyRawParser.FlatTypes.import_name_item"; }
+		template<class F> void ispa_debug_fields(const import_name_item& value, F&& field) {
+			field("name", value.name);
+			field("alias", value.alias);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9133,6 +9752,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const assignment_suffix&) { return "PyRawParser.FlatTypes.assignment_suffix"; }
+		template<class F> void ispa_debug_fields(const assignment_suffix& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9166,6 +9789,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const postfix&) { return "PyRawParser.FlatTypes.postfix"; }
+		template<class F> void ispa_debug_fields(const postfix& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9200,6 +9827,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const dotted_as_name&) { return "PyRawParser.FlatTypes.dotted_as_name"; }
+		template<class F> void ispa_debug_fields(const dotted_as_name& value, F&& field) {
+			field("name", value.name);
+			field("alias", value.alias);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9234,6 +9866,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const relative_module&) { return "PyRawParser.FlatTypes.relative_module"; }
+		template<class F> void ispa_debug_fields(const relative_module& value, F&& field) {
+			field("relative", value.relative);
+			field("name", value.name);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9268,6 +9905,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const assignment_tail&) { return "PyRawParser.FlatTypes.assignment_tail"; }
+		template<class F> void ispa_debug_fields(const assignment_tail& value, F&& field) {
+			field("op", value.op);
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9303,6 +9945,12 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const class_header&) { return "PyRawParser.FlatTypes.class_header"; }
+		template<class F> void ispa_debug_fields(const class_header& value, F&& field) {
+			field("name", value.name);
+			field("bases", value.bases);
+			field("body", value.body);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9336,6 +9984,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const decorators&) { return "PyRawParser.FlatTypes.decorators"; }
+		template<class F> void ispa_debug_fields(const decorators& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9370,6 +10022,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const raise_stmt&) { return "PyRawParser.FlatTypes.raise_stmt"; }
+		template<class F> void ispa_debug_fields(const raise_stmt& value, F&& field) {
+			field("exception", value.exception);
+			field("cause", value.cause);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9405,6 +10062,12 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const parameter&) { return "PyRawParser.FlatTypes.parameter"; }
+		template<class F> void ispa_debug_fields(const parameter& value, F&& field) {
+			field("name", value.name);
+			field("annotation", value.annotation);
+			field("def", value.def);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9439,6 +10102,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const compare_tail&) { return "PyRawParser.FlatTypes.compare_tail"; }
+		template<class F> void ispa_debug_fields(const compare_tail& value, F&& field) {
+			field("op", value.op);
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9473,6 +10141,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const import_names&) { return "PyRawParser.FlatTypes.import_names"; }
+		template<class F> void ispa_debug_fields(const import_names& value, F&& field) {
+			field("first", value.first);
+			field("rest", value.rest);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9507,6 +10180,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const assignment_target&) { return "PyRawParser.FlatTypes.assignment_target"; }
+		template<class F> void ispa_debug_fields(const assignment_target& value, F&& field) {
+			field("name", value.name);
+			field("suffixes", value.suffixes);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9541,6 +10219,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const dotted_as_names&) { return "PyRawParser.FlatTypes.dotted_as_names"; }
+		template<class F> void ispa_debug_fields(const dotted_as_names& value, F&& field) {
+			field("first", value.first);
+			field("rest", value.rest);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9574,6 +10257,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const assignment_value&) { return "PyRawParser.FlatTypes.assignment_value"; }
+		template<class F> void ispa_debug_fields(const assignment_value& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9608,6 +10295,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const decorated_def&) { return "PyRawParser.FlatTypes.decorated_def"; }
+		template<class F> void ispa_debug_fields(const decorated_def& value, F&& field) {
+			field("decorators", value.decorators);
+			field("definition", value.definition);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9642,6 +10334,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const class_def&) { return "PyRawParser.FlatTypes.class_def"; }
+		template<class F> void ispa_debug_fields(const class_def& value, F&& field) {
+			field("decorators", value.decorators);
+			field("definition", value.definition);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9676,6 +10373,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const parameters&) { return "PyRawParser.FlatTypes.parameters"; }
+		template<class F> void ispa_debug_fields(const parameters& value, F&& field) {
+			field("first", value.first);
+			field("rest", value.rest);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9709,6 +10411,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const parenthesized_imports&) { return "PyRawParser.FlatTypes.parenthesized_imports"; }
+		template<class F> void ispa_debug_fields(const parenthesized_imports& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9742,6 +10448,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const with_as&) { return "PyRawParser.FlatTypes.with_as"; }
+		template<class F> void ispa_debug_fields(const with_as& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9776,6 +10486,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const for_targets&) { return "PyRawParser.FlatTypes.for_targets"; }
+		template<class F> void ispa_debug_fields(const for_targets& value, F&& field) {
+			field("first", value.first);
+			field("rest", value.rest);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9810,6 +10525,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const del_stmt&) { return "PyRawParser.FlatTypes.del_stmt"; }
+		template<class F> void ispa_debug_fields(const del_stmt& value, F&& field) {
+			field("first", value.first);
+			field("rest", value.rest);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9843,6 +10563,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const import_name&) { return "PyRawParser.FlatTypes.import_name"; }
+		template<class F> void ispa_debug_fields(const import_name& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9877,6 +10601,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const expr_stmt&) { return "PyRawParser.FlatTypes.expr_stmt"; }
+		template<class F> void ispa_debug_fields(const expr_stmt& value, F&& field) {
+			field("target", value.target);
+			field("assignment", value.assignment);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9914,6 +10643,14 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const function_header&) { return "PyRawParser.FlatTypes.function_header"; }
+		template<class F> void ispa_debug_fields(const function_header& value, F&& field) {
+			field("async", value.async);
+			field("name", value.name);
+			field("params", value.params);
+			field("returns", value.returns);
+			field("body", value.body);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9947,6 +10684,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const import_targets&) { return "PyRawParser.FlatTypes.import_targets"; }
+		template<class F> void ispa_debug_fields(const import_targets& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -9981,6 +10722,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const with_item&) { return "PyRawParser.FlatTypes.with_item"; }
+		template<class F> void ispa_debug_fields(const with_item& value, F&& field) {
+			field("context", value.context);
+			field("target", value.target);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -10018,6 +10764,14 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const for_stmt&) { return "PyRawParser.FlatTypes.for_stmt"; }
+		template<class F> void ispa_debug_fields(const for_stmt& value, F&& field) {
+			field("async", value.async);
+			field("targets", value.targets);
+			field("iterable", value.iterable);
+			field("body", value.body);
+			field("otherwise", value.otherwise);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -10052,6 +10806,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const function_def&) { return "PyRawParser.FlatTypes.function_def"; }
+		template<class F> void ispa_debug_fields(const function_def& value, F&& field) {
+			field("decorators", value.decorators);
+			field("definition", value.definition);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -10086,6 +10845,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const import_from&) { return "PyRawParser.FlatTypes.import_from"; }
+		template<class F> void ispa_debug_fields(const import_from& value, F&& field) {
+			field("mod", value.mod);
+			field("names", value.names);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -10120,6 +10884,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const with_items&) { return "PyRawParser.FlatTypes.with_items"; }
+		template<class F> void ispa_debug_fields(const with_items& value, F&& field) {
+			field("first", value.first);
+			field("rest", value.rest);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -10153,6 +10922,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const import_stmt&) { return "PyRawParser.FlatTypes.import_stmt"; }
+		template<class F> void ispa_debug_fields(const import_stmt& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -10188,6 +10961,12 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const with_stmt&) { return "PyRawParser.FlatTypes.with_stmt"; }
+		template<class F> void ispa_debug_fields(const with_stmt& value, F&& field) {
+			field("async", value.async);
+			field("items", value.items);
+			field("body", value.body);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -10221,6 +11000,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const simple_stmt&) { return "PyRawParser.FlatTypes.simple_stmt"; }
+		template<class F> void ispa_debug_fields(const simple_stmt& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -10255,6 +11038,11 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const simple_stmts&) { return "PyRawParser.FlatTypes.simple_stmts"; }
+		template<class F> void ispa_debug_fields(const simple_stmts& value, F&& field) {
+			field("first", value.first);
+			field("rest", value.rest);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -10288,6 +11076,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const statement&) { return "PyRawParser.FlatTypes.statement"; }
+		template<class F> void ispa_debug_fields(const statement& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -10321,6 +11113,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const block&) { return "PyRawParser.FlatTypes.block"; }
+		template<class F> void ispa_debug_fields(const block& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -10354,6 +11150,10 @@ namespace PyRawParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const main&) { return "PyRawParser.FlatTypes.main"; }
+		template<class F> void ispa_debug_fields(const main& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -11391,9 +12191,9 @@ namespace PyRawParser {
 		auto on_eof() -> void override;
 	private:
 		static ::ISPA_STD::DFA::API::CharToClass char_class_table;
-		static ::ISPA_STD::DFA::API::Table<206, 61> dfa_table;
+		static ::ISPA_STD::DFA::API::Table<206, 60> dfa_table;
 		static ::ISPA_STD::DFA::API::Table<249, 4> action_table;
-		auto semantic_action_exec(long long state, const ::ISPA_STD::DFA::API::Captures& captures, long long start_pos, const char* start, long long length, long long line) -> std::pair<long long, Token>;
+		auto semantic_action_exec(long long state, const ::ISPA_STD::DFA::API::Captures& captures, long long start_pos, const char* start, long long length, long long line, const char*& cursor) -> std::pair<long long, Token>;
 		bool init_done = false;
 		auto init() -> void override;
 		::ISPA_STD::DFA::API::TdfaLayout<11, 10> tdfa_registers;
@@ -11423,7 +12223,6 @@ namespace PyRawParser {
 } // namespace PyRawParser
 namespace PyRawParser {
 	class Parser : public ::ISPA_STD::LLParser<Types::main, Token> {
-		Lexer lazy_lexer_;
 	protected:
 		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::PyRawParser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::PyRawParser::Lexer::lazy_iterator>>> auto shift_tail(IT pos) -> ::ISPA_STD::MatchResult<Types::shift_tail, IT>;
 		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::PyRawParser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::PyRawParser::Lexer::lazy_iterator>>> auto nonlocal_stmt(IT pos) -> ::ISPA_STD::MatchResult<Types::nonlocal_stmt, IT>;
@@ -11542,7 +12341,10 @@ namespace PyRawParser {
 		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::PyRawParser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::PyRawParser::Lexer::lazy_iterator>>> auto ispa_match_stmt(IT pos) -> ::ISPA_STD::MatchResult<Types::ispa_match_stmt, IT>;
 	public:
 		auto parseFromTokens() -> void override;
-		auto lazyParse() -> ISPA_STD::MatchResult<Types::main, ISPA_STD::Lexer_base<Token>::lazy_iterator> override;
+	private:
+		Lexer lazy_lexer_;
+	public:
+		auto lazyParse() -> ::ISPA_STD::MatchResult<Types::main, Lexer::lazy_iterator> override;
 		constexpr auto members() {
 			return std::tie();
 		}

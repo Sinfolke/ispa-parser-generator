@@ -1,0 +1,6 @@
+name: cpp-target
+layout:
+  root: parser/stdlibs
+  ispalib: {}
+  ispatarget:
+    cpp: target/cpp

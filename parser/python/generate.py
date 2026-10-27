@@ -12,7 +12,7 @@ def main():
     root = Path(__file__).resolve().parent
     options = argparse.ArgumentParser(description=__doc__)
     options.add_argument("generator", type=Path)
-    options.add_argument("--output", type=Path, default=root / "bootstrapped")
+    options.add_argument("--output", type=Path, default=root / "bootstrapped2")
     args = options.parse_args()
     generator = args.generator.resolve()
     output = args.output.resolve()
@@ -37,7 +37,7 @@ def main():
         source = Path(temporary) / "python.isc"
         source.write_text(grammar)
         subprocess.run([str(generator), str(source), "-l", "cpp", "-a", "LL",
-                        "--no-incremental", "-o", str(output / "PyRawParser")],
+                        "--no-incremental", "-o", str(output / "PyRawParser"), "--ai-recovery", str(root / "ai.json")],
                        cwd=temporary, check=True)
         # The flattened source is temporary. Map debug checkpoints back to the
         # grammar files so breakpoints remain usable after generation.

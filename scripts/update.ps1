@@ -70,7 +70,7 @@ try {
     if (-not $self -or -not (Test-Path -LiteralPath $self -PathType Leaf)) {
         throw 'Run update.ps1 from a saved script file.'
     }
-    foreach ($file in @('ispa-pkg.exe', 'ispadbg.exe', 'update.ps1', 'install.ps1')) {
+    foreach ($file in @('ispa-pkg.exe', 'ispadbg.exe', 'ispa-ai.exe', 'update.ps1', 'install.ps1')) {
         if (-not (Test-Path (Join-Path $extracted $file))) { throw "Release archive does not contain $file" }
     }
     Set-Content -LiteralPath (Join-Path $extracted 'INSTALL_VERSION') -Value $latest
@@ -83,11 +83,14 @@ try {
     } elseif (-not ((Test-Path (Join-Path $destination 'ispa.exe')) -and (Test-Path (Join-Path $destination 'update.ps1')))) {
         throw "Incomplete existing installation: $destination"
     }
-    if (-not (Test-Path (Join-Path $destination 'ispa-pkg.exe'))) {
-        Copy-Item -LiteralPath (Join-Path $extracted 'ispa-pkg.exe') -Destination (Join-Path $destination 'ispa-pkg.exe')
-    }
-    if (-not (Test-Path (Join-Path $destination 'ispadbg.exe'))) {
-        Copy-Item -LiteralPath (Join-Path $extracted 'ispadbg.exe') -Destination (Join-Path $destination 'ispadbg.exe')
+    # Existing version directory may predate newly added release tools.
+    if (Test-Path -LiteralPath $extracted -PathType Container) {
+      foreach ($tool in @('ispa-pkg.exe', 'ispadbg.exe', 'ispa-ai.exe')) {
+        $installedTool = Join-Path $destination $tool
+        if (-not (Test-Path -LiteralPath $installedTool -PathType Leaf)) {
+            Copy-Item -LiteralPath (Join-Path $extracted $tool) -Destination $installedTool
+        }
+      }
     }
 
     New-Item -ItemType Directory -Path $bin -Force | Out-Null
@@ -101,6 +104,8 @@ try {
     Set-Content -LiteralPath (Join-Path $bin 'ispa-pkg.cmd') -Value $pkgLauncher -Encoding Ascii
     $debuggerLauncher = "@echo off`r`nsetlocal`r`nset /p ISPA_VERSION=<`"$escapedRoot\current-version`"`r`n`"$escapedRoot\versions\%ISPA_VERSION%\ispadbg.exe`" %*`r`n"
     Set-Content -LiteralPath (Join-Path $bin 'ispadbg.cmd') -Value $debuggerLauncher -Encoding Ascii
+    $aiLauncher = "@echo off`r`nsetlocal`r`nset /p ISPA_VERSION=<`"$escapedRoot\current-version`"`r`n`"$escapedRoot\versions\%ISPA_VERSION%\ispa-ai.exe`" %*`r`n"
+    Set-Content -LiteralPath (Join-Path $bin 'ispa-ai.cmd') -Value $aiLauncher -Encoding Ascii
     Set-Content -LiteralPath $versionFile -Value $latest -NoNewline
 
     $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
@@ -109,7 +114,7 @@ try {
         [Environment]::SetEnvironmentVariable('Path', (($entries + $bin) -join ';'), 'User')
         Write-Host "Added $bin to user PATH. Open a new terminal."
     }
-    Write-Host "Installed ISPA $latest. Commands: ispa, ispa-pkg, ispadbg, ispa-update"
+    Write-Host "Installed ISPA $latest. Commands: ispa, ispa-pkg, ispadbg, ispa-ai, ispa-update"
 }
 finally {
     Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue

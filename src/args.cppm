@@ -21,6 +21,8 @@ export struct Args {
     std::vector<std::pair<std::string, std::string>> dependencies;
     bool no_dep = false;
     bool check_only = false;
+    bool no_ai_recovery = false;
+    std::string ai_recovery_file;
     // Internal: keep every exported module when generating a dependency.
     bool dependency_build = false;
     bool debug = false;

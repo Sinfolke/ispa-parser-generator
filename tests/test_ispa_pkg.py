@@ -18,6 +18,23 @@ from ispa_pkg.cli import (PackageError, default_root, export_variables, install,
 
 
 class PackageTests(unittest.TestCase):
+    def test_repository_packages_separate_grammar_and_targets(self):
+        repository = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as temp, patch('ispa_pkg.cli.build_cpp_library'):
+            root = Path(temp) / 'libraries'
+            for name, manifest in (('std', 'ispa-package.yaml'),
+                                   ('cpp-target', 'ispa-package.cpp-target.yaml'),
+                                   ('python-target', 'ispa-package.python-target.yaml')):
+                install(name, {'path': str(repository), 'manifest': manifest}, root)
+            self.assertTrue((root / 'std/ispalib/grammar').is_dir())
+            self.assertTrue((root / 'std/ispalib/python').is_dir())
+            self.assertFalse((root / 'std/ispatarget').exists())
+            self.assertTrue((root / 'cpp-target/ispatarget/cpp/src/core.cpp').is_file())
+            self.assertFalse((root / 'cpp-target/ispalib').exists())
+            self.assertTrue((root / 'python-target/ispatarget/ispa_std.py').is_file())
+            self.assertTrue((root / 'python-target/ispatarget/python/parser.py').is_file())
+            self.assertFalse((root / 'python-target/ispalib').exists())
+
     @unittest.skipUnless(os.name != 'nt' and shutil.which('c++') and shutil.which('ar')
                          and shutil.which('bash'), 'requires a POSIX C++ toolchain')
     def test_install_builds_static_library_and_exports_it_for_linking(self):
@@ -55,10 +72,9 @@ class PackageTests(unittest.TestCase):
             archive.unlink()
             entry = Path(__file__).resolve().parents[1] / 'cli' / 'pkg' / 'ispa_pkg_entry.py'
             exported = subprocess.run(
-                [sys.executable, str(entry), '--root', str(root), '--export', '--export-path'],
+                [sys.executable, str(entry), '--root', str(root), '--build', 'example'],
                 capture_output=True, text=True, check=True)
-            self.assertEqual(exported.stdout.strip(), str(script))
-            self.assertIn('compiling src/example.cpp', exported.stderr)
+            self.assertIn('building C++ library', exported.stderr)
             self.assertTrue(archive.is_file())
 
             (cpp / 'src' / 'example.cpp').write_text(

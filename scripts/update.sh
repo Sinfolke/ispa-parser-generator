@@ -8,6 +8,7 @@ fail() { printf 'ispa-update: %s\n' "$*" >&2; exit 1; }
 command -v curl >/dev/null 2>&1 || fail 'curl is required'
 command -v python3 >/dev/null 2>&1 || fail 'python3 is required'
 
+# The installer fetched below installs all release tools, including ispa-ai.
 # The version marker is maintained by install.sh. Support older installations
 # by recovering the tag from the existing symlink when possible.
 if [ -f "$INSTALL_ROOT/current-version" ]; then

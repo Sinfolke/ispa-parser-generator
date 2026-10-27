@@ -1,0 +1,9 @@
+name: python-target
+layout:
+  root: parser/stdlibs
+  ispalib: {}
+  ispatarget:
+    python: target/python
+  files:
+    ispatarget/ispa_std.py: target/ispa_std.py
+    ispatarget/ispa_debug.py: target/ispa_debug.py

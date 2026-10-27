@@ -1,9 +1,7 @@
 #pragma once
+#include "ispastdlib/ispa_debug.hpp"
 
-#include <ispastdlib/variant_io.hpp>
-#include <ispastdlib/assign.hpp>
-#include <ispastdlib/to_string.hpp>
-#include <ispastdlib/parser_ll.hpp>
+#include <ispastdlib.hpp>
 
 namespace DepParser {
 	namespace Tokens {
@@ -2405,6 +2403,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const __WS&) { return "DepParser.FlatTypes.__WS"; }
+		template<class F> void ispa_debug_fields(const __WS& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -2437,6 +2438,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_mod_module_MODULE&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_mod_module_MODULE"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_mod_module_MODULE& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -2473,6 +2477,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules&) { return "DepParser.FlatTypes.modules"; }
+		template<class F> void ispa_debug_fields(const modules& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -2522,6 +2529,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -2554,6 +2564,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_mod_detach_DETACH&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_mod_detach_DETACH"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_mod_detach_DETACH& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -2586,6 +2599,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_mod_import_IMPORT&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_mod_import_IMPORT"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_mod_import_IMPORT& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -2618,6 +2634,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_mod_import_import_value_module_import_AS&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_mod_import_import_value_module_import_AS"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_mod_import_import_value_module_import_AS& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -2650,6 +2669,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_mod_import_import_value_from_import_FROM&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_mod_import_import_value_from_import_FROM"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_mod_import_import_value_from_import_FROM& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -2682,6 +2704,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_parentheses_AUTO_1&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_parentheses_AUTO_1"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_parentheses_AUTO_1& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -2716,6 +2741,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_parentheses&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_parentheses"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_parentheses& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -2748,6 +2776,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_parentheses_AUTO&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_parentheses_AUTO"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_parentheses_AUTO& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -2780,6 +2811,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const RIGHT_CURLY_BRACKET&) { return "DepParser.FlatTypes.RIGHT_CURLY_BRACKET"; }
+		template<class F> void ispa_debug_fields(const RIGHT_CURLY_BRACKET& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -2812,6 +2846,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_fail_decl_FAIL&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_fail_decl_FAIL"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_fail_decl_FAIL& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -2845,6 +2882,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_fail_decl&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_fail_decl"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_fail_decl& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -2877,6 +2917,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const LEFT_CURLY_BRACKET&) { return "DepParser.FlatTypes.LEFT_CURLY_BRACKET"; }
+		template<class F> void ispa_debug_fields(const LEFT_CURLY_BRACKET& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -2909,6 +2952,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const FULL_STOP&) { return "DepParser.FlatTypes.FULL_STOP"; }
+		template<class F> void ispa_debug_fields(const FULL_STOP& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -2941,6 +2987,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const AUTO&) { return "DepParser.FlatTypes.AUTO"; }
+		template<class F> void ispa_debug_fields(const AUTO& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -2974,6 +3023,10 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_scanner_tokens_OTHER&) { return "DepParser.FlatTypes.modules_scanner_tokens_OTHER"; }
+		template<class F> void ispa_debug_fields(const modules_scanner_tokens_OTHER& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3010,6 +3063,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_scanner_tokens&) { return "DepParser.FlatTypes.modules_scanner_tokens"; }
+		template<class F> void ispa_debug_fields(const modules_scanner_tokens& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3042,6 +3098,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const GREATER_THAN_SIGN&) { return "DepParser.FlatTypes.GREATER_THAN_SIGN"; }
+		template<class F> void ispa_debug_fields(const GREATER_THAN_SIGN& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3074,6 +3133,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const LESS_THAN_SIGN&) { return "DepParser.FlatTypes.LESS_THAN_SIGN"; }
+		template<class F> void ispa_debug_fields(const LESS_THAN_SIGN& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3106,6 +3168,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const RIGHT_PARENTHESIS&) { return "DepParser.FlatTypes.RIGHT_PARENTHESIS"; }
+		template<class F> void ispa_debug_fields(const RIGHT_PARENTHESIS& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3138,6 +3203,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const LEFT_PARENTHESIS&) { return "DepParser.FlatTypes.LEFT_PARENTHESIS"; }
+		template<class F> void ispa_debug_fields(const LEFT_PARENTHESIS& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3172,6 +3240,11 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_common_NUMBER&) { return "DepParser.FlatTypes.modules_common_NUMBER"; }
+		template<class F> void ispa_debug_fields(const modules_common_NUMBER& value, F&& field) {
+			field("full", value.full);
+			field("floating", value.floating);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3214,6 +3287,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_common&) { return "DepParser.FlatTypes.modules_common"; }
+		template<class F> void ispa_debug_fields(const modules_common& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3246,6 +3322,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const COMMA&) { return "DepParser.FlatTypes.COMMA"; }
+		template<class F> void ispa_debug_fields(const COMMA& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3279,6 +3358,10 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_scanner_tokens_STRING&) { return "DepParser.FlatTypes.modules_scanner_tokens_STRING"; }
+		template<class F> void ispa_debug_fields(const modules_scanner_tokens_STRING& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3311,6 +3394,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const FEATURE&) { return "DepParser.FlatTypes.FEATURE"; }
+		template<class F> void ispa_debug_fields(const FEATURE& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3343,6 +3429,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const SEMICOLON&) { return "DepParser.FlatTypes.SEMICOLON"; }
+		template<class F> void ispa_debug_fields(const SEMICOLON& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3376,6 +3465,10 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_scanner_tokens_COMMENT&) { return "DepParser.FlatTypes.modules_scanner_tokens_COMMENT"; }
+		template<class F> void ispa_debug_fields(const modules_scanner_tokens_COMMENT& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3408,6 +3501,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const ASTERISK&) { return "DepParser.FlatTypes.ASTERISK"; }
+		template<class F> void ispa_debug_fields(const ASTERISK& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3440,6 +3536,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_mod_import_external_import_EXTERN&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_mod_import_external_import_EXTERN"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_mod_import_external_import_EXTERN& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3473,6 +3572,10 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_scanner_tokens_CGROUP&) { return "DepParser.FlatTypes.modules_scanner_tokens_CGROUP"; }
+		template<class F> void ispa_debug_fields(const modules_scanner_tokens_CGROUP& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3505,6 +3608,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_mod_import_PY&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_mod_import_PY"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_mod_import_PY& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3537,6 +3643,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const COLON&) { return "DepParser.FlatTypes.COLON"; }
+		template<class F> void ispa_debug_fields(const COLON& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3569,6 +3678,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const NUMBER_SIGN&) { return "DepParser.FlatTypes.NUMBER_SIGN"; }
+		template<class F> void ispa_debug_fields(const NUMBER_SIGN& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3602,6 +3714,10 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_common_ID&) { return "DepParser.FlatTypes.modules_common_ID"; }
+		template<class F> void ispa_debug_fields(const modules_common_ID& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3634,6 +3750,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_atom&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_atom"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_atom& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3666,6 +3785,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_braces&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_braces"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_braces& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3699,6 +3821,10 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_nested_rule&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_nested_rule"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_nested_rule& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3732,6 +3858,10 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_body_regular&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_body_regular"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_body_regular& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3764,6 +3894,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_modifier&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_modifier"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_modifier& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3797,6 +3930,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_entry&) { return "DepParser.FlatTypes.modules_entry"; }
+		template<class F> void ispa_debug_fields(const modules_entry& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3829,6 +3965,9 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_balanced_item&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_balanced_item"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_balanced_item& value, F&& field) {
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3863,6 +4002,10 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_mod_import_external_import&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_mod_import_external_import"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_mod_import_external_import& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3897,6 +4040,11 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_common_type_annotation&) { return "DepParser.FlatTypes.modules_common_type_annotation"; }
+		template<class F> void ispa_debug_fields(const modules_common_type_annotation& value, F&& field) {
+			field("base", value.base);
+			field("nested", value.nested);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3931,6 +4079,11 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_module_path&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_module_path"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_module_path& value, F&& field) {
+			field("primary", value.primary);
+			field("nested", value.nested);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3965,6 +4118,11 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_common_template_param&) { return "DepParser.FlatTypes.modules_common_template_param"; }
+		template<class F> void ispa_debug_fields(const modules_common_template_param& value, F&& field) {
+			field("first_p", value.first_p);
+			field("following_p", value.following_p);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -3999,6 +4157,10 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_body&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_body"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_body& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -4032,6 +4194,10 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_member&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_member"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_member& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -4067,6 +4233,11 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_declaration&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_declaration"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_declaration& value, F&& field) {
+			field("modifiers", value.modifiers);
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -4101,6 +4272,11 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_common_parameter&) { return "DepParser.FlatTypes.modules_common_parameter"; }
+		template<class F> void ispa_debug_fields(const modules_common_parameter& value, F&& field) {
+			field("name", value.name);
+			field("annotation", value.annotation);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -4136,6 +4312,11 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_mod_import_import_value_module_import&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_mod_import_import_value_module_import"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_mod_import_import_value_module_import& value, F&& field) {
+			field("source", value.source);
+			field("alias", value.alias);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -4169,6 +4350,10 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_common_template_params&) { return "DepParser.FlatTypes.modules_common_template_params"; }
+		template<class F> void ispa_debug_fields(const modules_common_template_params& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -4203,6 +4388,11 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_common_param&) { return "DepParser.FlatTypes.modules_common_param"; }
+		template<class F> void ispa_debug_fields(const modules_common_param& value, F&& field) {
+			field("first_p", value.first_p);
+			field("following_p", value.following_p);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -4290,6 +4480,10 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_common_rule_params&) { return "DepParser.FlatTypes.modules_common_rule_params"; }
+		template<class F> void ispa_debug_fields(const modules_common_rule_params& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -4324,6 +4518,11 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_declaration_form&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_declaration_form"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_declaration_form& value, F&& field) {
+			field("name", value.name);
+			field("body", value.body);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -4357,6 +4556,10 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_source_name&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_source_name"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_source_name& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -4395,6 +4598,14 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_mod_module&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_mod_module"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_mod_module& value, F&& field) {
+			field("begin", value.begin);
+			field("name", value.name);
+			field("parameters", value.parameters);
+			field("entry", value.entry);
+			field("end", value.end);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -4429,6 +4640,11 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_symbol_list&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_symbol_list"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_symbol_list& value, F&& field) {
+			field("first", value.first);
+			field("following", value.following);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -4462,6 +4678,10 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_mod_detach_detach_value_feature_ref&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_mod_detach_detach_value_feature_ref"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_mod_detach_detach_value_feature_ref& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -4496,6 +4716,11 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_mod_import_import_value_from_import_selection_items&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_mod_import_import_value_from_import_selection_items"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_mod_import_import_value_from_import_selection_items& value, F&& field) {
+			field("first", value.first);
+			field("sequence", value.sequence);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -4532,6 +4757,13 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_feature_decl&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_feature_decl"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_feature_decl& value, F&& field) {
+			field("begin", value.begin);
+			field("name", value.name);
+			field("symbols", value.symbols);
+			field("end", value.end);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -4566,6 +4798,10 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_mod_detach_detach_value&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_mod_detach_detach_value"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_mod_detach_detach_value& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -4600,6 +4836,10 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_mod_import_import_value_from_import_selection&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_mod_import_import_value_from_import_selection"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_mod_import_import_value_from_import_selection& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -4637,6 +4877,12 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_mod_detach&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_mod_detach"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_mod_detach& value, F&& field) {
+			field("begin", value.begin);
+			field("value", value.value);
+			field("end", value.end);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -4673,6 +4919,11 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_mod_import_import_value_from_import&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_mod_import_import_value_from_import"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_mod_import_import_value_from_import& value, F&& field) {
+			field("sel", value.sel);
+			field("source", value.source);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -4708,6 +4959,10 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_mod_import_import_value&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_mod_import_import_value"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_mod_import_import_value& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -4749,6 +5004,14 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_mod_import&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_mod_import"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_mod_import& value, F&& field) {
+			field("begin", value.begin);
+			field("py_import", value.py_import);
+			field("external", value.external);
+			field("value", value.value);
+			field("end", value.end);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -4782,6 +5045,10 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const modules_entry_main&) { return "DepParser.FlatTypes.modules_entry_main"; }
+		template<class F> void ispa_debug_fields(const modules_entry_main& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -4815,6 +5082,10 @@ namespace DepParser {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
+		inline std::string_view ispa_debug_type(const main&) { return "DepParser.FlatTypes.main"; }
+		template<class F> void ispa_debug_fields(const main& value, F&& field) {
+			field("value", value.value);
+		}
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
@@ -4921,7 +5192,7 @@ namespace DepParser {
 		static ::ISPA_STD::DFA::API::CharToClass char_class_table;
 		static ::ISPA_STD::DFA::API::Table<82, 44> dfa_table;
 		static ::ISPA_STD::DFA::API::Table<105, 4> action_table;
-		auto semantic_action_exec(long long state, const ::ISPA_STD::DFA::API::Captures& captures, long long start_pos, const char* start, long long length, long long line) -> std::pair<long long, Token>;
+		auto semantic_action_exec(long long state, const ::ISPA_STD::DFA::API::Captures& captures, long long start_pos, const char* start, long long length, long long line, const char*& cursor) -> std::pair<long long, Token>;
 		bool init_done = false;
 		auto init() -> void override;
 		::ISPA_STD::DFA::API::TdfaLayout<19, 18> tdfa_registers;
@@ -4951,7 +5222,6 @@ namespace DepParser {
 } // namespace DepParser
 namespace DepParser {
 	class Parser : public ::ISPA_STD::LLParser<Types::main, Token> {
-		Lexer lazy_lexer_;
 	protected:
 		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::DepParser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::DepParser::Lexer::lazy_iterator>>> auto modulesIspa_dep_scannerMod_detachDetach_value(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::ispa_dep_scanner::mod_detach::detach_value, IT>;
 		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::DepParser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::DepParser::Lexer::lazy_iterator>>> auto modulesCommonParam(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::common::param, IT>;
@@ -4992,7 +5262,10 @@ namespace DepParser {
 		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::DepParser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::DepParser::Lexer::lazy_iterator>>> auto ispa_match_template(std::type_identity<Types::modules::common::rule_params> tag, IT pos) -> ::ISPA_STD::MatchResult<Types::modules::common::rule_params, IT>;
 	public:
 		auto parseFromTokens() -> void override;
-		auto lazyParse() -> ISPA_STD::MatchResult<Types::main, ISPA_STD::Lexer_base<Token>::lazy_iterator> override;
+	private:
+		Lexer lazy_lexer_;
+	public:
+		auto lazyParse() -> ::ISPA_STD::MatchResult<Types::main, Lexer::lazy_iterator> override;
 		constexpr auto members() {
 			return std::tie();
 		}
@@ -5014,71 +5287,82 @@ namespace DepParser {
 	};
 } // namespace DepParser
 template<typename params, typename IT, class> auto DepParser::Parser::modulesCommonName(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::common::name<params>, IT> {
-	Types::modules::common::name<params> result = {};
-	::ISPA_STD::Node<Types::modules::common::ID> value_modules_common_ID;
-	::ISPA_STD::Node<Types::FULL_STOP> value_FULL_STOP;
-	::ISPA_STD::Node<Types::modules::common::ID> value_modules_common_ID_1;
-	std::pair<::ISPA_STD::Node<Types::FULL_STOP>, ::ISPA_STD::Node<Types::modules::common::ID>> group0;
-	std::vector<std::pair<::ISPA_STD::Node<Types::FULL_STOP>, ::ISPA_STD::Node<Types::modules::common::ID>>> group_list1;
-	std::vector<::ISPA_STD::Node<Types::modules::common::ID>> capture_list2;
-	::ISPA_STD::Node<Types::modules::common::template_params> value_modules_common_template_params;
-	::ISPA_STD::Node<params> value_modules_common_name_ispa_template_params;
-	auto recovery_scope = recovery_frame("modules::common::name");
-	if (unwinding()) {
-		return action_result(result, pos);
-	}
-	recovery_at<ISPA_STD::Recovery::Tokens<Tokens::modules::common::ID::id>, ISPA_STD::Recovery::EmptyTokens, ISPA_STD::Recovery::Tokens<Tokens::FULL_STOP::id, Tokens::modules::common::ID::id>, ISPA_STD::Recovery::EmptyTokens, ISPA_STD::Recovery::Tokens<Tokens::COMMA::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LESS_THAN_SIGN::id, Tokens::modules::common::ID::id>, ISPA_STD::Recovery::EmptyTokens, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("modules::common::ID", "modules::common::ID", "__WS", "<group>", "__WS", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
-	value_modules_common_ID = required<Types::modules::common::ID>(pos, ISPA_STD::Recovery::handler<ISPA_STD::Recovery::Tokens<Tokens::modules::common::ID::id>, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::LEFT_PARENTHESIS::id, Tokens::LESS_THAN_SIGN::id, Tokens::RIGHT_CURLY_BRACKET::id, Tokens::SEMICOLON::id>, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::RIGHT_CURLY_BRACKET::id, Tokens::SEMICOLON::id>, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LEFT_PARENTHESIS::id, Tokens::LESS_THAN_SIGN::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>, ISPA_STD::Recovery::Policy<true, true, true, 32>>("modules::common::name", "modules::common::ID"));
-	::ISPA_STD::assign_compatible(result.primary, value_modules_common_ID);
-	if (unwinding()) {
-		return action_result(result, pos);
-	}
-	recovery_at<ISPA_STD::Recovery::EmptyTokens, ISPA_STD::Recovery::Tokens<Tokens::FULL_STOP::id, Tokens::modules::common::ID::id>, ISPA_STD::Recovery::EmptyTokens, ISPA_STD::Recovery::Tokens<Tokens::COMMA::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LESS_THAN_SIGN::id, Tokens::modules::common::ID::id>, ISPA_STD::Recovery::EmptyTokens, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("__WS", "__WS", "<group>", "__WS", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
-	skip_spaces<Types::__WS>(pos);
-	if (unwinding()) {
-		return action_result(result, pos);
-	}
-	recovery_at<ISPA_STD::Recovery::Tokens<Tokens::FULL_STOP::id, Tokens::modules::common::ID::id>, ISPA_STD::Recovery::EmptyTokens, ISPA_STD::Recovery::Tokens<Tokens::COMMA::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LESS_THAN_SIGN::id, Tokens::modules::common::ID::id>, ISPA_STD::Recovery::EmptyTokens, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("<group>", "<group>", "__WS", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
-	// grammar ` ( FULL_STOP  __WS?; @  modules::common::ID)*;`: repeat while lookahead is in FIRST
-	while (((*pos).kind() == Tokens::FULL_STOP::id)) {
-		value_FULL_STOP = required<Types::FULL_STOP>(pos, ISPA_STD::Recovery::handler<ISPA_STD::Recovery::Tokens<Tokens::FULL_STOP::id>, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::LEFT_PARENTHESIS::id, Tokens::LESS_THAN_SIGN::id, Tokens::RIGHT_CURLY_BRACKET::id, Tokens::SEMICOLON::id>, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::RIGHT_CURLY_BRACKET::id, Tokens::SEMICOLON::id>, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LEFT_PARENTHESIS::id, Tokens::LESS_THAN_SIGN::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>, ISPA_STD::Recovery::Policy<false, true, false, 32>>("modules::common::name", "<group>"));
+	try {
+		::ispa::debug::RuleScope ispa_debug_rule{"modules.common.name", {"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/ispa/grammar/common.isc", 13, 1}};
+		::ispa::debug::ProductionScope ispa_debug_production{"modules.common.name", {"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/ispa/grammar/common.isc", 13, 1}};
+		if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/ispa/grammar/common.isc", 13, 1}, ::ispa::debug::Snapshot{}.add("pos", pos), "before");
+		Types::modules::common::name<params> result = {};
+		::ISPA_STD::Node<Types::modules::common::ID> value_modules_common_ID;
+		::ISPA_STD::Node<Types::FULL_STOP> value_FULL_STOP;
+		::ISPA_STD::Node<Types::modules::common::ID> value_modules_common_ID_1;
+		std::pair<::ISPA_STD::Node<Types::FULL_STOP>, ::ISPA_STD::Node<Types::modules::common::ID>> group0;
+		std::vector<std::pair<::ISPA_STD::Node<Types::FULL_STOP>, ::ISPA_STD::Node<Types::modules::common::ID>>> group_list1;
+		std::vector<::ISPA_STD::Node<Types::modules::common::ID>> capture_list2;
+		::ISPA_STD::Node<Types::modules::common::template_params> value_modules_common_template_params;
+		::ISPA_STD::Node<params> value_modules_common_name_ispa_template_params;
+		auto recovery_scope = recovery_frame("modules::common::name");
+		if (unwinding()) {
+			return action_result(result, pos);
+		}
+		recovery_at<ISPA_STD::Recovery::Tokens<Tokens::modules::common::ID::id>, ISPA_STD::Recovery::EmptyTokens, ISPA_STD::Recovery::Tokens<Tokens::FULL_STOP::id, Tokens::modules::common::ID::id>, ISPA_STD::Recovery::EmptyTokens, ISPA_STD::Recovery::Tokens<Tokens::COMMA::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LESS_THAN_SIGN::id, Tokens::modules::common::ID::id>, ISPA_STD::Recovery::EmptyTokens, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("modules::common::ID", "modules::common::ID", "__WS", "<group>", "__WS", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
+		value_modules_common_ID = required<Types::modules::common::ID>(pos, ISPA_STD::Recovery::handler<ISPA_STD::Recovery::Tokens<Tokens::modules::common::ID::id>, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::LEFT_PARENTHESIS::id, Tokens::LESS_THAN_SIGN::id, Tokens::RIGHT_CURLY_BRACKET::id, Tokens::SEMICOLON::id>, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::RIGHT_CURLY_BRACKET::id, Tokens::SEMICOLON::id>, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LEFT_PARENTHESIS::id, Tokens::LESS_THAN_SIGN::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>, ISPA_STD::Recovery::Policy<true, true, true, 32>>("modules::common::name", "modules::common::ID"));
+		::ISPA_STD::assign_compatible(result.primary, value_modules_common_ID);
+		if (::ispa::debug::enabled()) ::ispa::debug::value("result", result, ::ispa::debug::active_location());
+		if (unwinding()) {
+			return action_result(result, pos);
+		}
+		recovery_at<ISPA_STD::Recovery::EmptyTokens, ISPA_STD::Recovery::Tokens<Tokens::FULL_STOP::id, Tokens::modules::common::ID::id>, ISPA_STD::Recovery::EmptyTokens, ISPA_STD::Recovery::Tokens<Tokens::COMMA::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LESS_THAN_SIGN::id, Tokens::modules::common::ID::id>, ISPA_STD::Recovery::EmptyTokens, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("__WS", "__WS", "<group>", "__WS", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
 		skip_spaces<Types::__WS>(pos);
-		value_modules_common_ID_1 = required<Types::modules::common::ID>(pos, ISPA_STD::Recovery::handler<ISPA_STD::Recovery::Tokens<Tokens::FULL_STOP::id>, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::LEFT_PARENTHESIS::id, Tokens::LESS_THAN_SIGN::id, Tokens::RIGHT_CURLY_BRACKET::id, Tokens::SEMICOLON::id>, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::RIGHT_CURLY_BRACKET::id, Tokens::SEMICOLON::id>, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LEFT_PARENTHESIS::id, Tokens::LESS_THAN_SIGN::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>, ISPA_STD::Recovery::Policy<false, true, false, 32>>("modules::common::name", "<group>"));
-		group0 = std::make_pair(value_FULL_STOP, value_modules_common_ID_1);
-		group_list1.push_back(group0);
-		capture_list2.push_back(value_modules_common_ID_1);
+		if (unwinding()) {
+			return action_result(result, pos);
+		}
+		recovery_at<ISPA_STD::Recovery::Tokens<Tokens::FULL_STOP::id, Tokens::modules::common::ID::id>, ISPA_STD::Recovery::EmptyTokens, ISPA_STD::Recovery::Tokens<Tokens::COMMA::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LESS_THAN_SIGN::id, Tokens::modules::common::ID::id>, ISPA_STD::Recovery::EmptyTokens, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("<group>", "<group>", "__WS", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
+		// grammar ` ( FULL_STOP  __WS?; @  modules::common::ID)*;`: repeat while lookahead is in FIRST
+		while ((::ISPA_STD::lookahead_kind(pos) == Tokens::FULL_STOP::id)) {
+			value_FULL_STOP = required<Types::FULL_STOP>(pos, ISPA_STD::Recovery::handler<ISPA_STD::Recovery::Tokens<Tokens::FULL_STOP::id>, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::LEFT_PARENTHESIS::id, Tokens::LESS_THAN_SIGN::id, Tokens::RIGHT_CURLY_BRACKET::id, Tokens::SEMICOLON::id>, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::RIGHT_CURLY_BRACKET::id, Tokens::SEMICOLON::id>, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LEFT_PARENTHESIS::id, Tokens::LESS_THAN_SIGN::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>, ISPA_STD::Recovery::Policy<false, true, false, 32>>("modules::common::name", "<group>"));
+			skip_spaces<Types::__WS>(pos);
+			value_modules_common_ID_1 = required<Types::modules::common::ID>(pos, ISPA_STD::Recovery::handler<ISPA_STD::Recovery::Tokens<Tokens::FULL_STOP::id>, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::LEFT_PARENTHESIS::id, Tokens::LESS_THAN_SIGN::id, Tokens::RIGHT_CURLY_BRACKET::id, Tokens::SEMICOLON::id>, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::RIGHT_CURLY_BRACKET::id, Tokens::SEMICOLON::id>, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LEFT_PARENTHESIS::id, Tokens::LESS_THAN_SIGN::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>, ISPA_STD::Recovery::Policy<false, true, false, 32>>("modules::common::name", "<group>"));
+			group0 = std::make_pair(value_FULL_STOP, value_modules_common_ID_1);
+			group_list1.push_back(group0);
+			capture_list2.push_back(value_modules_common_ID_1);
+			skip_spaces<Types::__WS>(pos);
+		}
+		::ISPA_STD::assign_compatible(result.nested, capture_list2);
+		if (::ispa::debug::enabled()) ::ispa::debug::value("result", result, ::ispa::debug::active_location());
+		if (unwinding()) {
+			return action_result(result, pos);
+		}
+		recovery_at<ISPA_STD::Recovery::EmptyTokens, ISPA_STD::Recovery::Tokens<Tokens::COMMA::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LESS_THAN_SIGN::id, Tokens::modules::common::ID::id>, ISPA_STD::Recovery::EmptyTokens, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("__WS", "__WS", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
 		skip_spaces<Types::__WS>(pos);
-	}
-	::ISPA_STD::assign_compatible(result.nested, capture_list2);
-	if (unwinding()) {
-		return action_result(result, pos);
-	}
-	recovery_at<ISPA_STD::Recovery::EmptyTokens, ISPA_STD::Recovery::Tokens<Tokens::COMMA::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LESS_THAN_SIGN::id, Tokens::modules::common::ID::id>, ISPA_STD::Recovery::EmptyTokens, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("__WS", "__WS", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
-	skip_spaces<Types::__WS>(pos);
-	if (unwinding()) {
-		return action_result(result, pos);
-	}
-	recovery_at<ISPA_STD::Recovery::Tokens<Tokens::COMMA::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LESS_THAN_SIGN::id, Tokens::modules::common::ID::id>, ISPA_STD::Recovery::EmptyTokens, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("modules::common::template_params", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
-	value_modules_common_template_params = optional<Types::modules::common::template_params>(pos, [this](auto cursor) { return this->modulesCommonTemplate_params(cursor); });
-	::ISPA_STD::assign_compatible(result.temp_params, value_modules_common_template_params);
-	if (unwinding()) {
-		return action_result(result, pos);
-	}
-	recovery_at<ISPA_STD::Recovery::EmptyTokens, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("__WS", "__WS", "modules::common::name::ispa_template_params");
-	skip_spaces<Types::__WS>(pos);
-	if (unwinding()) {
-		return action_result(result, pos);
-	}
-	recovery_at<ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("modules::common::name::ispa_template_params", "modules::common::name::ispa_template_params");
-	value_modules_common_name_ispa_template_params = optional<params>(pos, [&](IT rule_pos) {
+		if (unwinding()) {
+			return action_result(result, pos);
+		}
+		recovery_at<ISPA_STD::Recovery::Tokens<Tokens::COMMA::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LESS_THAN_SIGN::id, Tokens::modules::common::ID::id>, ISPA_STD::Recovery::EmptyTokens, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("modules::common::template_params", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
+		value_modules_common_template_params = optional<Types::modules::common::template_params>(pos, [this](auto cursor) { return this->modulesCommonTemplate_params(cursor); });
+		::ISPA_STD::assign_compatible(result.temp_params, value_modules_common_template_params);
+		if (::ispa::debug::enabled()) ::ispa::debug::value("result", result, ::ispa::debug::active_location());
+		if (unwinding()) {
+			return action_result(result, pos);
+		}
+		recovery_at<ISPA_STD::Recovery::EmptyTokens, ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("__WS", "__WS", "modules::common::name::ispa_template_params");
+		skip_spaces<Types::__WS>(pos);
+		if (unwinding()) {
+			return action_result(result, pos);
+		}
+		recovery_at<ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("modules::common::name::ispa_template_params", "modules::common::name::ispa_template_params");
+		value_modules_common_name_ispa_template_params = optional<params>(pos, [&](IT rule_pos) {
 return ispa_match_template(std::type_identity<params>{}, rule_pos);
 });
-	::ISPA_STD::assign_compatible(result.param, value_modules_common_name_ispa_template_params);
-	::ISPA_STD::MatchResult<Types::modules::common::name<params>, IT> match_result;
-	match_result.status = true;
-	match_result.node.set_data(result);
-	match_result.it = pos;
-	return match_result;
+		::ISPA_STD::assign_compatible(result.param, value_modules_common_name_ispa_template_params);
+		if (::ispa::debug::enabled()) ::ispa::debug::value("result", result, ::ispa::debug::active_location());
+		::ISPA_STD::MatchResult<Types::modules::common::name<params>, IT> match_result;
+		match_result.status = true;
+		match_result.node.set_data(result);
+		match_result.it = pos;
+		return match_result;
+	} catch (const NoMatch&) { throw;
+	} catch (const ::ISPA_STD::ExternalParseError&) { throw;
+	} catch (...) { ::ispa::debug::breakpoint("uncaught parser failure"); throw; }
 }
 
 #include <ispastdlib/external.hpp>

@@ -1,0 +1,1181 @@
+{
+  "version": 1,
+  "suggestions": [
+    {
+      "id": "49f1e4ab4f5fa67a",
+      "file": "bench/grammar_no_ast/adv_rule.isc",
+      "rule": "dep_decl",
+      "symbol": "'depends'",
+      "offset": 85,
+      "expected": "'depends'",
+      "message": "Expected 'depends' keyword.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "e7f2ab6dd5e0218f",
+      "file": "bench/grammar_no_ast/adv_rule.isc",
+      "rule": "regular_match",
+      "symbol": "'match'",
+      "offset": 149,
+      "expected": "'match'",
+      "message": "Expected 'match' keyword.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "ddc1511f3713ac49",
+      "file": "bench/grammar_no_ast/adv_rule.isc",
+      "rule": "unpack",
+      "symbol": "'->'",
+      "offset": 213,
+      "expected": "'->'",
+      "message": "Expected '->' before ID in unpack.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "0abff5fb00cad7f6",
+      "file": "bench/grammar_no_ast/adv_rule.isc",
+      "rule": "fail_call",
+      "symbol": "'fail'",
+      "offset": 262,
+      "expected": "'fail'",
+      "message": "Expected 'fail' keyword.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "f514d788aa7459d2",
+      "file": "bench/grammar_no_ast/common.isc",
+      "rule": "name",
+      "symbol": "'->'",
+      "offset": 85,
+      "expected": "'->'",
+      "message": "Expected '->' in the name.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "4f8f69c0e7479ef0",
+      "file": "bench/grammar_no_ast/common.isc",
+      "rule": "PY_RAW",
+      "symbol": "'p{'",
+      "offset": 134,
+      "expected": "'p{'",
+      "message": "Expected 'p{' to begin the PY_RAW section.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "30caf18524a0ef54",
+      "file": "bench/grammar_no_ast/common.isc",
+      "rule": "PY_RAW",
+      "symbol": "'py'",
+      "offset": 139,
+      "expected": "'py'",
+      "message": "Expected 'py' after 'p{'.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "47803c7800b4d6a1",
+      "file": "bench/grammar_no_ast/common.isc",
+      "rule": "PY_RAW",
+      "symbol": "'}'",
+      "offset": 144,
+      "expected": "'}'",
+      "message": "Expected '}' to close the PY_RAW section.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "c7cc511414fe7682",
+      "file": "bench/grammar_no_ast/common.isc",
+      "rule": "explicit_expr",
+      "symbol": "'('",
+      "offset": 190,
+      "expected": "'('",
+      "message": "Expected '(' to begin the explicit expression.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "1b3091205901466d",
+      "file": "bench/grammar_no_ast/common.isc",
+      "rule": "explicit_expr",
+      "symbol": "')'",
+      "offset": 199,
+      "expected": "')'",
+      "message": "Expecting a closing parenthesis ')' after the expression.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "a4f685f31de21f16",
+      "file": "bench/grammar_no_ast/common.isc",
+      "rule": "forward_declaration",
+      "symbol": "'->'",
+      "offset": 249,
+      "expected": "'->'",
+      "message": "Expecting '->' to define a forward declaration.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "cfe3f0c01c010852",
+      "file": "bench/grammar_no_ast/entry.isc",
+      "rule": "main",
+      "symbol": "grammar",
+      "offset": 11,
+      "expected": "grammar",
+      "message": "Expecting a grammar rule after the grammar declaration.",
+      "strategy": "sync_tokens",
+      "sync": [
+        "fail_block",
+        "modifier"
+      ]
+    },
+    {
+      "id": "bf0bbc614cc2d00d",
+      "file": "bench/grammar_no_ast/fail_block.isc",
+      "rule": "fail_block",
+      "symbol": "'fail'",
+      "offset": 16,
+      "expected": "'fail'",
+      "message": "Expecting 'fail' keyword to start the fail block.",
+      "strategy": "replace",
+      "sync": []
+    },
+    {
+      "id": "68ad41fb63943a8b",
+      "file": "bench/grammar_no_ast/fail_block.isc",
+      "rule": "fail_block",
+      "symbol": "name",
+      "offset": 23,
+      "expected": "name",
+      "message": "Expected a name after 'fail'.",
+      "strategy": "sync_tokens",
+      "sync": [
+        "stmt"
+      ]
+    },
+    {
+      "id": "bf3091a84fc181f1",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "rule",
+      "symbol": "':'",
+      "offset": 10,
+      "expected": "':'",
+      "message": "Expected ':' before value.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "fbd05357573a41d8",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "rule",
+      "symbol": "';'",
+      "offset": 50,
+      "expected": "';'",
+      "message": "Expected ';' at the end of the rule.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "915b42062ffaaa4f",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "full",
+      "symbol": "'{'",
+      "offset": 132,
+      "expected": "'{'",
+      "message": "Expected '{' after '&'.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "8459a341f19c5d37",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "full",
+      "symbol": "'}'",
+      "offset": 142,
+      "expected": "'}'",
+      "message": "Expected '}' at the end of the full expression.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "5ff7f527da922b34",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "part",
+      "symbol": "':'",
+      "offset": 185,
+      "expected": "':'",
+      "message": "Expected ':' after ID.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "acfc4fb94d77a9d2",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "abbr",
+      "symbol": "'{'",
+      "offset": 249,
+      "expected": "'{'",
+      "message": "Expected '{' after '@'.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "0906ced3f2dc3066",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "abbr",
+      "symbol": "','",
+      "offset": 257,
+      "expected": "','",
+      "message": "Expected ',' between IDs in abbreviation.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "9cacb82cf7b88c19",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "abbr",
+      "symbol": "'}'",
+      "offset": 267,
+      "expected": "'}'",
+      "message": "Expected '}' at the end of abbreviation.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "7e6f9fe12956e44d",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "single_value",
+      "symbol": "'}'",
+      "offset": 331,
+      "expected": "'}'",
+      "message": "Expected a closing brace.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "eb89098f5b99435a",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "f_binding",
+      "symbol": "'{'",
+      "offset": 379,
+      "expected": "'{'",
+      "message": "Expected an opening brace for the binding.",
+      "strategy": "sync_tokens",
+      "sync": [
+        "ID"
+      ]
+    },
+    {
+      "id": "d32a248f7df9a396",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "f_binding",
+      "symbol": "','",
+      "offset": 387,
+      "expected": "','",
+      "message": "Expected a comma after the identifier.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "8522991e5cee9c88",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "f_binding",
+      "symbol": "'}'",
+      "offset": 397,
+      "expected": "'}'",
+      "message": "Expected a closing brace for the binding.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "68a6f8c5f81ac11e",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "var_capture",
+      "symbol": "'&'",
+      "offset": 488,
+      "expected": "'&'",
+      "message": "Expected '&' before identifier in variable capture.",
+      "strategy": "sync_tokens",
+      "sync": [
+        "ID"
+      ]
+    },
+    {
+      "id": "db65a44afb80df6b",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "ast_capture",
+      "symbol": "'@'",
+      "offset": 539,
+      "expected": "'@'",
+      "message": "Expected '@' at the start of ast capture.",
+      "strategy": "sync_tokens",
+      "sync": [
+        "ID"
+      ]
+    },
+    {
+      "id": "f95a7410c04b6a85",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "fail_capture",
+      "symbol": "'%'",
+      "offset": 596,
+      "expected": "'%'",
+      "message": "Expected '%' at the start of fail capture.",
+      "strategy": "sync_tokens",
+      "sync": [
+        "name"
+      ]
+    },
+    {
+      "id": "6ada2a4db15c614a",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "pattern",
+      "symbol": "name",
+      "offset": 650,
+      "expected": "name",
+      "message": "Expected a name in pattern.",
+      "strategy": "sync_tokens",
+      "sync": [
+        "group",
+        "STRING"
+      ]
+    },
+    {
+      "id": "cd0ea08419ed3337",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "one_capture",
+      "symbol": "pattern",
+      "offset": 795,
+      "expected": "pattern",
+      "message": "Expected a capture in one capture.",
+      "strategy": "sync_tokens",
+      "sync": [
+        "pattern"
+      ]
+    },
+    {
+      "id": "78bc76bf79fd57e3",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "mul_capture",
+      "symbol": "'='",
+      "offset": 908,
+      "expected": "'='",
+      "message": "Expected '=' before the capture.",
+      "strategy": "replace",
+      "sync": []
+    },
+    {
+      "id": "951d19b19b30527e",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "mul_capture",
+      "symbol": "'('",
+      "offset": 912,
+      "expected": "'('",
+      "message": "Expected '(' to start one capture.",
+      "strategy": "sync_tokens",
+      "sync": [
+        "one_capture"
+      ]
+    },
+    {
+      "id": "060651e818cb40c7",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "mul_capture",
+      "symbol": "')'",
+      "offset": 929,
+      "expected": "')'",
+      "message": "Expected ')' to close the capture.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "8cd042957c6aba87",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "STRING",
+      "symbol": "'\\\\'",
+      "offset": 979,
+      "expected": "'\\\\'",
+      "message": "Missing closing quote for string.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "fdc2ecf63a0baebf",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "CGROUP",
+      "symbol": "'['",
+      "offset": 1042,
+      "expected": "'['",
+      "message": "Missing closing bracket for character group.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "9653abffd46173ae",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "dyn_expr",
+      "symbol": "'{'",
+      "offset": 1355,
+      "expected": "'{'",
+      "message": "Missing opening brace for dynamic expression.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "db1459459e085ee9",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "alternative",
+      "symbol": "'|'",
+      "offset": 1426,
+      "expected": "'|'",
+      "message": "Missing alternative separator.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "4923b2f2c58e41ff",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "shared_counter_registration",
+      "symbol": "'=>'",
+      "offset": 1690,
+      "expected": "'=>'",
+      "message": "Expected '=>' but found nothing.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "f8b583a27e25623a",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "shared_counter_registration",
+      "symbol": "ID",
+      "offset": 1695,
+      "expected": "ID",
+      "message": "Expected an ID but found nothing.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "908420ee8dc74df9",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "nested_rule",
+      "symbol": "'#'",
+      "offset": 1740,
+      "expected": "'#'",
+      "message": "Expected '#' but found nothing.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "198439cd6049777a",
+      "file": "bench/grammar_no_ast/rule.isc",
+      "rule": "nested_rule",
+      "symbol": "grammar",
+      "offset": 1748,
+      "expected": "grammar",
+      "message": "Expected a grammar definition but found nothing.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "53b413681f00a829",
+      "file": "grammar/advanced_rule.isc",
+      "rule": "dep_decl",
+      "symbol": "'depends'",
+      "offset": 258,
+      "expected": "'depends'",
+      "message": "Expected 'depends' but found nothing.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "c6efcb48e9d878e1",
+      "file": "grammar/advanced_rule.isc",
+      "rule": "regular_match",
+      "symbol": "'match'",
+      "offset": 336,
+      "expected": "'match'",
+      "message": "Expected 'match' but found nothing.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "8a30f280419993e2",
+      "file": "grammar/advanced_rule.isc",
+      "rule": "regular_match",
+      "symbol": "rule",
+      "offset": 356,
+      "expected": "rule",
+      "message": "Expected a rule but found nothing.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "717b51cd7c4a35fb",
+      "file": "grammar/advanced_rule.isc",
+      "rule": "regular_match",
+      "symbol": "';'",
+      "offset": 386,
+      "expected": "';'",
+      "message": "Expected ';' but found nothing.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "ace8f9a2d42574f7",
+      "file": "grammar/advanced_rule.isc",
+      "rule": "source",
+      "symbol": "'('",
+      "offset": 462,
+      "expected": "'('",
+      "message": "Expected '(' but found nothing.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "1612cd7a01116167",
+      "file": "grammar/advanced_rule.isc",
+      "rule": "source",
+      "symbol": "ID",
+      "offset": 468,
+      "expected": "ID",
+      "message": "Expected an ID but found nothing.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "9c449ad1b2eda495",
+      "file": "grammar/advanced_rule.isc",
+      "rule": "source",
+      "symbol": "')'",
+      "offset": 471,
+      "expected": "')'",
+      "message": "Expected ')' but found nothing.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "98d889bedee6db87",
+      "file": "grammar/advanced_rule.isc",
+      "rule": "unpack",
+      "symbol": "'->'",
+      "offset": 531,
+      "expected": "'->'",
+      "message": "Expected '->' but found nothing.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "ff83b499dd6caaa1",
+      "file": "grammar/advanced_rule.isc",
+      "rule": "unpack",
+      "symbol": "ID",
+      "offset": 538,
+      "expected": "ID",
+      "message": "Expected an ID but found nothing.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "39723191a1aed0c8",
+      "file": "grammar/advanced_rule.isc",
+      "rule": "fail_call",
+      "symbol": "'fail'",
+      "offset": 599,
+      "expected": "'fail'",
+      "message": "Expected 'fail' but found nothing.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "f1ccca5dd33e418a",
+      "file": "grammar/advanced_rule.isc",
+      "rule": "fail_call",
+      "symbol": "name",
+      "offset": 608,
+      "expected": "name",
+      "message": "Expected a name but found nothing.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "3ddbf8db5a9ed709",
+      "file": "grammar/common.isc",
+      "rule": "NUMBER",
+      "symbol": "'.'",
+      "offset": 84,
+      "expected": "'.'",
+      "message": "Expected '.' but found nothing.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "0006b643138964ad",
+      "file": "grammar/common.isc",
+      "rule": "call_params",
+      "symbol": "'&('",
+      "offset": 276,
+      "expected": "'&('",
+      "message": "Expected '&(' but found nothing.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "908709699b092444",
+      "file": "grammar/common.isc",
+      "rule": "call_params",
+      "symbol": "')'",
+      "offset": 290,
+      "expected": "')'",
+      "message": "Missing closing parenthesis for call parameters.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "1775ba91ed1a45d2",
+      "file": "grammar/common.isc",
+      "rule": "rule_params",
+      "symbol": "'('",
+      "offset": 321,
+      "expected": "'('",
+      "message": "Missing opening parenthesis for rule parameters.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "ae6a08d44c38e1c6",
+      "file": "grammar/common.isc",
+      "rule": "rule_params",
+      "symbol": "')'",
+      "offset": 334,
+      "expected": "')'",
+      "message": "Missing closing parenthesis for rule parameters.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "537cb208e6c262c8",
+      "file": "grammar/common.isc",
+      "rule": "template_params",
+      "symbol": "'<'",
+      "offset": 369,
+      "expected": "'<'",
+      "message": "Missing opening angle bracket for template parameters.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "76dc6f18dae2efad",
+      "file": "grammar/common.isc",
+      "rule": "template_params",
+      "symbol": "'>'",
+      "offset": 391,
+      "expected": "'>'",
+      "message": "Missing closing angle bracket for template parameters.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "09063953f6e924ec",
+      "file": "grammar/common.isc",
+      "rule": "param",
+      "symbol": "','",
+      "offset": 429,
+      "expected": "','",
+      "message": "Missing comma between parameters.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "19424595962e18ee",
+      "file": "grammar/common.isc",
+      "rule": "parameter",
+      "symbol": "':'",
+      "offset": 498,
+      "expected": "':'",
+      "message": "Missing colon in parameter type annotation.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "bd9af1c696ddb2a1",
+      "file": "grammar/common.isc",
+      "rule": "type_annotation",
+      "symbol": "'.'",
+      "offset": 575,
+      "expected": "'.'",
+      "message": "Missing dot in type annotation.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "72f1c39385f4045c",
+      "file": "grammar/common.isc",
+      "rule": "template_param",
+      "symbol": "','",
+      "offset": 634,
+      "expected": "','",
+      "message": "Missing comma between template parameters.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "4e3ae8f10ad731bc",
+      "file": "grammar/fail_block.isc",
+      "rule": "fail_block",
+      "symbol": "'fail'",
+      "offset": 122,
+      "expected": "'fail'",
+      "message": "Missing 'fail' keyword in fail block.",
+      "strategy": "replace",
+      "sync": []
+    },
+    {
+      "id": "ed233c87494b1aac",
+      "file": "grammar/fail_block.isc",
+      "rule": "fail_block",
+      "symbol": "name",
+      "offset": 131,
+      "expected": "name",
+      "message": "Missing rule name in fail block.",
+      "strategy": "replace",
+      "sync": []
+    },
+    {
+      "id": "9fff08437c32cd47",
+      "file": "grammar/fail_block.isc",
+      "rule": "fail_block",
+      "symbol": "'{'",
+      "offset": 149,
+      "expected": "'{'",
+      "message": "Missing opening brace in fail block.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "f0d001b6d8dcbd3f",
+      "file": "grammar/fail_block.isc",
+      "rule": "fail_block",
+      "symbol": "'}'",
+      "offset": 161,
+      "expected": "'}'",
+      "message": "Missing closing brace '}' for the fail_block.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "5854e763afd76435",
+      "file": "grammar/forward_declaration.isc",
+      "rule": "cls",
+      "symbol": "'class'",
+      "offset": 107,
+      "expected": "'class'",
+      "message": "Expected 'class' keyword to define a class.",
+      "strategy": "replace",
+      "sync": []
+    },
+    {
+      "id": "159fcdd62722aee9",
+      "file": "grammar/forward_declaration.isc",
+      "rule": "cls",
+      "symbol": "':'",
+      "offset": 120,
+      "expected": "':'",
+      "message": "Expected ':' after class identifier.",
+      "strategy": "replace",
+      "sync": []
+    },
+    {
+      "id": "2f9a972d787367dd",
+      "file": "grammar/forward_declaration.isc",
+      "rule": "class_property",
+      "symbol": "':'",
+      "offset": 288,
+      "expected": "':'",
+      "message": "Expected ':' after property keyword.",
+      "strategy": "replace",
+      "sync": []
+    },
+    {
+      "id": "d0ac2a94ae24fb18",
+      "file": "grammar/forward_declaration.isc",
+      "rule": "class_property",
+      "symbol": "ID",
+      "offset": 285,
+      "expected": "ID",
+      "message": "Expected ID after property keyword.",
+      "strategy": "replace",
+      "sync": []
+    },
+    {
+      "id": "7f7fe0cc396668d3",
+      "file": "grammar/forward_declaration.isc",
+      "rule": "fun_forward",
+      "symbol": "ID",
+      "offset": 385,
+      "expected": "ID",
+      "message": "Expected ID for function name.",
+      "strategy": "replace",
+      "sync": []
+    },
+    {
+      "id": "c587754853693996",
+      "file": "grammar/forward_declaration.isc",
+      "rule": "fun_forward",
+      "symbol": "'('",
+      "offset": 388,
+      "expected": "'('",
+      "message": "Expected '(' to start parameter list.",
+      "strategy": "replace",
+      "sync": []
+    },
+    {
+      "id": "bfe0b7c89b275271",
+      "file": "grammar/forward_declaration.isc",
+      "rule": "fun_forward",
+      "symbol": "':'",
+      "offset": 398,
+      "expected": "':'",
+      "message": "Expected ':' for parameter type.",
+      "strategy": "replace",
+      "sync": []
+    },
+    {
+      "id": "068f70a179b67570",
+      "file": "grammar/forward_declaration.isc",
+      "rule": "fun_forward",
+      "symbol": "','",
+      "offset": 407,
+      "expected": "','",
+      "message": "Expected ',' to separate parameters.",
+      "strategy": "replace",
+      "sync": []
+    },
+    {
+      "id": "a012998ece083b36",
+      "file": "grammar/forward_declaration.isc",
+      "rule": "fun_forward",
+      "symbol": "')'",
+      "offset": 413,
+      "expected": "')'",
+      "message": "Missing closing parenthesis for function forward declaration.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "50ff28b1e41fc10e",
+      "file": "grammar/rule.isc",
+      "rule": "regular_rule",
+      "symbol": "';'",
+      "offset": 204,
+      "expected": "';'",
+      "message": "Expected ';' to end the regular rule.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "1ea472295e1693b0",
+      "file": "grammar/python.isc",
+      "rule": "stmt",
+      "symbol": "python",
+      "offset": 157,
+      "expected": "python",
+      "message": "Expected a python statement in stmt.",
+      "strategy": "sync_tokens",
+      "sync": [
+        "python"
+      ]
+    },
+    {
+      "id": "8f3ea47f895dd163",
+      "file": "grammar/python.isc",
+      "rule": "explicit_expr",
+      "symbol": "')'",
+      "offset": 131,
+      "expected": "')'",
+      "message": "Missing closing parenthesis in explicit expression.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "d7450d5fa2ea4a79",
+      "file": "grammar/rule.isc",
+      "rule": "abbr",
+      "symbol": "'@'",
+      "offset": 498,
+      "expected": "'@'",
+      "message": "Expected '{' after '@'.",
+      "strategy": "sync_tokens",
+      "sync": [
+        "ID"
+      ]
+    },
+    {
+      "id": "55f5ae8bc4756d6c",
+      "file": "grammar/rule.isc",
+      "rule": "abbr",
+      "symbol": "'{'",
+      "offset": 502,
+      "expected": "'{'",
+      "message": "Expected ID or ',' after '{'.",
+      "strategy": "sync_tokens",
+      "sync": [
+        "ID"
+      ]
+    },
+    {
+      "id": "a5fea68984dc5cc4",
+      "file": "grammar/rule.isc",
+      "rule": "f_binding",
+      "symbol": "'{'",
+      "offset": 639,
+      "expected": "'{'",
+      "message": "Expected ID after '{'.",
+      "strategy": "sync_tokens",
+      "sync": [
+        "ID"
+      ]
+    },
+    {
+      "id": "0b052c153594dc45",
+      "file": "grammar/rule.isc",
+      "rule": "f_binding",
+      "symbol": "','",
+      "offset": 649,
+      "expected": "','",
+      "message": "Expected ID after ID.",
+      "strategy": "sync_tokens",
+      "sync": [
+        "ID"
+      ]
+    },
+    {
+      "id": "38dc0f5efc3a0712",
+      "file": "grammar/rule.isc",
+      "rule": "var_capture",
+      "symbol": "'&'",
+      "offset": 755,
+      "expected": "'&'",
+      "message": "Expected ID after '&'.",
+      "strategy": "sync_tokens",
+      "sync": [
+        "ID"
+      ]
+    },
+    {
+      "id": "bdee60923e2a9104",
+      "file": "grammar/rule.isc",
+      "rule": "fail_capture",
+      "symbol": "'%'",
+      "offset": 867,
+      "expected": "'%'",
+      "message": "Missing expected symbol '%' after error.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "538ced835517df4a",
+      "file": "grammar/rule.isc",
+      "rule": "fail_capture",
+      "symbol": "name",
+      "offset": 877,
+      "expected": "name",
+      "message": "Unexpected token; expected 'name'.",
+      "strategy": "replace",
+      "sync": []
+    },
+    {
+      "id": "1b5aa9d406735658",
+      "file": "grammar/rule.isc",
+      "rule": "pattern",
+      "symbol": "name",
+      "offset": 938,
+      "expected": "name",
+      "message": "Unexpected token; expected 'name'.",
+      "strategy": "replace",
+      "sync": []
+    },
+    {
+      "id": "4596b102351607f0",
+      "file": "grammar/rule.isc",
+      "rule": "STRING",
+      "symbol": "'\\\\'",
+      "offset": 1381,
+      "expected": "'\\\\'",
+      "message": "Unexpected token; expected '\\\\'.",
+      "strategy": "replace",
+      "sync": []
+    },
+    {
+      "id": "817b920436753b50",
+      "file": "grammar/rule.isc",
+      "rule": "not_a",
+      "symbol": "'!'",
+      "offset": 1640,
+      "expected": "'!'",
+      "message": "Unexpected token; expected '!' or name/dyn/group/etc.",
+      "strategy": "replace",
+      "sync": []
+    },
+    {
+      "id": "fe046200d17be6c8",
+      "file": "grammar/rule.isc",
+      "rule": "not_a",
+      "symbol": "name",
+      "offset": 1647,
+      "expected": "name",
+      "message": "Unexpected token; expected 'name'.",
+      "strategy": "replace",
+      "sync": []
+    },
+    {
+      "id": "28c8199b6ecfdb92",
+      "file": "grammar/rule.isc",
+      "rule": "group",
+      "symbol": "'('",
+      "offset": 1760,
+      "expected": "'('",
+      "message": "Missing opening parenthesis '(' in group definition.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "ea67b749b3efeb4b",
+      "file": "grammar/rule.isc",
+      "rule": "group",
+      "symbol": "')'",
+      "offset": 1773,
+      "expected": "')'",
+      "message": "Missing closing parenthesis ')' in group definition.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "b4f2fb4044790fed",
+      "file": "grammar/rule.isc",
+      "rule": "dyn",
+      "symbol": "'$'",
+      "offset": 1813,
+      "expected": "'$'",
+      "message": "Expected '$' for dynamic expression.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "3a44d84a1062b16c",
+      "file": "grammar/rule.isc",
+      "rule": "dyn_expr",
+      "symbol": "'{'",
+      "offset": 1878,
+      "expected": "'{'",
+      "message": "Expected '{' to start dynamic expression.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "33d596a3f043fff7",
+      "file": "grammar/rule.isc",
+      "rule": "dyn_expr",
+      "symbol": "'}'",
+      "offset": 1909,
+      "expected": "'}'",
+      "message": "Missing closing brace '}' for dynamic expression.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "87d154b8339dc1b2",
+      "file": "grammar/rule.isc",
+      "rule": "alternative",
+      "symbol": "'|'",
+      "offset": 1971,
+      "expected": "'|'",
+      "message": "Expected '|' to separate alternatives.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "21860f1dca928e28",
+      "file": "grammar/rule.isc",
+      "rule": "QUANTIFIER",
+      "symbol": "'?'",
+      "offset": 2029,
+      "expected": "'?'",
+      "message": "Expected quantifier '?' in quantifier definition.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "df6d7810e33718cd",
+      "file": "grammar/rule.isc",
+      "rule": "bounded",
+      "symbol": "'='",
+      "offset": 2249,
+      "expected": "'='",
+      "message": "Expected '=' for bounded expression.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "6f5a6a1ba9215b33",
+      "file": "grammar/rule.isc",
+      "rule": "bounded",
+      "symbol": "expr",
+      "offset": 2255,
+      "expected": "expr",
+      "message": "Expected 'expr' in bounded expression.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "87aec925d080238f",
+      "file": "grammar/rule.isc",
+      "rule": "shared_counter_registration",
+      "symbol": "'=>'",
+      "offset": 2335,
+      "expected": "'=>'",
+      "message": "Expected '=>' for shared counter registration.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "0a9dbb7b0c3f1b40",
+      "file": "grammar/rule.isc",
+      "rule": "shared_counter_registration",
+      "symbol": "ID",
+      "offset": 2342,
+      "expected": "ID",
+      "message": "Expected ID for shared counter registration.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "c0fee0bd85d882ef",
+      "file": "grammar/rule.isc",
+      "rule": "nested_rule",
+      "symbol": "'#'",
+      "offset": 2382,
+      "expected": "'#'",
+      "message": "Expected '#' to start nested rule.",
+      "strategy": "insert",
+      "sync": []
+    },
+    {
+      "id": "8e97e90d9cb3d00a",
+      "file": "grammar/rule.isc",
+      "rule": "nested_rule",
+      "symbol": "grammar",
+      "offset": 2392,
+      "expected": "grammar",
+      "message": "Expected grammar definition in nested rule.",
+      "strategy": "insert",
+      "sync": []
+    }
+  ]
+}

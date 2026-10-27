@@ -5,6 +5,10 @@ grammar actions are under `python/`. Modules are imported by their declared
 module name, for example `import std.collections;` or
 `import py {sep_seq_to_list} from ast;`.
 
+Install these with `ispa-pkg install std`. The generated parser runtimes are
+separate packages: `ispa-pkg install cpp-target` for C++ and
+`ispa-pkg install python-target` for Python.
+
 ## Grammar modules
 
 | Module | Contents |

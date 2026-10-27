@@ -12,6 +12,7 @@ dependencies = ["PyYAML>=6,<7"]
 [project.scripts]
 ispa-pkg = "ispa_pkg.cli:main"
 ispa-lsp = "ispa_pkg.lsp:main"
+ispa-ai = "ispa_pkg.ai:main"
 
 [tool.setuptools.packages.find]
 where = ["cli/pkg"]

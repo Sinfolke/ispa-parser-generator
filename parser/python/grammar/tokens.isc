@@ -1,5 +1,4 @@
 module tokens;
-import std.collections;
 COLON: ':';
 COMMA: ',';
 SEMICOLON: ';';

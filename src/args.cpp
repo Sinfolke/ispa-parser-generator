@@ -17,6 +17,8 @@ Args parse_args(int argc, char** argv) {
     app.add_option("--dep", args.dependencies, "Use an external parser: NAME OUTPUT_PREFIX")->type_size(2)->expected(1)->take_all()->allow_extra_args(false);
     app.add_flag("--no-dep", args.no_dep, "Generate external dependencies as separate parsers in the output directory");
     app.add_flag("--check-only", args.check_only, "Run parsing and semantic checks without generating output");
+    app.add_option("--ai-recovery", args.ai_recovery_file, "Load AI recovery messages from this JSON file");
+    app.add_flag("--no-ai-recovery", args.no_ai_recovery, "Do not load AI recovery messages");
     app.add_option("-l,--lang", args.language_str, "Set build language")->required();
     app.add_option("-a,--algorithm", algorithm, "Set one of algorithms: LL, LR(0), LR(1), LALR, LR(*)");
     app.add_option("--debug", args.debug, "Output debug logs into Logs directory");
@@ -57,6 +59,8 @@ Args parse_args(int argc, char** argv) {
 
     if (args.conflict_lookahead < 1 || args.conflict_lookahead > 8)
         throw Error("--lr-conflict-lookahead must be between 1 and 8");
+    if (args.no_ai_recovery && !args.ai_recovery_file.empty())
+        throw Error("--ai-recovery and --no-ai-recovery cannot be used together");
 
     // Map algorithm string to enum
     if (!args.language_str.empty()) {

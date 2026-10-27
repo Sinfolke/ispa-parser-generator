@@ -61,11 +61,13 @@ tar -xzf "$tmp/$archive" -C "$tmp/unpacked"
 [ -f "$tmp/unpacked/ispa" ] || fail 'Archive does not contain ispa executable'
 [ -f "$tmp/unpacked/ispa-pkg" ] || fail 'Archive does not contain ispa-pkg executable'
 [ -f "$tmp/unpacked/ispadbg" ] || fail 'Archive does not contain ispadbg executable'
+[ -f "$tmp/unpacked/ispa-ai" ] || fail 'Archive does not contain ispa-ai executable'
 [ -f "$tmp/unpacked/install.sh" ] || fail 'Archive does not contain install.sh'
 [ -f "$tmp/unpacked/update.sh" ] || fail 'Archive does not contain update.sh'
 chmod 755 "$tmp/unpacked/ispa"
 chmod 755 "$tmp/unpacked/ispa-pkg"
 chmod 755 "$tmp/unpacked/ispadbg"
+chmod 755 "$tmp/unpacked/ispa-ai"
 
 mkdir -p "$INSTALL_ROOT/versions" "$BIN_DIR"
 target="$INSTALL_ROOT/versions/$tag"
@@ -82,6 +84,10 @@ if [ -e "$target" ]; then
     cp "$staging/ispadbg" "$target/ispadbg"
     chmod 755 "$target/ispadbg"
   fi
+  if [ ! -f "$target/ispa-ai" ]; then
+    cp "$staging/ispa-ai" "$target/ispa-ai"
+    chmod 755 "$target/ispa-ai"
+  fi
   rm -rf "$staging"
 else
   mv "$staging" "$target"
@@ -89,6 +95,7 @@ fi
 ln -sfn "$target/ispa" "$BIN_DIR/ispa"
 ln -sfn "$target/ispa-pkg" "$BIN_DIR/ispa-pkg"
 ln -sfn "$target/ispadbg" "$BIN_DIR/ispadbg"
+ln -sfn "$target/ispa-ai" "$BIN_DIR/ispa-ai"
 cp "$target/install.sh" "$INSTALL_ROOT/install.sh"
 cp "$target/update.sh" "$INSTALL_ROOT/update.sh"
 printf '%s' "$tag" > "$INSTALL_ROOT/current-version"
@@ -102,6 +109,7 @@ printf 'Installed %s\n' "$target"
 printf 'Command: %s/ispa\n' "$BIN_DIR"
 printf 'Package command: %s/ispa-pkg\n' "$BIN_DIR"
 printf 'Debugger command: %s/ispadbg\n' "$BIN_DIR"
+printf 'AI command: %s/ispa-ai\n' "$BIN_DIR"
 case ":$PATH:" in
   *":$BIN_DIR:"*) ;;
   *) printf 'Add this to your shell profile, then restart the shell:\n  export PATH="%s:$PATH"\n' "$BIN_DIR" ;;

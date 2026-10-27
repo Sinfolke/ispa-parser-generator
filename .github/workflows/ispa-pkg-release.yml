@@ -29,24 +29,32 @@ jobs:
             archive: ispa-pkg-linux-x64.tar.gz
             debugger: ispadbg
             debugger_archive: ispadbg-linux-x64.tar.gz
+            ai: ispa-ai
+            ai_archive: ispa-ai-linux-x64.tar.gz
           - os: windows-latest
             platform: windows-x64
             executable: ispa-pkg.exe
             archive: ispa-pkg-windows-x64.zip
             debugger: ispadbg.exe
             debugger_archive: ispadbg-windows-x64.zip
+            ai: ispa-ai.exe
+            ai_archive: ispa-ai-windows-x64.zip
           - os: macos-26
             platform: macos-arm64
             executable: ispa-pkg
             archive: ispa-pkg-macos-arm64.tar.gz
             debugger: ispadbg
             debugger_archive: ispadbg-macos-arm64.tar.gz
+            ai: ispa-ai
+            ai_archive: ispa-ai-macos-arm64.tar.gz
           - os: macos-26-intel
             platform: macos-x64
             executable: ispa-pkg
             archive: ispa-pkg-macos-x64.tar.gz
             debugger: ispadbg
             debugger_archive: ispadbg-macos-x64.tar.gz
+            ai: ispa-ai
+            ai_archive: ispa-ai-macos-x64.tar.gz
 
     steps:
       - name: Checkout release tag
@@ -83,6 +91,8 @@ jobs:
         shell: bash
         env:
           EXECUTABLE: ${{ matrix.executable }}
+          DEBUGGER: ${{ matrix.debugger }}
+          AI: ${{ matrix.ai }}
         run: |
           set -euo pipefail
           python -m nuitka \
@@ -97,12 +107,24 @@ jobs:
             --mode=onefile \
             --assume-yes-for-downloads \
             --output-dir=dist \
-            --output-filename=ispadbg \
+            "--output-filename=$DEBUGGER" \
             cli/ispadbg/debugger.py
+          python -m nuitka \
+            --mode=onefile \
+            --assume-yes-for-downloads \
+            --include-package=ispa_pkg \
+            --include-package=yaml \
+            --output-dir=dist \
+            "--output-filename=$AI" \
+            cli/pkg/ispa_pkg/ai.py
 
       - name: Compile Windows onefile executable
         if: runner.os == 'Windows'
         shell: pwsh
+        env:
+          EXECUTABLE: ${{ matrix.executable }}
+          DEBUGGER: ${{ matrix.debugger }}
+          AI: ${{ matrix.ai }}
         run: |
           python -m nuitka `
             --mode=onefile `
@@ -111,21 +133,31 @@ jobs:
             --include-package=ispa_pkg `
             --include-package=yaml `
             --output-dir=dist `
-            --output-filename=ispa-pkg.exe `
+            "--output-filename=$env:EXECUTABLE" `
             cli/pkg/ispa_pkg_entry.py
           python -m nuitka `
             --mode=onefile `
             --msvc=latest `
             --assume-yes-for-downloads `
             --output-dir=dist `
-            --output-filename=ispadbg.exe `
+            "--output-filename=$env:DEBUGGER" `
             cli/ispadbg/debugger.py
+          python -m nuitka `
+            --mode=onefile `
+            --msvc=latest `
+            --assume-yes-for-downloads `
+            --include-package=ispa_pkg `
+            --include-package=yaml `
+            --output-dir=dist `
+            "--output-filename=$env:AI" `
+            cli/pkg/ispa_pkg/ai.py
 
       - name: Smoke test compiled CLI
         shell: bash
         env:
           EXECUTABLE: ${{ matrix.executable }}
           DEBUGGER: ${{ matrix.debugger }}
+          AI: ${{ matrix.ai }}
         run: |
           set -euo pipefail
           test -f "dist/$EXECUTABLE"
@@ -133,6 +165,8 @@ jobs:
           "dist/$EXECUTABLE" catalog list
           test -f "dist/$DEBUGGER"
           "dist/$DEBUGGER" --help
+          test -f "dist/$AI"
+          "dist/$AI" --help
 
       - name: Package executable
         shell: bash
@@ -141,6 +175,8 @@ jobs:
           ARCHIVE: ${{ matrix.archive }}
           DEBUGGER: ${{ matrix.debugger }}
           DEBUGGER_ARCHIVE: ${{ matrix.debugger_archive }}
+          AI: ${{ matrix.ai }}
+          AI_ARCHIVE: ${{ matrix.ai_archive }}
         run: |
           set -euo pipefail
           mkdir -p packages
@@ -153,6 +189,7 @@ jobs:
           for executable_name, archive_name in (
               (os.environ['EXECUTABLE'], os.environ['ARCHIVE']),
               (os.environ['DEBUGGER'], os.environ['DEBUGGER_ARCHIVE']),
+              (os.environ['AI'], os.environ['AI_ARCHIVE']),
           ):
               executable = Path('dist') / executable_name
               archive = Path('packages') / archive_name
@@ -179,6 +216,13 @@ jobs:
           path: packages/${{ matrix.debugger_archive }}
           if-no-files-found: error
 
+      - name: Save AI workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ispa-ai-${{ matrix.platform }}
+          path: packages/${{ matrix.ai_archive }}
+          if-no-files-found: error
+
       - name: Upload to GitHub Release
         shell: bash
         env:
@@ -187,6 +231,7 @@ jobs:
           TAG: ${{ inputs.release_tag }}
           ARCHIVE: ${{ matrix.archive }}
           DEBUGGER_ARCHIVE: ${{ matrix.debugger_archive }}
+          AI_ARCHIVE: ${{ matrix.ai_archive }}
         run: |
           set -euo pipefail
-          gh release upload "$TAG" "packages/$ARCHIVE" "packages/$DEBUGGER_ARCHIVE" --clobber
+          gh release upload "$TAG" "packages/$ARCHIVE" "packages/$DEBUGGER_ARCHIVE" "packages/$AI_ARCHIVE" --clobber

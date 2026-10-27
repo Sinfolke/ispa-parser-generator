@@ -1,4 +1,5 @@
 #include <ispa/parser.h>
+#include <yaml-cpp/yaml.h>
 #ifdef _WIN32
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -170,6 +171,173 @@ namespace {
         std::ifstream input(source.file, std::ios::binary);
         if (!input) return source.grammar;
         return {std::istreambuf_iterator<char>{input}, {}};
+    }
+
+    std::string pythonString(std::string_view value) {
+        std::string output = "\"";
+        constexpr char hex[] = "0123456789abcdef";
+        for (unsigned char c : value) {
+            if (c == '"' || c == '\\') { output += '\\'; output += c; }
+            else if (c == '\n') output += "\\n";
+            else if (c == '\r') output += "\\r";
+            else if (c == '\t') output += "\\t";
+            else if (c < 0x20) { output += "\\x"; output += hex[c >> 4]; output += hex[c & 15]; }
+            else output += c;
+        }
+        return output + '"';
+    }
+
+    bool identifier(std::string_view value) {
+        if (value.empty() || !(std::isalpha(static_cast<unsigned char>(value[0])) || value[0] == '_')) return false;
+        return std::ranges::all_of(value.substr(1), [](unsigned char c) { return std::isalnum(c) || c == '_'; });
+    }
+
+    bool insideFailBlock(std::string_view grammar, std::size_t offset) {
+        bool inside = false;
+        std::size_t start = 0;
+        while (start < offset) {
+            const auto end = grammar.find('\n', start);
+            const auto line_end = end == std::string_view::npos ? grammar.size() : end;
+            const auto line = grammar.substr(start, std::min(line_end, offset) - start);
+            if (line.starts_with("fail ")) inside = true;
+            if (line.starts_with('}')) inside = false;
+            if (end == std::string_view::npos) break;
+            start = end + 1;
+        }
+        return inside;
+    }
+
+    void loadAiRecovery(Modules::Project& project, const Args& args) {
+        namespace fs = std::filesystem;
+        if (args.no_ai_recovery) return;
+        if (args.algorithm != Args::Algorithm::LL) {
+            if (!args.ai_recovery_file.empty())
+                throw std::runtime_error("--ai-recovery requires the LL algorithm");
+            return;
+        }
+        std::vector<fs::path> roots;
+        for (const auto& input : args.files) roots.push_back(fs::absolute(input).parent_path());
+        for (const auto& dir : args.dir) {
+            roots.push_back(fs::absolute(dir));
+            roots.push_back(fs::absolute(dir).parent_path());
+        }
+        fs::path root, file_path;
+        if (!args.ai_recovery_file.empty()) {
+            file_path = fs::absolute(args.ai_recovery_file);
+            if (!fs::is_regular_file(file_path) || fs::file_size(file_path) == 0)
+                throw std::runtime_error("AI recovery file is missing or empty: " + file_path.string());
+            root = file_path.parent_path();
+        } else {
+            for (const auto& name : {"ai.json", "ai.gle"}) {
+                for (const auto& candidate : roots) {
+                    const auto path = candidate / name;
+                    if (fs::is_regular_file(path) && fs::file_size(path) != 0) {
+                        root = candidate;
+                        file_path = path;
+                        break;
+                    }
+                }
+                if (!file_path.empty()) break;
+            }
+        }
+        if (file_path.empty()) return;
+        const auto document = YAML::LoadFile(file_path.string());
+        if (!document.IsMap() || !document["version"] || document["version"].as<int>() != 1 ||
+            !document["suggestions"] || !document["suggestions"].IsSequence())
+            throw std::runtime_error("Invalid " + file_path.filename().string() + ": expected version 1 and suggestions array");
+        struct Edit { std::size_t offset; std::string marker; };
+        std::map<std::string, std::vector<Edit>> edits;
+        std::map<std::string, std::string> blocks;
+        std::size_t skipped_unsupported = 0;
+        const auto canonical_root = fs::weakly_canonical(root);
+        for (const auto& item : document["suggestions"]) {
+            if (!item.IsMap()) throw std::runtime_error("Invalid AI recovery suggestion");
+            const auto relative = item["file"].as<std::string>();
+            const auto file = fs::weakly_canonical(canonical_root / relative);
+            if (file.parent_path() != canonical_root &&
+                file.string().compare(0, canonical_root.string().size()+1, canonical_root.string()+fs::path::preferred_separator) != 0)
+                throw std::runtime_error("AI recovery file escapes grammar root: " + relative);
+            auto source = std::ranges::find_if(project.sources, [&](const auto& value) {
+                return fs::weakly_canonical(value.file) == file;
+            });
+            if (source == project.sources.end()) continue; // The selected entry may use only part of this grammar root.
+            const auto rule = item["rule"].as<std::string>();
+            if (std::ranges::none_of(source->declarations, [&](const auto& declaration) {
+                    return !declaration.first.empty() && declaration.first.back() == rule;
+                })) {
+                ++skipped_unsupported;
+                continue;
+            }
+            const auto offset = item["offset"].as<std::size_t>();
+            const auto expected = item["expected"].as<std::string>();
+            const auto message = item["message"].as<std::string>();
+            const auto strategy = item["strategy"].as<std::string>();
+            if (expected.empty() || offset > source->grammar.size() ||
+                source->grammar.substr(offset, expected.size()) != expected)
+                throw std::runtime_error("Stale AI recovery site in " + relative + " at byte " + std::to_string(offset));
+            const auto previous = offset == 0 ? std::string::npos :
+                source->grammar.find_last_not_of(" \t\r\n", offset - 1);
+            auto next = offset + expected.size();
+            while (next < source->grammar.size() && std::isspace(static_cast<unsigned char>(source->grammar[next]))) ++next;
+            if ((previous != std::string::npos &&
+                 (source->grammar[previous] == '|' || source->grammar[previous] == '<' ||
+                  source->grammar[previous] == '#' || source->grammar[previous] == '.' ||
+                  source->grammar[previous] == '\\')) ||
+                insideFailBlock(source->grammar, offset) ||
+                (next < source->grammar.size() && (source->grammar[next] == '?' || source->grammar[next] == '*'))) {
+                ++skipped_unsupported;
+                continue;
+            }
+            if (message.empty() || message.size() > 500) throw std::runtime_error("Invalid AI recovery message");
+            if (strategy != "insert" && strategy != "replace" && strategy != "sync_tokens")
+                throw std::runtime_error("Invalid AI recovery strategy: " + strategy);
+            if (!rule.empty() && std::isupper(static_cast<unsigned char>(rule.front())) &&
+                strategy != "insert") {
+                std::cerr << "Skipping AI recovery at " << relative << ':' << rule << ": lexer fail handlers"
+                          << " do not support " << strategy << '\n';
+                ++skipped_unsupported;
+                continue;
+            }
+            const auto id = item["id"].as<std::string>();
+            if (id.size() != 16 || !std::ranges::all_of(id, [](unsigned char c) { return std::isxdigit(c); }))
+                throw std::runtime_error("Invalid AI recovery site ID");
+            const auto handler = "ispa_ai_" + id;
+            auto body = "\nfail " + handler + " {\n    ctx.error(" + pythonString(message) + ")\n";
+            if (strategy == "sync_tokens") {
+                if (!item["sync"] || !item["sync"].IsSequence() || item["sync"].size() == 0)
+                    throw std::runtime_error("AI recovery sync_tokens requires sync token names");
+                body += "    ctx.sync_tokens(";
+                bool first = true;
+                for (const auto& token : item["sync"]) {
+                    const auto name = token.as<std::string>();
+                    if (!identifier(name)) throw std::runtime_error("Invalid AI recovery sync token: " + name);
+                    if (!first) body += ", ";
+                    body += pythonString(name);
+                    first = false;
+                }
+                body += ")\n";
+            }
+            body += strategy == "replace" ? "    ctx.replace()\n}" : "    ctx.insert()\n}";
+            auto& source_blocks = blocks[source->file];
+            if (source_blocks.find("fail " + handler + " {") != std::string::npos)
+                throw std::runtime_error("Duplicate AI recovery site ID: " + id);
+            source_blocks += body;
+            edits[source->file].push_back({offset, "%" + handler + " "});
+        }
+        for (auto& source : project.sources) {
+            const auto found = edits.find(source.file);
+            if (found == edits.end()) continue;
+            auto& changes = found->second;
+            std::sort(changes.begin(), changes.end(), [](const auto& a, const auto& b) { return a.offset > b.offset; });
+            for (std::size_t i = 1; i < changes.size(); ++i)
+                if (changes[i-1].offset == changes[i].offset)
+                    throw std::runtime_error("Duplicate AI recovery site");
+            for (const auto& change : changes) source.grammar.insert(change.offset, change.marker);
+            source.grammar += blocks[source.file];
+        }
+        if (skipped_unsupported)
+            std::cerr << "Skipped " << skipped_unsupported << " unsupported AI recovery site(s) in "
+                      << file_path << '\n';
     }
 
     UAST::SourcePosition semanticPosition(const AST::SourcePosition& position) {
@@ -405,6 +573,7 @@ int generate(Args args) {
         for (const auto& [name, path] : args.dependencies)
             if (!resolve.emplace(name, path).second) throw std::runtime_error("Duplicate --dep binding: " + name);
         module_project = Modules::preprocess(args.dir, args.files, resolve, args.library_dirs);
+        loadAiRecovery(module_project, args);
         if (args.dependency_build) {
             module_project.root.reset();
             // A library module can export rules without declaring a default

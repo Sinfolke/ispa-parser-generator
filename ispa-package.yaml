@@ -1,14 +1,9 @@
-# Layout of this repository when installed with `ispa-pkg install std`.
+# Grammar and Python helpers installed with `ispa-pkg install std`.
 name: std
 layout:
   root: parser/stdlibs
   ispalib:
     grammar: grammar
     python: python
-  ispatarget:
-    cpp: target/cpp
-    python: target/python
-  files:
-    ispatarget/ispa_std.py: target/ispa_std.py
-    ispatarget/ispa_debug.py: target/ispa_debug.py
-  # LL and LR are bundled with ISPA itself, not distributed as stdlib files.
+  ispatarget: {}
+# LL and LR are bundled with ISPA itself, not distributed as stdlib files.

@@ -33,12 +33,21 @@ curl -fsSL https://raw.githubusercontent.com/Sinfolke/ispa-parser-generator/main
 irm https://raw.githubusercontent.com/Sinfolke/ispa-parser-generator/main/scripts/install.ps1 | iex
 ```
 
-Then install the standard library and load its exports into a new shell:
+Install the grammar standard library, then the runtime for each output language you use:
 
 ```sh
 ispa-pkg install std
+ispa-pkg install cpp-target    # for C++ output
+ispa-pkg install python-target # for Python output
 ispa-pkg --export-permanent
 ```
+
+`std` contains `.isc` grammar modules and their Python helpers. It does not
+install a generated parser runtime. `cpp-target` supplies the C++ headers and
+library; `python-target` supplies the Python runtime modules. Install either
+target package or both, according to the code you generate. If a C++ toolchain
+is unavailable during installation, run `ispa-pkg --build cpp-target` after
+setting it up.
 
 `ispa --help` lists generation options; `ispa-pkg --help` covers package management. The [Getting Started](https://github.com/Sinfolke/ispa-parser-generator/wiki/Getting-Started) wiki page walks through the rest, including non-CMake builds.
 
@@ -136,6 +145,7 @@ With a full typed AST, ISPA was about 12x faster than ANTLR with CST constructio
 ## Learn more
 
 - [Wiki](https://github.com/Sinfolke/ispa-parser-generator/wiki) — grammar syntax, CLI reference, generated code and runtime API, error recovery, modules, package manager, debugging, building from source.
+- [ispa-ai](docs/ISPA_AI.md) — interactive AI suggestions for LL diagnostics and recovery in `ai.json`.
 - [Discussions](https://github.com/Sinfolke/ispa-parser-generator/discussions) and [Issues](https://github.com/Sinfolke/ispa-parser-generator/issues) for questions and bug reports.
 
 ## License

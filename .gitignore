@@ -79,5 +79,7 @@ parser/ispa_dep_scanner/bootstrapped/.codegen-*
 tree.txt
 treeAPI.txt
 __pycache__
+.ispa-ai-cache.json
+.ispa-ai-draft.json
 /mnt/5EE9F38E0E9F2DC9/ispa-parser/test.isc
 /mnt/5EE9F38E0E9F2DC9/ispa-parser/test.txt

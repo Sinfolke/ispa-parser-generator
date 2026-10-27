@@ -20,7 +20,13 @@ import yaml
 
 
 CATALOG_URL = "https://raw.githubusercontent.com/Sinfolke/ispa-parser-generator/main/ispa-libraries.yaml"
-DEFAULT_CATALOG = {"packages": {"std": {"github": "Sinfolke/ispa-parser-generator", "ref": "main"}}}
+DEFAULT_CATALOG = {"packages": {
+    "std": {"github": "Sinfolke/ispa-parser-generator", "ref": "main"},
+    "cpp-target": {"github": "Sinfolke/ispa-parser-generator", "ref": "main",
+                   "manifest": "ispa-package.cpp-target.yaml"},
+    "python-target": {"github": "Sinfolke/ispa-parser-generator", "ref": "main",
+                      "manifest": "ispa-package.python-target.yaml"},
+}}
 FOLDERS = ("ispalib", "ispatarget", "ispaalgorithm")
 GITHUB = re.compile(r"^[\w.-]+/[\w.-]+$")
 NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
@@ -187,46 +193,67 @@ def layout_entries(config):
     return root, result, file_entries
 
 
-def build_cpp_library(package, name, root):
+def build_cpp_library(package, name, root, required=False):
     """Compile a package's C++ sources into a static archive beside its headers."""
     cpp = package / 'ispatarget' / 'cpp'
     sources = sorted(source for source in cpp.rglob('*.cpp') if source.is_file())
     if not sources:
         return None
-    default_compiler = 'cl' if os.name == 'nt' and not shutil.which('c++') else 'c++'
-    compiler = shlex.split(os.environ.get('CXX', default_compiler))
-    msvc = bool(compiler and Path(compiler[0]).name.lower() in ('cl', 'cl.exe', 'clang-cl', 'clang-cl.exe'))
-    archiver = shlex.split(os.environ.get('AR', 'lib' if msvc else 'ar'))
-    if not compiler or not archiver or not shutil.which(compiler[0]) or not shutil.which(archiver[0]):
-        raise PackageError('Building C++ libraries requires a C++ compiler and archiver (set CXX and AR)')
-    flags = shlex.split(os.environ.get('CXXFLAGS', ''))
+    cmake = shutil.which('cmake')
+    if not cmake:
+        if required:
+            raise PackageError('Building C++ libraries requires CMake')
+        print(f'{name}: skipping C++ build (CMake not found)', file=sys.stderr)
+        return None
+    compiler = shlex.split(os.environ.get('CXX', ''))
     includes = [cpp, cpp / 'include']
     for other in discover_exports(root).get('cpp', []):
         includes.extend((other, other / 'include'))
-    include_flags = [flag for directory in dict.fromkeys(includes) if directory.is_dir()
-                     for flag in (('/I' if msvc else '-I'), str(directory))]
     with tempfile.TemporaryDirectory(prefix='.ispa-cpp-', dir=root) as temporary:
         work = Path(temporary)
-        objects = []
-        for index, source in enumerate(sources):
-            obj = work / f'{index}{".obj" if msvc else ".o"}'
-            if msvc:
-                command = [*compiler, '/nologo', '/std:c++17', '/EHsc', *flags,
-                           *include_flags, '/c', str(source), f'/Fo{obj}']
-            else:
-                command = [*compiler, '-std=c++17', *flags, *include_flags,
-                           '-c', str(source), '-o', str(obj)]
-            print(f'{name}: compiling {source.relative_to(cpp)}', file=sys.stderr)
-            subprocess.run(command, check=True, stdout=sys.stderr)
-            objects.append(obj)
-        archive_name = f'{name}.lib' if msvc else f'lib{name}.a'
-        archive = work / archive_name
-        if msvc:
-            command = [*archiver, '/nologo', f'/OUT:{archive}', *(str(obj) for obj in objects)]
-        else:
-            command = [*archiver, 'rcs', str(archive), *(str(obj) for obj in objects)]
-        print(f'{name}: archiving {archive.name}', file=sys.stderr)
-        subprocess.run(command, check=True, stdout=sys.stderr)
+        def cmake_quote(value):
+            return '"' + str(value).replace('\\', '\\\\').replace('"', '\\"') + '"'
+
+        lines = ['cmake_minimum_required(VERSION 3.15)',
+                 'project(ispa_package LANGUAGES CXX)',
+                 'add_library(ispa_package STATIC']
+        lines.extend(f'  {cmake_quote(source)}' for source in sources)
+        lines.extend([')', 'set_target_properties(ispa_package PROPERTIES',
+                      f'  OUTPUT_NAME {cmake_quote(name)}',
+                      f'  ARCHIVE_OUTPUT_DIRECTORY {cmake_quote(work)}', ')',
+                      'target_compile_features(ispa_package PRIVATE cxx_std_17)'])
+        valid_includes = [directory for directory in dict.fromkeys(includes) if directory.is_dir()]
+        if valid_includes:
+            lines.append('target_include_directories(ispa_package PRIVATE')
+            lines.extend(f'  {cmake_quote(directory)}' for directory in valid_includes)
+            lines.append(')')
+        (work / 'CMakeLists.txt').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+        configure = [cmake, '-S', str(work), '-B', str(work / 'build')]
+        flags = []
+        if compiler:
+            configure.extend(['-DCMAKE_CXX_COMPILER=' + compiler[0]])
+            flags.extend(compiler[1:])
+        if os.environ.get('CXXFLAGS'):
+            flags.extend(shlex.split(os.environ['CXXFLAGS']))
+        if flags:
+            configure.append('-DCMAKE_CXX_FLAGS=' + ' '.join(shlex.quote(arg) for arg in flags))
+        print(f'{name}: configuring CMake C++ library', file=sys.stderr)
+        try:
+            subprocess.run(configure, check=True, stdout=sys.stderr)
+        except subprocess.CalledProcessError as error:
+            if required:
+                raise PackageError(f'{name}: CMake could not configure a C++ toolchain') from error
+            print(f'{name}: skipping C++ build (CMake could not configure a C++ toolchain)', file=sys.stderr)
+            return None
+        print(f'{name}: building C++ library', file=sys.stderr)
+        subprocess.run([cmake, '--build', str(work / 'build'), '--config', 'Release', '--parallel'],
+                       check=True, stdout=sys.stderr)
+        archive_names = (f'{name}.lib', f'lib{name}.a')
+        matches = [candidate for search_root in (work, work / 'build')
+                   for archive_name in archive_names for candidate in search_root.rglob(archive_name)]
+        if not matches:
+            raise PackageError(f'CMake did not produce a static library for {name}')
+        archive = matches[0]
         destination = cpp / 'lib' / archive.name
         destination.parent.mkdir(parents=True, exist_ok=True)
         archive.replace(destination)
@@ -252,7 +279,9 @@ def install(name, spec, root, allow_scripts=False, force=False, from_catalog=Fal
         work = Path(temp)
         tree, revision = source_tree(spec, work)
         config_tree = tree
-        config_file = tree / "ispa-package.yaml"
+        config_file = tree / safe_relative(spec.get("manifest", "ispa-package.yaml"))
+        if "manifest" in spec and not config_file.is_file():
+            raise PackageError(f"Package manifest not found: {spec['manifest']}")
         config = read_yaml(config_file.read_text(encoding="utf-8"), str(config_file)) if config_file.is_file() else {}
         if "archive" in config:
             location = config["archive"]
@@ -633,6 +662,7 @@ def main(argv=None):
     exports = parser.add_mutually_exclusive_group()
     exports.add_argument("--export", action="store_true", help="Print shell exports and generate target manifests")
     exports.add_argument("--export-permanent", action="store_true", help="Persist exports in the user shell profile")
+    exports.add_argument("--build", metavar="PACKAGE", help="Build an installed package's C++ library")
     parser.add_argument("--export-path", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--shell", choices=("bash", "zsh", "powershell"), help="Shell used for exports")
     sub = parser.add_subparsers(dest="command")
@@ -653,11 +683,25 @@ def main(argv=None):
     if args.export_path and not args.export:
         parser.error("--export-path requires --export")
     root = args.root.expanduser().resolve()
-    if args.command is None and not (args.export or args.export_permanent):
-        parser.error("Specify a command, --export, or --export-permanent")
-    if args.command is not None and (args.export or args.export_permanent):
+    if args.command is None and not (args.export or args.export_permanent or args.build):
+        parser.error("Specify a command, --build, --export, or --export-permanent")
+    if args.command is not None and (args.export or args.export_permanent or args.build):
         parser.error("Export flags cannot be combined with a subcommand")
     try:
+        if args.build:
+            if not NAME.fullmatch(args.build):
+                raise PackageError(f"Invalid package name: {args.build}")
+            package = root / args.build
+            marker = package / ".ispa-package.json"
+            if not marker.is_file():
+                raise PackageError(f"Package not installed: {args.build}")
+            archive = build_cpp_library(package, args.build, root, required=True)
+            if archive:
+                refresh_saved_exports(root)
+                print(f"{args.build}: built {archive}")
+            else:
+                raise PackageError(f"Package has no C++ sources to build: {args.build}")
+            return 0
         if args.export or args.export_permanent:
             output, manifest = write_export_files(root)
             variables = export_variables(root, output, manifest)

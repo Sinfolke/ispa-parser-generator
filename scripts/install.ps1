@@ -34,7 +34,7 @@ try {
   } finally { $zip.Dispose() }
   Expand-Archive -LiteralPath $zipPath -DestinationPath $extractDir
   if (-not (Test-Path (Join-Path $extractDir 'ispa.exe'))) { throw 'Archive does not contain ispa.exe' }
-  foreach ($file in @('ispa-pkg.exe', 'ispadbg.exe', 'install.ps1', 'update.ps1')) {
+  foreach ($file in @('ispa-pkg.exe', 'ispadbg.exe', 'ispa-ai.exe', 'install.ps1', 'update.ps1')) {
     if (-not (Test-Path (Join-Path $extractDir $file))) { throw "Archive does not contain $file" }
   }
   $versions = Join-Path $root 'versions'
@@ -43,7 +43,7 @@ try {
   if (-not (Test-Path $target)) {
     Move-Item -LiteralPath $extractDir -Destination $target
   } else {
-    foreach ($file in @('ispa-pkg.exe', 'ispadbg.exe')) {
+    foreach ($file in @('ispa-pkg.exe', 'ispadbg.exe', 'ispa-ai.exe')) {
       if (-not (Test-Path (Join-Path $target $file))) {
         Copy-Item -LiteralPath (Join-Path $extractDir $file) -Destination (Join-Path $target $file)
       }
@@ -58,6 +58,8 @@ try {
   "@echo off`r`n`"$pkg`" %*`r`n" | Set-Content -LiteralPath (Join-Path $bin 'ispa-pkg.cmd') -Encoding ASCII
   $debugger = Join-Path $target 'ispadbg.exe'
   "@echo off`r`n`"$debugger`" %*`r`n" | Set-Content -LiteralPath (Join-Path $bin 'ispadbg.cmd') -Encoding ASCII
+  $ai = Join-Path $target 'ispa-ai.exe'
+  "@echo off`r`n`"$ai`" %*`r`n" | Set-Content -LiteralPath (Join-Path $bin 'ispa-ai.cmd') -Encoding ASCII
   $updater = Join-Path $target 'update.ps1'
   "@echo off`r`npowershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$updater`" %*`r`n" | Set-Content -LiteralPath (Join-Path $bin 'ispa-update.cmd') -Encoding ASCII
   Set-Content -LiteralPath (Join-Path $root 'current-version') -Value $tag -NoNewline
@@ -69,7 +71,7 @@ try {
   }
   if (($env:Path.Split(';')) -notcontains $bin) { $env:Path += ";$bin" }
   Write-Host "Installed ISPA $tag to $target"
-  Write-Host 'Open a new terminal and run: ispa --help'
+  Write-Host 'Open a new terminal and run: ispa-ai --help'
 } finally {
   Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
 }
