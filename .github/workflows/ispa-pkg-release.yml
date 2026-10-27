@@ -3,6 +3,11 @@ name: Nuitka Python CLIs release
 on:
   workflow_call:
     inputs:
+      platform:
+        description: Platform to build (all or one platform)
+        type: string
+        required: false
+        default: all
       checkout_ref:
         description: Git tag to compile
         type: string
@@ -16,45 +21,33 @@ permissions:
   contents: write
 
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+    steps:
+      - id: select
+        shell: bash
+        env:
+          SELECTED_PLATFORM: ${{ inputs.platform || 'all' }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          platforms = [{"os":"ubuntu-26.04","platform":"linux-x64","executable":"ispa-pkg","archive":"ispa-pkg-linux-x64.tar.gz","debugger":"ispadbg","debugger_archive":"ispadbg-linux-x64.tar.gz","ai":"ispa-ai","ai_archive":"ispa-ai-linux-x64.tar.gz"},{"os":"windows-latest","platform":"windows-x64","executable":"ispa-pkg.exe","archive":"ispa-pkg-windows-x64.zip","debugger":"ispadbg.exe","debugger_archive":"ispadbg-windows-x64.zip","ai":"ispa-ai.exe","ai_archive":"ispa-ai-windows-x64.zip"},{"os":"macos-26","platform":"macos-arm64","executable":"ispa-pkg","archive":"ispa-pkg-macos-arm64.tar.gz","debugger":"ispadbg","debugger_archive":"ispadbg-macos-arm64.tar.gz","ai":"ispa-ai","ai_archive":"ispa-ai-macos-arm64.tar.gz"},{"os":"macos-26-intel","platform":"macos-x64","executable":"ispa-pkg","archive":"ispa-pkg-macos-x64.tar.gz","debugger":"ispadbg","debugger_archive":"ispadbg-macos-x64.tar.gz","ai":"ispa-ai","ai_archive":"ispa-ai-macos-x64.tar.gz"}]
+          selected = os.environ["SELECTED_PLATFORM"]
+          items = [p for p in platforms if selected == "all" or p["platform"] == selected]
+          if not items: raise SystemExit("Unknown platform: " + selected)
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              print("matrix=" + json.dumps({"include": items}, separators=(",", ":")), file=output)
+          PY
+
   build:
+    needs: plan
     name: ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-26.04
-            platform: linux-x64
-            executable: ispa-pkg
-            archive: ispa-pkg-linux-x64.tar.gz
-            debugger: ispadbg
-            debugger_archive: ispadbg-linux-x64.tar.gz
-            ai: ispa-ai
-            ai_archive: ispa-ai-linux-x64.tar.gz
-          - os: windows-latest
-            platform: windows-x64
-            executable: ispa-pkg.exe
-            archive: ispa-pkg-windows-x64.zip
-            debugger: ispadbg.exe
-            debugger_archive: ispadbg-windows-x64.zip
-            ai: ispa-ai.exe
-            ai_archive: ispa-ai-windows-x64.zip
-          - os: macos-26
-            platform: macos-arm64
-            executable: ispa-pkg
-            archive: ispa-pkg-macos-arm64.tar.gz
-            debugger: ispadbg
-            debugger_archive: ispadbg-macos-arm64.tar.gz
-            ai: ispa-ai
-            ai_archive: ispa-ai-macos-arm64.tar.gz
-          - os: macos-26-intel
-            platform: macos-x64
-            executable: ispa-pkg
-            archive: ispa-pkg-macos-x64.tar.gz
-            debugger: ispadbg
-            debugger_archive: ispadbg-macos-x64.tar.gz
-            ai: ispa-ai
-            ai_archive: ispa-ai-macos-x64.tar.gz
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
 
     steps:
       - name: Checkout release tag

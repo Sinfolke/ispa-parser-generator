@@ -6,8 +6,25 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Platform to build
+        type: choice
+        default: all
+        options:
+          - all
+          - linux-x64
+          - windows-x64
+          - macos-arm64
+          - macos-x64
   workflow_call:
     inputs:
+      platform:
+        description: Platform to build (all or one platform)
+        type: string
+        required: false
+        default: all
       checkout_ref:
         description: Git ref to build; empty uses triggering commit
         type: string
@@ -44,8 +61,30 @@ jobs:
       - name: Test package manager
         run: python -m unittest tests/test_ispa_pkg.py -v
 
+
+  plan:
+    name: Select requested CMake platforms
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+    steps:
+      - id: select
+        shell: bash
+        env:
+          SELECTED_PLATFORM: ${{ inputs.platform || 'all' }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          platforms = [{"os":"ubuntu-26.04","artifact_name":"ispa-linux-x64","c_compiler":"clang-20","cpp_compiler":"clang++-20","triplet":"x64-linux-libcxx","overlay_triplets":"cmake/triplets","extra_cxx_flags":"-stdlib=libc++"},{"os":"windows-latest","artifact_name":"ispa-windows-x64","c_compiler":"clang-cl","cpp_compiler":"clang-cl","triplet":"x64-windows","overlay_triplets":"","extra_cxx_flags":""},{"os":"macos-26","artifact_name":"ispa-macos-arm64","c_compiler":"clang","cpp_compiler":"clang++","triplet":"arm64-osx","overlay_triplets":"","extra_cxx_flags":""},{"os":"macos-26-intel","artifact_name":"ispa-macos-x64","c_compiler":"clang","cpp_compiler":"clang++","triplet":"x64-osx","overlay_triplets":"","extra_cxx_flags":""}]
+          selected = os.environ["SELECTED_PLATFORM"]
+          items = [p for p in platforms if selected == "all" or p["artifact_name"] == "ispa-" + selected]
+          if not items: raise SystemExit("Unknown platform: " + selected)
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              print("matrix=" + json.dumps({"include": items}, separators=(",", ":")), file=output)
+          PY
+
   build:
-    needs: pkg
+    needs: [pkg, plan]
     permissions:
       contents: write
       actions: write
@@ -54,39 +93,7 @@ jobs:
 
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-26.04
-            artifact_name: ispa-linux-x64
-            c_compiler: clang-20
-            cpp_compiler: clang++-20
-            triplet: x64-linux-libcxx
-            overlay_triplets: cmake/triplets
-            extra_cxx_flags: "-stdlib=libc++"
-
-          - os: windows-latest
-            artifact_name: ispa-windows-x64
-            c_compiler: clang-cl
-            cpp_compiler: clang-cl
-            triplet: x64-windows
-            overlay_triplets: ""
-            extra_cxx_flags: ""
-
-          - os: macos-26
-            artifact_name: ispa-macos-arm64
-            c_compiler: clang
-            cpp_compiler: clang++
-            triplet: arm64-osx
-            overlay_triplets: ""
-            extra_cxx_flags: ""
-
-          - os: macos-26-intel
-            artifact_name: ispa-macos-x64
-            c_compiler: clang
-            cpp_compiler: clang++
-            triplet: x64-osx
-            overlay_triplets: ""
-            extra_cxx_flags: ""
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
 
     steps:
       # -------------------------------------------------------
@@ -761,7 +768,7 @@ jobs:
             executable_suffix=""
           fi
           mkdir -p pkg-download
-          for name in ispa-pkg ispadbg; do
+          for name in ispa-pkg ispadbg ispa-ai; do
             gh release download "$TAG" --pattern "$name-$suffix.$extension" --dir pkg-download
           done
           python3 - "$suffix" "$extension" "$executable_suffix" <<'PY'
@@ -772,7 +779,7 @@ jobs:
           import zipfile
 
           suffix, extension, executable_suffix = sys.argv[1:]
-          for name in ('ispa-pkg', 'ispadbg'):
+          for name in ('ispa-pkg', 'ispadbg', 'ispa-ai'):
               archive = f'{name}-{suffix}.{extension}'
               executable = name + executable_suffix
               source = Path('pkg-download') / archive
@@ -791,6 +798,7 @@ jobs:
           PY
           "release/ispa-pkg$executable_suffix" --help
           "release/ispadbg$executable_suffix" --help
+          "release/ispa-ai$executable_suffix" --help
 
       - name: Upload release build artifacts
         if: inputs.upload_artifacts
@@ -819,8 +827,11 @@ jobs:
           platform = os.environ['ISPA_RELEASE_PLATFORM']
           release = Path('release')
           files = sorted(p for p in release.iterdir() if p.is_file())
-          if not any(p.name in ('ispa', 'ispa.exe') for p in files):
-              raise RuntimeError('Release executable is missing')
+          executable_suffix = '.exe' if os.environ['RUNNER_OS'] == 'Windows' else ''
+          for name in ('ispa', 'ispa-pkg', 'ispadbg', 'ispa-ai'):
+              expected = name + executable_suffix
+              if not (release / expected).is_file():
+                  raise RuntimeError(f'Release executable is missing: {expected}')
 
           if os.environ['RUNNER_OS'] == 'Windows':
               output = Path('packages') / f'{platform}.zip'

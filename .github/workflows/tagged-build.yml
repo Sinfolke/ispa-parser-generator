@@ -5,6 +5,17 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      platform:
+        description: Platform to rebuild and publish
+        type: choice
+        default: all
+        options:
+          - all
+          - linux-x64
+          - windows-x64
+          - macos-arm64
+          - macos-x64
 
 permissions:
   contents: write
@@ -77,6 +88,7 @@ jobs:
       checkout_ref: ${{ needs.resolve-tag.outputs.tag }}
       upload_artifacts: true
       release_tag: ${{ needs.resolve-tag.outputs.tag }}
+      platform: ${{ inputs.platform || 'all' }}
 
   pkg:
     name: Compile Python CLIs for release
@@ -87,8 +99,10 @@ jobs:
     with:
       checkout_ref: ${{ needs.resolve-tag.outputs.tag }}
       release_tag: ${{ needs.resolve-tag.outputs.tag }}
+      platform: ${{ inputs.platform || 'all' }}
 
   jetbrains:
+    if: ${{ inputs.platform == 'all' || inputs.platform == '' }}
     name: Package JetBrains plugin for release
     needs: [resolve-tag, prepare-release]
     permissions:
@@ -96,4 +110,5 @@ jobs:
     uses: ./.github/workflows/jetbrains-plugin-release.yml
     with:
       release_tag: ${{ needs.resolve-tag.outputs.tag }}
+      platform: ${{ inputs.platform || 'all' }}
 

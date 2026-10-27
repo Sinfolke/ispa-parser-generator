@@ -254,8 +254,9 @@ namespace {
             if (!item.IsMap()) throw std::runtime_error("Invalid AI recovery suggestion");
             const auto relative = item["file"].as<std::string>();
             const auto file = fs::weakly_canonical(canonical_root / relative);
-            if (file.parent_path() != canonical_root &&
-                file.string().compare(0, canonical_root.string().size()+1, canonical_root.string()+fs::path::preferred_separator) != 0)
+            const auto relative_path = file.lexically_relative(canonical_root);
+            if (relative_path.empty() || relative_path.is_absolute() ||
+                *relative_path.begin() == fs::path(".."))
                 throw std::runtime_error("AI recovery file escapes grammar root: " + relative);
             auto source = std::ranges::find_if(project.sources, [&](const auto& value) {
                 return fs::weakly_canonical(value.file) == file;
