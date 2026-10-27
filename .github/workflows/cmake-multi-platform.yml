@@ -687,6 +687,11 @@ jobs:
             "-DCMAKE_CXX_FLAGS=-fno-modules-reduced-bmi"
             )
           fi
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            CMAKE_ARGS+=(
+            "-DICU_INCLUDE_DIR=$GITHUB_WORKSPACE/build/vcpkg_installed/$MATRIX_TRIPLET/include"
+            )
+          fi
           # -------------------------------------------------------
           # 3. Run configuration
           # -------------------------------------------------------

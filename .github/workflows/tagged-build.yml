@@ -110,5 +110,4 @@ jobs:
     uses: ./.github/workflows/jetbrains-plugin-release.yml
     with:
       release_tag: ${{ needs.resolve-tag.outputs.tag }}
-      platform: ${{ inputs.platform || 'all' }}
 
