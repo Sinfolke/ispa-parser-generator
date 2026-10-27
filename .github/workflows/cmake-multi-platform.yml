@@ -267,10 +267,7 @@ jobs:
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          set -euo pipefail
-          
-          brew update
-          
+          set -euo pipefail          
           brew install \
             ninja \
             autoconf \
@@ -298,41 +295,43 @@ jobs:
           command -v aclocal
           
           echo "Autoconf Archive: $ACLOCAL_DIR"
-      - name: Install LLVM 23 (macOS)
+      - name: Setup Conda & Install LLVM 23 (macOS)
         if: runner.os == 'macOS'
-        shell: bash
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+          channels: conda-forge
+          channel-priority: strict
+
+      - name: Install LLVM 23 via Conda (macOS)
+        if: runner.os == 'macOS'
+        shell: bash -l {0}
         run: |
           set -euo pipefail
-
-          # The unversioned llvm formula now provides LLVM 23.
-          brew install llvm
-          brew upgrade llvm || true
-
-          LLVM_PREFIX="$(brew --prefix llvm)"
+          
+          conda install -y -c conda-forge llvmdev=23 clangdev=23
+          
+          # Use CONDA_PREFIX (points to the currently active environment)
+          LLVM_PREFIX="$CONDA_PREFIX"
+          
           LLVM_VERSION="$("$LLVM_PREFIX/bin/llvm-config" --version)"
-
-          echo "Installed LLVM: $LLVM_VERSION"
-
-          if [[ "${LLVM_VERSION%%.*}" != "23" ]]; then
-            echo "::error::Expected LLVM 23, got $LLVM_VERSION"
-            brew info llvm
-            exit 1
-          fi
-
+          echo "Installed LLVM via Conda: $LLVM_VERSION"
+          
           # Export compiler paths for CMake and vcpkg.
           echo "$LLVM_PREFIX/bin" >> "$GITHUB_PATH"
           echo "LLVM_PREFIX=$LLVM_PREFIX" >> "$GITHUB_ENV"
           echo "CC=$LLVM_PREFIX/bin/clang" >> "$GITHUB_ENV"
           echo "CXX=$LLVM_PREFIX/bin/clang++" >> "$GITHUB_ENV"
-
+          
           # Verify compiler and module scanner.
           "$LLVM_PREFIX/bin/clang" --version
           "$LLVM_PREFIX/bin/clang++" --version
           "$LLVM_PREFIX/bin/clang-scan-deps" --version
           "$LLVM_PREFIX/bin/llvm-config" --version
+
       - name: Install libc++ module resources (macOS)
         if: runner.os == 'macOS'
-        shell: bash
+        shell: bash -l {0}
         run: |
           set -euo pipefail
           
@@ -351,21 +350,21 @@ jobs:
             "$SOURCE_DIR"
           
           cmake -S "$SOURCE_DIR/libcxx" \
-          -B "$BUILD_DIR" \
-          -G Ninja \
-          -DCMAKE_C_COMPILER="$LLVM_PREFIX/bin/clang" \
-          -DCMAKE_CXX_COMPILER="$LLVM_PREFIX/bin/clang++" \
-          -DCMAKE_INSTALL_PREFIX="$MODULE_PREFIX" \
-          -DLIBCXX_CXX_ABI=none \
-          -DLIBCXX_INSTALL_MODULES=ON \
-          -DLIBCXX_INSTALL_HEADERS=OFF \
-          -DLIBCXX_INSTALL_LIBRARY=OFF \
-          -DLIBCXX_INCLUDE_TESTS=OFF \
-          -DLIBCXX_INCLUDE_BENCHMARKS=OFF
+            -B "$BUILD_DIR" \
+            -G Ninja \
+            -DCMAKE_C_COMPILER="$LLVM_PREFIX/bin/clang" \
+            -DCMAKE_CXX_COMPILER="$LLVM_PREFIX/bin/clang++" \
+            -DCMAKE_INSTALL_PREFIX="$MODULE_PREFIX" \
+            -DLIBCXX_CXX_ABI=none \
+            -DLIBCXX_INSTALL_MODULES=ON \
+            -DLIBCXX_INSTALL_HEADERS=OFF \
+            -DLIBCXX_INSTALL_LIBRARY=OFF \
+            -DLIBCXX_INCLUDE_TESTS=OFF \
+            -DLIBCXX_INCLUDE_BENCHMARKS=OFF
           
           cmake --build "$BUILD_DIR" \
-          --target install-cxx-modules \
-          --parallel 3
+            --target install-cxx-modules \
+            --parallel 3
           
           MODULES_JSON="$MODULE_PREFIX/lib/libc++.modules.json"
           
