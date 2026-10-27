@@ -8280,7 +8280,7 @@ namespace Parser {
 		static ::ISPA_STD::DFA::API::CharToClass char_class_table;
 		static ::ISPA_STD::DFA::API::Table<106, 54> dfa_table;
 		static ::ISPA_STD::DFA::API::Table<139, 4> action_table;
-		auto semantic_action_exec(long long state, const ::ISPA_STD::DFA::API::Captures& captures, long long start_pos, const char* start, long long length, long long line) -> std::pair<long long, Token>;
+		auto semantic_action_exec(long long state, const ::ISPA_STD::DFA::API::Captures& captures, long long start_pos, const char* start, long long length, long long line, const char*& cursor) -> std::pair<long long, Token>;
 		bool init_done = false;
 		auto init() -> void override;
 		::ISPA_STD::DFA::API::TdfaLayout<23, 22> tdfa_registers;
@@ -8310,7 +8310,6 @@ namespace Parser {
 } // namespace Parser
 namespace Parser {
 	class Parser : public ::ISPA_STD::LLParser<Types::main, Token> {
-		Lexer lazy_lexer_;
 	protected:
 		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularNested_rule(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::regular::nested_rule, IT>;
 		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueCounterBounded(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::regular::value::counter::bounded, IT>;
@@ -8368,7 +8367,10 @@ namespace Parser {
 		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto ispa_match_template(std::type_identity<Types::modules::common::rule_params> tag, IT pos) -> ::ISPA_STD::MatchResult<Types::modules::common::rule_params, IT>;
 	public:
 		auto parseFromTokens() -> void override;
-		auto lazyParse() -> ISPA_STD::MatchResult<Types::main, Lexer::lazy_iterator> override;
+	private:
+		Lexer lazy_lexer_;
+	public:
+		auto lazyParse() -> ::ISPA_STD::MatchResult<Types::main, Lexer::lazy_iterator> override;
 		constexpr auto members() {
 			return std::tie();
 		}

@@ -128,6 +128,27 @@ namespace ISPA_STD {
             std::size_t table_states,
             std::size_t table_classes,
             std::size_t action_table_states,
+            typename Layout
+        >
+        Token lookup(
+            const DFA::API::Table<table_states, table_classes> &table,
+            const DFA::API::CharToClass &class_table,
+            const DFA::API::LRTable<action_table_states> &action_table,
+            Layout layout,
+            SemanticFunc semantic,
+            const char* &pos
+        ) {
+            static constexpr DFA::API::DFADebugTable<0> no_debug{};
+            static const DFA::API::DebugIndex no_debug_index{};
+            return lookup(table, class_table, action_table, layout, semantic,
+                          no_debug, no_debug_index, pos);
+        }
+
+        template<
+            typename SemanticFunc,
+            std::size_t table_states,
+            std::size_t table_classes,
+            std::size_t action_table_states,
             std::size_t debug_size,
             typename Layout
         >

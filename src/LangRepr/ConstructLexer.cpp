@@ -1129,7 +1129,9 @@ namespace LangRepr {
                 })),
                 LangAPI::Visibility::Private
             ));
-            auto debug = makeDebugTable(states, state_count, class_count);
+            auto debug = lexer_builder.hasDebugInstrumentation()
+                ? makeDebugTable(states, state_count, class_count)
+                : std::nullopt;
             if (debug.has_value()) {
                 auto [debug_array, debug_index] = debug.value();
                 lexer.data.push_back(std::make_pair(
@@ -1166,6 +1168,19 @@ namespace LangRepr {
                     LangAPI::Symbol::createExpression(LangAPI::Symbol{"line"}),
                     LangAPI::Symbol::createExpression(LangAPI::Symbol{"cursor"})}})});
 
+        stdu::vector<LangAPI::Expression> lookup_args{
+            LangAPI::Symbol::createExpression(LangAPI::Symbol {"dfa_table"}),
+            LangAPI::Symbol::createExpression(LangAPI::Symbol {"char_class_table"}),
+            LangAPI::Symbol::createExpression(LangAPI::Symbol {"action_table"}),
+            LangAPI::Symbol::createExpression(LangAPI::Symbol {"tdfa_registers"}),
+            LangAPI::Lambda::createExpression(semantic_callback)
+        };
+        if (lexer_builder.hasDebugInstrumentation()) {
+            lookup_args.push_back(LangAPI::Symbol::createExpression(LangAPI::Symbol {"debug_array"}));
+            lookup_args.push_back(LangAPI::Symbol::createExpression(LangAPI::Symbol {"debug_index"}));
+        }
+        lookup_args.push_back(LangAPI::Symbol::createExpression(LangAPI::Symbol {"pos"}));
+
         lexer.data.push_back(
             std::make_pair(
                 std::make_shared<LangAPI::Declaration>(LangAPI::Function::createDeclaration(LangAPI::Function {
@@ -1182,17 +1197,7 @@ namespace LangRepr {
                         LangAPI::Return {
                             .value = LangAPI::FunctionCall::createExpression(LangAPI::FunctionCall {
                                 .name = std::make_shared<LangAPI::Symbol>(LangAPI::Symbol {"lookup"}),
-                                .args =
-                                {
-                                    LangAPI::Symbol::createExpression(LangAPI::Symbol {"dfa_table"}),
-                                    LangAPI::Symbol::createExpression(LangAPI::Symbol {"char_class_table"}),
-                                    LangAPI::Symbol::createExpression(LangAPI::Symbol {"action_table"}),
-                                    LangAPI::Symbol::createExpression(LangAPI::Symbol {"tdfa_registers"}),
-                                    LangAPI::Lambda::createExpression(semantic_callback),
-                                    LangAPI::Symbol::createExpression(LangAPI::Symbol {"debug_array"}),
-                                    LangAPI::Symbol::createExpression(LangAPI::Symbol {"debug_index"}),
-                                    LangAPI::Symbol::createExpression(LangAPI::Symbol {"pos"}),
-                                }
+                                .args = std::move(lookup_args)
                             })
                         }
                     ),

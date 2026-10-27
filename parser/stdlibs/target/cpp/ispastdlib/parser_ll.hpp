@@ -710,9 +710,17 @@ namespace ISPA_STD {
             if (pos.isEnd()) return "end of input";
             [[maybe_unused]] const auto& tok = *pos;
             if constexpr (detail::detected_v<detail::meta_start_length, decltype(tok)>) {
-                if (tok.meta().start())
-                    return "'" + std::string(std::string_view(tok.meta().start(),
-                                                              tok.meta().length())) + "'";
+                if constexpr (detail::detected_v<detail::source_origin_position, IT> &&
+                              detail::detected_v<detail::meta_startpos_length, decltype(tok)>) {
+                    const char* origin = pos.sourceOrigin();
+                    const std::size_t offset = tok.meta().startpos();
+                    const std::size_t length = tok.meta().length();
+                    if (origin && offset != std::numeric_limits<std::size_t>::max()) {
+                        const std::size_t input_length = std::char_traits<char>::length(origin);
+                        if (offset <= input_length && length <= input_length - offset)
+                            return "'" + std::string(origin + offset, length) + "'";
+                    }
+                }
             }
             return "<token>";
         }

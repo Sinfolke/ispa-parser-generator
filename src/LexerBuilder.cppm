@@ -34,9 +34,12 @@ private:
     std::size_t registers_count = 0;
     std::size_t output_count = 0;
     bool debug = false;
+    bool debug_instrumentation = true;
     bool isTopLevel(const stdu::vector<std::string> &name);
 public:
-    LexerBuilder(AST::Tree &ast, bool debug = false) : ast(ast), debug(debug) {};
+    LexerBuilder(AST::Tree &ast, bool debug = false, bool debug_instrumentation = true)
+        : ast(ast), debug(debug), debug_instrumentation(debug_instrumentation) {};
+    bool hasDebugInstrumentation() const { return debug_instrumentation; }
     void build();
     auto& getDFA() { return dfa; }
     auto& getDFA() const { return dfa; }
