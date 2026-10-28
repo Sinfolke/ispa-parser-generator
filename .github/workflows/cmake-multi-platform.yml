@@ -509,8 +509,6 @@ jobs:
         with:
           path: ${{ env.SCCACHE_DIR }}
           key: sccache-${{ matrix.os }}-${{ matrix.triplet }}-${{ github.sha }}
-          restore-keys: |
-            sccache-${{ matrix.os }}-${{ matrix.triplet }}-
 
       - name: Export GitHub Actions Cache Token
         uses: actions/github-script@v7
