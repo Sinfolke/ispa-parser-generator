@@ -322,6 +322,38 @@ def step_item(obj: Any, key: Any, delta: int, post: bool) -> Any:
     return old if post else new
 
 
+def _assigned_value(old: Any, value: Any, operation: str) -> Any:
+    if operation == '=':
+        return value
+    if operation == '+':
+        return old + value
+    if operation == '-':
+        return old - value
+    if operation == '*':
+        return old * value
+    if operation == '/':
+        return old / value
+    if operation == '//':
+        return old // value
+    if operation == '%':
+        return old % value
+    raise ValueError(f'unknown assignment operation: {operation}')
+
+
+def assign_attr(obj: Any, name: str, value: Any, operation: str = '=') -> Any:
+    """Assign an attribute and return the assigned value for an action expression."""
+    result = _assigned_value(getattr(obj, name) if operation != '=' else None, value, operation)
+    setattr(obj, name, result)
+    return result
+
+
+def assign_item(obj: Any, key: Any, value: Any, operation: str = '=') -> Any:
+    """Assign a subscript and return the assigned value for an action expression."""
+    result = _assigned_value(obj[key] if operation != '=' else None, value, operation)
+    obj[key] = result
+    return result
+
+
 @dataclass(slots=True)
 class Position:
     source: str

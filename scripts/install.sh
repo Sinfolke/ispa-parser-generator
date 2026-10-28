@@ -42,13 +42,15 @@ PY
 )" || fail 'Failed to read valid release tag'
 
 archive="$platform.tar.gz"
-url="https://github.com/$REPO/releases/download/$tag/$archive"
-printf 'Installing ISPA %s (%s)\n' "$tag" "$platform"
-curl -fL --retry 3 "$url" -o "$tmp/$archive" || fail "Release asset not available: $archive (release $tag may still be publishing)"
-
-mkdir -p "$tmp/unpacked"
-# Reject absolute paths, parent traversal, symlinks and hardlinks before extraction.
-python3 - "$tmp/$archive" <<'PY'
+prepare_release() {
+  candidate=$1
+  url="https://github.com/$REPO/releases/download/$candidate/$archive"
+  printf 'Trying ISPA %s (%s)\n' "$candidate" "$platform"
+  rm -rf "$tmp/unpacked"
+  mkdir -p "$tmp/unpacked"
+  curl -fL --retry 2 "$url" -o "$tmp/$archive" || return 1
+  # Reject absolute paths, parent traversal, symlinks and hardlinks.
+  python3 - "$tmp/$archive" <<'PY'
 import pathlib, sys, tarfile
 with tarfile.open(sys.argv[1], 'r:gz') as t:
     for member in t.getmembers():
@@ -56,18 +58,41 @@ with tarfile.open(sys.argv[1], 'r:gz') as t:
         if p.is_absolute() or '..' in p.parts or not (member.isfile() or member.isdir()):
             raise SystemExit('Unsafe member in archive: ' + member.name)
 PY
+  tar -xzf "$tmp/$archive" -C "$tmp/unpacked" || return 1
+  for file in ispa ispa-pkg ispadbg ispa-ai install.sh update.sh; do
+    [ -f "$tmp/unpacked/$file" ] || return 1
+  done
+  chmod 755 "$tmp/unpacked/ispa" "$tmp/unpacked/ispa-pkg" "$tmp/unpacked/ispadbg" "$tmp/unpacked/ispa-ai"
+  for tool in ispa ispa-pkg ispadbg ispa-ai; do
+    "$tmp/unpacked/$tool" --help >/dev/null 2>&1 || return 1
+  done
+  return 0
+}
 
-tar -xzf "$tmp/$archive" -C "$tmp/unpacked"
-[ -f "$tmp/unpacked/ispa" ] || fail 'Archive does not contain ispa executable'
-[ -f "$tmp/unpacked/ispa-pkg" ] || fail 'Archive does not contain ispa-pkg executable'
-[ -f "$tmp/unpacked/ispadbg" ] || fail 'Archive does not contain ispadbg executable'
-[ -f "$tmp/unpacked/ispa-ai" ] || fail 'Archive does not contain ispa-ai executable'
-[ -f "$tmp/unpacked/install.sh" ] || fail 'Archive does not contain install.sh'
-[ -f "$tmp/unpacked/update.sh" ] || fail 'Archive does not contain update.sh'
-chmod 755 "$tmp/unpacked/ispa"
-chmod 755 "$tmp/unpacked/ispa-pkg"
-chmod 755 "$tmp/unpacked/ispadbg"
-chmod 755 "$tmp/unpacked/ispa-ai"
+if ! prepare_release "$tag"; then
+  [ "$VERSION" = latest ] || fail "Release $tag could not be installed"
+  curl -fsSL --retry 3 -H 'Accept: application/vnd.github+json' \
+    "https://api.github.com/repos/$REPO/releases?per_page=20" -o "$tmp/releases.json" || fail "Release $tag failed and fallback metadata could not be fetched"
+  fallback="$(python3 - "$tmp/releases.json" "$tag" <<'PY'
+import json, re, sys
+releases=json.load(open(sys.argv[1], encoding='utf-8'))
+current=sys.argv[2]
+version=re.compile(r'^v?(\d+)\.(\d+)\.(\d+)$')
+stable=[]
+for release in releases:
+    tag=release.get('tag_name', '')
+    match=version.fullmatch(tag)
+    if tag != current and not release.get('draft') and not release.get('prerelease') and match:
+        stable.append((tuple(map(int, match.groups())), tag))
+stable.sort(reverse=True)
+if stable: print(stable[0][1])
+PY
+)" || fail "Release $tag failed and no previous stable release was found"
+  [ -n "$fallback" ] || fail "Release $tag failed and no previous stable release was found"
+  printf 'Release %s failed validation; falling back to %s\n' "$tag" "$fallback" >&2
+  prepare_release "$fallback" || fail "Both $tag and fallback release $fallback failed installation checks"
+  tag=$fallback
+fi
 
 mkdir -p "$INSTALL_ROOT/versions" "$BIN_DIR"
 target="$INSTALL_ROOT/versions/$tag"

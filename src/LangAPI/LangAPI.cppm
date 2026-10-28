@@ -104,7 +104,7 @@ export namespace LangAPI {
     };
     enum class ObjectMethods {};
     enum class Language {
-        Cpp, Python
+        Cpp, Rust, Python
     };
     enum class StdlibExports {
         Node, MatchResult, Lexer, Parser, LRParser, LRGeneralizedParser, LRParse, LRParseGeneralized, LRGet, LRNode, LRPack, LRCaptureAssign, LRToken, LexerMakeTokenParameter,
@@ -116,7 +116,8 @@ export namespace LangAPI {
         MatchResultValue, VariantIndex, AssignCompatible,
         LexerTokenIterator, LexerLazyIterator,
         ParserRequired, ParserOptional, ParserRange, ParserRangeOptional,
-        RecoveryDecision, RecoveryState, RecoverEncoded, ParserCounted
+        RecoveryDecision, RecoveryState, RecoverEncoded, ParserCounted,
+        RecoveryTokenSet, RecoveryEndOfInput, RecoveryPolicy
     };
 
 

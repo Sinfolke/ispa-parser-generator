@@ -1,0 +1,686 @@
+module Rust.Init;
+
+import Rust.CoreFunctions;
+import Rust.Rewriter;
+import corelib;
+import Converter.Writer;
+import logging;
+import dstd;
+import std;
+
+namespace Rust {
+    // ------------------------------------------------------------------------
+    // Writer conventions (same as the C++ backend): every line goes through writeln("{}", text) so braces in the text
+    // are never treated as format placeholders and indentation is always applied.
+    // ------------------------------------------------------------------------
+    namespace {
+        auto emitLine(Converter::Writer &w, const std::string &s) -> void { w.writeln("{}", s); }
+
+        auto joinStrings(const std::vector<std::string> &items, const std::string &sep) -> std::string {
+            std::string out;
+            for (std::size_t i = 0; i < items.size(); ++i) {
+                if (i) out += sep;
+                out += items[i];
+            }
+            return out;
+        }
+        auto fileSafe(const std::string &name) -> std::string {
+            std::string out;
+            for (const char c : name) out += (std::isalnum(static_cast<unsigned char>(c)) || c == '_') ? c : '_';
+            return out.empty() ? "_" : out;
+        }
+        auto genericParams(const std::vector<std::string> &names) -> std::string {
+            if (names.empty()) return "";
+            std::vector<std::string> idents;
+            for (const auto &n : names) idents.push_back(RustCore::ident(n));
+            return "<" + joinStrings(idents, ", ") + ">";
+        }
+        auto isValueTypeOf(const LangAPI::Type &t, LangAPI::ValueType vt) -> bool {
+            return t.isValueType() && t.getValueType() == vt;
+        }
+        // `inline const int x = 5;` style scalars become a real `const`; anything else needs runtime construction
+        auto isConstScalar(const LangAPI::Type &t) -> bool {
+            if (!isValueTypeOf(t, LangAPI::ValueType::ImmutableSemantic) || t.template_parameters.size() != 1) return false;
+            if (!std::holds_alternative<LangAPI::Type>(t.template_parameters.front())) return false;
+            const auto &inner = std::get<LangAPI::Type>(t.template_parameters.front());
+            if (!inner.isValueType()) return false;
+            switch (inner.getValueType()) {
+                case LangAPI::ValueType::Int: case LangAPI::ValueType::LargeUInt: case LangAPI::ValueType::Float:
+                case LangAPI::ValueType::Bool: case LangAPI::ValueType::Char: return true;
+                default: return false;
+            }
+        }
+        auto singleStringLiteral(const LangAPI::Expression &e) -> bool {
+            return e.size() == 1 && e[0].type() == LangAPI::ExpressionValueType::RValue &&
+                   e[0].getRValue().type() == LangAPI::RValueType::String;
+        }
+        constexpr const char *kAllow =
+            "#![allow(non_snake_case, non_camel_case_types, non_upper_case_globals, unused_mut, unused_variables,\n"
+            "         unused_parens, unused_labels, unused_imports, unreachable_patterns, unreachable_code, dead_code,\n"
+            "         unused_braces, clippy::all)]\n";
+    }
+
+    // ========================================================================
+    // initialisers
+    // ========================================================================
+    // C++ converts a string literal to whatever the declaration asks for; Rust needs it spelled out.
+    auto Construct::initializer(const LangAPI::Type &type, const LangAPI::Expression &value) -> std::string {
+        if (value.empty()) return "";
+        if (type.isValueType() && type.getValueType() == LangAPI::ValueType::FixedSizeArray &&
+            value.size() == 1 && value[0].type() == LangAPI::ExpressionValueType::RValue &&
+            value[0].getRValue().type() == LangAPI::RValueType::Array) {
+            const auto rendered = RustCore::convertRValue(value[0].getRValue());
+            if (rendered.starts_with("vec![")) return rendered.substr(4);
+        }
+        if (singleStringLiteral(value)) {
+            const auto &t = isValueTypeOf(type, LangAPI::ValueType::ImmutableSemantic) && !type.template_parameters.empty() &&
+                                    std::holds_alternative<LangAPI::Type>(type.template_parameters.front())
+                                ? std::get<LangAPI::Type>(type.template_parameters.front()) : type;
+            if (isValueTypeOf(t, LangAPI::ValueType::String))
+                return "String::from(" + RustCore::convertExpression(value) + ")";
+            if (isValueTypeOf(t, LangAPI::ValueType::NonOwnedString))
+                return "::ispa_std::Ptr::from_static(" + RustCore::convertExpression(value) + ")";
+        }
+        return RustCore::convertExpression(value);
+    }
+
+    // ========================================================================
+    // statements
+    // ========================================================================
+    auto Construct::produceIf(const LangAPI::If &if_stmt, Converter::Writer &o) -> void {
+        emitLine(o, "if " + RustCore::convertExpression(if_stmt.expr) + " {");
+        o.increaseIndentation();
+        convertStatements(if_stmt.stmt, o);
+        o.decreaseIndentation();
+        if (!if_stmt.else_stmt.empty()) {
+            emitLine(o, "} else {");
+            o.increaseIndentation();
+            convertStatements(if_stmt.else_stmt, o);
+            o.decreaseIndentation();
+        }
+        emitLine(o, "}");
+    }
+
+    auto Construct::produceWhile(const LangAPI::While &while_stmt, Converter::Writer &o) -> void {
+        const auto label = "'w" + std::to_string(++RustCore::label_counter);
+        RustCore::loop_frames.push_back({"break " + label, "continue " + label});
+        emitLine(o, label + ": while " + RustCore::convertExpression(while_stmt.expr) + " {");
+        o.increaseIndentation();
+        convertStatements(while_stmt.stmt, o);
+        o.decreaseIndentation();
+        emitLine(o, "}");
+        RustCore::loop_frames.pop_back();
+    }
+
+    // do { body } while (cond): `continue` has to run the condition, so the body sits in a labeled block and
+    // `continue` becomes `break 'body`.
+    auto Construct::produceDoWhile(const LangAPI::DoWhile &do_while_stmt, Converter::Writer &o) -> void {
+        const auto n = std::to_string(++RustCore::label_counter);
+        const auto outer = "'dw" + n, inner = "'dwb" + n;
+        RustCore::loop_frames.push_back({"break " + outer, "break " + inner});
+        emitLine(o, outer + ": loop {");
+        o.increaseIndentation();
+        emitLine(o, inner + ": {");
+        o.increaseIndentation();
+        convertStatements(do_while_stmt.stmt, o);
+        o.decreaseIndentation();
+        emitLine(o, "}");
+        RustCore::loop_frames.pop_back();                 // the condition is outside the body frame
+        emitLine(o, "if !(" + RustCore::convertExpression(do_while_stmt.expr) + ") { break " + outer + "; }");
+        o.decreaseIndentation();
+        emitLine(o, "}");
+    }
+
+    // Every case of the C++ output ends in `break`, so there is no fallthrough to model. A `break` written inside a case
+    // targets the labeled block around the match.
+    auto Construct::produceSwitch(const LangAPI::Switch &switch_stmt, Converter::Writer &o) -> void {
+        const auto label = "'sw" + std::to_string(++RustCore::label_counter);
+        RustCore::loop_frames.push_back({"break " + label, ""});
+        emitLine(o, label + ": {");
+        o.increaseIndentation();
+        emitLine(o, "match " + RustCore::convertExpression(switch_stmt.expression) + " {");
+        o.increaseIndentation();
+        for (const auto &case_stmt : switch_stmt.cases) {
+            emitLine(o, RustCore::convertRValue(case_stmt.first) + " => {");
+            o.increaseIndentation();
+            convertStatements(case_stmt.second, o);
+            o.decreaseIndentation();
+            emitLine(o, "}");
+        }
+        emitLine(o, "_ => {}");
+        o.decreaseIndentation();
+        emitLine(o, "}");
+        o.decreaseIndentation();
+        emitLine(o, "}");
+        RustCore::loop_frames.pop_back();
+    }
+
+    auto Construct::produceVariableStatement(const LangAPI::Variable &variable, Converter::Writer &o) -> void {
+        const auto type = RustCore::convertType(variable.type);
+        const bool inferred = type == "_";
+        std::string line = "let mut " + RustCore::ident(variable.name);
+        if (!inferred) line += ": " + type;
+        if (!variable.value.empty()) {
+            line += " = " + initializer(variable.type, variable.value);
+        } else {
+            if (inferred) throw Error("Rust Converter: `auto {}` without initialiser", variable.name);
+            line += " = Default::default()";       // C++ default-initialises; the type has to implement Default
+        }
+        emitLine(o, line + ";");
+        if (debug_instrumentation_ && !variable.value.empty() &&
+            RustCore::convertExpression(variable.value).find("captures.") != std::string::npos)
+            emitLine(o, "if ::ispa_std::debug::enabled() { ::ispa_std::debug::lexer_capture(\"" + variable.name + "\", &" +
+                        RustCore::ident(variable.name) + "); }");
+    }
+
+    // The error path of the generated parsers is `throw`. IR has no try/catch, the catching happens in the runtime
+    // (required/optional/...), so a throw becomes a panic with a typed payload that the runtime catches with
+    // catch_unwind + downcast. See the notes: this is the biggest design decision of the backend.
+    auto Construct::produceThrow(const LangAPI::Throw &throw_stmt, Converter::Writer &o) -> void {
+        emitLine(o, "::std::panic::panic_any(" + RustCore::convertExpression(throw_stmt.throw_value) + ");");
+    }
+
+    // ISPA_DEBUG_LINE / ISPA_DEBUG_SCOPE markers carry the debugger instrumentation; same format as for C++.
+    auto Construct::produceComment(const LangAPI::Comment &comment, Converter::Writer &o) -> void {
+        const std::string &text = comment.value;
+        const auto quoted = [](const std::string &s) {
+            std::ostringstream out;
+            out << std::quoted(s);
+            return out.str();
+        };
+        if (text.starts_with("ISPA_DEBUG_LINE ")) {
+            std::istringstream input(text.substr(16));
+            std::string file, local;
+            int row = 0, column = 0;
+            input >> std::quoted(file) >> row >> column;
+            if (!input || row <= 0) throw std::runtime_error("Malformed ISPA debug line marker");
+            std::string snapshot = "::ispa_std::debug::Snapshot::new()";
+            std::string phase = "before";
+            while (input >> local) {
+                if (local == "@after") phase = "after";
+                else if (local == "ctx") {
+                    snapshot += ".add(\"ctx.rule\", &ctx.rule).add(\"ctx.pos\", &ctx.pos).add(\"ctx.ast\", &ctx.ast)";
+                } else {
+                    const auto equal = local.find('=');
+                    const auto label = equal == std::string::npos ? local : local.substr(0, equal);
+                    const auto symbol = equal == std::string::npos ? local : local.substr(equal + 1);
+                    snapshot += ".add(\"" + label + "\", &" + symbol + ")";
+                }
+            }
+            emitLine(o, "if ::ispa_std::debug::enabled() { ::ispa_std::debug::line(::ispa_std::debug::Loc::new(" + quoted(file) + ", " +
+                        std::to_string(row) + ", " + std::to_string(column) + "), " + snapshot + ", \"" + phase + "\"); }");
+            return;
+        }
+        if (text.starts_with("ISPA_DEBUG_SCOPE ")) {
+            std::istringstream input(text.substr(17));
+            std::string kind, name, file;
+            int row = 0, column = 0;
+            input >> kind >> std::quoted(name) >> std::quoted(file) >> row >> column;
+            if (!input || (kind != "rule" && kind != "production"))
+                throw std::runtime_error("Malformed ISPA debug scope marker");
+            // RAII guard: Drop also runs while a panic unwinds, so no try/catch is needed
+            emitLine(o, "let ispa_debug_" + kind + " = ::ispa_std::debug::" + (kind == "rule" ? "RuleScope" : "ProductionScope") +
+                        "::new(" + quoted(name) + ", ::ispa_std::debug::Loc::new(" + quoted(file) + ", " + std::to_string(row) + ", " +
+                        std::to_string(column) + "));");
+            return;
+        }
+        std::size_t start = 0;
+        while (true) {
+            const auto nl = text.find('\n', start);
+            emitLine(o, "// " + text.substr(start, nl == std::string::npos ? std::string::npos : nl - start));
+            if (nl == std::string::npos) break;
+            start = nl + 1;
+        }
+    }
+
+    auto Construct::convertStatements(const LangAPI::Statements &statements, Converter::Writer &o) -> void {
+        for (const auto &stmt : statements) convertStatement(stmt, o);
+    }
+
+    auto Construct::convertStatement(const LangAPI::Statement &stmt, Converter::Writer &o) -> void {
+        if (stmt.isExpression()) {
+            const std::string text = RustCore::convertExpression(stmt.getExpression());
+            if (!text.empty()) {
+                emitLine(o, text + ";");
+                if (debug_instrumentation_ && text.find("assign_compatible(") != std::string::npos && text.find("result") != std::string::npos)
+                    emitLine(o, "if ::ispa_std::debug::enabled() { ::ispa_std::debug::value(\"result\", &result, ::ispa_std::debug::active_location()); }");
+            }
+        } else if (stmt.isIf()) produceIf(stmt.getIf(), o);
+        else if (stmt.isWhile()) produceWhile(stmt.getWhile(), o);
+        else if (stmt.isDoWhile()) produceDoWhile(stmt.getDoWhile(), o);
+        else if (stmt.isSwitch()) produceSwitch(stmt.getSwitch(), o);
+        else if (stmt.isThrow()) produceThrow(stmt.getThrow(), o);
+        else if (stmt.isComment()) produceComment(stmt.getComment(), o);
+        else if (stmt.isVariable()) produceVariableStatement(stmt.getVariable(), o);
+        else throw std::runtime_error("Rust Converter: unsupported statement kind");
+    }
+
+    // ========================================================================
+    // functions
+    // ========================================================================
+    // free function / method / constructor:
+    //   free          pub fn f<T: Marker>(a: A) -> R { ... }
+    //   method        pub fn f(&mut self, ...) / (&self, ...) / (no self when static)
+    //   constructor   pub fn new(...) -> Self { let mut this = Self::default(); ...; this }
+    // Constrained templates (every type parameter has a fixed type list, C++ `enable_if<is_same<..> || ...>`) get a
+    // marker trait implemented for exactly those types.
+    auto Construct::emitFunction(const LangAPI::Function &func, Converter::Writer &w, Converter::Writer &aux, FnKind kind,
+                                 const std::string &scope, const std::vector<std::string> &bases) -> void {
+        std::string name = kind == FnKind::Constructor ? "new" : RustCore::ident(func.name);
+        const auto key = scope + "::" + name;
+        if (const auto n = ++context.fn_counts[key]; n > 1) {
+            name += "_" + std::to_string(n);
+            RustCore::warn("overload `" + func.name + "` in `" + scope + "` renamed to `" + name +
+                           "`; call sites are not redirected (Rust has no overloading)");
+        }
+        if (func.override)
+            RustCore::warn("`override` on `" + func.name + "` ignored: Rust has no virtual dispatch through inheritance");
+
+        // generics + marker traits
+        std::vector<std::string> generics;
+        for (const auto &tp : func.template_parameters) {
+            const auto param = RustCore::ident(tp.first);
+            if (tp.second.empty()) {
+                RustCore::warn("template parameter `" + tp.first + "` of `" + func.name +
+                               "` has no fixed type list: the Rust generic is unbounded and the body will not type-check without bounds");
+                generics.push_back(param);
+                continue;
+            }
+            const auto marker = "__Allowed_" + fileSafe(scope) + "_" + fileSafe(func.name) + "_" + fileSafe(tp.first) + "_" +
+                                std::to_string(++context.marker_counter);
+            emitLine(aux, "pub trait " + marker + " {}");
+            for (const auto &allowed : tp.second) emitLine(aux, "impl " + marker + " for " + RustCore::convertType(allowed) + " {}");
+            generics.push_back(param + ": " + marker);
+        }
+
+        // signature
+        std::vector<std::string> params;
+        if (kind == FnKind::Method && !func.is_static) params.push_back(func.is_const ? "&self" : "&mut self");
+        for (const auto &p : func.parameters) {
+            const auto type = RustCore::convertType(p.first);
+            params.push_back((type.starts_with("&") ? "" : "mut ") + RustCore::ident(p.second) + ": " + type);
+        }
+        std::string ret;
+        if (kind == FnKind::Constructor) ret = " -> Self";
+        else if (!(func.type.isValueType() && func.type.getValueType() == LangAPI::ValueType::Void)) {
+            const auto type = RustCore::convertType(func.type);
+            if (type == "_") throw Error("Rust Converter: `{}` has an `auto` return type; Rust cannot infer it (add a Rewriter pass or type the IR)", func.name);
+            ret = " -> " + type;
+        }
+        emitLine(w, "pub fn " + name + (generics.empty() ? "" : "<" + joinStrings(generics, ", ") + ">") + "(" +
+                    joinStrings(params, ", ") + ")" + ret + " {");
+        w.increaseIndentation();
+
+        const auto saved_counter = RustCore::counter;
+        const auto saved_frames = RustCore::loop_frames;
+        RustCore::counter = {RustCore::base_pointer};
+        RustCore::loop_frames.clear();
+
+        if (kind == FnKind::Constructor) emitLine(w, "let mut this = Self::default();");
+        if (func.statements.empty() && kind != FnKind::Constructor && !ret.empty()) {
+            RustCore::warn("`" + func.name + "` has no body but a return value: emitted as unimplemented!()");
+            emitLine(w, "unimplemented!()");
+        }
+        for (const auto &stmt : func.statements) {
+            // `Base{args}` initialiser-list entries of a constructor assign the embedded base
+            if (kind == FnKind::Constructor && stmt.isExpression() && stmt.getExpression().size() == 1 &&
+                stmt.getExpression()[0].type() == LangAPI::ExpressionValueType::RValue &&
+                stmt.getExpression()[0].getRValue().type() == LangAPI::RValueType::Inheritance) {
+                const auto &inheritance = stmt.getExpression()[0].getRValue().getInheritance();
+                std::string base_name;
+                if (std::holds_alternative<LangAPI::Symbol>(inheritance.name)) base_name = RustCore::convertSymbol(std::get<LangAPI::Symbol>(inheritance.name));
+                else if (std::holds_alternative<LangAPI::IspaLibSymbol>(inheritance.name)) base_name = RustCore::convertIspaLibSymbol(std::get<LangAPI::IspaLibSymbol>(inheritance.name), false);
+                else base_name = RustCore::convertType(*std::get<std::shared_ptr<LangAPI::Type>>(inheritance.name));
+                const auto it = std::find(bases.begin(), bases.end(), base_name);
+                if (it == bases.end()) throw Error("Rust Converter: constructor initialises `{}` which is not a base class", base_name);
+                emitLine(w, "this.base_" + std::to_string(it - bases.begin()) + " = " + RustCore::convertRValue(stmt.getExpression()[0].getRValue()) + ";");
+                continue;
+            }
+            convertStatement(stmt, w);
+        }
+        if (kind == FnKind::Constructor) emitLine(w, "this");
+
+        RustCore::counter = saved_counter;
+        RustCore::loop_frames = saved_frames;
+        w.decreaseIndentation();
+        emitLine(w, "}");
+    }
+
+    // C++ `ostream& operator<<(ostream& os, <params>)`. The IR passes the object as an ordinary parameter, so this is a
+    // free function; the stream becomes `&mut dyn fmt::Write`.
+    auto Construct::emitOutputFunction(const LangAPI::Function &func, Converter::Writer &w) -> void {
+        std::vector<std::string> params{"os: &'a mut dyn ::std::fmt::Write"};
+        for (const auto &p : func.parameters) params.push_back(RustCore::ident(p.second) + ": " + RustCore::convertType(p.first));
+        const auto suffix = func.parameters.empty() ? std::string("value") : fileSafe(RustCore::convertType(func.parameters.front().first));
+        emitLine(w, "pub fn operator_shl_" + suffix + "<'a>(" + joinStrings(params, ", ") + ") -> &'a mut dyn ::std::fmt::Write {");
+        w.increaseIndentation();
+        RustCore::loop_frames.clear();
+        convertStatements(func.statements, w);
+        w.decreaseIndentation();
+        emitLine(w, "}");
+    }
+
+    // ========================================================================
+    // classes
+    // ========================================================================
+    // struct + impl. Rust has no inheritance, nested types or in-class initialisers, so:
+    //   bases            -> `base_N` fields, Deref/DerefMut to the first base
+    //   field initialisers -> a hand-written Default (derive(Default) when there are none)
+    //   constructor      -> `new`, built on Default
+    //   nested types / statics were hoisted by Rust.Rewriter; anything that still shows up is emitted as a sibling
+    auto Construct::emitClass(const LangAPI::Class &cls, Converter::Writer &w) -> void {
+        const std::string name = RustCore::convertSymbol(cls.name);
+        const std::string generics = genericParams(cls.template_parameters);
+        const bool templated = !cls.template_parameters.empty();
+
+        std::vector<std::string> bases;
+        for (const auto &inherit : cls.inherit_members) {
+            if (std::holds_alternative<LangAPI::Symbol>(inherit.second)) bases.push_back(RustCore::convertSymbol(std::get<LangAPI::Symbol>(inherit.second)));
+            else bases.push_back(RustCore::convertIspaLibSymbol(std::get<LangAPI::IspaLibSymbol>(inherit.second), false));
+        }
+
+        struct Field { std::string name, type; const LangAPI::Expression *init; bool is_public; };
+        std::vector<Field> fields;
+        std::vector<std::string> methods;
+        std::vector<const LangAPI::Declaration *> siblings;
+        for (const auto &[declaration, visibility] : cls.data) {
+            if (declaration->isVariable() && !declaration->getVariable().is_static) {
+                const auto &v = declaration->getVariable();
+                fields.push_back({RustCore::ident(v.name), RustCore::convertType(v.type), &v.value, visibility == LangAPI::Visibility::Public});
+            } else if (declaration->isFunction()) {
+                if (visibility == LangAPI::Visibility::Public) methods.push_back(declaration->getFunction().name);
+            } else {
+                siblings.push_back(declaration.get());
+            }
+        }
+        const bool has_defaults = std::any_of(fields.begin(), fields.end(), [](const Field &f) { return !f.init->empty(); });
+
+        // --- struct ---
+        emitLine(w, std::string("#[derive(Clone") + (has_defaults ? "" : ", Default") + ")]");
+        emitLine(w, "pub struct " + name + generics + " {");
+        w.increaseIndentation();
+        for (std::size_t i = 0; i < bases.size(); ++i) emitLine(w, "pub base_" + std::to_string(i) + ": " + bases[i] + ",");
+        for (const auto &f : fields) emitLine(w, "pub " + f.name + ": " + f.type + ",");
+        if (templated) {
+            std::vector<std::string> names;
+            for (const auto &n : cls.template_parameters) names.push_back(RustCore::ident(n));
+            emitLine(w, "pub __phantom: ::std::marker::PhantomData<(" + joinStrings(names, ", ") + (names.size() == 1 ? ",)>," : ")>,"));
+        }
+        w.decreaseIndentation();
+        emitLine(w, "}");
+
+        if (has_defaults) {
+            emitLine(w, "impl" + generics + " Default for " + name + generics + " {");
+            w.increaseIndentation();
+            emitLine(w, "fn default() -> Self {");
+            w.increaseIndentation();
+            emitLine(w, "Self {");
+            w.increaseIndentation();
+            for (std::size_t i = 0; i < bases.size(); ++i) emitLine(w, "base_" + std::to_string(i) + ": Default::default(),");
+            for (const auto &f : fields) {
+                // the field type is not kept next to the initialiser here, so literals are converted by the plain path
+                emitLine(w, f.name + ": " + (f.init->empty() ? std::string("Default::default()") : RustCore::convertExpression(*f.init)) + ",");
+            }
+            if (templated) emitLine(w, "__phantom: Default::default(),");
+            w.decreaseIndentation();
+            emitLine(w, "}");
+            w.decreaseIndentation();
+            emitLine(w, "}");
+            w.decreaseIndentation();
+            emitLine(w, "}");
+        }
+        if (!bases.empty()) {
+            if (bases.size() > 1) RustCore::warn("`" + name + "` has several bases: only the first one is reachable through Deref");
+            emitLine(w, "impl" + generics + " ::std::ops::Deref for " + name + generics + " { type Target = " + bases[0] + "; fn deref(&self) -> &Self::Target { &self.base_0 } }");
+            emitLine(w, "impl" + generics + " ::std::ops::DerefMut for " + name + generics + " { fn deref_mut(&mut self) -> &mut Self::Target { &mut self.base_0 } }");
+        }
+
+        // --- impl ---
+        Converter::Writer aux;
+        const auto saved_modules = context.module_path;
+        std::vector<std::string> scope_parts = context.module_path;
+        scope_parts.push_back(name);
+        const auto scope = joinStrings(scope_parts, "::");
+        emitLine(w, "impl" + generics + " " + name + generics + " {");
+        w.increaseIndentation();
+        if (cls.constructor) emitFunction(*cls.constructor, w, aux, FnKind::Constructor, scope, bases);
+        for (const auto &[declaration, visibility] : cls.data)
+            if (declaration->isFunction()) emitFunction(declaration->getFunction(), w, aux, FnKind::Method, scope, bases);
+        if (cls.to_str_fun) emitFunction(*cls.to_str_fun, w, aux, FnKind::Method, scope, bases);
+
+        // reflection used by printers: members() / members_mut() / members_str(), methods_str()
+        std::vector<std::string> refs, mut_refs, types, mut_types, names, method_names;
+        for (const auto &f : fields) {
+            if (!f.is_public) continue;
+            refs.push_back("&self." + f.name);
+            mut_refs.push_back("&mut self." + f.name);
+            types.push_back("&" + f.type);
+            mut_types.push_back("&mut " + f.type);
+            names.push_back("\"" + f.name + "\"");
+        }
+        for (const auto &m : methods) method_names.push_back("\"" + m + "\"");
+        const auto tuple = [](const std::vector<std::string> &items) {
+            return "(" + joinStrings(items, ", ") + (items.size() == 1 ? ",)" : ")");
+        };
+        emitLine(w, "pub fn members(&self) -> " + tuple(types) + " { " + tuple(refs) + " }");
+        emitLine(w, "pub fn members_mut(&mut self) -> " + tuple(mut_types) + " { " + tuple(mut_refs) + " }");
+        emitLine(w, "pub fn members_str() -> [&'static str; " + std::to_string(names.size()) + "] { [" + joinStrings(names, ", ") + "] }");
+        emitLine(w, "pub fn methods_str() -> [&'static str; " + std::to_string(method_names.size()) + "] { [" + joinStrings(method_names, ", ") + "] }");
+        w.decreaseIndentation();
+        emitLine(w, "}");
+
+        if (debug_instrumentation_ && !templated) {
+            const auto in_types = std::find(context.module_path.begin(), context.module_path.end(), "Types") != context.module_path.end() ||
+                                  std::find(context.module_path.begin(), context.module_path.end(), "FlatTypes") != context.module_path.end();
+            if (!fields.empty() || in_types) {
+                std::vector<std::string> path = context.module_path;
+                path.push_back(name);
+                emitLine(w, "impl ::ispa_std::debug::DebugFields for " + name + " {");
+                w.increaseIndentation();
+                emitLine(w, "fn ispa_debug_type(&self) -> &'static str { \"" + joinStrings(path, ".") + "\" }");
+                emitLine(w, "fn ispa_debug_fields(&self, field: &mut dyn FnMut(&str, &dyn ::ispa_std::debug::DebugValue)) {");
+                w.increaseIndentation();
+                for (const auto &f : fields) emitLine(w, "field(\"" + f.name + "\", &self." + f.name + ");");
+                w.decreaseIndentation();
+                emitLine(w, "}");
+                w.decreaseIndentation();
+                emitLine(w, "}");
+            }
+        }
+        if (cls.output_fun && !templated) emitOutputFunction(*cls.output_fun, w);
+
+        const auto aux_text = std::string(aux.get());
+        if (!aux_text.empty()) w.dwrite("{}", aux_text);
+
+        for (const auto *sibling : siblings) {
+            RustCore::warn("`" + name + "` still contains a nested declaration after rewriting: emitted as a sibling without reference renaming");
+            emitItem(*sibling, w);
+        }
+        context.module_path = saved_modules;
+    }
+
+    // ========================================================================
+    // enums / aliases / variables
+    // ========================================================================
+    auto Construct::emitEnum(const LangAPI::Enum &enum_, Converter::Writer &w) -> void {
+        emitLine(w, "#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]");
+        emitLine(w, "pub enum " + RustCore::ident(enum_.name) + " {");
+        w.increaseIndentation();
+        bool first = true;
+        for (const auto &n : enum_.value) {
+            emitLine(w, std::string(first ? "#[default] " : "") + RustCore::ident(n) + ",");
+            first = false;
+        }
+        w.decreaseIndentation();
+        emitLine(w, "}");
+    }
+
+    auto Construct::emitTypeAlias(const LangAPI::TypeAlias &alias, Converter::Writer &w) -> void {
+        // The flattening pass may leave a compatibility alias that points back
+        // to the item in the very same module. Emitting it would duplicate the
+        // item (and create a recursive alias in Rust).
+        const auto self_path = "crate::" + joinStrings(context.module_path, "::") + "::" + RustCore::ident(alias.name);
+        if (RustCore::convertType(alias.type) == self_path) return;
+        emitLine(w, "pub type " + RustCore::ident(alias.name) + genericParams(alias.template_parameters) + " = " +
+                    RustCore::convertType(alias.type) + ";");
+    }
+
+    // namespace-level variables: scalars -> const, everything else -> a lazily built static.
+    // Mutation is not expressible this way (see notes).
+    auto Construct::emitVariable(const LangAPI::Variable &v, Converter::Writer &w) -> void {
+        const auto type = RustCore::convertType(v.type);
+        if (type == "_") throw Error("Rust Converter: static `{}` needs an explicit type", v.name);
+        const auto name = RustCore::ident(v.name);
+        const auto value = v.value.empty() ? std::string("Default::default()") : initializer(v.type, v.value);
+        if (isConstScalar(v.type) && !v.value.empty()) {
+            emitLine(w, "pub const " + name + ": " + type + " = " + value + ";");
+        } else {
+            emitLine(w, "pub static " + name + ": ::ispa_std::Lazy<" + type + "> = ::ispa_std::Lazy::new(|| " + value + ");");
+        }
+    }
+
+    // generated enums standing in for std::variant<std::monostate, ...>
+    auto Construct::emitVariants(Converter::Writer &w) -> void {
+        for (const auto &def : RustCore::variants) {
+            emitLine(w, "#[derive(Clone, Default)]");
+            emitLine(w, "pub enum " + def.name + " {");
+            w.increaseIndentation();
+            emitLine(w, "#[default] Monostate,");
+            for (std::size_t i = 0; i < def.alternatives.size(); ++i) emitLine(w, "V" + std::to_string(i) + "(" + def.alternatives[i] + "),");
+            w.decreaseIndentation();
+            emitLine(w, "}");
+            for (std::size_t i = 0; i < def.alternatives.size(); ++i) {
+                const auto v = "V" + std::to_string(i);
+                const auto &t = def.alternatives[i];
+                emitLine(w, "impl From<" + t + "> for " + def.name + " { fn from(v: " + t + ") -> Self { " + def.name + "::" + v + "(v) } }");
+                emitLine(w, "impl ::ispa_std::VariantGet<" + t + "> for " + def.name + " {");
+                w.increaseIndentation();
+                emitLine(w, "fn holds(&self) -> bool { matches!(self, " + def.name + "::" + v + "(_)) }");
+                emitLine(w, "fn get(&self) -> &" + t + " { match self { " + def.name + "::" + v + "(x) => x, _ => ::ispa_std::bad_variant_access() } }");
+                emitLine(w, "fn get_mut(&mut self) -> &mut " + t + " { match self { " + def.name + "::" + v + "(x) => x, _ => ::ispa_std::bad_variant_access() } }");
+                w.decreaseIndentation();
+                emitLine(w, "}");
+            }
+            emitLine(w, "impl " + def.name + " {");
+            w.increaseIndentation();
+            emitLine(w, "pub fn index(&self) -> usize {");
+            w.increaseIndentation();
+            emitLine(w, "match self {");
+            w.increaseIndentation();
+            emitLine(w, def.name + "::Monostate => 0,");
+            for (std::size_t i = 0; i < def.alternatives.size(); ++i)
+                emitLine(w, def.name + "::V" + std::to_string(i) + "(_) => " + std::to_string(i + 1) + ",");
+            w.decreaseIndentation();
+            emitLine(w, "}");
+            w.decreaseIndentation();
+            emitLine(w, "}");
+            w.decreaseIndentation();
+            emitLine(w, "}");
+        }
+    }
+
+    // ========================================================================
+    // declarations
+    // ========================================================================
+    auto Construct::emitNamespace(const LangAPI::Namespace &ns, Converter::Writer &w) -> void {
+        emitLine(w, "pub mod " + RustCore::ident(ns.name) + " {");
+        w.increaseIndentation();
+        emitLine(w, "#[allow(unused_imports)] use super::*;");
+        context.module_path.push_back(ns.name);
+        emitDeclarations(ns.declarations, w);
+        context.module_path.pop_back();
+        w.decreaseIndentation();
+        emitLine(w, "}");
+    }
+
+    // one item, no file splitting
+    auto Construct::emitItem(const LangAPI::Declaration &decl, Converter::Writer &w) -> void {
+        if (decl.isNamespace()) {
+            emitNamespace(decl.getNamespace(), w);
+        } else if (decl.isFunction()) {
+            Converter::Writer aux;
+            const auto scope = joinStrings(context.module_path, "::");
+            emitFunction(decl.getFunction(), w, aux, FnKind::Free, scope, {});
+            const auto text = std::string(aux.get());
+            if (!text.empty()) w.dwrite("{}", text);
+        } else if (decl.isClass()) {
+            emitClass(decl.getClass(), w);
+        } else if (decl.isEnum()) {
+            emitEnum(decl.getEnum(), w);
+        } else if (decl.isTypeAlias()) {
+            emitTypeAlias(decl.getTypeAlias(), w);
+        } else if (decl.isVariable()) {
+            emitVariable(decl.getVariable(), w);
+        } else if (decl.isForwardDeclaredClass()) {
+            // Rust needs no forward declarations: items are visible module-wide regardless of order
+        }
+    }
+
+    // incremental mode: every namespace-level item gets its own file, declared and re-exported from the parent module
+    auto Construct::emitDeclaration(const LangAPI::Declaration &decl, Converter::Writer &w) -> void {
+        if (!incremental || decl.isNamespace() || decl.isForwardDeclaredClass()) {
+            emitItem(decl, w);
+            return;
+        }
+        std::string stem;
+        if (decl.isFunction()) stem = decl.getFunction().name;
+        else if (decl.isClass()) stem = RustCore::convertSymbol(decl.getClass().name);
+        else if (decl.isEnum()) stem = decl.getEnum().name;
+        else if (decl.isTypeAlias()) stem = decl.getTypeAlias().name;
+        else stem = decl.getVariable().name;
+        const auto base = "f_" + fileSafe(stem);
+        std::string module_name = base;
+        if (const auto n = ++context.file_counts[joinStrings(context.module_path, "/") + "/" + base]; n > 1)
+            module_name += "_" + std::to_string(n);
+
+        Converter::Writer file;
+        emitLine(file, "#[allow(unused_imports)] use super::*;");
+        emitItem(decl, file);
+
+        std::string path = std::string(namespace_name);
+        for (const auto &m : context.module_path) path += "/" + m;
+        context.files.emplace_back(path + "/" + module_name + ".rs", std::string(file.get()));
+        emitLine(w, "pub mod " + module_name + ";");
+        emitLine(w, "pub use self::" + module_name + "::*;");
+    }
+
+    auto Construct::emitDeclarations(const LangAPI::Declarations &decls, Converter::Writer &w) -> void {
+        for (const auto &decl : decls) emitDeclaration(decl, w);
+    }
+
+    auto Construct::construct() -> void {
+        RustCore::name = std::string(namespace_name);
+        RustCore::variants.clear();
+        RustCore::diagnostics.clear();
+        RustCore::counter = {RustCore::base_pointer};
+        RustCore::loop_frames.clear();
+        RustCore::label_counter = 0;
+        context = Context{};
+
+        program = Rust::Rewriter::rewrite(*source);
+
+        Converter::Writer body;
+        emitDeclarations(program, body);
+        Converter::Writer variants;
+        emitVariants(variants);                         // must come last: variants are registered while types are converted
+
+        std::string header = "// @generated by the ISPA Rust backend. Expects the `ispa_std` crate and to live at `crate::" +
+                             std::string(namespace_name) + "`.\n";
+        header += kAllow;
+        for (const auto &d : RustCore::diagnostics) header += "// ISPA-RUST-WARNING: " + d + "\n";
+        header += "\n";
+
+        writable_files.clear();
+        writable_files.emplace_back(std::string(namespace_name) + ".rs", header + std::string(body.get()) + std::string(variants.get()));
+        if (incremental)
+            for (auto &file : context.files) writable_files.emplace_back(std::move(file));
+    }
+}
+
+extern "C" auto rust_construct(const LangAPI::Declarations *tree, const char *namespace_name,
+                               bool incremental, bool debug_instrumentation) -> Rust::Construct* {
+    return new Rust::Construct(tree, namespace_name, incremental, debug_instrumentation);
+}
+extern "C" auto rust_construct_finish(Rust::Construct *c) -> void {
+    delete c;
+}

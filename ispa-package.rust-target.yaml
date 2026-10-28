@@ -1,0 +1,6 @@
+name: rust-target
+layout:
+  root: parser/stdlibs
+  ispalib: {}
+  ispatarget:
+    rust: target/rust

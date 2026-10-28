@@ -302,7 +302,7 @@ internal object IspaEditorModel {
         return result
     }
 
-    fun syntaxProblems(source: String): List<EditorProblem> {
+    fun syntaxProblems(source: String, includeGrammarFallback: Boolean = true): List<EditorProblem> {
         if (source.isBlank()) return emptyList()
         val tokens = lex(source)
         val problems = ArrayList<EditorProblem>()
@@ -326,13 +326,15 @@ internal object IspaEditorModel {
         lexer.start(source, 0, source.length, 0)
         while (lexer.tokenType != null) lexer.advance()
         if (lexer.state ushr 8 != 0) problems += EditorProblem(source.length.coerceAtLeast(1) - 1, source.length, "Unclosed Python block or expression")
-        val last = IspaSymbols.declarations(source).lastOrNull()
-        if (last != null) {
-            val suffix = source.substring(last.offset + last.name.length)
-            if (suffix.trimStart().startsWith(":") && !suffix.trimEnd().endsWith(";"))
-                problems += EditorProblem(source.length.coerceAtLeast(1) - 1, source.length, "Expected ';' after rule")
-        } else if (source.trim().matches(Regex("[A-Za-z_]\\w*"))) {
-            problems += EditorProblem(0, source.length, "Expected a rule declaration")
+        if (includeGrammarFallback) {
+            val last = IspaSymbols.declarations(source).lastOrNull()
+            if (last != null) {
+                val suffix = source.substring(last.offset + last.name.length)
+                if (suffix.trimStart().startsWith(":") && !suffix.trimEnd().endsWith(";"))
+                    problems += EditorProblem(source.length.coerceAtLeast(1) - 1, source.length, "Expected ';' after rule")
+            } else if (source.trim().matches(Regex("[A-Za-z_]\\w*"))) {
+                problems += EditorProblem(0, source.length, "Expected a rule declaration")
+            }
         }
         return problems
     }

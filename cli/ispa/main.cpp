@@ -167,6 +167,75 @@ namespace {
         printDiagnostics(reporter);
     }
 
+    // Dependency scanning only discovers modules and rule names. When it fails
+    // on a rule body, ask the grammar parser for its more specific diagnostic.
+    bool printGrammarDiagnosticAfterScanFailure(const std::exception& error) {
+        const std::string message = error.what();
+        if (message.find("unexpected ") == std::string::npos &&
+            message.find("invalid ISPA dependency syntax") == std::string::npos &&
+            message.find("unterminated or unrecognized token in ISPA source") == std::string::npos)
+            return false;
+        std::string file;
+        for (auto colon = message.find(':'); colon != std::string::npos; colon = message.find(':', colon + 1)) {
+            const auto candidate = message.substr(0, colon);
+            if (std::filesystem::is_regular_file(candidate) &&
+                colon + 1 < message.size() && std::isdigit(static_cast<unsigned char>(message[colon + 1]))) {
+                file = candidate;
+                break;
+            }
+        }
+        if (file.empty()) return false;
+        std::ifstream input(file, std::ios::binary);
+        if (!input) return false;
+        const std::string source{std::istreambuf_iterator<char>{input}, {}};
+        auto grammar = source;
+        // The main parser sees declarations; preprocessing owns these directives.
+        for (std::size_t line = 0; line < grammar.size();) {
+            auto start = line;
+            while (start < grammar.size() && (grammar[start] == ' ' || grammar[start] == '\t')) ++start;
+            const auto directive = [&](std::string_view keyword) {
+                return grammar.compare(start, keyword.size(), keyword) == 0 &&
+                    start + keyword.size() < grammar.size() &&
+                    std::isspace(static_cast<unsigned char>(grammar[start + keyword.size()]));
+            };
+            if (directive("module") || directive("import") || directive("detach") || directive("feature")) {
+                const auto semicolon = grammar.find(';', start);
+                if (semicolon != std::string::npos) {
+                    for (auto i = start; i <= semicolon; ++i)
+                        if (grammar[i] != '\n' && grammar[i] != '\r') grammar[i] = ' ';
+                    line = grammar.find('\n', semicolon);
+                    if (line == std::string::npos) break;
+                    ++line;
+                    continue;
+                }
+            }
+            line = grammar.find('\n', line);
+            if (line == std::string::npos) break;
+            ++line;
+        }
+        IspaParser parser;
+        try { parser.parse(grammar.c_str()); } catch (const std::exception&) {}
+        diagnostics::Reporter reporter;
+        reporter.source(file, source);
+        const auto usable = [&](const auto& diagnostic) {
+            return diagnostic.offset <= grammar.size() &&
+                !diagnostic.message.empty() && diagnostic.message.size() <= 1024;
+        };
+        for (const auto& diagnostic : parser.getErrors())
+            if (usable(diagnostic)) {
+                reporter.error("P001", diagnostic.message, {file, diagnostic.offset, diagnostic.length});
+                break;
+            }
+        for (const auto& diagnostic : parser.getContextErrors())
+            if (reporter.diagnostics().empty() && usable(diagnostic)) {
+                reporter.error("P002", diagnostic.message, {file, diagnostic.offset, diagnostic.length});
+                break;
+            }
+        if (reporter.diagnostics().empty()) return false;
+        printDiagnostics(reporter);
+        return true;
+    }
+
     std::string sourceSnapshot(const Modules::Source& source) {
         std::ifstream input(source.file, std::ios::binary);
         if (!input) return source.grammar;
@@ -591,7 +660,7 @@ int generate(Args args) {
             }
         }
     } catch (const std::exception& error) {
-        printExceptionDiagnostic("P000", error);
+        if (!printGrammarDiagnosticAfterScanFailure(error)) printExceptionDiagnostic("P000", error);
         return 1;
     }
     diagnostics::Reporter parse_diagnostics;
@@ -599,17 +668,17 @@ int generate(Args args) {
         parse_diagnostics.source(source.file, sourceSnapshot(source));
         IspaParser parser;
         const auto collect_errors = [&] {
+            const auto usable = [&](const auto& e) {
+                return e.offset <= source.grammar.size() &&
+                    !e.message.empty() && e.message.size() <= 1024;
+            };
             for (const auto& e : parser.getErrors()) {
-                const auto offset = e.offset <= source.grammar.size()
-                    ? e.offset : std::string::npos;
-                parse_diagnostics.error("P001", e.message,
-                    {source.file, offset, e.length});
+                if (usable(e)) parse_diagnostics.error("P001", e.message,
+                    {source.file, e.offset, e.length});
             }
             for (const auto& e : parser.getContextErrors()) {
-                const auto offset = e.offset <= source.grammar.size()
-                    ? e.offset : std::string::npos;
-                parse_diagnostics.error("P002", e.message,
-                    {source.file, offset, e.length});
+                if (usable(e)) parse_diagnostics.error("P002", e.message,
+                    {source.file, e.offset, e.length});
             }
         };
         decltype(&parser.parse(source.grammar.c_str()).value.data()) syntax = nullptr;
@@ -617,13 +686,15 @@ int generate(Args args) {
             syntax = &parser.parse(source.grammar.c_str()).value.data();
         } catch (const std::exception& error) {
             collect_errors();
-            if (parser.getErrors().empty() && parser.getContextErrors().empty())
+            if (parse_diagnostics.diagnostics().empty())
                 parse_diagnostics.error("P000", error.what(), {source.file});
             printDiagnostics(parse_diagnostics);
             return 1;
         }
         collect_errors();
         if (!parser.getErrors().empty() || !parser.getContextErrors().empty()) {
+            if (parse_diagnostics.diagnostics().empty())
+                parse_diagnostics.error("P000", "Could not parse ISPA grammar", {source.file});
             printDiagnostics(parse_diagnostics);
             return 1;
         }

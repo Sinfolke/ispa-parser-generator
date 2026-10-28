@@ -37,6 +37,10 @@ try {
   foreach ($file in @('ispa-pkg.exe', 'ispadbg.exe', 'ispa-ai.exe', 'install.ps1', 'update.ps1')) {
     if (-not (Test-Path (Join-Path $extractDir $file))) { throw "Archive does not contain $file" }
   }
+  foreach ($tool in @('ispa.exe', 'ispa-pkg.exe', 'ispadbg.exe', 'ispa-ai.exe')) {
+    & (Join-Path $extractDir $tool) --help *> $null
+    if ($LASTEXITCODE -ne 0) { throw "$tool from release $tag failed its smoke check" }
+  }
   $versions = Join-Path $root 'versions'
   $target = Join-Path $versions $tag
   New-Item -ItemType Directory -Force -Path $versions, $bin | Out-Null

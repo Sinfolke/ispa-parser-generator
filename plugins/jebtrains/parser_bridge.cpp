@@ -271,9 +271,11 @@ int main() {
                     Semantics{text, spans}.visit(result.node);
                 } else add(errors, "Parsing stopped: expected a rule declaration", begin.isEnd() ? source.size() : begin->meta().startpos(), 1, source.size());
             } catch (const std::exception& e) {
-                if (parser.getErrors().empty()) add(errors, e.what(), diagnosticOffset(e.what(), source, parserLexer.stopped), 1, source.size());
+                if (parser.getErrors().empty() && parser.getContextErrors().empty())
+                    add(errors, e.what(), diagnosticOffset(e.what(), source, parserLexer.stopped), 1, source.size());
             } catch (const char* e) {
-                if (parser.getErrors().empty()) add(errors, e, parserLexer.stopped, 1, source.size());
+                if (parser.getErrors().empty() && parser.getContextErrors().empty())
+                    add(errors, e, parserLexer.stopped, 1, source.size());
             }
             for (const auto& error : parser.getErrors()) {
                 std::string expected = error.expected_text;
@@ -282,9 +284,13 @@ int main() {
                     expected += ::Parser::TokensToString(kind);
                 }
                 const bool eof = error.unexpected == ISPA_STD::Recovery::eof_token;
-                auto message = "Expected " + expected + (eof ? " at end of file" : "; got " + std::string(::Parser::TokensToString(error.unexpected)));
+                auto message = error.message.empty()
+                    ? "Expected " + expected + (eof ? " at end of file" : "; got " + std::string(::Parser::TokensToString(error.unexpected)))
+                    : error.message;
                 add(errors, message, eof ? source.size() : error.offset, error.length, source.size());
             }
+            for (const auto& error : parser.getContextErrors())
+                add(errors, error.message, error.offset, error.length, source.size());
         }
         std::stable_sort(errors.begin(), errors.end(), [](const auto& a, const auto& b) { return a.start < b.start; });
     }

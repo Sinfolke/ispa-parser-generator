@@ -73,6 +73,27 @@ namespace {
         }
         unsupported("++/-- on an operand that is not a name, attribute or subscript");
     }
+    std::string assigned_storage_value(const std::string& operand, const std::string& rhs,
+                                       const std::string& op) {
+        const std::string tail = ", " + rhs + ", \"" + op + "\")";
+        if (operand.ends_with(']')) {
+            int depth = 0;
+            for (std::size_t i = operand.size(); i-- > 0;) {
+                if (operand[i] == ']') ++depth;
+                else if (operand[i] == '[' && --depth == 0) {
+                    if (i == 0) break;
+                    return "ispa_std.assign_item(" + operand.substr(0, i) + ", " +
+                           operand.substr(i + 1, operand.size() - i - 2) + tail;
+                }
+            }
+        } else {
+            const auto dot = operand.rfind('.');
+            if (dot != std::string::npos && dot > 0 && is_name(operand.substr(dot + 1)))
+                return "ispa_std.assign_attr(" + operand.substr(0, dot) + ", \"" +
+                       operand.substr(dot + 1) + "\"" + tail;
+        }
+        unsupported("assignment used as a value on an unrecognized storage location");
+    }
     // Shortest round-trip text, always a valid Python float literal.
     std::string float_literal(double v) {
         if (std::isnan(v)) return "float('nan')";
@@ -348,34 +369,34 @@ std::string Core::lib(const LangAPI::IspaLibSymbol& s) {
     }
     unsupported("StdlibExports");
 }
-// Recovery::Tokens<A, B, ...> / EmptyTokens -> a Python tuple of token ids.
+// Target-neutral recovery set -> a Python tuple of token ids.
 std::string Core::recovery_set(const LangAPI::Type& set) {
-    if (!set.isSymbol()) throw std::runtime_error("Python target: invalid recovery token set");
-    const auto name = symbol(set.getSymbol());
-    if (name != "ISPA_STD.Recovery.Tokens" && name != "ISPA_STD.Recovery.EmptyTokens")
+    if (!set.isIspaLibSymbol() || set.getIspaLibSymbol().exports != LangAPI::StdlibExports::RecoveryTokenSet)
         throw std::runtime_error("Python target: unsupported recovery token set");
     std::string out = "(";
     std::size_t values = 0;
-    for (const auto& item : set.template_parameters) {
-        std::string text = std::holds_alternative<LangAPI::Type>(item)
-            ? type(std::get<LangAPI::Type>(item))
-            : rvalue(std::get<LangAPI::RValue>(item));
-        if (text == "ISPA_STD.Recovery.EndOfInput") text = "ispa_std.EndOfInput";
+    for (const auto& item : set.getIspaLibSymbol().template_parameters) {
+        std::string text;
+        if (const auto* t = std::get_if<std::shared_ptr<LangAPI::Type>>(&item);
+            t && *t && (**t).isIspaLibSymbol() && (**t).getIspaLibSymbol().exports == LangAPI::StdlibExports::RecoveryEndOfInput)
+            text = "ispa_std.EndOfInput";
+        else if (const auto* t = std::get_if<std::shared_ptr<LangAPI::Type>>(&item)) text = type(**t);
+        else text = rvalue(*std::get<std::shared_ptr<LangAPI::RValue>>(item));
         if (values++) out += ", ";
         out += text;
     }
     if (values == 1) out += ",";
     return out + ")";
 }
-// Recovery::Policy<AllowInsertion, AllowDeletion, AllowReplacement, MaxSkip> -> (bool, bool, bool, int)
+// Target-neutral recovery policy -> (bool, bool, bool, int).
 std::string Core::recovery_policy(const LangAPI::Type& policy) {
-    if (!policy.isSymbol() || symbol(policy.getSymbol()) != "ISPA_STD.Recovery.Policy")
+    if (!policy.isIspaLibSymbol() || policy.getIspaLibSymbol().exports != LangAPI::StdlibExports::RecoveryPolicy)
         throw std::runtime_error("Python target: unsupported recovery policy");
     std::vector<std::string> values;
-    for (const auto& item : policy.template_parameters)
-        values.push_back(std::holds_alternative<LangAPI::Type>(item)
-            ? type(std::get<LangAPI::Type>(item))
-            : rvalue(std::get<LangAPI::RValue>(item)));
+    for (const auto& item : policy.getIspaLibSymbol().template_parameters)
+        values.push_back(std::holds_alternative<std::shared_ptr<LangAPI::Type>>(item)
+            ? type(*std::get<std::shared_ptr<LangAPI::Type>>(item))
+            : rvalue(*std::get<std::shared_ptr<LangAPI::RValue>>(item)));
     if (values.size() > 4) throw std::runtime_error("Python target: too many recovery policy arguments");
     static const char* const defaults[] = {"True", "True", "True", "64"};
     for (std::size_t i = values.size(); i < 4; ++i) values.emplace_back(defaults[i]);
@@ -436,6 +457,10 @@ std::string Core::call(const LangAPI::FunctionCall& c) {
         if (!binding || !*binding) throw std::runtime_error("Python target: invalid external parser binding");
         return "ispa_std.external_match(" + type(**binding)
             + ", " + expression(c.args.front()) + ")";
+    }
+    if (fn == "ISPA_STD.lookahead_kind") {
+        if (c.args.size() != 1) throw std::runtime_error("Python target: invalid lookahead call");
+        return "ispa_std.lookahead_kind(" + expression(c.args.front()) + ")";
     }
     return fn + "(" + join(c.args, ", ", [this](const auto& p) { return expression(p); }) + ")";
 }
@@ -633,8 +658,6 @@ std::string Core::expression(const LangAPI::Expression& e) {
                 const auto lhs = std::holds_alternative<LangAPI::Symbol>(var.name)
                     ? symbol(std::get<LangAPI::Symbol>(var.name))
                     : storage(std::get<LangAPI::StorageSymbol>(var.name));
-                if (!is_name(lhs)) unsupported("assignment used as a value on a non-local target");
-                note_assigned(lhs);
                 const auto rhs = expression(var.value);
                 const char* op = nullptr;
                 switch (var.type) {
@@ -645,7 +668,17 @@ std::string Core::expression(const LangAPI::Expression& e) {
                     case LangAPI::OperatorType::Divide: op = has_float(var.value) ? " / " : " // "; break;
                     case LangAPI::OperatorType::Modulo: op = " % "; break;
                 }
-                out += "(" + lhs + " := " + (op ? lhs + op + "(" + rhs + ")" : rhs) + ")";
+                if (is_name(lhs)) {
+                    note_assigned(lhs);
+                    out += "(" + lhs + " := " + (op ? lhs + op + "(" + rhs + ")" : rhs) + ")";
+                } else {
+                    const char* operation = op == nullptr ? "=" :
+                        var.type == LangAPI::OperatorType::Add ? "+" :
+                        var.type == LangAPI::OperatorType::Minus ? "-" :
+                        var.type == LangAPI::OperatorType::Multiply ? "*" :
+                        var.type == LangAPI::OperatorType::Divide ? (has_float(var.value) ? "/" : "//") : "%";
+                    out += assigned_storage_value(lhs, rhs, operation);
+                }
                 break;
             }
             case E::CounterIncreament: unsupported("counter increment inside expression");

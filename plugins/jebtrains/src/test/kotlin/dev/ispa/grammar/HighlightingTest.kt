@@ -167,6 +167,7 @@ class HighlightingTest {
     }
     @Test fun localSyntaxDiagnosticsWorkWithoutNativeHelper() {
         assertTrue(IspaEditorModel.syntaxProblems("entry: 'x'").any { "Expected ';'" in it.message })
+        assertTrue(IspaEditorModel.syntaxProblems("entry: 'x'", includeGrammarFallback = false).none { "Expected ';'" in it.message })
         assertTrue(IspaEditorModel.syntaxProblems("entry { value").any { "Unclosed Python" in it.message })
         assertTrue(IspaEditorModel.syntaxProblems("entry: 'unfinished").any { "Unterminated string" in it.message })
         val invalid = "NEWLINE {\n    234234sdf[]w[]r\n    l = []\n}"
@@ -237,6 +238,6 @@ class HighlightingTest {
         assertTrue(result != null, "Packaged native helper must run")
         assertTrue(result.tokens.isNotEmpty())
         assertEquals(10, result.diagnostics.single().start)
-        assertTrue(result.diagnostics.single().message.contains("SEMICOLON"))
+        assertEquals("Expected ';' to end the regular rule.", result.diagnostics.single().message)
     }
 }

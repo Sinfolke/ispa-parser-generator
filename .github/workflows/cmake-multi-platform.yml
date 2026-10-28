@@ -53,6 +53,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref || github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -184,20 +186,6 @@ jobs:
         run: |
           cmake --version
           command -v cmake
-      - name: Verify Ninja
-        shell: bash
-        run: |
-          set -euo pipefail
-          
-          if ! command -v ninja >/dev/null 2>&1; then
-            echo "Ninja is missing"
-            exit 1
-          fi
-          
-          NINJA_PATH="$(command -v ninja)"
-          echo "NINJA_PATH=$NINJA_PATH" >> "$GITHUB_ENV"
-          
-          ninja --version
       # -------------------------------------------------------
       # 3. Configure compilers and platform dependencies
       # -------------------------------------------------------
@@ -302,6 +290,17 @@ jobs:
           command -v aclocal
           
           echo "Autoconf Archive: $ACLOCAL_DIR"
+      - name: Verify Ninja
+        shell: bash
+        run: |
+          set -euo pipefail
+          NINJA_PATH="$(command -v ninja)"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            # CMake is a native Windows executable; MSYS /c/... paths are not native paths.
+            NINJA_PATH="$(cygpath -m "$NINJA_PATH")"
+          fi
+          echo "NINJA_PATH=$NINJA_PATH" >> "$GITHUB_ENV"
+          ninja --version
       - name: Setup Conda & Install LLVM 23 (macOS)
         if: runner.os == 'macOS'
         uses: conda-incubator/setup-miniconda@v3
@@ -316,7 +315,8 @@ jobs:
         run: |
           set -euo pipefail
           
-          conda install -y -c conda-forge llvmdev=23 clangdev=23 icu          
+          conda install -y -c conda-forge \
+            llvmdev=23 clangdev=23 clang=23 clangxx=23 clang-scan-deps=23
           # Use CONDA_PREFIX (points to the currently active environment)
           LLVM_PREFIX="$CONDA_PREFIX"
           
@@ -689,7 +689,7 @@ jobs:
           fi
           if [[ "$RUNNER_OS" == "macOS" ]]; then
             CMAKE_ARGS+=(
-            "-DICU_INCLUDE_DIR=$GITHUB_WORKSPACE/build/vcpkg_installed/$MATRIX_TRIPLET/include"
+            "-DICU_ROOT=$GITHUB_WORKSPACE/build/vcpkg_installed/$MATRIX_TRIPLET"
             )
           fi
           # -------------------------------------------------------
@@ -697,6 +697,12 @@ jobs:
           # -------------------------------------------------------
           
           cmake "${CMAKE_ARGS[@]}"
+
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            echo "Resolved ICU configuration:"
+            grep -E '^ICU_(ROOT|INCLUDE_DIR|UC_LIBRARY|DATA_LIBRARY)(:|_)' build/CMakeCache.txt || true
+            grep -E '^ICU_VERSION:' build/CMakeCache.txt || true
+          fi
 
 
       # -------------------------------------------------------
@@ -709,6 +715,42 @@ jobs:
           cmake --build build \
             --config Release \
             --parallel 3
+
+      - name: Diagnose macOS build failure
+        if: failure() && runner.os == 'macOS'
+        shell: bash
+        run: |
+          set +e
+          echo '=== Runner and compiler ==='
+          echo "CONDA_PREFIX=${CONDA_PREFIX:-}"
+          echo "CC=${CC:-}"
+          echo "CXX=${CXX:-}"
+          "$CXX" --version
+          echo "LLVM_PREFIX=${LLVM_PREFIX:-}"
+
+          echo '=== ICU selection in CMakeCache ==='
+          grep -E '^(ICU_|CMAKE_PREFIX_PATH|VCPKG_INSTALLED_DIR|VCPKG_TARGET_TRIPLET)' build/CMakeCache.txt
+
+          echo '=== ICU include version ==='
+          icu_include="$(sed -n 's/^ICU_INCLUDE_DIR:PATH=//p' build/CMakeCache.txt | head -n 1)"
+          if [[ -n "$icu_include" && -f "$icu_include/unicode/uvernum.h" ]]; then
+            grep -E '^#define U_ICU_VERSION_(MAJOR_NUM|MINOR_NUM)' "$icu_include/unicode/uvernum.h"
+            grep -E '^#define U_ICU_VERSION_SHORT' "$icu_include/unicode/uvernum.h"
+          else
+            echo "ICU headers not found at: $icu_include"
+          fi
+
+          echo '=== ICU libraries and requested symbol ==='
+          rg --files build/vcpkg_installed "$CONDA_PREFIX" 2>/dev/null | rg '/libicu(uc|data).*\.(a|dylib)$' | while read -r library; do
+            echo "--- $library"
+            nm -gU "$library" 2>/dev/null | rg 'u_charName(_[0-9]+)?$' | head -n 10
+          done
+
+          echo '=== corelib compile command ==='
+          ninja -C build -t commands 2>/dev/null | rg 'corelib\.cpp' | head -n 3
+
+          echo '=== Relevant environment paths ==='
+          env | sort | rg '^(CONDA|CPATH|CPLUS_INCLUDE_PATH|C_INCLUDE_PATH|LIBRARY_PATH|DYLD|CMAKE_PREFIX_PATH|ICU_ROOT|CC=|CXX=)' 
 
       # -------------------------------------------------------
       # 10. Tests

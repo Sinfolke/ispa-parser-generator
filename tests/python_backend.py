@@ -36,6 +36,12 @@ def main():
             "decorators: decorator+;\n"
             "main: decorators? CLASS;\n"
         )
+        (grammar / "dynamic.isc").write_text(
+            "REPEAT: &q [a-z]+ ':' $q;\n"
+            "QUOTED: '#' &q [a-z]+ ':' !($q | '!')* $q;\n"
+            "NEGATED: '~' &q [a-z]+ ':' !$q;\n"
+            "main: REPEAT | QUOTED | NEGATED;\n"
+        )
 
         def generate(name, *options):
             result = subprocess.run(
@@ -69,6 +75,21 @@ except ParseError:
     pass
 else:
     raise AssertionError('a started optional rule must not hide a missing CLASS')
+""")
+
+        generate("Dynamic", grammar / "dynamic.isc")
+        execute("""
+import Dynamic
+from python.lexer import LexError
+for source in ('abc:abc', '#abc:yyyabc', '#abc:abc', '~abc:x'):
+    assert Dynamic.Parser().parse(source)
+for source in ('abc:abd', '#abc:!abc', '~abc:abc'):
+    try:
+        Dynamic.Parser().parse(source)
+    except (LexError, RuntimeError):
+        pass
+    else:
+        raise AssertionError(f'dynamic pattern accepted {source!r}')
 """)
 
         generate("Foreign", grammar / "foreign.isc")
@@ -106,7 +127,7 @@ assert isinstance(node.data(), Foreign.FlatTypes.modules_expression_WORD)
 assert node.data().value == 'hello'
 """)
 
-    print("Python backend: simple parse, optional rule, external rule/token --dep, and --no-dep passed")
+    print("Python backend: simple parse, optional rule, dynamic patterns, external rule/token --dep, and --no-dep passed")
 
 
 if __name__ == "__main__":

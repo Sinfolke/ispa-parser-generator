@@ -73,6 +73,10 @@ try {
     foreach ($file in @('ispa-pkg.exe', 'ispadbg.exe', 'ispa-ai.exe', 'update.ps1', 'install.ps1')) {
         if (-not (Test-Path (Join-Path $extracted $file))) { throw "Release archive does not contain $file" }
     }
+    foreach ($tool in @('ispa.exe', 'ispa-pkg.exe', 'ispadbg.exe', 'ispa-ai.exe')) {
+        & (Join-Path $extracted $tool) --help *> $null
+        if ($LASTEXITCODE -ne 0) { throw "$tool from release $latest failed its smoke check" }
+    }
     Set-Content -LiteralPath (Join-Path $extracted 'INSTALL_VERSION') -Value $latest
 
     $versions = Join-Path $root 'versions'

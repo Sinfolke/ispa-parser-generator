@@ -206,7 +206,7 @@ endfunction()
 
 add_converter(cpp)
 add_converter(python)
-
+add_converter(rust)
 # =============================================
 # Algorithms Shared Library
 # =============================================

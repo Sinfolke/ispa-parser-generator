@@ -74,6 +74,21 @@ fi
 printf 'ISPA update available: %s -> %s\n' "$current" "$latest"
 installer_url="https://raw.githubusercontent.com/$REPO/$latest/scripts/install.sh"
 curl -fsSL --retry 3 "$installer_url" -o "$scratch/install.sh" || fail "Could not download installer for $latest"
-ISPA_VERSION="$latest" ISPA_INSTALL_DIR="$INSTALL_ROOT" ISPA_BIN_DIR="$BIN_DIR" \
-  sh "$scratch/install.sh"
+if ! ISPA_VERSION="$latest" ISPA_INSTALL_DIR="$INSTALL_ROOT" ISPA_BIN_DIR="$BIN_DIR" \
+  sh "$scratch/install.sh"; then
+  previous="$INSTALL_ROOT/versions/$current"
+  if [ -x "$previous/ispa" ] && [ -x "$previous/ispa-pkg" ] && \
+     [ -x "$previous/ispadbg" ] && [ -x "$previous/ispa-ai" ]; then
+    mkdir -p "$BIN_DIR"
+    ln -sfn "$previous/ispa" "$BIN_DIR/ispa"
+    ln -sfn "$previous/ispa-pkg" "$BIN_DIR/ispa-pkg"
+    ln -sfn "$previous/ispadbg" "$BIN_DIR/ispadbg"
+    ln -sfn "$previous/ispa-ai" "$BIN_DIR/ispa-ai"
+    cp "$previous/update.sh" "$INSTALL_ROOT/update.sh"
+    cp "$previous/install.sh" "$INSTALL_ROOT/install.sh"
+    printf '%s' "$current" > "$INSTALL_ROOT/current-version"
+    fail "Update to $latest failed; restored installed release $current"
+  fi
+  fail "Update to $latest failed and installed release $current is unavailable for rollback"
+fi
 printf 'Updated ISPA to %s.\n' "$latest"

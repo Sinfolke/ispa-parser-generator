@@ -104,6 +104,11 @@ class BridgeTests(unittest.TestCase):
         self.assertFalse(result['ok'])
         self.assertEqual(source.index('234234sdf'), result['diagnostics'][0]['start'])
 
+    def test_advanced_rule_reports_context_errors(self):
+        result = self.parse("entry { match 'x';")
+        self.assertFalse(result['ok'])
+        self.assertTrue(any('reached end of input' in item['message'] for item in result['diagnostics']))
+
     def test_unterminated_python(self):
         source = "entry: 'x' {value"
         result = self.parse(source)
@@ -121,7 +126,7 @@ class BridgeTests(unittest.TestCase):
         self.assertFalse(result['ok'])
         self.assertTrue(result['tokens'])
         self.assertEqual(result['diagnostics'][0]['start'], len(source.encode()))
-        self.assertIn('SEMICOLON', result['diagnostics'][0]['message'])
+        self.assertEqual("Expected ';' to end the regular rule.", result['diagnostics'][0]['message'])
 
     def test_trailing_incomplete_rule(self):
         source = "entry: 'x';\nwrong"

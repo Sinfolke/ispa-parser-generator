@@ -43,6 +43,8 @@ object NativeParserBridge {
         } catch (_: Exception) { null }
     }
 
+    val isAvailable: Boolean get() = executable != null
+
     internal fun decode(source: String, json: String): BridgeResult {
         val root = JsonParser.parseString(json).asJsonObject
         val pythonOffsets = BooleanArray(source.length)
@@ -141,7 +143,8 @@ class IspaLiveAnnotator : Annotator {
         val file = element as? PsiFile ?: return
         if (file.language != IspaLanguage.INSTANCE) return
         val source = file.text
-        for (problem in IspaEditorModel.syntaxProblems(source) + IspaEditorModel.problems(source)) {
+        val syntax = IspaEditorModel.syntaxProblems(source, includeGrammarFallback = !NativeParserBridge.isAvailable)
+        for (problem in syntax + IspaEditorModel.problems(source)) {
             holder.newAnnotation(if (problem.warning) HighlightSeverity.WARNING else HighlightSeverity.ERROR, problem.message)
                 .range(TextRange(problem.start, problem.end)).create()
         }

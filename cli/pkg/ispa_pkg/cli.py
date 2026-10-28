@@ -26,6 +26,8 @@ DEFAULT_CATALOG = {"packages": {
                    "manifest": "ispa-package.cpp-target.yaml"},
     "python-target": {"github": "Sinfolke/ispa-parser-generator", "ref": "main",
                       "manifest": "ispa-package.python-target.yaml"},
+    "rust-target": {"github": "Sinfolke/ispa-parser-generator", "ref": "main",
+                    "manifest": "ispa-package.rust-target.yaml"},
 }}
 FOLDERS = ("ispalib", "ispatarget", "ispaalgorithm")
 GITHUB = re.compile(r"^[\w.-]+/[\w.-]+$")
@@ -175,7 +177,8 @@ def layout_entries(config):
             defaults = {"ispalib": ("grammar", "python"), "ispatarget": (), "ispaalgorithm": ()}
             mapping = {name: f"{folder}/{name}" for name in defaults[folder]}
             if folder == "ispatarget":
-                mapping = {"cpp": "ispatarget/cpp", "python": "ispatarget/python"}
+                mapping = {"cpp": "ispatarget/cpp", "python": "ispatarget/python",
+                           "rust": "ispatarget/rust"}
             if folder == "ispaalgorithm":
                 mapping = {".": "ispaalgorithm"}
         if not isinstance(mapping, dict):
@@ -267,6 +270,37 @@ def build_missing_cpp_library(package, name, root):
     library_dir = cpp / 'lib'
     if not (library_dir / f'lib{name}.a').is_file() and not (library_dir / f'{name}.lib').is_file():
         return build_cpp_library(package, name, root)
+    return None
+
+
+def build_rust_package(package, name, required=False):
+    """Build a package's Rust target crate in release mode."""
+    rust = package / 'ispatarget' / 'rust'
+    manifests = sorted(rust.rglob('Cargo.toml')) if rust.is_dir() else []
+    if not manifests:
+        return None
+    cargo = shutil.which('cargo')
+    if not cargo:
+        if required:
+            raise PackageError('Building Rust packages requires Cargo (install the Rust toolchain)')
+        print(f'{name}: skipping Rust build (Cargo not found)', file=sys.stderr)
+        return None
+    for manifest in manifests:
+        print(f'{name}: building Rust crate {manifest.parent.relative_to(rust)}', file=sys.stderr)
+        try:
+            subprocess.run([cargo, 'build', '--release', '--manifest-path', str(manifest)],
+                           cwd=manifest.parent, check=True, stdout=sys.stderr)
+        except subprocess.CalledProcessError as error:
+            if required:
+                raise PackageError(f'{name}: Cargo could not build {manifest.parent.name}') from error
+            raise
+    return manifests
+
+
+def build_missing_rust_package(package, name):
+    rust = package / 'ispatarget' / 'rust'
+    if rust.is_dir() and any(rust.rglob('Cargo.toml')):
+        return build_rust_package(package, name)
     return None
 
 
@@ -376,6 +410,7 @@ def install(name, spec, root, allow_scripts=False, force=False, from_catalog=Fal
                 command = ["sh", str(script_path), str(stage)]
             subprocess.run(command, cwd=config_tree, check=True)
         build_cpp_library(stage, name, root)
+        build_rust_package(stage, name)
         marker_data = {"name": name, "source": spec, "revision": revision, "fingerprint": fingerprint,
                        "from_catalog": from_catalog}
         (stage / ".ispa-package.json").write_text(json.dumps(marker_data, indent=2) + "\n")
@@ -462,6 +497,7 @@ def write_export_files(root):
     for marker in sorted(root.glob('*/.ispa-package.json')):
         package = marker.parent
         build_missing_cpp_library(package, package.name, root)
+        build_missing_rust_package(package, package.name)
     targets, includes, sources, libraries, library_dirs, runtime_dirs, python_dirs = export_data(root)
     output = root / '.ispa-exports'
     output.mkdir(parents=True, exist_ok=True)
@@ -662,7 +698,7 @@ def main(argv=None):
     exports = parser.add_mutually_exclusive_group()
     exports.add_argument("--export", action="store_true", help="Print shell exports and generate target manifests")
     exports.add_argument("--export-permanent", action="store_true", help="Persist exports in the user shell profile")
-    exports.add_argument("--build", metavar="PACKAGE", help="Build an installed package's C++ library")
+    exports.add_argument("--build", metavar="PACKAGE", help="Build an installed package's C++ library and Rust crates")
     parser.add_argument("--export-path", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--shell", choices=("bash", "zsh", "powershell"), help="Shell used for exports")
     sub = parser.add_subparsers(dest="command")
@@ -695,12 +731,16 @@ def main(argv=None):
             marker = package / ".ispa-package.json"
             if not marker.is_file():
                 raise PackageError(f"Package not installed: {args.build}")
-            archive = build_cpp_library(package, args.build, root, required=True)
-            if archive:
+            archive = build_cpp_library(package, args.build, root)
+            rust_crates = build_rust_package(package, args.build, required=True)
+            if archive or rust_crates:
                 refresh_saved_exports(root)
-                print(f"{args.build}: built {archive}")
+                if archive:
+                    print(f"{args.build}: built {archive}")
+                if rust_crates:
+                    print(f"{args.build}: built {len(rust_crates)} Rust crate(s)")
             else:
-                raise PackageError(f"Package has no C++ sources to build: {args.build}")
+                raise PackageError(f"Package has no C++ sources or Rust crates to build: {args.build}")
             return 0
         if args.export or args.export_permanent:
             output, manifest = write_export_files(root)

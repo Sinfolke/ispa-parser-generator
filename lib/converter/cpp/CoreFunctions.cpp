@@ -248,6 +248,12 @@ auto Core::convertStorageSymbol(const LangAPI::StorageSymbol &symbol) -> std::st
 }
 auto Core::convertIspaLibSymbol(const LangAPI::IspaLibSymbol &symbol) -> std::string {
     switch (symbol.exports) {
+        case LangAPI::StdlibExports::RecoveryTokenSet:
+            return "::ISPA_STD::Recovery::Tokens<" + convertTemplates(symbol.template_parameters) + ">";
+        case LangAPI::StdlibExports::RecoveryEndOfInput:
+            return "::ISPA_STD::Recovery::EndOfInput";
+        case LangAPI::StdlibExports::RecoveryPolicy:
+            return "::ISPA_STD::Recovery::Policy<" + convertTemplates(symbol.template_parameters) + ">";
         case LangAPI::StdlibExports::Node:
             return std::string("::ISPA_STD::Node<") + convertTemplates(symbol.template_parameters) + ">";
         case LangAPI::StdlibExports::MatchResult:

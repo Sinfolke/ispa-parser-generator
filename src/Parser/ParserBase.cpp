@@ -56,10 +56,6 @@ namespace {
             LangAPI::RValue{LangAPI::String{.value = std::move(str)}});
     }
 
-    auto runtimeType(std::string name) -> LangAPI::Type {
-        return LangAPI::Type{LangAPI::Symbol{"ISPA_STD", "Recovery", std::move(name)}};
-    }
-
     // {"Lexer", "SEMI"} -> Tokens::Lexer::SEMI (preserving qualified paths).
     auto tokenType(const AST::LLkToken& path) -> LangAPI::Type {
         LangAPI::Symbol symbol{kTokensRoot};
@@ -69,27 +65,28 @@ namespace {
         return LangAPI::Type{std::move(symbol)};
     }
 
-    // Emits ISPA_STD::Recovery::Tokens<Tokens::A, ..., Recovery::EndOfInput>
+    // Keep recovery token sets semantic in the shared IR. Backends choose
+    // their own representation for the set and its EOF marker.
     auto setType(const TokenSet& set) -> LangAPI::Type {
-        if (set.tokens.empty() && !set.end) return runtimeType("EmptyTokens");
-        auto type = runtimeType("Tokens");
+        auto type = LangAPI::Type{LangAPI::IspaLibSymbol{.exports = LangAPI::StdlibExports::RecoveryTokenSet}};
         for (const auto& path : set.tokens)
-            type.template_parameters.emplace_back(tokenType(path));
+            type.getIspaLibSymbol().template_parameters.emplace_back(std::make_shared<LangAPI::Type>(tokenType(path)));
         if (set.end)
-            type.template_parameters.emplace_back(runtimeType("EndOfInput"));
+            type.getIspaLibSymbol().template_parameters.emplace_back(std::make_shared<LangAPI::Type>(LangAPI::Type{LangAPI::IspaLibSymbol{
+                .exports = LangAPI::StdlibExports::RecoveryEndOfInput}}));
         return type;
     }
 
-    // Emits Recovery::Policy<insert, delete, replace, max_skip>
+    // A target-neutral recovery policy; each backend renders its own form.
     auto policyType(const RecoverySpec& spec) -> LangAPI::Type {
-        auto type = runtimeType("Policy");
+        auto type = LangAPI::Type{LangAPI::IspaLibSymbol{.exports = LangAPI::StdlibExports::RecoveryPolicy}};
         for (const bool flag : {
                 spec.allow_insertion, spec.allow_deletion, spec.allow_replacement}) {
-            type.template_parameters.emplace_back(
-                LangAPI::RValue{LangAPI::Bool{.value = flag}});
+            type.getIspaLibSymbol().template_parameters.emplace_back(
+                std::make_shared<LangAPI::RValue>(LangAPI::RValue{LangAPI::Bool{.value = flag}}));
         }
-        type.template_parameters.emplace_back(LangAPI::RValue{
-            LangAPI::Int{.value = static_cast<long long>(spec.max_skip)}});
+        type.getIspaLibSymbol().template_parameters.emplace_back(std::make_shared<LangAPI::RValue>(LangAPI::RValue{
+            LangAPI::Int{.value = static_cast<long long>(spec.max_skip)}}));
         return type;
     }
 

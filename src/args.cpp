@@ -65,6 +65,7 @@ Args parse_args(int argc, char** argv) {
     // Map algorithm string to enum
     if (!args.language_str.empty()) {
         if (args.language_str == "cpp") args.language = Args::Language::Cpp;
+        else if (args.language_str == "rust") args.language = Args::Language::Rust;
         else if (args.language_str == "python" || args.language_str == "py") args.language = Args::Language::Python;
         else throw Error("Unknown language {}", args.language_str);
     }
@@ -96,6 +97,8 @@ auto to_string(Args::Language language) -> std::string {
     switch (language) {
         case Args::Language::Cpp:
             return "cpp";
+        case Args::Language::Rust:
+            return "rust";
         case Args::Language::Python:
             return "python";
         default:
