@@ -690,6 +690,7 @@ jobs:
           if [[ "$RUNNER_OS" == "macOS" ]]; then
             CMAKE_ARGS+=(
             "-DICU_ROOT=$GITHUB_WORKSPACE/build/vcpkg_installed/$MATRIX_TRIPLET"
+            "-DCMAKE_IGNORE_PREFIX_PATH=/Users/runner/miniconda3/envs/test"
             )
           fi
           # -------------------------------------------------------
