@@ -47,10 +47,10 @@ try {
   if (-not (Test-Path $target)) {
     Move-Item -LiteralPath $extractDir -Destination $target
   } else {
-    foreach ($file in @('ispa-pkg.exe', 'ispadbg.exe', 'ispa-ai.exe')) {
-      if (-not (Test-Path (Join-Path $target $file))) {
-        Copy-Item -LiteralPath (Join-Path $extractDir $file) -Destination (Join-Path $target $file)
-      }
+    # Refresh every archive file so rerunning the installer repairs stale or
+    # partial version directories, including runtime DLLs and scripts.
+    Get-ChildItem -LiteralPath $extractDir -File | ForEach-Object {
+      Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $target $_.Name) -Force
     }
   }
 
@@ -69,11 +69,15 @@ try {
   Set-Content -LiteralPath (Join-Path $root 'current-version') -Value $tag -NoNewline
   $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
   if (-not $userPath) { $userPath = '' }
-  $entries = $userPath.Split(';', [StringSplitOptions]::RemoveEmptyEntries)
+  $entries = @($userPath -split ';' | Where-Object { $_ })
   if ($entries -notcontains $bin) {
     [Environment]::SetEnvironmentVariable('Path', (($entries + $bin) -join ';'), 'User')
   }
-  if (($env:Path.Split(';')) -notcontains $bin) { $env:Path += ";$bin" }
+  $processPath = [Environment]::GetEnvironmentVariable('Path', 'Process')
+  $processEntries = @($processPath -split ';' | Where-Object { $_ })
+  if ($processEntries -notcontains $bin) {
+    $env:Path = (@($processEntries) + $bin) -join ';'
+  }
   Write-Host "Installed ISPA $tag to $target"
   Write-Host 'Open a new terminal and run: ispa-ai --help'
 } finally {

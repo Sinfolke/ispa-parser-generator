@@ -84,6 +84,7 @@ jobs:
       contents: write
       actions: write
     uses: ./.github/workflows/cmake-multi-platform.yml
+    secrets: inherit
     with:
       checkout_ref: ${{ needs.resolve-tag.outputs.tag }}
       upload_artifacts: true

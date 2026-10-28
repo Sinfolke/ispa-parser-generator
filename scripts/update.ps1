@@ -84,17 +84,12 @@ try {
     $destination = Join-Path $versions $latest
     if (-not (Test-Path -LiteralPath $destination)) {
         Move-Item -LiteralPath $extracted -Destination $destination
-    } elseif (-not ((Test-Path (Join-Path $destination 'ispa.exe')) -and (Test-Path (Join-Path $destination 'update.ps1')))) {
-        throw "Incomplete existing installation: $destination"
-    }
-    # Existing version directory may predate newly added release tools.
-    if (Test-Path -LiteralPath $extracted -PathType Container) {
-      foreach ($tool in @('ispa-pkg.exe', 'ispadbg.exe', 'ispa-ai.exe')) {
-        $installedTool = Join-Path $destination $tool
-        if (-not (Test-Path -LiteralPath $installedTool -PathType Leaf)) {
-            Copy-Item -LiteralPath (Join-Path $extracted $tool) -Destination $installedTool
+    } else {
+        # A prior interrupted install may have left a partial version directory.
+        # Refresh every file from the validated archive, including DLLs.
+        Get-ChildItem -LiteralPath $extracted -File | ForEach-Object {
+            Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $destination $_.Name) -Force
         }
-      }
     }
 
     New-Item -ItemType Directory -Path $bin -Force | Out-Null

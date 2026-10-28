@@ -40,6 +40,11 @@ on:
         type: string
         required: false
         default: ''
+    secrets:
+      ISPA_CODESIGN_CERT_BASE64:
+        required: false
+      ISPA_CODESIGN_CERT_PASSWORD:
+        required: false
 
 permissions:
   contents: read
@@ -77,7 +82,7 @@ jobs:
         run: |
           python3 - <<'PY'
           import json, os
-          platforms = [{"os":"ubuntu-26.04","artifact_name":"ispa-linux-x64","c_compiler":"clang-20","cpp_compiler":"clang++-20","triplet":"x64-linux-libcxx","overlay_triplets":"cmake/triplets","extra_cxx_flags":"-stdlib=libc++"},{"os":"windows-latest","artifact_name":"ispa-windows-x64","c_compiler":"clang-cl","cpp_compiler":"clang-cl","triplet":"x64-windows","overlay_triplets":"","extra_cxx_flags":""},{"os":"macos-26","artifact_name":"ispa-macos-arm64","c_compiler":"clang","cpp_compiler":"clang++","triplet":"arm64-osx","overlay_triplets":"","extra_cxx_flags":""},{"os":"macos-26-intel","artifact_name":"ispa-macos-x64","c_compiler":"clang","cpp_compiler":"clang++","triplet":"x64-osx","overlay_triplets":"","extra_cxx_flags":""}]
+          platforms = [{"os":"ubuntu-26.04","artifact_name":"ispa-linux-x64","c_compiler":"clang-20","cpp_compiler":"clang++-20","triplet":"x64-linux-libcxx","overlay_triplets":"cmake/triplets","extra_cxx_flags":"-stdlib=libc++"},{"os":"windows-latest","artifact_name":"ispa-windows-x64","c_compiler":"clang-cl","cpp_compiler":"clang-cl","triplet":"x64-windows-static-md","overlay_triplets":"cmake/triplets","extra_cxx_flags":""},{"os":"macos-26","artifact_name":"ispa-macos-arm64","c_compiler":"clang","cpp_compiler":"clang++","triplet":"arm64-osx","overlay_triplets":"","extra_cxx_flags":""},{"os":"macos-26-intel","artifact_name":"ispa-macos-x64","c_compiler":"clang","cpp_compiler":"clang++","triplet":"x64-osx","overlay_triplets":"","extra_cxx_flags":""}]
           selected = os.environ["SELECTED_PLATFORM"]
           items = [p for p in platforms if selected == "all" or p["artifact_name"] == "ispa-" + selected]
           if not items: raise SystemExit("Unknown platform: " + selected)
@@ -1030,6 +1035,43 @@ jobs:
           "release/ispa-pkg$executable_suffix" --help
           "release/ispadbg$executable_suffix" --help
           "release/ispa-ai$executable_suffix" --help
+
+      - name: Sign Windows release files
+        if: inputs.release_tag != '' && runner.os == 'Windows'
+        shell: pwsh
+        env:
+          CERT_BASE64: ${{ secrets.ISPA_CODESIGN_CERT_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.ISPA_CODESIGN_CERT_PASSWORD }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not $env:CERT_BASE64) {
+            Write-Host 'No code-signing certificate configured; skipping Authenticode signing.'
+            exit 0
+          }
+          if (-not $env:CERT_PASSWORD) { throw 'ISPA_CODESIGN_CERT_PASSWORD is required with the signing certificate.' }
+          $certificatePath = Join-Path $env:RUNNER_TEMP 'ispa-codesign.pfx'
+          [IO.File]::WriteAllBytes($certificatePath, [Convert]::FromBase64String($env:CERT_BASE64))
+          try {
+            $certificate = Import-PfxCertificate -FilePath $certificatePath `
+              -CertStoreLocation Cert:\CurrentUser\My `
+              -Password (ConvertTo-SecureString $env:CERT_PASSWORD -AsPlainText -Force)
+            if (-not $certificate) { throw 'Could not import the ISPA signing certificate.' }
+            $signTool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe' |
+              Sort-Object FullName -Descending | Select-Object -First 1
+            if (-not $signTool) { throw 'Windows SDK signtool.exe was not found.' }
+            Get-ChildItem release -File | Where-Object { $_.Extension -in @('.exe', '.dll') } | ForEach-Object {
+              & $signTool.FullName sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com `
+                /sha1 $certificate.Thumbprint $_.FullName
+              if ($LASTEXITCODE -ne 0) { throw "Signing failed: $($_.Name)" }
+            }
+            Get-ChildItem release -Filter '*.ps1' -File | ForEach-Object {
+              $result = Set-AuthenticodeSignature -FilePath $_.FullName -Certificate $certificate `
+                -TimestampServer http://timestamp.digicert.com -HashAlgorithm SHA256
+              if ($result.Status -ne 'Valid') { throw "Signing failed: $($_.Name): $($result.StatusMessage)" }
+            }
+          } finally {
+            Remove-Item -LiteralPath $certificatePath -Force -ErrorAction SilentlyContinue
+          }
 
       - name: Upload release build artifacts
         if: inputs.upload_artifacts
