@@ -639,13 +639,17 @@ jobs:
             "-DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
             "-DVCPKG_TARGET_TRIPLET=$MATRIX_TRIPLET"
             
-            "-DCMAKE_C_COMPILER_LAUNCHER=sccache"
-            "-DCMAKE_CXX_COMPILER_LAUNCHER=sccache"
-            
             "-DCMAKE_CXX_SCAN_FOR_MODULES=ON"
             "-DCMAKE_BUILD_TYPE=Release"
             "-DCMAKE_MAKE_PROGRAM=$NINJA_PATH"
           )
+          
+          if [[ "$RUNNER_OS" != "macOS" ]]; then
+            CMAKE_ARGS+=(
+              "-DCMAKE_C_COMPILER_LAUNCHER=sccache"
+              "-DCMAKE_CXX_COMPILER_LAUNCHER=sccache"
+            )
+          fi
           
           # Windows: embedded debug information for sccache.
           if [[ "$RUNNER_OS" == "Windows" ]]; then
