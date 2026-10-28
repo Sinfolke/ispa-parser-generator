@@ -21,8 +21,7 @@ namespace LangRepr {
             .inherit_members = {std::make_pair(LangAPI::Visibility::Public, lexer_s)},
             .default_visibility = LangAPI::Visibility::Private
         };
-        LangAPI::Type shared{LangAPI::Symbol{"std", "shared_ptr"}};
-        shared.template_parameters.push_back(LangAPI::Type{lexer_s});
+        LangAPI::Type shared{LangAPI::ValueType::Box, LangAPI::Type{lexer_s}};
         LangAPI::Function clone;
         clone.name = "clone";
         clone.type = shared;

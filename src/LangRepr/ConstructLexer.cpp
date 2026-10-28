@@ -868,8 +868,8 @@ namespace LangRepr {
         const auto callStatement = [](const LangAPI::Expression& expression) {
             return LangAPI::Expression::createStatement(expression);
         };
-        LangAPI::Type pending_type{LangAPI::Symbol{"std", "vector"}};
-        pending_type.template_parameters.push_back(LangAPI::Type{LangAPI::Symbol{"Token"}});
+        LangAPI::Type pending_type{LangAPI::ValueType::Array,
+                                   LangAPI::Type{LangAPI::Symbol{"Token"}}};
         lexer.data.emplace_back(std::make_shared<LangAPI::Declaration>(LangAPI::Variable::createDeclaration(
             LangAPI::Variable{.name = "ispa_pending_tokens", .type = pending_type})), LangAPI::Visibility::Private);
         namespace py = UAST::py;

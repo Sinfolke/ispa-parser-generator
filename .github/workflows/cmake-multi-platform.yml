@@ -741,16 +741,18 @@ jobs:
           fi
 
           echo '=== ICU libraries and requested symbol ==='
-          rg --files build/vcpkg_installed "$CONDA_PREFIX" 2>/dev/null | rg '/libicu(uc|data).*\.(a|dylib)$' | while read -r library; do
-            echo "--- $library"
-            nm -gU "$library" 2>/dev/null | rg 'u_charName(_[0-9]+)?$' | head -n 10
-          done
+          find build/vcpkg_installed "$CONDA_PREFIX" -type f \
+            \( -name 'libicuuc*.a' -o -name 'libicuuc*.dylib' -o -name 'libicudata*.a' -o -name 'libicudata*.dylib' \) \
+            -print 2>/dev/null | while IFS= read -r library; do
+              echo "--- $library"
+              nm -gU "$library" 2>/dev/null | grep -E 'u_charName(_[0-9]+)?$' | head -n 10 || true
+            done
 
           echo '=== corelib compile command ==='
-          ninja -C build -t commands 2>/dev/null | rg 'corelib\.cpp' | head -n 3
+          ninja -C build -t commands 2>/dev/null | grep 'corelib\.cpp' | head -n 3 || true
 
           echo '=== Relevant environment paths ==='
-          env | sort | rg '^(CONDA|CPATH|CPLUS_INCLUDE_PATH|C_INCLUDE_PATH|LIBRARY_PATH|DYLD|CMAKE_PREFIX_PATH|ICU_ROOT|CC=|CXX=)' 
+          env | sort | grep -E '^(CONDA|CPATH|CPLUS_INCLUDE_PATH|C_INCLUDE_PATH|LIBRARY_PATH|DYLD|CMAKE_PREFIX_PATH|ICU_ROOT|CC=|CXX=)' || true
 
       # -------------------------------------------------------
       # 10. Tests
