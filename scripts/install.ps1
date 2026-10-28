@@ -2,9 +2,17 @@
 $ErrorActionPreference = 'Stop'
 $repo = 'Sinfolke/ispa-parser-generator'
 $version = if ($env:ISPA_VERSION) { $env:ISPA_VERSION } else { 'latest' }
-$platform = switch ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()) {
-  'X64' { 'ispa-windows-x64' }
-  default { throw 'ISPA currently has a Windows x64 release only.' }
+$architecture = [string][System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
+if ([string]::IsNullOrWhiteSpace($architecture)) {
+  # Windows PowerShell 5.1 can expose RuntimeInformation while returning a
+  # null OSArchitecture value on .NET Framework. Use the Windows environment
+  # variables as a fallback, preferring the native OS architecture when the
+  # process is running under WOW64.
+  $architecture = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
+}
+$platform = switch ($architecture.ToUpperInvariant()) {
+  { $_ -in 'X64', 'AMD64' } { 'ispa-windows-x64' }
+  default { throw "ISPA currently has a Windows x64 release only (detected '$architecture')." }
 }
 $root = if ($env:ISPA_INSTALL_DIR) { $env:ISPA_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA 'Programs\ISPA' }
 $bin = if ($env:ISPA_BIN_DIR) { $env:ISPA_BIN_DIR } else { Join-Path $root 'bin' }
@@ -23,6 +31,7 @@ try {
   $extractDir = Join-Path $temp 'unpacked'
   # Validate ZIP entry paths before Expand-Archive.
   Add-Type -AssemblyName System.IO.Compression
+  Add-Type -AssemblyName System.IO.Compression.FileSystem
   $zip = [IO.Compression.ZipFile]::OpenRead($zipPath)
   try {
     foreach ($entry in $zip.Entries) {
@@ -38,8 +47,12 @@ try {
     if (-not (Test-Path (Join-Path $extractDir $file))) { throw "Archive does not contain $file" }
   }
   foreach ($tool in @('ispa.exe', 'ispa-pkg.exe', 'ispadbg.exe', 'ispa-ai.exe')) {
-    & (Join-Path $extractDir $tool) --help *> $null
-    if ($LASTEXITCODE -ne 0) { throw "$tool from release $tag failed its smoke check" }
+    $toolOutput = & (Join-Path $extractDir $tool) --help 2>&1
+    $toolExitCode = $LASTEXITCODE
+    if ($toolExitCode -ne 0) {
+      $details = ($toolOutput | Out-String).Trim()
+      throw "$tool from release $tag failed its smoke check (exit code $toolExitCode). Output: $details"
+    }
   }
   $versions = Join-Path $root 'versions'
   $target = Join-Path $versions $tag

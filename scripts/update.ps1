@@ -5,8 +5,13 @@ $ProgressPreference = 'SilentlyContinue'
 $repo = if ($env:ISPA_REPOSITORY) { $env:ISPA_REPOSITORY } else { 'Sinfolke/ispa-parser-generator' }
 $root = if ($env:ISPA_INSTALL_DIR) { $env:ISPA_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA 'Programs\ISPA' }
 $bin = if ($env:ISPA_BIN_DIR) { $env:ISPA_BIN_DIR } else { Join-Path $root 'bin' }
-if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne [System.Runtime.InteropServices.Architecture]::X64) {
-    throw 'ISPA currently publishes Windows x64 binaries only.'
+$architecture = [string][System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
+if ([string]::IsNullOrWhiteSpace($architecture)) {
+    # Windows PowerShell 5.1 can return null here on .NET Framework.
+    $architecture = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
+}
+if ($architecture -notin 'X64', 'AMD64') {
+    throw "ISPA currently publishes Windows x64 binaries only (detected '$architecture')."
 }
 
 function Parse-VersionTag([string]$tag) {
@@ -51,6 +56,7 @@ try {
     $extracted = Join-Path $temp 'extracted'
     Invoke-WebRequest -Uri $url -OutFile $archive
     Add-Type -AssemblyName System.IO.Compression
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
     $zip = [IO.Compression.ZipFile]::OpenRead($archive)
     try {
         foreach ($entry in $zip.Entries) {
