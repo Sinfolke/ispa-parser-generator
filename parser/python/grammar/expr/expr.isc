@@ -247,7 +247,7 @@ keyword_arg:
 // Synchronize in token space so NEWLINE and synthetic DEDENT survive recovery.
 fail missing_operand {
     ctx.error("Expected a Python expression")
-    ctx.sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE")
+    ctx.sync_tokens(COMMA, COLON, SEMICOLON, NEWLINE, DEDENT, RPAREN, RBRACKET, RBRACE)
     ctx.insert()
 }
 fail missing_attribute {

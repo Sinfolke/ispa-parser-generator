@@ -565,6 +565,43 @@ jobs:
 
           echo "vcpkg: $VCPKG_INSTALLATION_ROOT"
 
+      - name: Record build environment
+        shell: bash
+        env:
+          MATRIX_OS: ${{ matrix.os }}
+          MATRIX_TRIPLET: ${{ matrix.triplet }}
+        run: |
+          set +e
+          mkdir -p diag
+          {
+            echo "## Build environment: $MATRIX_OS / $MATRIX_TRIPLET"
+            echo '```'
+            echo "runner: $RUNNER_OS $RUNNER_ARCH"
+            uname -a
+            echo "--- tools"
+            command -v cmake ninja clang clang++ clang-cl clang-scan-deps sccache
+            cmake --version | head -n 1
+            ninja --version
+            echo "CC=${CC:-} CXX=${CXX:-} LLVM_PREFIX=${LLVM_PREFIX:-}"
+            if [[ -n "${CXX:-}" ]]; then "$CXX" --version | head -n 2; fi
+            echo "--- vcpkg: ${VCPKG_INSTALLATION_ROOT:-unset}"
+            git -C "${VCPKG_INSTALLATION_ROOT:-.}" rev-parse HEAD 2>/dev/null
+            echo "--- PATH"
+            echo "$PATH" | tr ':' '\n'
+            echo "--- variables that influence compiler/linker/package search paths"
+            env | sort \
+              | grep -E '^(CONDA|CPATH|CPLUS_INCLUDE_PATH|C_INCLUDE_PATH|OBJC_INCLUDE_PATH|LIBRARY_PATH|LD_LIBRARY_PATH|DYLD_|CMAKE_|CPPFLAGS|CFLAGS|CXXFLAGS|LDFLAGS|SDKROOT|MACOSX_DEPLOYMENT_TARGET|ICU_|PKG_CONFIG|VCPKG_|ACLOCAL_PATH|CC=|CXX=)' \
+              | grep -viE 'TOKEN|SECRET|PASSWORD'
+            echo '```'
+          } 2>&1 | tee -a "$GITHUB_STEP_SUMMARY" diag/environment.txt
+
+          # Early warning: a second ICU (e.g. inside the conda LLVM prefix) next to vcpkg's ICU
+          if [[ -n "${LLVM_PREFIX:-}" && -f "$LLVM_PREFIX/include/unicode/uvernum.h" ]]; then
+            conda_icu="$(grep -E '^#define U_ICU_VERSION_MAJOR_NUM' "$LLVM_PREFIX/include/unicode/uvernum.h")"
+            echo "::warning title=Second ICU found in LLVM prefix::$LLVM_PREFIX/include/unicode exists ($conda_icu) and may shadow vcpkg's ICU headers"
+          fi
+          exit 0
+
       # -------------------------------------------------------
       # 8. Configure CMake
       # -------------------------------------------------------
@@ -647,6 +684,7 @@ jobs:
             "-DCMAKE_CXX_SCAN_FOR_MODULES=ON"
             "-DCMAKE_BUILD_TYPE=Release"
             "-DCMAKE_MAKE_PROGRAM=$NINJA_PATH"
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
           )
           
           # Windows: embedded debug information for sccache.
@@ -690,14 +728,14 @@ jobs:
           if [[ "$RUNNER_OS" == "macOS" ]]; then
             CMAKE_ARGS+=(
             "-DICU_ROOT=$GITHUB_WORKSPACE/build/vcpkg_installed/$MATRIX_TRIPLET"
-            "-DCMAKE_IGNORE_PREFIX_PATH=/Users/runner/miniconda3/envs/test"
             )
           fi
           # -------------------------------------------------------
           # 3. Run configuration
           # -------------------------------------------------------
           
-          cmake "${CMAKE_ARGS[@]}"
+          mkdir -p diag
+          cmake --log-level=VERBOSE "${CMAKE_ARGS[@]}" 2>&1 | tee diag/configure.log
 
           if [[ "$RUNNER_OS" == "macOS" ]]; then
             echo "Resolved ICU configuration:"
@@ -713,47 +751,190 @@ jobs:
       - name: Build
         shell: bash
         run: |
-          cmake --build build \
-            --config Release \
-            --parallel 3
+          set -euo pipefail
+          mkdir -p diag
 
-      - name: Diagnose macOS build failure
-        if: failure() && runner.os == 'macOS'
-        shell: bash
-        run: |
-          set +e
-          echo '=== Runner and compiler ==='
-          echo "CONDA_PREFIX=${CONDA_PREFIX:-}"
-          echo "CC=${CC:-}"
-          echo "CXX=${CXX:-}"
-          "$CXX" --version
-          echo "LLVM_PREFIX=${LLVM_PREFIX:-}"
-
-          echo '=== ICU selection in CMakeCache ==='
-          grep -E '^(ICU_|CMAKE_PREFIX_PATH|VCPKG_INSTALLED_DIR|VCPKG_TARGET_TRIPLET)' build/CMakeCache.txt
-
-          echo '=== ICU include version ==='
-          icu_include="$(sed -n 's/^ICU_INCLUDE_DIR:PATH=//p' build/CMakeCache.txt | head -n 1)"
-          if [[ -n "$icu_include" && -f "$icu_include/unicode/uvernum.h" ]]; then
-            grep -E '^#define U_ICU_VERSION_(MAJOR_NUM|MINOR_NUM)' "$icu_include/unicode/uvernum.h"
-            grep -E '^#define U_ICU_VERSION_SHORT' "$icu_include/unicode/uvernum.h"
-          else
-            echo "ICU headers not found at: $icu_include"
+          # Ninja always prints the full command of a FAILED step.
+          # Re-run the job with "Enable debug logging" to print every command.
+          verbose=()
+          if [[ "${RUNNER_DEBUG:-}" == "1" ]]; then
+            verbose=(--verbose)
           fi
 
-          echo '=== ICU libraries and requested symbol ==='
-          find build/vcpkg_installed "$CONDA_PREFIX" -type f \
-            \( -name 'libicuuc*.a' -o -name 'libicuuc*.dylib' -o -name 'libicudata*.a' -o -name 'libicudata*.dylib' \) \
-            -print 2>/dev/null | while IFS= read -r library; do
-              echo "--- $library"
-              nm -gU "$library" 2>/dev/null | grep -E 'u_charName(_[0-9]+)?$' | head -n 10 || true
+          cmake --build build \
+            --config Release \
+            --parallel 3 \
+            "${verbose[@]}" 2>&1 | tee diag/build.log
+
+      - name: Diagnose build failure
+        if: failure()
+        shell: bash
+        env:
+          MATRIX_OS: ${{ matrix.os }}
+          MATRIX_TRIPLET: ${{ matrix.triplet }}
+          MATRIX_ARTIFACT: ${{ matrix.artifact_name }}
+        run: |
+          set +e
+          mkdir -p diag/vcpkg-logs
+          CACHE=build/CMakeCache.txt
+          SUMMARY="${GITHUB_STEP_SUMMARY:-/dev/null}"
+
+          # Log to analyse: build log if the build started, otherwise the configure log.
+          LOG=diag/build.log
+          if [[ ! -s "$LOG" ]]; then LOG=diag/configure.log; fi
+          [[ -f "$LOG" ]] || : > "$LOG"
+          tr -d '\r' < "$LOG" > diag/analysed.log
+          LOG=diag/analysed.log
+
+          group() { echo "::group::$*"; }
+          endgroup() { echo "::endgroup::"; }
+
+          diagnose() {
+            # ---- 1. Error annotations (visible on the run page without opening logs)
+            grep -E 'error:|fatal error|Undefined symbols|undefined reference|unresolved external|ld: |lld-link: error|CMake Error|FAILED:' "$LOG" \
+              | head -n 25 | sed 's/%/%25/g' \
+              | while IFS= read -r line; do echo "::error title=Build error ($MATRIX_OS)::${line}"; done
+
+            # ---- 2. Failed ninja commands, in full
+            group "Failed ninja commands"
+            grep -A1 '^FAILED:' "$LOG" | head -n 60
+            endgroup
+
+            # ---- 3. Search paths used by the first failed command
+            first_cmd="$(grep -A1 -m1 '^FAILED:' "$LOG" | sed -n 2p)"
+            if [[ -n "$first_cmd" ]]; then
+              group "Search paths of the first failed command"
+              echo "$first_cmd" | tr ' ' '\n' | grep -E -A1 '^(-isystem|-isysroot|-iquote|-framework|-arch|-target)$'
+              echo "$first_cmd" | tr ' ' '\n' | grep -E '^(-I.|-L.|-l.|-F.|-Wl,-rpath|--sysroot|-stdlib|-nostdinc|-fmodule)'
+              endgroup
+            fi
+
+            # ---- 4. Undefined symbols: which libraries define something similar?
+            symbols="$( { sed -n 's/^ *"\(_[^"]*\)", referenced from.*/\1/p' "$LOG"; sed -n "s/.*undefined reference to \`\([^']*\)'.*/\1/p" "$LOG"; sed -n 's/.*unresolved external symbol \([^ ]*\).*/\1/p' "$LOG"; } | sort -u | head -n 10 )"
+            if [[ -n "$symbols" ]]; then
+              group "Undefined symbols and where similar symbols are defined"
+              echo "$symbols"
+              for sym in $symbols; do
+                base="$(echo "${sym#_}" | sed -E 's/_[0-9]+$//')"
+                echo "--- looking for '${base}' (any version suffix) in libraries under build/"
+                find build -path '*/debug/*' -prune -o \( -name '*.a' -o -name '*.dylib' -o -name '*.so' \) -type f -print 2>/dev/null \
+                  | while IFS= read -r lib; do
+                      hit="$(nm -g "$lib" 2>/dev/null | grep -E "[ _]${base}(_[0-9]+)?\$" | head -n 3)"
+                      if [[ -n "$hit" ]]; then echo "$lib"; echo "$hit" | sed 's/^/    /'; fi
+                    done
+              done
+              endgroup
+            fi
+
+            # ---- 5. ICU: headers vs. libraries
+            if [[ -f "$CACHE" ]] && grep -q '^ICU_' "$CACHE"; then
+              group "ICU selection"
+              grep -E '^ICU_' "$CACHE"
+              icu_include="$(sed -n 's/^ICU_INCLUDE_DIR:[A-Z]*=//p' "$CACHE" | head -n 1)"
+              if [[ -f "$icu_include/unicode/uvernum.h" ]]; then
+                echo "--- headers: $icu_include"
+                grep -E '^#define U_ICU_VERSION(_MAJOR_NUM|_SHORT)? ' "$icu_include/unicode/uvernum.h"
+              else
+                echo "ICU headers not found at: '$icu_include'"
+              fi
+              find build/vcpkg_installed -path '*/debug/*' -prune -o -name 'libicu*' -type f -print 2>/dev/null \
+                | while IFS= read -r lib; do
+                    echo "--- $lib"
+                    nm -g "$lib" 2>/dev/null | grep -E 'u_charName' | head -n 5
+                    ar t "$lib" 2>/dev/null | grep -i 'unames' | head -n 3
+                  done
+              if [[ -n "${LLVM_PREFIX:-}" && -f "$LLVM_PREFIX/include/unicode/uvernum.h" ]]; then
+                echo "--- ICU headers inside the LLVM prefix (can shadow vcpkg's):"
+                grep -E '^#define U_ICU_VERSION_MAJOR_NUM' "$LLVM_PREFIX/include/unicode/uvernum.h"
+              fi
+              endgroup
+            fi
+
+            # ---- 6. Important CMake cache values
+            if [[ -f "$CACHE" ]]; then
+              group "Selected CMake cache values"
+              grep -E '^(CMAKE_(C|CXX)_COMPILER|CMAKE_BUILD_TYPE|CMAKE_(C|CXX)_FLAGS|CMAKE_.*LINKER_FLAGS|CMAKE_TOOLCHAIN_FILE|CMAKE_PREFIX_PATH|CMAKE_CXX_STDLIB_MODULES_JSON|CMAKE_OSX_|VCPKG_|Boost_(DIR|INCLUDE_DIR)|yaml-cpp_DIR|CLI11_DIR|GTest_DIR|ICU_)' "$CACHE" | sort
+              endgroup
+
+              # ---- 7. Compiler default search paths
+              cxx="$(sed -n 's/^CMAKE_CXX_COMPILER:[A-Z]*=//p' "$CACHE" | head -n 1)"
+              if [[ -n "$cxx" && "$RUNNER_OS" != "Windows" ]]; then
+                group "Compiler default search paths ($cxx)"
+                "$cxx" -v -E -x c++ - </dev/null 2>&1 | sed -n '/search starts/,/End of search/p'
+                "$cxx" -print-resource-dir
+                "$cxx" -print-search-dirs | head -n 5
+                endgroup
+              fi
+            fi
+
+            # ---- 8. Installed vcpkg packages
+            if [[ -f build/vcpkg_installed/vcpkg/status ]]; then
+              group "vcpkg packages installed for this build"
+              grep -E '^(Package|Version):' build/vcpkg_installed/vcpkg/status | paste - - | sort -u
+              endgroup
+            fi
+
+            # ---- 9. Configure-stage logs (only interesting if configure failed)
+            if [[ ! -s diag/build.log ]]; then
+              group "Tail of CMake configure logs"
+              tail -n 80 diag/configure.log 2>/dev/null
+              tail -n 80 build/CMakeFiles/CMakeError.log 2>/dev/null
+              endgroup
+            fi
+
+            # ---- 10. vcpkg build logs: the real reason a dependency failed lives here
+            cp build/vcpkg-manifest-install.log diag/vcpkg-logs/ 2>/dev/null
+            if [[ -n "${VCPKG_INSTALLATION_ROOT:-}" && -d "$VCPKG_INSTALLATION_ROOT/buildtrees" ]]; then
+              for f in "$VCPKG_INSTALLATION_ROOT"/buildtrees/*/*.log; do
+                [[ -f "$f" ]] || continue
+                cp "$f" "diag/vcpkg-logs/$(basename "$(dirname "$f")")-$(basename "$f")"
+              done
+            fi
+            for f in diag/vcpkg-logs/*err*.log diag/vcpkg-logs/vcpkg-manifest-install.log; do
+              [[ -s "$f" ]] || continue
+              group "vcpkg log: $(basename "$f") (last 60 lines)"
+              tail -n 60 "$f"
+              endgroup
             done
+          }
 
-          echo '=== corelib compile command ==='
-          ninja -C build -t commands 2>/dev/null | grep 'corelib\.cpp' | head -n 3 || true
+          diagnose 2>&1 | tee diag/diagnostics.txt
 
-          echo '=== Relevant environment paths ==='
-          env | sort | grep -E '^(CONDA|CPATH|CPLUS_INCLUDE_PATH|C_INCLUDE_PATH|LIBRARY_PATH|DYLD|CMAKE_PREFIX_PATH|ICU_ROOT|CC=|CXX=)' || true
+          # ---- Collect files for the artifact
+          cp "$CACHE" build/.ninja_log build/compile_commands.json diag/ 2>/dev/null
+          cp build/CMakeFiles/CMakeConfigureLog.yaml build/CMakeFiles/CMakeError.log build/CMakeFiles/CMakeOutput.log diag/ 2>/dev/null
+
+          # ---- Job summary (shown on the run page)
+          {
+            echo "## Build failed: $MATRIX_OS / $MATRIX_TRIPLET"
+            echo
+            echo "### Failed commands"
+            echo '```'
+            grep -A1 '^FAILED:' "$LOG" | cut -c1-1500 | head -n 40
+            echo '```'
+            echo "### Last 40 lines of the log"
+            echo '```'
+            tail -n 40 "$LOG" | cut -c1-1500
+            echo '```'
+            echo "<details><summary>Full diagnostics</summary>"
+            echo
+            echo '```'
+            grep -v '^::' diag/diagnostics.txt | cut -c1-600 | head -c 600000
+            echo '```'
+            echo "</details>"
+            echo
+            echo "Complete logs (build, configure, vcpkg, CMake cache, compile_commands.json) are in the **diagnostics-$MATRIX_ARTIFACT** artifact."
+          } >> "$SUMMARY"
+          exit 0
+
+      - name: Upload diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostics-${{ matrix.artifact_name }}
+          path: diag/
+          if-no-files-found: ignore
+          retention-days: 14
 
       # -------------------------------------------------------
       # 10. Tests

@@ -518,11 +518,6 @@ namespace LangRepr {
                 const auto integer = [](std::size_t value) {
                     return LangAPI::Int::createExpression(LangAPI::Int{.value = static_cast<long long>(value)});
                 };
-                const auto escaped = [](const std::string& value) {
-                    std::string result;
-                    for (char c : value) result += corelib::text::getEscapedAsStr(c, true);
-                    return result;
-                };
                 std::set<std::string> declared;
                 for (const auto &[name, id] : semantic_state.dynamic_captures) {
                     if (!declared.insert(name).second) continue;
@@ -556,7 +551,7 @@ namespace LangRepr {
                         }
                     if (member.isString()) {
                         choices.values.push_back(LangAPI::String::createExpression(
-                            LangAPI::String{.value = escaped(member.getString().value)}));
+                            LangAPI::String{.value = member.getString().value}));
                     } else if (member.isCsequence()) {
                         const auto &set = member.getCsequence();
                         std::set<unsigned char> chars;
@@ -570,8 +565,7 @@ namespace LangRepr {
                             if (set.negative ? !chars.contains(static_cast<unsigned char>(c)) :
                                 chars.contains(static_cast<unsigned char>(c)))
                                 choices.values.push_back(LangAPI::String::createExpression(
-                                    LangAPI::String{.value = corelib::text::getEscapedAsStr(
-                                        static_cast<char>(c), true)}));
+                                    LangAPI::String{.value = std::string(1, static_cast<char>(c))}));
                     } else if (member.isGroup()) {
                         if (member.getGroup().values.size() != 1)
                             throw Error("negated dynamic lexer group must match one character");
@@ -672,7 +666,7 @@ namespace LangRepr {
                         statements.push_back(LangAPI::Variable::createStatement(LangAPI::Variable{
                             .name = "ispa_token_text", .type = LangAPI::ValueType::String,
                             .value = LangAPI::Inheritance::createExpression(LangAPI::Inheritance{
-                                .name = LangAPI::Symbol{"std", "string"},
+                                .name = std::make_shared<LangAPI::Type>(LangAPI::Type{LangAPI::ValueType::String}),
                                 .args = {LangAPI::Symbol::createExpression(LangAPI::Symbol{"start"}),
                                     end}})}));
                         statements.push_back(LangAPI::Variable::createStatement(LangAPI::Variable{

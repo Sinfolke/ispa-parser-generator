@@ -248,6 +248,8 @@ auto Core::convertStorageSymbol(const LangAPI::StorageSymbol &symbol) -> std::st
 }
 auto Core::convertIspaLibSymbol(const LangAPI::IspaLibSymbol &symbol) -> std::string {
     switch (symbol.exports) {
+        case LangAPI::StdlibExports::TextOutput: return "std::ostream";
+        case LangAPI::StdlibExports::RecoveryHandler: return "::ISPA_STD::Recovery::handler";
         case LangAPI::StdlibExports::RecoveryTokenSet:
             return "::ISPA_STD::Recovery::Tokens<" + convertTemplates(symbol.template_parameters) + ">";
         case LangAPI::StdlibExports::RecoveryEndOfInput:
@@ -321,6 +323,10 @@ auto Core::convertIspaLibSymbol(const LangAPI::IspaLibSymbol &symbol) -> std::st
         case LangAPI::StdlibExports::ParserCounted: return "counted";
         case LangAPI::StdlibExports::AssignCompatible:
             return "::ISPA_STD::assign_compatible";
+        case LangAPI::StdlibExports::CloneSelfBox:
+            return "std::make_shared";
+        case LangAPI::StdlibExports::LookaheadKind:
+            return "::ISPA_STD::lookahead_kind";
         case LangAPI::StdlibExports::LexerTokenIterator:
             return scopePrefix() + "Lexer::iterator";
         case LangAPI::StdlibExports::LexerLazyIterator:
@@ -544,6 +550,8 @@ auto Core::convertFunctionCall(const LangAPI::FunctionCall &call, bool need_temp
     return str;
 }
 auto Core::convertIspaLibFunctionCall(const LangAPI::IspaLibFunctionCall &call) -> std::string {
+    if (call.symbol.exports == LangAPI::StdlibExports::CloneSelfBox)
+        return "std::make_shared<" + convertTemplates(call.template_parameters) + ">(*this)";
     std::ostringstream out;
     out << convertIspaLibSymbol(call.symbol);
     if (!call.template_parameters.empty())
@@ -755,7 +763,9 @@ auto Core::convertRValue(const LangAPI::RValue &rvalue) -> std::string {
         case LangAPI::RValueType::Float:
             return std::to_string(rvalue.getFloat().value);
         case LangAPI::RValueType::String:
-            return std::string("\"") + rvalue.getString().value + "\"";
+            { std::string literal = "\"";
+              for (const char c : rvalue.getString().value) literal += corelib::text::getEscapedAsStr(c, true);
+              return literal + "\""; }
         case LangAPI::RValueType::Array: {
             const auto& array = rvalue.getArray();
 
@@ -805,7 +815,7 @@ auto Core::convertRValue(const LangAPI::RValue &rvalue) -> std::string {
 
                 // 1. Format Key
                 if (std::holds_alternative<LangAPI::String>(map.keys[i])) {
-                    res += "\"" + std::get<LangAPI::String>(map.keys[i]).value + "\"";
+                    res += convertRValue(LangAPI::RValue{std::get<LangAPI::String>(map.keys[i])});
                 } else if (std::holds_alternative<LangAPI::Int>(map.keys[i])) {
                     res += std::to_string(std::get<LangAPI::Int>(map.keys[i]).value);
                 }

@@ -73,7 +73,7 @@ export class MemLower : Parser::ParserBase {
     auto composeValue(const AST::RuleMember &mem, const std::vector<Parser::LowerMeta> &parts) -> Parser::LowerMeta;
     auto tokenKindIs(const AST::LLkToken &token) -> LangAPI::Expression;
     static auto kindOfCurrent() -> LangAPI::Expression;
-    static auto tokenIdSymbol(const AST::LLkToken &token) -> LangAPI::Symbol;
+    static auto tokenIdSymbol(const AST::LLkToken &token) -> LangAPI::RValue;
     static auto hasValue(const Parser::LowerMeta &meta) -> bool;
     static auto isWhitespaceRef(const AST::RuleMember &mem) -> bool;
 public:

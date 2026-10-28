@@ -42,6 +42,39 @@ def main():
             "NEGATED: '~' &q [a-z]+ ':' !$q;\n"
             "main: REPEAT | QUOTED | NEGATED;\n"
         )
+        (grammar / "templates.isc").write_text(
+            "A:'a'; B:'b'; leaf: @ A {@}; outer<T>: @ T {@};\n"
+            "WRAP<T>: '[' @ ${T} ']' {@}; forwarded<U>: @ outer<U> {@};\n"
+            "main: @ forwarded<leaf> @ outer<B> @ WRAP<A> @ WRAP<B> @{first, second, third, fourth};\n"
+        )
+        (grammar / "counts.isc").write_text(
+            "A:'a'; B:'b'; main: @ A=x ':' @ body @ B=2 '!' @{first, body, last};\n"
+            "body: @ item=x {@}; item: @ A {@};\n"
+        )
+        (grammar / "helpers.py").write_text('''def sorting() -> int:
+    xs = [1, 3, 2]
+    xs.sort(reverse=True)
+    return xs[0]
+def negate(value: int) -> int:
+    return -value
+def keyed() -> int:
+    xs = [1, 3, 2]
+    xs.sort(key=negate)
+    return xs[0]
+def updating() -> int:
+    d = {'a': 1}
+    d.update({'a': 3}, b=4)
+    d.update(c=5)
+    return d['a'] + d['b'] + d['c']
+def division(a: float, b: float) -> float:
+    return a / b
+class Box:
+    def __init__(self, value: int):
+        self.value = value
+    def get(self) -> int:
+        return self.value
+''')
+        (grammar / "helpers.isc").write_text("import py helpers; main: 'x';\n")
 
         def generate(name, *options):
             result = subprocess.run(
@@ -60,6 +93,48 @@ def main():
 
         generate("Simple", grammar / "simple.isc")
         execute("import Simple; assert Simple.Parser().parse('  hello  ').data().value.data().value == 'hello'")
+
+        generate("Helpers", "--dir", grammar, grammar / "helpers.isc")
+        execute('''import Helpers
+h = Helpers.python.helpers
+assert h.sorting() == 3 and h.keyed() == 3
+assert h.updating() == 12
+assert h.division(5.0, 2.0) == 2.5
+assert h.Box(7).get() == 7
+''')
+
+        generate("Templates", grammar / "templates.isc")
+        execute('''import Templates as t
+tree = t.Parser().parse('ab[a][b]').data()
+assert isinstance(tree.first.data(), t.Types.forwarded(t.Types.leaf))
+assert isinstance(tree.second.data(), t.Types.outer(t.Types.B))
+assert isinstance(tree.third.data(), t.Types.WRAP(t.Types.A))
+assert isinstance(tree.fourth.data(), t.Types.WRAP(t.Types.B))
+assert type(tree.third.data()) is not type(tree.fourth.data())
+assert tree.third.data().value.startpos == 3
+assert tree.fourth.data().value.startpos == 6
+''')
+
+        generate("Counts", grammar / "counts.isc")
+        execute('''import Counts
+for source, count in [('aa:aabb!', 2), ('a:a b b!', 1), (':bb!', 0)]:
+    parser = Counts.Parser()
+    tree = parser.parse(source).data()
+    assert len(tree.first) == count
+    assert len(tree.body.data().value) == count
+    assert len(tree.last) == 2
+    assert not parser.getErrors()
+    assert not parser.counters
+for source in ['aa:abb!', 'a:a b!', 'a:a bbb!']:
+    parser = Counts.Parser()
+    try:
+        parser.parse(source)
+    except RuntimeError:
+        pass
+    else:
+        assert parser.getErrors(), source
+    assert not parser.counters
+''')
 
         generate("OptionalRule", grammar / "optional_rule.isc")
         execute("""
@@ -127,7 +202,7 @@ assert isinstance(node.data(), Foreign.FlatTypes.modules_expression_WORD)
 assert node.data().value == 'hello'
 """)
 
-    print("Python backend: simple parse, optional rule, dynamic patterns, external rule/token --dep, and --no-dep passed")
+    print("Python backend: parsing, helpers, templates, counted repetitions, dynamic patterns, and external imports passed")
 
 
 if __name__ == "__main__":

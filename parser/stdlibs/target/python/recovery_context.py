@@ -1,5 +1,6 @@
 """Rule / fail contexts handed to user actions (port of LLParser::RuleContext / FailContext)."""
 from __future__ import annotations
+from dataclasses import dataclass
 from typing import Any, Callable
 
 from . import recovery as R
@@ -9,8 +10,13 @@ MAX_ACTION_LOOKAHEAD = 64
 MAX_ACTION_CHECKPOINTS = 32
 
 
+@dataclass(frozen=True)
+class TokenBoundary:
+    name: str
+
+
 def context_at(candidate, spelling: str, lookahead: int,
-               token_name: Callable[[Any], str] | None) -> bool:
+               token_name: Callable[[Any], str] | None, match_name: bool = False) -> bool:
     if lookahead > MAX_ACTION_LOOKAHEAD:
         raise IndexError('ctx.at lookahead exceeds 64 tokens')
     cursor = candidate.copy()
@@ -21,8 +27,8 @@ def context_at(candidate, spelling: str, lookahead: int,
     if cursor.isEnd():
         return False
     token = cursor.peek()
-    if getattr(token, 'length', 0) and token.text() == spelling:
-        return True
+    if not match_name:
+        return bool(getattr(token, 'length', 0)) and token.text() == spelling
     if token_name is None:
         return False
     name = spelling.replace('::', '.')
@@ -56,6 +62,13 @@ class ActionCheckpoint:
 
     def commit(self, name: str) -> None:
         del self.checkpoints[self._find(name):]
+
+    def at_token(self, name: str, lookahead: int = 0) -> bool:
+        return context_at(self.pos, name, lookahead, self.token_name, True)
+
+    @staticmethod
+    def token_boundary(name: str) -> TokenBoundary:
+        return TokenBoundary(name)
 
 
 class RuleContext(ActionCheckpoint):
@@ -167,11 +180,11 @@ class FailContext(ActionCheckpoint):
         if exhausted or self.recovery.exhausted():
             self.abort()
 
-    def sync_tokens(self, *boundaries: str) -> None:
+    def sync_tokens(self, *boundaries: str | TokenBoundary) -> None:
         """Skip tokens, preserving token-stream structure (e.g. synthetic indentation)."""
         if not boundaries:
             raise TypeError('ctx.sync_tokens requires at least one boundary')
-        if any(not stop for stop in boundaries):
+        if any(not (stop.name if isinstance(stop, TokenBoundary) else stop) for stop in boundaries):
             raise ValueError('ctx.sync_tokens requires nonempty boundaries')
         while True:
             if self.recovery.exhausted() or self.requested == R.Mode.Abort:
@@ -179,7 +192,8 @@ class FailContext(ActionCheckpoint):
                 return
             if self.pos.isEnd():
                 return
-            if any(self.at(stop) for stop in boundaries):
+            if any(self.at_token(stop.name) if isinstance(stop, TokenBoundary) else self.at(stop)
+                   for stop in boundaries):
                 return
             self.skip()
 

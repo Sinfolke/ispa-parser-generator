@@ -23,6 +23,65 @@ la::Symbol pythonSymbol(const std::string& name) {
     throw std::invalid_argument(p.file + ":" + std::to_string(p.line) + ":" +
         std::to_string(p.column) + ": Python conversion: " + std::string(what));
 }
+// Decode source syntax at the source-language boundary. LangAPI stores values.
+std::string decodedString(std::string_view source, const UAST::SourcePosition& position) {
+    std::string result;
+    const auto unicode = [&](unsigned value) {
+        if (value > 0x10ffff || (value >= 0xd800 && value <= 0xdfff))
+            unsupported(position, "string contains a non-scalar Unicode escape");
+        if (value < 0x80) result += static_cast<char>(value);
+        else if (value < 0x800) {
+            result += static_cast<char>(0xc0 | (value >> 6));
+            result += static_cast<char>(0x80 | (value & 0x3f));
+        } else if (value < 0x10000) {
+            result += static_cast<char>(0xe0 | (value >> 12));
+            result += static_cast<char>(0x80 | ((value >> 6) & 0x3f));
+            result += static_cast<char>(0x80 | (value & 0x3f));
+        } else {
+            result += static_cast<char>(0xf0 | (value >> 18));
+            result += static_cast<char>(0x80 | ((value >> 12) & 0x3f));
+            result += static_cast<char>(0x80 | ((value >> 6) & 0x3f));
+            result += static_cast<char>(0x80 | (value & 0x3f));
+        }
+    };
+    for (std::size_t i = 0; i < source.size(); ++i) {
+        if (source[i] != '\\') { result += source[i]; continue; }
+        if (++i == source.size()) unsupported(position, "dangling string escape");
+        const char escaped = source[i];
+        switch (escaped) {
+            case '\\': case '\'': case '"': result += escaped; break;
+            case 'n': result += '\n'; break;
+            case 'r': result += '\r'; break;
+            case 't': result += '\t'; break;
+            case 'a': result += '\a'; break;
+            case 'b': result += '\b'; break;
+            case 'f': result += '\f'; break;
+            case 'v': result += '\v'; break;
+            case '\n': break;
+            case 'x': case 'u': case 'U': {
+                const std::size_t width = escaped == 'x' ? 2 : escaped == 'u' ? 4 : 8;
+                unsigned value = 0;
+                for (std::size_t j = 0; j < width; ++j) {
+                    if (++i == source.size()) unsupported(position, "truncated string escape");
+                    const unsigned char c = source[i];
+                    if (!std::isxdigit(c)) unsupported(position, "invalid hexadecimal string escape");
+                    value = (value << 4) | (std::isdigit(c) ? c - '0' : std::tolower(c) - 'a' + 10);
+                }
+                unicode(value);
+                break;
+            }
+            case 'N': unsupported(position, "named Unicode escapes need source-language decoding");
+            default:
+                if (escaped >= '0' && escaped <= '7') {
+                    unsigned value = escaped - '0';
+                    for (int j = 0; j < 2 && i + 1 < source.size() && source[i + 1] >= '0' && source[i + 1] <= '7'; ++j)
+                        value = value * 8 + source[++i] - '0';
+                    unicode(value);
+                } else { result += '\\'; result += escaped; }
+        }
+    }
+    return result;
+}
 struct PythonConverter {
     std::set<std::string> locals;
     bool action_context = false, failure_context = false;
@@ -218,17 +277,7 @@ struct PythonConverter {
                         return la::Float::createExpression(la::Float{.value = value});
                     }
                     case py::ConstantKind::Str: {
-                        // LangAPI strings contain escaped target literal contents.
-                        // Preserve Python escapes and protect quotes from single-quoted literals.
-                        std::string value;
-                        bool escaped = false;
-                        for (char c : x.value) {
-                            if (c == '"' && !escaped) value += '\\';
-                            value += c;
-                            if (c == '\\') escaped = !escaped;
-                            else escaped = false;
-                        }
-                        return la::String::createExpression(la::String{.value = value});
+                        return la::String::createExpression(la::String{.value = decodedString(x.value, e.pos)});
                     }
                     default: unsupported(e.pos, "None has no LangAPI value representation");
                 }

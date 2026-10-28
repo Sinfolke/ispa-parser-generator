@@ -59,7 +59,8 @@ class Lexer(Generic[T]):
         actual = self.source[pos.index:pos.index + 1]
         try:
             token, self.line = run_tdfa(self.source, pos, table, class_table,
-                                        action_table, layout, semantic, self.line)
+                                        action_table, layout, semantic, self.line,
+                                        debug_array, debug_index)
         finally:
             if tracing:
                 ispa_debug.match('lexer scan', actual, token is not None,
@@ -154,11 +155,13 @@ class Lexer(Generic[T]):
         at = (pos.index if isinstance(pos, Position) else pos) if index is None else index
         return at - self.source.rfind('\n', 0, at)
 
-    def _next_char(self, pos: Position) -> str:
-        return pos.peek()
+    def _next_char(self, pos: Position | int) -> str:
+        at = pos.index if isinstance(pos, Position) else pos
+        return self.source[at:at + 1]
 
-    def _line_prefix(self, pos: Position) -> str:
-        return self.source[self.source.rfind('\n', 0, pos.index) + 1:pos.index]
+    def _line_prefix(self, pos: Position | int) -> str:
+        at = pos.index if isinstance(pos, Position) else pos
+        return self.source[self.source.rfind('\n', 0, at) + 1:at]
 
     def panic_mode(self, pos: Position) -> None:
         """Lexer-level recovery: drop one character so lexing can make progress."""

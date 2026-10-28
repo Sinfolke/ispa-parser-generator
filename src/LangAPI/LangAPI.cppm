@@ -117,7 +117,8 @@ export namespace LangAPI {
         LexerTokenIterator, LexerLazyIterator,
         ParserRequired, ParserOptional, ParserRange, ParserRangeOptional,
         RecoveryDecision, RecoveryState, RecoverEncoded, ParserCounted,
-        RecoveryTokenSet, RecoveryEndOfInput, RecoveryPolicy
+        RecoveryTokenSet, RecoveryEndOfInput, RecoveryPolicy, CloneSelfBox, LookaheadKind,
+        TextOutput, RecoveryHandler
     };
 
 
@@ -344,6 +345,7 @@ export namespace LangAPI {
     };
 
     struct String : RValueLevel {
+        // Decoded UTF-8 data. Backends escape this value for their own literal syntax.
         std::string value;
 
         bool operator==(const String& other) const { return value == other.value; }

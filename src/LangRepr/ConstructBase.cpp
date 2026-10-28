@@ -28,10 +28,9 @@ namespace LangRepr {
         clone.is_const = true;
         clone.override = true;
         clone.statements.push_back(LangAPI::Return::createStatement(LangAPI::Return{
-            .value = LangAPI::FunctionCall::createExpression(LangAPI::FunctionCall{
-                .name = std::make_shared<LangAPI::Symbol>(LangAPI::Symbol{"std", "make_shared"}),
-                .template_parameters = {std::make_shared<LangAPI::Type>(LangAPI::Type{LangAPI::Symbol{"Lexer"}})},
-                .args = {LangAPI::Symbol::createExpression(LangAPI::Symbol{"*this"})}})}));
+            .value = LangAPI::IspaLibFunctionCall::createExpression(LangAPI::IspaLibFunctionCall{
+                .symbol = LangAPI::IspaLibSymbol{.exports = LangAPI::StdlibExports::CloneSelfBox},
+                .template_parameters = {std::make_shared<LangAPI::Type>(LangAPI::Type{LangAPI::Symbol{"Lexer"}})}})}));
         result.data.emplace_back(std::make_shared<LangAPI::Declaration>(LangAPI::Function::createDeclaration(clone)), LangAPI::Visibility::Public);
         return result;
     }

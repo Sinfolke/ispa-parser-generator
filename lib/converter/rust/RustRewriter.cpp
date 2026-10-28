@@ -1,6 +1,5 @@
 module Rust.Rewriter;
 
-import Rust.CoreFunctions;
 import LangAPI;
 import dstd;
 import std;
@@ -28,12 +27,6 @@ namespace {
         return out;
     }
     auto makeSymbol(const std::string &name) -> Symbol { return Symbol{name}; }
-    auto isImmutableWrapped(const Type &t) -> bool {
-        return t.template_parameters.size() == 1 && std::holds_alternative<Type>(t.template_parameters.front()) &&
-               std::get<Type>(t.template_parameters.front()).isValueType() &&
-               std::get<Type>(t.template_parameters.front()).getValueType() == ValueType::ImmutableSemantic;
-    }
-
     // ========================================================================
     // Generic, mutating IR walker. Hooks decide what happens; the walker owns the traversal order and scoping.
     // Everything reached through a shared_ptr is copied before it is mutated (the source tree is shared).
@@ -392,6 +385,15 @@ namespace {
         auto resolve(Symbol &s) const -> void {
             if (s.path.empty() || !allStrings(s)) return;
             const auto path = stringParts(s);
+            // Nested grammar declarations are hoisted into FlatTypes. Types
+            // only carries aliases for top-level names.
+            if (path.size() > 2 && path.front() == "Types") {
+                std::vector<std::string> flat{"FlatTypes", joinStrings(
+                    std::vector<std::string>(path.begin() + 1, path.end()), "_")};
+                s.path.clear();
+                for (auto &part : flat) s.path.emplace_back(std::move(part));
+                return;
+            }
             for (std::size_t i = 0; i < path.size(); ++i) {
                 for (std::size_t len = path.size() - i; len >= 1; --len) {
                     const std::vector<std::string> window(path.begin() + i, path.begin() + i + len);
@@ -445,164 +447,11 @@ namespace {
         w.decls(decls);
     }
 
-    // ========================================================================
-    // 3. qualify members
-    // ========================================================================
-    struct ClassInfo {
-        std::unordered_set<std::string> fields, methods, static_methods;
-        std::vector<std::string> bases;
-    };
-    using ClassTable = std::unordered_map<std::string, ClassInfo>;
-
-    auto collectClasses(const Declarations &decls, ClassTable &table) -> void {
-        for (const auto &d : decls) {
-            if (d.isNamespace()) { collectClasses(d.getNamespace().declarations, table); continue; }
-            if (!d.isClass()) continue;
-            const auto &cls = d.getClass();
-            const auto parts = stringParts(cls.name);
-            if (parts.empty()) continue;
-            ClassInfo info;
-            for (const auto &entry : cls.data) {
-                const auto &m = *entry.first;
-                if (m.isVariable()) info.fields.insert(m.getVariable().name);
-                else if (m.isFunction()) (m.getFunction().is_static ? info.static_methods : info.methods).insert(m.getFunction().name);
-            }
-            if (cls.to_str_fun) info.methods.insert(cls.to_str_fun->name);
-            for (const auto &in : cls.inherit_members)
-                if (std::holds_alternative<Symbol>(in.second)) {
-                    const auto base = stringParts(std::get<Symbol>(in.second));
-                    if (!base.empty()) info.bases.push_back(base.back());
-                }
-            table[parts.back()] = std::move(info);
-        }
-    }
-    // own members plus everything inherited from bases that are defined in the IR (library bases are unknown)
-    auto aggregate(const ClassTable &table, const std::string &name, std::unordered_set<std::string> &seen) -> ClassInfo {
-        ClassInfo out;
-        if (!seen.insert(name).second) return out;
-        const auto it = table.find(name);
-        if (it == table.end()) return out;
-        out = it->second;
-        for (const auto &b : it->second.bases) {
-            const auto base = aggregate(table, b, seen);
-            out.fields.insert(base.fields.begin(), base.fields.end());
-            out.methods.insert(base.methods.begin(), base.methods.end());
-            out.static_methods.insert(base.static_methods.begin(), base.static_methods.end());
-        }
-        return out;
-    }
-
-    auto qualifyMembers(Declarations &decls) -> void {
-        ClassTable table;
-        collectClasses(decls, table);
-
-        std::optional<ClassInfo> current;
-        IRWalker::FnKind kind = IRWalker::FnKind::Free;
-        bool static_fn = false;
-        std::vector<std::unordered_set<std::string>> scopes;
-        const auto is_local = [&](const std::string &n) {
-            for (const auto &s : scopes) if (s.contains(n)) return true;
-            return false;
-        };
-
-        IRWalker w;
-        w.scope_push = [&] { scopes.emplace_back(); };
-        w.scope_pop = [&] { scopes.pop_back(); };
-        w.on_local = [&](const std::string &n) { if (!scopes.empty()) scopes.back().insert(n); };
-        w.on_class = [&](Class &c, bool enter) {
-            if (!enter) { current.reset(); return; }
-            const auto parts = stringParts(c.name);
-            std::unordered_set<std::string> seen;
-            current = parts.empty() ? ClassInfo{} : aggregate(table, parts.back(), seen);
-        };
-        w.on_function = [&](Function &f, IRWalker::FnKind k, bool enter) {
-            kind = enter ? k : IRWalker::FnKind::Free;
-            static_fn = enter && f.is_static;
-        };
-        w.on_symbol = [&](Symbol &s, bool in_type) {
-            if (in_type || !current || s.path.empty()) return;
-            if (kind != IRWalker::FnKind::Method && kind != IRWalker::FnKind::Constructor) return;
-            if (!std::holds_alternative<std::string>(s.path.front())) return;
-            const auto &n = std::get<std::string>(s.path.front());
-            if (n == "self" || n == "this" || n == "Self" || n == "__ispa_parser__" || n == "__ispa_python_self" || is_local(n)) return;
-            if (!static_fn && (current->fields.contains(n) || current->methods.contains(n)))
-                s.path.insert(s.path.begin(), std::string(kind == IRWalker::FnKind::Constructor ? "this" : "self"));
-            else if (current->static_methods.contains(n))
-                s.path.insert(s.path.begin(), std::string("Self"));
-        };
-        w.decls(decls);
-    }
-
-    // ========================================================================
-    // 4. call-site adaptation
-    // ========================================================================
-    enum class ParamKind { Value, Ref, Mut, Move };
-    auto paramKind(const Type &t) -> ParamKind {
-        if (!t.isValueType()) return ParamKind::Value;
-        switch (t.getValueType()) {
-            case ValueType::BorrowSemantic: return isImmutableWrapped(t) ? ParamKind::Ref : ParamKind::Mut;
-            case ValueType::MoveSemantic: return ParamKind::Move;
-            default: return ParamKind::Value;
-        }
-    }
-    auto wrapCall(const char *name, Expression inner) -> Expression {
-        FunctionCall fc;
-        fc.name = std::make_shared<Symbol>(makeSymbol(name));
-        fc.args.push_back(std::move(inner));
-        Expression out;
-        out.push_back(ExpressionValue{std::move(fc)});
-        return out;
-    }
-    auto isPlace(const Expression &e) -> bool {
-        return e.size() == 1 && e[0].type() == ExpressionValueType::RValue &&
-               (e[0].getRValue().isSymbol() || e[0].getRValue().isStorageSymbol());
-    }
-    auto collectFunctions(const Declarations &decls, std::unordered_map<std::string, std::vector<const Function *>> &table) -> void {
-        for (const auto &d : decls) {
-            if (d.isNamespace()) collectFunctions(d.getNamespace().declarations, table);
-            else if (d.isFunction()) table[d.getFunction().name].push_back(&d.getFunction());
-            else if (d.isClass()) {
-                for (const auto &entry : d.getClass().data)
-                    if (entry.first->isFunction()) table[entry.first->getFunction().name].push_back(&entry.first->getFunction());
-                if (d.getClass().to_str_fun) table[d.getClass().to_str_fun->name].push_back(&*d.getClass().to_str_fun);
-            }
-        }
-    }
-
-    auto adaptCallSites(Declarations &decls) -> void {
-        // Overloaded names are skipped: without expression types the right overload cannot be picked.
-        std::unordered_map<std::string, std::vector<const Function *>> table;
-        const Declarations snapshot = decls;                    // function signatures are read from a stable copy
-        collectFunctions(snapshot, table);
-
-        IRWalker w;
-        w.on_call = [&](FunctionCall &c) {
-            if (!std::holds_alternative<std::shared_ptr<Symbol>>(c.name)) return;
-            const auto &sym = *std::get<std::shared_ptr<Symbol>>(c.name);
-            const auto parts = stringParts(sym);
-            if (parts.empty() || parts.back().starts_with("__ispa_rust_")) return;
-            const auto it = table.find(parts.back());
-            if (it == table.end() || it->second.size() != 1) return;
-            const auto &f = *it->second.front();
-            if (f.parameters.size() != c.args.size()) return;
-            for (std::size_t i = 0; i < c.args.size(); ++i) {
-                switch (paramKind(f.parameters[i].first)) {
-                    case ParamKind::Ref: c.args[i] = wrapCall(RustCore::kRefWrapper, c.args[i]); break;
-                    case ParamKind::Mut: c.args[i] = wrapCall(RustCore::kMutWrapper, c.args[i]); break;
-                    case ParamKind::Value: if (isPlace(c.args[i])) c.args[i] = wrapCall(RustCore::kCloneWrapper, c.args[i]); break;
-                    case ParamKind::Move: break;
-                }
-            }
-        };
-        w.decls(decls);
-    }
 }
 
 auto Rust::Rewriter::rewrite(const LangAPI::Declarations &source) -> LangAPI::Declarations {
     LangAPI::Declarations program = source;      // top level is a value copy; shared parts are copied by the passes
     mergeNamespaces(program);
     flattenNested(program);                      // also replaces every class's shared member list with fresh copies
-    qualifyMembers(program);
-    adaptCallSites(program);
     return program;
 }

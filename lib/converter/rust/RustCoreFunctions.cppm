@@ -29,16 +29,23 @@ export namespace RustCore {
     std::vector<VariantDef> variants;
     std::vector<std::string> diagnostics;               // written as `// ISPA-RUST-WARNING:` lines at the top of the root file
 
-    // names of the pseudo calls the Rewriter inserts to adapt call sites (see Rust.Rewriter)
-    constexpr const char* kRefWrapper = "__ispa_rust_ref";      // &x
-    constexpr const char* kMutWrapper = "__ispa_rust_mut";      // &mut x
-    constexpr const char* kCloneWrapper = "__ispa_rust_clone";  // x.clone()
+    // Emission state only. Target syntax must never be written back into LangAPI.
+    std::vector<std::string> scope;
+    std::unordered_map<std::string, std::vector<const LangAPI::Function*>> functions;
+    std::unordered_set<std::string> members, static_members;
+    std::vector<std::unordered_set<std::string>> locals;
+    std::unordered_set<std::string> borrowed_parameters;
+    std::string receiver;
+    const LangAPI::Type* return_type = nullptr;
+    auto indexFunctions(const LangAPI::Declarations& declarations) -> void;
+    auto bind(const std::string& name) -> void;
 
     auto warn(std::string message) -> void;
     auto crateRoot() -> std::string;                    // "crate::<name>" (or "crate" without a name)
 
     // naming / literals
     auto ident(const std::string &id) -> std::string;
+    auto moduleIdent(const std::string &name) -> std::string;
     auto rustStringBody(std::string_view raw) -> std::string;
     auto rustCharLiteral(char value, bool escaped) -> std::string;
     auto variantEnum(const std::vector<std::string> &alternatives) -> std::string;
@@ -47,13 +54,14 @@ export namespace RustCore {
     auto convertType(const LangAPI::Type &type) -> std::string;
     auto convertTemplates(const decltype(LangAPI::Type::template_parameters) &template_parameters) -> std::string;
     auto convertTemplates(const stdu::vector<std::variant<std::shared_ptr<LangAPI::Type>, std::shared_ptr<LangAPI::RValue>>> &template_parameters) -> std::string;
-    auto convertSymbol(const LangAPI::Symbol &symbol) -> std::string;
+    auto convertSymbol(const LangAPI::Symbol &symbol, bool value_context = true) -> std::string;
     auto convertStorageSymbol(const LangAPI::StorageSymbol &symbol) -> std::string;
     // expr == true: expression context (turbofish `::<>`), false: type context (`<>`)
     auto convertIspaLibSymbol(const LangAPI::IspaLibSymbol &symbol, bool expr = false) -> std::string;
 
     // expression
     auto convertExpression(const LangAPI::Expression &expression) -> std::string;
+    auto convertInitializer(const LangAPI::Type& type, const LangAPI::Expression& value) -> std::string;
     auto convertExpressionElement(LangAPI::ExpressionElement element) -> const char *;
     auto convertLambda(const LangAPI::Lambda &lambda) -> std::string;
     auto convertFunctionCall(const LangAPI::FunctionCall &call) -> std::string;

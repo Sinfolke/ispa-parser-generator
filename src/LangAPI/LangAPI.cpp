@@ -219,6 +219,8 @@ namespace LangAPI {
 
     auto operator<<(std::ostream &os, StdlibExports e) -> std::ostream& {
         switch (e) {
+            case StdlibExports::TextOutput: os << "TextOutput"; break;
+            case StdlibExports::RecoveryHandler: os << "RecoveryHandler"; break;
             case StdlibExports::Node: os << "Node"; break;
             case StdlibExports::MatchResult: os << "MatchResult"; break;
             case StdlibExports::Lexer: os << "Lexer"; break;

@@ -2,6 +2,7 @@ module Python.CoreFunctions;
 
 import dstd;
 import std;
+import AST.API;
 
 namespace Python {
 namespace {
@@ -19,9 +20,21 @@ namespace {
     [[noreturn]] void unsupported(const char* kind) {
         throw std::runtime_error(std::string("Python target: not lowered: ") + kind);
     }
-    std::string member(const std::string& name) {
-        if (name == "__ispa_python_self") return "self";
-        return name;
+    std::string pointer_offset(std::string text) {
+        // The C++ start pointer corresponds to the token's numeric start
+        // offset. Keep identifiers such as start_pos intact.
+        std::size_t offset = 0;
+        const auto identifier_char = [](char ch) {
+            return std::isalnum(static_cast<unsigned char>(ch)) || ch == '_';
+        };
+        while ((offset = text.find("start", offset)) != std::string::npos) {
+            if ((offset == 0 || !identifier_char(text[offset - 1])) &&
+                (offset + 5 == text.size() || !identifier_char(text[offset + 5]))) {
+                text.replace(offset, 5, "start_pos");
+                offset += 9;
+            } else offset += 5;
+        }
+        return text;
     }
     // `A::B::C` -> `A.B.C`, escaping every segment (not just the whole string).
     std::string path_identifiers(const std::string& name) {
@@ -101,20 +114,6 @@ namespace {
         auto text = std::format("{}", v);
         if (text.find_first_of(".e") == std::string::npos) text += ".0";
         return text;
-    }
-    // C++ `/` on integers truncates; Python `/` always yields float. Without type
-    // information we use true division only when the expression visibly involves a float.
-    bool has_float(const LangAPI::Expression& e) {
-        for (const auto& part : e) {
-            if (part.type() != LangAPI::ExpressionValueType::RValue) continue;
-            const auto& v = part.getRValue();
-            if (v.type() == LangAPI::RValueType::Float) return true;
-            if (v.type() == LangAPI::RValueType::Cast) {
-                const auto& t = v.getCast().type;
-                if (t && t->isValueType() && t->getValueType() == LangAPI::ValueType::Float) return true;
-            }
-        }
-        return false;
     }
 }
 Core::Core(std::string name) : module_name_(std::move(name)) {}
@@ -221,7 +220,7 @@ std::string Core::type(const LangAPI::Type& t) {
         auto name = symbol(t.getSymbol());
         if (name.find('&') != std::string::npos || name.find('*') != std::string::npos)
             return "typing.Any";
-        return name; // Python erases user-defined C++ template instantiation.
+        return t.template_parameters.empty() ? name : name + "(" + templates(t.template_parameters) + ")";
     }
     if (t.isIspaLibSymbol()) return lib(t.getIspaLibSymbol());
     if (!t.isValueType()) unsupported("LangAPI::Type");
@@ -254,7 +253,7 @@ std::string Core::type(const LangAPI::Type& t) {
             return args.empty() ? "ispa_std.Variant" : "ispa_std.Variant.specialize(" + args + ")";
         case V::Box: return args.empty() ? "typing.Any" : args;
         case V::Span: return "list[" + (args.empty() ? "typing.Any" : args) + "]";
-        case V::TypeTag: return "type";
+        case V::TypeTag: return "ispa_std.TypeTag.specialize(" + args + ")";
         case V::Undef: return "typing.Any";
     }
     unsupported("ValueType");
@@ -265,8 +264,11 @@ std::string Core::symbol(const LangAPI::Symbol& s) {
     for (const auto& piece : s.path) {
         std::string item;
         if (const auto* str = std::get_if<std::string>(&piece)) {
-            item = (*str == "__ispa_parser__") ? module_name_ : member(path_identifiers(*str));
-            if (first && method_members_.contains(*str)) item = "self." + item;
+            item = *str == "__ispa_parser__" ? module_name_ :
+                *str == "__ispa_python_self" ? "self" : path_identifiers(*str);
+            if (first && method_members_.contains(*str) &&
+                !std::ranges::any_of(scopes_, [&](const auto& scope) { return scope.contains(identifier(*str)); }))
+                item = "self." + item;
         } else if (const auto* special = std::get_if<LangAPI::IspaLibSymbol>(&piece)) {
             item = lib(*special);
         } else item = call(std::get<LangAPI::FunctionCall>(piece));
@@ -284,9 +286,23 @@ std::string Core::storage(const LangAPI::StorageSymbol& s) {
         } else if (const auto* offset = std::get_if<LangAPI::StorageOffset>(&piece)) {
             result += "[" + expression(offset->offset) + "]";
         } else if (const auto* property = std::get_if<LangAPI::Property>(&piece)) {
-            result += "." + property->name + "()";
+            if (property->name == "size") result = "len(" + result + ")";
+            else result += "." + property->name + "()";
         } else if (const auto* method = std::get_if<LangAPI::ArrayMethodCall>(&piece)) {
             using M = LangAPI::ArrayMethods;
+            if (method->method == M::PythonSort) {
+                std::string args;
+                if (!method->args.empty()) args = "reverse=" + expression(method->args[0]);
+                if (method->args.size() > 1) args += ", key=" + expression(method->args[1]);
+                result += ".sort(" + args + ")";
+                continue;
+            }
+            if (method->method == M::PythonUpdate) {
+                result = "ispa_std.python_update(" + result +
+                    (method->args.empty() ? "" : ", " + join(method->args, ", ",
+                        [this](const auto& a) { return expression(a); })) + ")";
+                continue;
+            }
             std::string name;
             switch (method->method) {
                 case M::Push:
@@ -314,7 +330,15 @@ std::string Core::storage(const LangAPI::StorageSymbol& s) {
             }
             result += "." + name + "(" + join(method->args, ", ", [this](const auto& a) { return expression(a); }) + ")";
         } else if (const auto* func = std::get_if<LangAPI::FunctionCall>(&piece)) {
-            result += "." + call(*func);
+            // A storage call is already bound to its receiver, even if its
+            // name also denotes a member of the enclosing generated class.
+            auto rendered = call(*func);
+            if (rendered.starts_with("self.")) rendered.erase(0, 5);
+            if (rendered == "size()") result = "len(" + result + ")";
+            else if (rendered.starts_with("substr("))
+                result = "ispa_std.substr(" + result + ", " + rendered.substr(7);
+            else if (rendered.starts_with("push_back(")) result += ".append(" + rendered.substr(10);
+            else result += "." + rendered;
         } else if (const auto* special = std::get_if<LangAPI::IspaLibSymbol>(&piece)) {
             result += "." + lib(*special);
         } else unsupported("StorageSymbol segment");
@@ -324,6 +348,8 @@ std::string Core::storage(const LangAPI::StorageSymbol& s) {
 std::string Core::lib(const LangAPI::IspaLibSymbol& s) {
     using S = LangAPI::StdlibExports;
     switch (s.exports) {
+        case LangAPI::StdlibExports::TextOutput: return "typing.TextIO";
+        case LangAPI::StdlibExports::RecoveryHandler: return "ispa_std.Recovery.handler";
         case S::Node: return "ispa_std.Node";
         case S::MatchResult: return "ispa_std.MatchResult";
         case S::Lexer: return "ispa_std.Lexer";
@@ -348,6 +374,9 @@ std::string Core::lib(const LangAPI::IspaLibSymbol& s) {
         case S::Error: return "RuntimeError";
         case S::ASTPrinter: return "ispa_std.ASTPrinter";
         case S::Concat: return "ispa_std.concat";
+        case S::CloneSelfBox: return "__import__('copy').copy";
+        case S::LookaheadKind: return "ispa_std.lookahead_kind";
+        case S::RecoveryEndOfInput: return "ispa_std.EndOfInput";
         case S::MatchResultValue: return "node";
         case S::VariantIndex: return "index()";
         case S::ParserRequired: return "self.required";
@@ -407,6 +436,14 @@ std::string Core::call(const LangAPI::FunctionCall& c) {
         [this](const std::shared_ptr<LangAPI::Symbol>& name) { return symbol(*name); },
         [this](const std::shared_ptr<LangAPI::IspaLibSymbol>& name) { return lib(*name); }
     }, c.name);
+    if (fn.starts_with("ISPA_STD.CountSpec.")) fn.replace(0, 8, "ispa_std");
+    if ((fn == "_ispa__line_prefix" || fn == "_ispa__next_char" || fn == "_ispa__line" ||
+         fn == "_ispa__column") && c.args.size() == 1) {
+        const auto offset = pointer_offset(expression(c.args.front()));
+        const auto method = fn == "_ispa__line_prefix" ? "_line_prefix" :
+            fn == "_ispa__next_char" ? "_next_char" : fn == "_ispa__column" ? "_column" : "_line";
+        return std::string("self.") + method + "(" + offset + ")";
+    }
     const auto as_type = [](const auto& item) -> const LangAPI::Type& {
         const auto* t = std::get_if<std::shared_ptr<LangAPI::Type>>(&item);
         if (!t || !*t) throw std::runtime_error("Python target: invalid recovery template argument");
@@ -439,7 +476,8 @@ std::string Core::call(const LangAPI::FunctionCall& c) {
         return out + ")";
     }
     // Recovery::handler<Expected, Continuation, Follow, Synchronization, Policy>(rule, expected_text)
-    if (fn == "ISPA_STD.Recovery.handler") {
+    if (const auto* library = std::get_if<std::shared_ptr<LangAPI::IspaLibSymbol>>(&c.name);
+        library && (*library)->exports == LangAPI::StdlibExports::RecoveryHandler) {
         if (c.template_parameters.size() != 5 || c.args.size() != 2)
             throw std::runtime_error("Python target: invalid recovery handler");
         return "ispa_std.Recovery.handler(" +
@@ -462,9 +500,22 @@ std::string Core::call(const LangAPI::FunctionCall& c) {
         if (c.args.size() != 1) throw std::runtime_error("Python target: invalid lookahead call");
         return "ispa_std.lookahead_kind(" + expression(c.args.front()) + ")";
     }
-    return fn + "(" + join(c.args, ", ", [this](const auto& p) { return expression(p); }) + ")";
+    const auto last = fn.substr(fn.rfind('.') == std::string::npos ? 0 : fn.rfind('.') + 1);
+    std::string args;
+    if (generic_functions_.contains(last) && !c.template_parameters.empty())
+        args = templates(c.template_parameters);
+    for (std::size_t i = 0; i < c.args.size(); ++i) {
+        if (!args.empty()) args += ", ";
+        // C++ token actions pass a pointer into the input. Python keeps the
+        // full source and its separately supplied start offset.
+        auto argument = expression(c.args[i]);
+        if (fn == "Token.create" && i == 1 && pointer_offset(argument) != argument) argument = "start";
+        args += argument;
+    }
+    return fn + "(" + args + ")";
 }
 std::string Core::lib_call(const LangAPI::IspaLibFunctionCall& c) {
+    if (c.symbol.exports == LangAPI::StdlibExports::CloneSelfBox) return "__import__('copy').copy(self)";
     std::string fn = lib(c.symbol);
     using S = LangAPI::StdlibExports;
     const auto kind = c.symbol.exports;
@@ -495,6 +546,10 @@ std::string Core::lib_call(const LangAPI::IspaLibFunctionCall& c) {
             : rvalue(*std::get<std::shared_ptr<LangAPI::RValue>>(first));
         const auto target_index = (kind == S::ParserCounted) ? 2u : 1u;
         args.insert(args.begin() + std::min((std::size_t)target_index, args.size()), expected);
+        if (kind == S::ParserCounted && c.template_parameters.size() > 1) {
+            const auto* space = std::get_if<std::shared_ptr<LangAPI::Type>>(&c.template_parameters[1]);
+            if (space && *space) args.push_back("space=" + type(**space));
+        }
     }
     // C++ lr_parse<Generated>(pos): the template argument is the generated parser class itself.
     if (kind == S::LRParse || kind == S::LRParseGeneralized) {
@@ -521,7 +576,7 @@ std::string Core::lambda(const LangAPI::Lambda& fn) {
     return name;
 }
 
-std::string Core::element(LangAPI::ExpressionElement value, bool real_division) {
+std::string Core::element(LangAPI::ExpressionElement value) {
     using E = LangAPI::ExpressionElement;
     switch (value) {
         case E::GroupOpen: return "(";
@@ -540,8 +595,8 @@ std::string Core::element(LangAPI::ExpressionElement value, bool real_division) 
         case E::Add: return " + ";
         case E::Minus: return " - ";
         case E::Multiply: return " * ";
-        case E::Divide: return real_division ? " / " : " // ";
-        case E::Modulo: return " % ";
+        case E::Divide:
+        case E::Modulo: unsupported("division/remainder without two operands");
         case E::PlusPlus:
         case E::MinusMinus: unsupported("prefix/postfix increment expression; use statement lowering");
     }
@@ -594,6 +649,17 @@ std::string Core::rvalue(const LangAPI::RValue& v) {
                 [this](const LangAPI::IspaLibSymbol& s) { return lib(s); },
                 [this](const std::shared_ptr<LangAPI::Type>& t) { return type(*t); }
             }, inh.name);
+            if (ctor == "str" && inh.args.size() == 2 &&
+                expression(inh.args[0]) == "start" && expression(inh.args[1]) == "start + length")
+                return "start[start_pos:start_pos + length]";
+            if (ctor == "ispa_std.Node" && inh.args.size() >= 8) {
+                // Captures are absolute offsets in Python, whereas C++ uses
+                // pointers and subtracts the token's start pointer.
+                const auto offset = pointer_offset(expression(inh.args[0]));
+                std::string args = offset + ", start";
+                for (std::size_t i = 2; i < inh.args.size(); ++i) args += ", " + expression(inh.args[i]);
+                return "ispa_std.Node.from_cpp(" + args + ")";
+            }
             const auto args = join(inh.args, ", ", [this](const auto& e) { return expression(e); });
             return (ctor == "ispa_std.Node" ? "ispa_std.Node.from_cpp" : ctor) + "(" + args + ")";
         }
@@ -620,8 +686,52 @@ std::string Core::rvalue(const LangAPI::RValue& v) {
     unsupported("RValueType");
 }
 std::string Core::expression(const LangAPI::Expression& e) {
+    using Op = LangAPI::ExpressionElement;
+    // Split at the least tightly bound binary operator. Runtime operands decide
+    // integer truncation versus floating division; literals alone cannot do so.
+    const bool arithmetic = std::ranges::any_of(e, [](const auto& p) {
+        return p.isExpressionElement() && (p.getExpressionElement() == Op::Divide ||
+            p.getExpressionElement() == Op::Modulo);
+    });
+    if (arithmetic) {
+        int depth = 0, best = 100;
+        std::size_t split = e.size();
+        for (std::size_t i = 0; i < e.size(); ++i) {
+            if (!e[i].isExpressionElement()) continue;
+            const auto op = e[i].getExpressionElement();
+            if (op == Op::GroupOpen || op == Op::SquareBraceOpen) { ++depth; continue; }
+            if (op == Op::GroupClose || op == Op::SquareBraceClose) { --depth; continue; }
+            if (depth || i == 0 || i + 1 == e.size()) continue;
+            if (e[i - 1].isExpressionElement() &&
+                e[i - 1].getExpressionElement() != Op::GroupClose &&
+                e[i - 1].getExpressionElement() != Op::SquareBraceClose &&
+                e[i - 1].getExpressionElement() != Op::PlusPlus &&
+                e[i - 1].getExpressionElement() != Op::MinusMinus) continue;
+            int precedence = 100;
+            switch (op) {
+                case Op::Or: precedence = 1; break;
+                case Op::And: precedence = 2; break;
+                case Op::Equal: case Op::NotEqual: precedence = 3; break;
+                case Op::Higher: case Op::Lower: case Op::HigherOrEqual: case Op::LowerOrEqual: precedence = 4; break;
+                case Op::Add: case Op::Minus: precedence = 5; break;
+                case Op::Multiply: case Op::Divide: case Op::Modulo: precedence = 6; break;
+                default: continue;
+            }
+            if (precedence <= best) { best = precedence; split = i; }
+        }
+        if (split != e.size()) {
+            const auto left = expression(LangAPI::Expression{e.begin(), e.begin() + split});
+            const auto right = expression(LangAPI::Expression{e.begin() + split + 1, e.end()});
+            const auto op = e[split].getExpressionElement();
+            if (op == Op::Divide || op == Op::Modulo)
+                return std::string(op == Op::Divide ? "ispa_std.divide(" : "ispa_std.modulo(") + left + ", " + right + ")";
+            return "(" + left + element(op) + right + ")";
+        }
+        if (e.front().isExpressionElement() && e.front().getExpressionElement() == Op::GroupOpen &&
+            e.back().isExpressionElement() && e.back().getExpressionElement() == Op::GroupClose)
+            return "(" + expression(LangAPI::Expression{e.begin() + 1, e.end() - 1}) + ")";
+    }
     std::string out;
-    const bool real_division = has_float(e);
     // Value-producing ++/--: a postfix operator rewrites the operand rendered just before it,
     // a prefix operator remembers its delta until the next operand has been rendered.
     std::size_t operand_begin = std::string::npos;
@@ -647,7 +757,7 @@ std::string Core::expression(const LangAPI::Expression& e) {
             case E::Empty: break;
             case E::RValue: out += rvalue(part.getRValue()); break;
             case E::EmptyInitializer: out += "None"; break;
-            case E::ExpressionElement: out += element(part.getExpressionElement(), real_division); break;
+            case E::ExpressionElement: out += element(part.getExpressionElement()); break;
             case E::FunctionCall: out += call(part.getFunctionCall()); break;
             case E::Return: unsupported("return inside expression");
             case E::Break: unsupported("break inside expression");
@@ -659,14 +769,23 @@ std::string Core::expression(const LangAPI::Expression& e) {
                     ? symbol(std::get<LangAPI::Symbol>(var.name))
                     : storage(std::get<LangAPI::StorageSymbol>(var.name));
                 const auto rhs = expression(var.value);
+                if (var.type == LangAPI::OperatorType::Divide || var.type == LangAPI::OperatorType::Modulo) {
+                    if (is_name(lhs)) {
+                        note_assigned(lhs);
+                        out += "(" + lhs + " := ispa_std." +
+                            (var.type == LangAPI::OperatorType::Divide ? "divide(" : "modulo(") + lhs + ", " + rhs + "))";
+                    } else out += assigned_storage_value(lhs, rhs,
+                        var.type == LangAPI::OperatorType::Divide ? "/" : "%");
+                    break;
+                }
                 const char* op = nullptr;
                 switch (var.type) {
                     case LangAPI::OperatorType::Assign: break;
                     case LangAPI::OperatorType::Add: op = " + "; break;
                     case LangAPI::OperatorType::Minus: op = " - "; break;
                     case LangAPI::OperatorType::Multiply: op = " * "; break;
-                    case LangAPI::OperatorType::Divide: op = has_float(var.value) ? " / " : " // "; break;
-                    case LangAPI::OperatorType::Modulo: op = " % "; break;
+                    case LangAPI::OperatorType::Divide:
+                    case LangAPI::OperatorType::Modulo: unsupported("unlowered compound arithmetic");
                 }
                 if (is_name(lhs)) {
                     note_assigned(lhs);
@@ -675,8 +794,7 @@ std::string Core::expression(const LangAPI::Expression& e) {
                     const char* operation = op == nullptr ? "=" :
                         var.type == LangAPI::OperatorType::Add ? "+" :
                         var.type == LangAPI::OperatorType::Minus ? "-" :
-                        var.type == LangAPI::OperatorType::Multiply ? "*" :
-                        var.type == LangAPI::OperatorType::Divide ? (has_float(var.value) ? "/" : "//") : "%";
+                        "*";
                     out += assigned_storage_value(lhs, rhs, operation);
                 }
                 break;
@@ -691,7 +809,34 @@ std::string Core::expression(const LangAPI::Expression& e) {
             case E::ReportError: out += "self.raise_error(" + literal(part.getReportError().message) + ")"; break;
             case E::Lambda: out += lambda(part.getLambda()); break;
             case E::IspaLibFunctionCall: out += lib_call(part.getIspaLibFunctionCall()); break;
-            case E::DFADebug: std::cout << "Note: skipping DFADebug" << std::endl; break;
+            case E::DFADebug: {
+                const auto& debug = part.getDFADebug();
+                std::string member_text = "<Undefined>";
+                if (!debug.member.empty()) {
+                    if (debug.member.isString()) member_text = debug.member.getString().value;
+                    else if (debug.member.isCsequence()) {
+                        member_text = "[";
+                        const auto& sequence = debug.member.getCsequence();
+                        for (const auto ch : sequence.characters) member_text += ch;
+                        for (const auto ch : sequence.escaped) member_text += std::string("\\") + ch;
+                        for (const auto& [from, to] : sequence.diapasons) member_text += std::string(1, from) + "-" + to;
+                        member_text += "]";
+                    } else {
+                        std::ostringstream stream;
+                        stream << debug.member;
+                        member_text = stream.str();
+                    }
+                }
+                const auto number = [](std::size_t value) {
+                    return value == std::numeric_limits<std::size_t>::max() ? std::string("-1") : std::to_string(value);
+                };
+                out += "ispa_std.DFADebug(" + literal(member_text) + ", " +
+                    literal(join(debug.token_name, ".", [](const auto& name) { return name; })) + ", " +
+                    std::to_string(debug.position_in_token) + ", " + number(debug.call) + ", " + number(debug.group) + ", " +
+                    number(debug.rule_run) + ", " + std::to_string(debug.offset) + ", " + std::to_string(debug.length) + ", " +
+                    literal(std::string(1, debug.ch)) + ")";
+                break;
+            }
             case E::StringCompare: {
                 const auto compare = part.getStringCompare();
                 if (compare.is_string) {
@@ -746,14 +891,22 @@ std::string Core::statement_expression(const LangAPI::Expression& e) {
                 const auto lhs = std::holds_alternative<LangAPI::Symbol>(var.name)
                     ? symbol(std::get<LangAPI::Symbol>(var.name))
                     : storage(std::get<LangAPI::StorageSymbol>(var.name));
+                if (var.type == LangAPI::OperatorType::Divide || var.type == LangAPI::OperatorType::Modulo) {
+                    const auto rhs = expression(var.value);
+                    if (!is_name(lhs)) return assigned_storage_value(lhs, rhs,
+                        var.type == LangAPI::OperatorType::Divide ? "/" : "%");
+                    note_assigned(lhs);
+                    return lhs + " = ispa_std." +
+                        (var.type == LangAPI::OperatorType::Divide ? "divide(" : "modulo(") + lhs + ", " + rhs + ")";
+                }
                 const char* op = "=";
                 switch (var.type) {
                     case LangAPI::OperatorType::Assign: op = "="; break;
                     case LangAPI::OperatorType::Add: op = "+="; break;
                     case LangAPI::OperatorType::Minus: op = "-="; break;
                     case LangAPI::OperatorType::Multiply: op = "*="; break;
-                    case LangAPI::OperatorType::Divide: op = has_float(var.value) ? "/=" : "//="; break;
-                    case LangAPI::OperatorType::Modulo: op = "%="; break;
+                    case LangAPI::OperatorType::Divide:
+                    case LangAPI::OperatorType::Modulo: unsupported("unlowered compound arithmetic");
                 }
                 if (is_name(lhs)) note_assigned(lhs);
                 return lhs + " " + op + " " + expression(var.value);

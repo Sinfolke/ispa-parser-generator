@@ -37,6 +37,9 @@ impl Ptr {
         *self
     }
     pub fn advance(mut self, count: usize) -> Self { for _ in 0..count { self.inc(); } self }
+    pub fn offset_by(self, count: i64) -> Self {
+        Self { offset: self.offset.saturating_add_signed(count as isize).min(self.input.len()), ..self }
+    }
     pub fn starts_with(self, text: &str) -> bool { self.input.get(self.offset..).is_some_and(|s| s.starts_with(text)) }
     pub fn remaining(self) -> &'static str { self.input.get(self.offset..).unwrap_or("") }
     pub fn line(self) -> usize { self.input[..self.offset.min(self.input.len())].bytes().filter(|b| *b == b'\n').count() + 1 }
@@ -48,6 +51,14 @@ impl Ptr {
 }
 
 impl From<&'static str> for Ptr { fn from(value: &'static str) -> Self { Self::new(value) } }
+impl std::ops::Add<i64> for Ptr {
+    type Output = Self;
+    fn add(self, count: i64) -> Self { self.offset_by(count) }
+}
+pub fn string_range(start: Ptr, end: Ptr) -> String {
+    assert!(std::ptr::eq(start.input, end.input) && start.offset <= end.offset);
+    start.input[start.offset..end.offset].to_owned()
+}
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct Span<'a, T> { values: &'a [T] }
@@ -322,7 +333,7 @@ pub mod dfa {
             pub fn new(_: &'static str, _: &'static str, _: i64, _: i64, _: i64,
                        _: i64, _: i64, _: i64, _: u8) -> Self { Self }
         }
-        #[derive(Clone, Copy, Debug, Default)] pub struct TdfaLayout<T>(pub std::marker::PhantomData<T>);
+        #[derive(Clone, Copy, Debug, Default)] pub struct TdfaLayout<const REGISTERS: usize, const GROUPS: usize>;
         #[derive(Clone, Copy, Debug, Default)] pub struct SpanCharState<'a, T>(pub usize, pub usize, pub Span<'a, T>);
         impl<'a, T> SpanCharState<'a, T> { pub fn new(a: usize, b: usize, c: Span<'a,T>) -> Self { Self(a,b,c) } }
         #[derive(Clone, Copy, Debug, Default)] pub struct SpanMultiTableState<'a, T>(pub usize, pub usize, pub Span<'a,T>);

@@ -364,7 +364,7 @@ import_name_item:
 
 fail expected_expression {
     ctx.error("Expected a Python expression")
-    ctx.sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE")
+    ctx.sync_tokens(COMMA, COLON, SEMICOLON, NEWLINE, DEDENT, RPAREN, RBRACKET, RBRACE)
     ctx.insert()
 }
 fail header_colon {
@@ -381,8 +381,8 @@ fail expected_block {
 }
 fail statement_end {
     ctx.error("Expected a newline or ';' after Python statement")
-    ctx.sync_tokens("NEWLINE", "DEDENT")
-    if ctx.at("NEWLINE"):
+    ctx.sync_tokens(NEWLINE, DEDENT)
+    if ctx.at(NEWLINE):
         ctx.retry()
     else:
         ctx.insert()

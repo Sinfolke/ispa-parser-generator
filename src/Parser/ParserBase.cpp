@@ -350,8 +350,8 @@ auto ParserBase::recoveryHandler(AST::Tree& tree,
     const auto spec = makeRecoverySpec(tree, rule, member_index, options);
 
     LangAPI::FunctionCall call;
-    call.name = std::make_shared<LangAPI::Symbol>(
-        "ISPA_STD", "Recovery", "handler");
+    call.name = std::make_shared<LangAPI::IspaLibSymbol>(
+        LangAPI::IspaLibSymbol{.exports = LangAPI::StdlibExports::RecoveryHandler});
     for (const auto* set : {
             &spec.expected, &spec.continuation, &spec.follow, &spec.sync}) {
         call.template_parameters.emplace_back(

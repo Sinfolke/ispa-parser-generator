@@ -11,11 +11,27 @@ import std;
 
 namespace {
 const UAST::SourcePosition position{"conversion.isc", 0, 0, 7, 3};
+LangAPI::Statements executableStatements(LangAPI::Statements input) {
+    LangAPI::Statements result;
+    for (auto& statement : input) {
+        if (statement.isComment() && statement.getComment().value.starts_with("ISPA_DEBUG_")) continue;
+        if (statement.isIf()) {
+            auto& branch = statement.getIf();
+            branch.stmt = executableStatements(branch.stmt);
+            branch.else_stmt = executableStatements(branch.else_stmt);
+        } else if (statement.isWhile() || statement.isDoWhile()) {
+            auto& loop = statement.getWhileOrDoWhile();
+            loop.stmt = executableStatements(loop.stmt);
+        }
+        result.push_back(std::move(statement));
+    }
+    return result;
+}
 auto expression(const std::string& source) {
     return Parser::ParserBase::convertPython(*UAST::parsePythonExpr(source, position));
 }
 auto statements(const std::string& source) {
-    return Parser::ParserBase::convertPython(UAST::parsePythonModule(source, position));
+    return executableStatements(Parser::ParserBase::convertPython(UAST::parsePythonModule(source, position)));
 }
 }
 TEST(PythonConversion, ExternalExpressionUsesOriginalParserTypeAndSource) {
@@ -76,6 +92,12 @@ TEST(PythonConversion, ArithmeticPreservesGrouping) {
     EXPECT_EQ(multiplies, 1);
 }
 
+TEST(PythonConversion, StringLiteralsBecomeDecodedNeutralValues) {
+    const auto value = expression(R"py('quote" slash\\ newline\n hex\x41 unicode\u00e9')py");
+    ASSERT_EQ(value.size(), 1u);
+    EXPECT_EQ(value.front().getRValue().getString().value, "quote\" slash\\ newline\n hexA unicodeé");
+}
+
 TEST(PythonConversion, RecoveredSyntaxCannotBecomeExecutableActions) {
     for (const auto* source : {"1 +", "f(1", "[1", "{'k': }"})
         EXPECT_THROW(UAST::parsePythonExpr(source, position), std::runtime_error) << source;
@@ -104,6 +126,16 @@ TEST(PythonConversion, AssignmentAndControlFlow) {
     EXPECT_EQ(output[2].getIf().else_stmt.size(), 1u);
     EXPECT_EQ(output[3].getWhile().stmt.size(), 1u);
     EXPECT_TRUE(output[4].getExpression().front().isReturn());
+}
+TEST(PythonConversion, DebugCheckpointsSurroundExecutableStatements) {
+    const auto module = UAST::parsePythonModule("capture = 5\n", position);
+    const auto output = Parser::ParserBase::convertPython(module, {"capture"});
+    ASSERT_EQ(output.size(), 3u);
+    ASSERT_TRUE(output.front().isComment());
+    EXPECT_TRUE(output.front().getComment().value.starts_with("ISPA_DEBUG_LINE "));
+    EXPECT_TRUE(output[1].getExpression().front().isVariableAssignment());
+    ASSERT_TRUE(output.back().isComment());
+    EXPECT_NE(output.back().getComment().value.find("@after"), std::string::npos);
 }
 TEST(PythonConversion, DeclarationsKeepTypesAndParameters) {
     auto module = UAST::parsePythonModule("def add(x: int, y: int) -> int:\n    return x + y\nclass Box:\n    value: int = 0\n", position);
@@ -138,7 +170,7 @@ TEST(PythonConversion, ContainersAndExistingBindings) {
     EXPECT_EQ(expression("(1, 2)").front().getRValue().getMakeTuple().args.size(), 2u);
     EXPECT_EQ(expression("{'key': 1}").front().getRValue().getMap().keys.size(), 1u);
     auto module = UAST::parsePythonModule("capture = 5\n", position);
-    auto output = Parser::ParserBase::convertPython(module, {"capture"});
+    auto output = executableStatements(Parser::ParserBase::convertPython(module, {"capture"}));
     ASSERT_EQ(output.size(), 1u);
     EXPECT_TRUE(output.front().getExpression().front().isVariableAssignment());
     EXPECT_THROW(statements("if True:\n    x = 1\n"), std::invalid_argument);
@@ -174,7 +206,7 @@ TEST(PythonConversion, ActionContextValidatesMetadataAndPreservesLocals) {
     std::set<std::string> locals;
     EXPECT_NO_THROW(Parser::ParserBase::convertPythonAction(action("saved = ctx.pos\nctx.ast.count: int = 3\n"), locals));
     EXPECT_TRUE(locals.contains("saved"));
-    const auto restore = Parser::ParserBase::convertPythonAction(action("ctx.pos = saved\n"), locals);
+    const auto restore = executableStatements(Parser::ParserBase::convertPythonAction(action("ctx.pos = saved\n"), locals));
     EXPECT_TRUE(restore.front().getExpression().front().isVariableAssignment());
     for (const auto* source : {"ctx = 1\n", "ctx: int = 1\n", "ctx.rule = 'x'\n", "ctx.start_pos += 1\n", "x = ctx.unknown\n", "x = ctx.failed_rule\n"})
         EXPECT_THROW(Parser::ParserBase::convertPythonAction(action(source), locals), std::invalid_argument) << source;
@@ -213,6 +245,27 @@ TEST(PythonConversion, ActionContextCanReadAndConsumeLookaheadTokens) {
         action("same = previous.name == ID\nliteral = previous.name == 'id'\n"), locals, true));
     locals.insert("ID");
     EXPECT_NO_THROW(Parser::ParserBase::convertPythonAction(action("same = previous.name == ID\n"), locals, true));
+}
+
+TEST(PythonConversion, RecoveryTokenNamesRemainDistinctFromLiteralSpellings) {
+    const auto convert = [](const std::string& code) {
+        AST::PythonAction action;
+        action.code = UAST::parsePythonModule(code, position);
+        std::set<std::string> locals;
+        return executableStatements(Parser::ParserBase::convertPythonAction(action, locals, true));
+    };
+    const auto named = convert("ctx.sync_tokens(NEWLINE, DEDENT)\n");
+    const auto& named_call = std::get<LangAPI::FunctionCall>(
+        named.front().getExpression().front().getRValue().getStorageSymbol().path.back());
+    ASSERT_EQ(named_call.args.size(), 2u);
+    for (const auto& argument : named_call.args) {
+        const auto& boundary = std::get<LangAPI::FunctionCall>(argument.front().getRValue().getStorageSymbol().path.back());
+        EXPECT_EQ(std::get<std::string>(std::get<std::shared_ptr<LangAPI::Symbol>>(boundary.name)->path.back()), "token_boundary");
+    }
+    const auto literal = convert("ctx.sync_tokens(';')\n");
+    const auto& literal_call = std::get<LangAPI::FunctionCall>(
+        literal.front().getExpression().front().getRValue().getStorageSymbol().path.back());
+    EXPECT_EQ(literal_call.args.front().front().getRValue().getString().value, ";");
 }
 
 TEST(PythonConversion, CollectionMethodsUsePortableIR) {

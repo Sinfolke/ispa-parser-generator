@@ -108,6 +108,7 @@ main:
 
 - **C++17:** LL is the recommended, most complete backend.
 - **Python:** LL generation only, via the `ispa_std` runtime.
+- **Rust:** experimental typed IR emission; full parser generation awaits [neutral IR and runtime contracts](lib/converter/rust/README.md).
 - **Lexing:** token patterns, captures, nested token data, dynamic patterns, negative matching.
 - **Recovery and actions:** advanced rules, embedded Python actions, fail-block recovery — all on LL.
 - **External parsers:** a grammar can call another generated parser and keep its native node type (LL + lazy tokenization only).

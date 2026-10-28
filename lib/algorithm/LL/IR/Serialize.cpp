@@ -38,6 +38,8 @@ template<class T> auto persistedMembers(T& value) {
     using U = std::remove_cvref_t<T>;
     if constexpr (std::is_same_v<U, LangAPI::IspaLibFunctionCall>)
         return std::tie(value.symbol, value.args, value.template_parameters);
+    else if constexpr (std::is_same_v<U, LangAPI::IspaLibSymbol>)
+        return std::tie(value.exports, value.template_parameters, value.Const, value.Reference);
     else if constexpr (std::is_same_v<U, LangAPI::FixedSizeArray>)
         return std::tie(value.values, value.template_parameters);
     else

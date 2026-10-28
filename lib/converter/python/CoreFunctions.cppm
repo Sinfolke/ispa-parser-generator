@@ -11,6 +11,7 @@ export namespace Python {
         std::string module_name_;
         std::size_t lambda_number_ = 0;
         std::unordered_set<std::string> method_members_;
+        std::unordered_set<std::string> generic_functions_;
     public:
         struct LambdaDefinition { std::string name, params, body; };
     private:
@@ -28,7 +29,7 @@ export namespace Python {
         std::string call(const LangAPI::FunctionCall& value);
         std::string lib_call(const LangAPI::IspaLibFunctionCall& value);
         std::string lambda(const LangAPI::Lambda& value);
-        std::string element(LangAPI::ExpressionElement value, bool real_division = false);
+        std::string element(LangAPI::ExpressionElement value);
         std::string templates(const decltype(LangAPI::Type::template_parameters)& values);
         std::string templates(const stdu::vector<std::variant<std::shared_ptr<LangAPI::Type>, std::shared_ptr<LangAPI::RValue>>>& values);
         std::string counter() const;
@@ -37,6 +38,7 @@ export namespace Python {
     public:
         explicit Core(std::string module_name);
         void set_method_members(std::unordered_set<std::string> members) { method_members_ = std::move(members); }
+        void set_generic_functions(std::unordered_set<std::string> names) { generic_functions_ = std::move(names); }
         void set_statement_writer(StatementWriter callback);
         // Open/close the Python `def` that owns the statements being rendered.
         void enter_scope(const std::vector<std::string>& params);

@@ -9,7 +9,8 @@ import std;
 
 export namespace LLIR::Serialize {
 using namespace ParserIR;
-    constexpr std::uint32_t FORMAT_VERSION = 4;
+    // v5 stores decoded strings, semantic recovery handlers, and complete library symbols.
+    constexpr std::uint32_t FORMAT_VERSION = 5;
 
     // Writes one Production as a length-prefixed record.
     // Returns false (and writes nothing) if the Production contains a

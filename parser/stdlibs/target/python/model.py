@@ -332,11 +332,13 @@ def _assigned_value(old: Any, value: Any, operation: str) -> Any:
     if operation == '*':
         return old * value
     if operation == '/':
-        return old / value
+        from .conversion import divide
+        return divide(old, value)
     if operation == '//':
         return old // value
     if operation == '%':
-        return old % value
+        from .conversion import modulo
+        return modulo(old, value)
     raise ValueError(f'unknown assignment operation: {operation}')
 
 

@@ -87,7 +87,8 @@ namespace {
                 const auto& value = st.getVariable().value;
                 if (value.size() == 1 && value.front().type() == LangAPI::ExpressionValueType::FunctionCall) {
                     const auto* name = std::get_if<std::shared_ptr<LangAPI::Symbol>>(&value.front().getFunctionCall().name);
-                    if (name && *name && symbol_last_name(**name) == "recovery_frame") return index;
+                    if (name && *name && (symbol_last_name(**name) == "recovery_frame" ||
+                        symbol_last_name(**name) == "counter_scope")) return index;
                 }
             }
             ++index;
@@ -164,7 +165,23 @@ std::string Construct::statements_inline(const LangAPI::Statements& s, const std
     return result;
 }
 void Construct::statements(const LangAPI::Statements& s) {
-    for (const auto& statement_ : s) statement(statement_);
+    const auto guard = recovery_frame_statement(s);
+    std::size_t index = 0;
+    for (const auto& statement_ : s) {
+        statement(statement_);
+        if (index++ == guard) {
+            line("try:");
+            ++indentation_;
+            const LangAPI::Statements tail{std::next(s.begin(), index), s.end()};
+            body_or_pass(tail);
+            --indentation_;
+            line("finally:");
+            ++indentation_;
+            line(Core::identifier(statement_.getVariable().name) + ".close()");
+            --indentation_;
+            return;
+        }
+    }
 }
 void Construct::body_or_pass(const LangAPI::Statements& s) {
     if (s.empty()) line("pass");
@@ -210,15 +227,14 @@ void Construct::while_stmt(const LangAPI::While& value) {
     --indentation_;
 }
 void Construct::do_while_stmt(const LangAPI::DoWhile& value) {
-    line("while True:");
-    ++indentation_;
-    statements(value.stmt);
+    const auto first = "_ispa_first_" + std::to_string(++switch_counter_);
+    line(first + " = True");
     auto expression = core_.expression(value.expr);
     emit_pending_lambdas();
-    line("if not (" + expression + "):");
+    line("while " + first + " or (" + expression + "):");
     ++indentation_;
-    line("break");
-    --indentation_;
+    line(first + " = False");
+    statements(value.stmt);
     --indentation_;
 }
 void Construct::switch_body(const LangAPI::Statements& s) {
@@ -238,30 +254,15 @@ void Construct::switch_stmt(const LangAPI::Switch& value) {
     emit_pending_lambdas();
     line(temp + " = " + scrutinee);
     bool first = true;
-    std::vector<std::string> tests;  // empty-bodied cases fall through into the next body
-    const auto emit_case = [&](const LangAPI::Statements* body) {
-        std::string condition;
-        if (tests.size() == 1) condition = temp + " == " + tests.front();
-        else {
-            condition = temp + " in (";
-            for (const auto& t : tests) condition += t + ", ";
-            condition += ")";
-        }
-        line(std::string(first ? "if " : "elif ") + condition + ":");
-        ++indentation_;
-        if (body) switch_body(*body); else line("pass");
-        --indentation_;
-        first = false;
-        tests.clear();
-    };
     for (const auto& entry : value.cases) {
         auto test_value = core_.value(entry.first);
         emit_pending_lambdas();
-        tests.push_back(std::move(test_value));
-        if (entry.second.empty()) continue;
-        emit_case(&entry.second);
+        line(std::string(first ? "if " : "elif ") + temp + " == " + test_value + ":");
+        ++indentation_;
+        switch_body(entry.second);
+        --indentation_;
+        first = false;
     }
-    if (!tests.empty()) emit_case(nullptr);
 }
 void Construct::statement(const LangAPI::Statement& stmt) {
     if (stmt.isExpression()) {
@@ -348,10 +349,15 @@ void Construct::variable(const LangAPI::Variable& var) {
              "\", " + Core::identifier(var.name) + ")");
 }
 void Construct::alias(const LangAPI::TypeAlias& value) {
-    if (!value.template_parameters.empty())
-        comment("Generic alias type parameters erased on Python target");
-    const auto rhs = core_.type(value.type);
-    if (class_context_ && rhs.starts_with(Core::identifier(namespace_name) + ".FlatTypes.")) {
+    auto rhs = core_.type(value.type);
+    const bool flat_alias = rhs.starts_with(Core::identifier(namespace_name) + ".FlatTypes.");
+    if (!value.template_parameters.empty()) {
+        std::string params;
+        for (const auto& p : value.template_parameters) params += (params.empty() ? "" : ", ") + Core::identifier(p);
+        rhs = "lambda " + params + ": " + rhs;
+    }
+    if ((class_context_ || current_scope_ == "FlatTypes") &&
+        flat_alias) {
         deferred_aliases_.emplace_back(current_scope_ + "." + Core::identifier(value.name), rhs);
         return;
     }
@@ -382,6 +388,11 @@ void Construct::function(const LangAPI::Function& fn, bool ctor) {
     std::string args;
     const bool is_method = class_context_ && !fn.is_static;
     if (is_method || ctor) args = "self";
+    for (const auto& [parameter, constraints] : fn.template_parameters) {
+        if (!constraints.empty() || parameter.starts_with("ISPAParam")) continue;
+        if (!args.empty()) args += ", ";
+        args += Core::identifier(parameter);
+    }
     for (const auto& param : fn.parameters) {
         if (!args.empty()) args += ", ";
         args += Core::identifier(param.second) + ": " + core_.type(param.first);
@@ -422,31 +433,7 @@ void Construct::function(const LangAPI::Function& fn, bool ctor) {
         // This prelude is emitted by cls(), not here.
     }
     if (!body.empty()) {
-        const auto frame_at = recovery_frame_statement(body);
-        if (frame_at == std::string::npos) {
-            statements(body);
-        } else {
-            std::size_t index = 0;
-            std::string frame_name;
-            bool in_try = false;
-            for (const auto& st : body) {
-                statement(st);
-                if (index++ == frame_at) {
-                    frame_name = Core::identifier(st.getVariable().name);
-                    line("try:");
-                    ++indentation_;
-                    in_try = true;
-                }
-            }
-            if (in_try) {
-                if (frame_at + 1 == index) line("pass");   // nothing after the frame declaration
-                --indentation_;
-                line("finally:");
-                ++indentation_;
-                line(frame_name + ".close()");   // pops the frame and counts down an unwind request
-                --indentation_;
-            }
-        }
+        statements(body);
         emitted = true;
     }
     if (!emitted) line("pass");
@@ -462,6 +449,15 @@ void Construct::cls(const LangAPI::Class& value) {
     auto name = path.empty() ? full_name : path.back();
     const bool qualified = path.size() > 1 && !class_context_;
     if (qualified) name = "_ispa_generated_class_" + std::to_string(++hidden_class_counter_);
+    const bool generic = !value.template_parameters.empty();
+    if (generic) {
+        std::string params;
+        for (const auto& parameter : value.template_parameters)
+            params += (params.empty() ? "" : ", ") + Core::identifier(parameter);
+        line("@ispa_std.template");
+        line("def " + name + "(" + params + "):");
+        ++indentation_;
+    }
 
     std::string bases;
     bool has_lib_base = false;  // Lexer/Parser subclass: its __init__ must chain to the runtime
@@ -495,7 +491,8 @@ void Construct::cls(const LangAPI::Class& value) {
     } else if (name == "Parser") {
         class_members_.insert({"lr_parse", "lr_parse_generalized", "getErrors"});
         class_members_.insert({"lexer", "tree", "errors", "required", "optional", "range", "counted",
-            "range_optional", "skip_spaces", "recovery_frame", "recovery_at", "unwinding", "action_result"});
+            "range_optional", "skip_spaces", "recovery_frame", "recovery_at", "unwinding", "action_result",
+            "counter_scope", "bind_counter"});
         // Recovery runtime (ispa_std/parser.py). recover_choice stays bare: Core::call lowers it itself.
         class_members_.insert({"getContextErrors", "fail_context", "rule_context", "custom_failure_decision",
             "required_recovering", "sync_loop", "note_match", "reject_absent_rule", "recover_at_context",
@@ -593,6 +590,10 @@ void Construct::cls(const LangAPI::Class& value) {
     class_members_ = saved_members;
     current_scope_ = saved_scope;
     --indentation_;
+    if (generic) {
+        line("return " + name);
+        --indentation_;
+    }
     if (qualified) {
         std::string target;
         for (std::size_t i = 0; i < path.size(); ++i) {
@@ -688,6 +689,22 @@ void Construct::construct() {
     line(Core::identifier(namespace_name) + " = _sys.modules[__name__]");
     line();
     rewritten_source_ = rewriter_.run(*source);
+    std::unordered_set<std::string> generic_functions;
+    const auto collect = [&](auto&& self, const LangAPI::Declarations& decls) -> void {
+        for (const auto& d : decls) {
+            if (d.isFunction() && std::ranges::any_of(d.getFunction().template_parameters,
+                [](const auto& parameter) { return parameter.second.empty() && !parameter.first.starts_with("ISPAParam"); }))
+                generic_functions.insert(Core::identifier(d.getFunction().name));
+            else if (d.isNamespace()) self(self, d.getNamespace().declarations);
+            else if (d.isClass()) {
+                LangAPI::Declarations members;
+                for (const auto& [member, visibility] : d.getClass().data) members.push_back(*member);
+                self(self, members);
+            }
+        }
+    };
+    collect(collect, rewritten_source_);
+    core_.set_generic_functions(std::move(generic_functions));
     declarations(rewritten_source_);
     // C++ cursor snapshots are value copies. Python cursors are mutable, so
     // generated fail blocks must snapshot them explicitly before sync/skip.
@@ -716,6 +733,8 @@ void Construct::construct() {
         if (newline_action.empty())
             throw std::runtime_error("Python bootstrap NEWLINE action was not generated");
         replace_all(output_, "std.string(start, start + length)",
+                    "start[start_pos:start_pos + length]");
+        replace_all(output_, "str(start, start + length)",
                     "start[start_pos:start_pos + length]");
         replace_all(output_, "_ispa__next_char(((start) + (length)))",
                     "self._next_char_at(start_pos + length)");

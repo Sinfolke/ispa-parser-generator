@@ -73,6 +73,7 @@ TestDumps
 parser/ispa/incremental
 parser/python/incremental
 parser/build
+parser/stdlibs/target/rust/target/
 parser/ispa/bootstrapped/.codegen-*
 parser/python/bootstrapped/.codegen-*
 parser/ispa_dep_scanner/bootstrapped/.codegen-*

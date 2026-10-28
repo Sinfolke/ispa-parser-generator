@@ -5513,7 +5513,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();
@@ -5965,7 +5965,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();
@@ -6383,7 +6383,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();
@@ -6488,7 +6488,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();
@@ -6683,7 +6683,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();
@@ -6869,7 +6869,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();
@@ -7125,7 +7125,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();
@@ -7359,7 +7359,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();
@@ -7871,7 +7871,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();
@@ -7902,7 +7902,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();
@@ -8765,7 +8765,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();
@@ -9112,7 +9112,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();
@@ -9421,7 +9421,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();
@@ -9756,7 +9756,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();
@@ -9822,7 +9822,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();
@@ -10487,7 +10487,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();
@@ -10582,7 +10582,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();
@@ -10760,7 +10760,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 366, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();
@@ -10883,7 +10883,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();
@@ -11109,10 +11109,10 @@ if (true) {
 	(ctx).error("Expected a newline or ';' after Python statement");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 383, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 383, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("NEWLINE", "DEDENT");
+	(ctx).sync_tokens((ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 383, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 383, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	if ((ctx).at("NEWLINE")) {
+	if ((ctx).at_token("NEWLINE")) {
 		if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 383, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 		(ctx).retry();
 		if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/statements/statement.isc", 383, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
@@ -11209,7 +11209,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();
@@ -11479,7 +11479,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();
@@ -11631,7 +11631,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();
@@ -11971,7 +11971,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();
@@ -12344,7 +12344,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();
@@ -12527,7 +12527,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();
@@ -12796,7 +12796,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();
@@ -13241,7 +13241,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();
@@ -13290,7 +13290,7 @@ if (true) {
 	(ctx).error("Expected a Python expression");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
-	(ctx).sync_tokens("COMMA", "COLON", "SEMICOLON", "NEWLINE", "DEDENT", "RPAREN", "RBRACKET", "RBRACE");
+	(ctx).sync_tokens((ctx).token_boundary("COMMA"), (ctx).token_boundary("COLON"), (ctx).token_boundary("SEMICOLON"), (ctx).token_boundary("NEWLINE"), (ctx).token_boundary("DEDENT"), (ctx).token_boundary("RPAREN"), (ctx).token_boundary("RBRACKET"), (ctx).token_boundary("RBRACE"));
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "after");
 	if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/python/grammar/expr/expr.isc", 249, 5}, ::ispa::debug::Snapshot{}.add("ctx.rule", ctx.rule).add("ctx.pos", ctx.pos).add("ctx.ast", ctx.ast), "before");
 	(ctx).insert();

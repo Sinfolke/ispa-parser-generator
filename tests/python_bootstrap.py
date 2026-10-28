@@ -54,12 +54,19 @@ assert sum(token.holds(Types.modules.tokens.INDENT) for token in tokens) == 1
 assert sum(token.holds(Types.modules.tokens.DEDENT) for token in tokens) == 1
 assert sum(token.holds(Types.modules.tokens.NEWLINE) for token in tokens) == 2
 Parser().parse(layout_source)
+for source in ('x =\\ny = 2\\n', 'x = 1 +\\ny = 2\\n',
+               'x = 1 unexpected\\ny = 2\\n', 'x = f(1, +)\\ny = 2\\n'):
+    parser = Parser()
+    tree = parser.parse(source)
+    assert len(tree.data().value.data().value) == 2, 'recovery lost the following statement'
+    assert parser.getErrors(), 'malformed Python must retain its diagnostic'
+parser = Parser()
 try:
-    Parser().parse('class C\\n    pass\\n')
+    parser.parse('class C\\n    pass\\n')
 except ParseError:
     pass
 else:
-    raise AssertionError('invalid class header must report a parse error')
+    assert parser.getErrors(), 'invalid class header must report a diagnostic after recovery'
 """], cwd=root, env=env, check=True)
     print('Python grammar bootstrap passed')
 

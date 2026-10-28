@@ -443,7 +443,7 @@ namespace LangRepr {
         function.name = "print";
         function.type = LangAPI::ValueType::Void;
         function.is_const = true;
-        function.parameters.emplace_back(LangAPI::Type{LangAPI::Symbol{"std::ostream&"}}, "os");
+        function.parameters.emplace_back(LangAPI::Type{LangAPI::ValueType::BorrowSemantic, LangAPI::Type{LangAPI::IspaLibSymbol{.exports = LangAPI::StdlibExports::TextOutput}}}, "os");
         function.statements.push_back(LangAPI::Variable{
             .name = "printer",
             .type = LangAPI::Type{LangAPI::IspaLibSymbol{.exports = LangAPI::StdlibExports::ASTPrinter}},
@@ -701,7 +701,7 @@ namespace LangRepr {
         };
 
         auto flatSymbol = [&](const Name& n) -> LangAPI::Symbol {
-            return LangAPI::Symbol{"::" + namespace_name + "::FlatTypes::" + flattenName(n)};
+            return LangAPI::Symbol{"", namespace_name, "FlatTypes", flattenName(n)};
         };
 
         auto templateNames = [&](const Name& n) -> stdu::vector<std::string> {

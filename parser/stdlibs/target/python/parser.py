@@ -95,6 +95,18 @@ class FrameGuard:
         self.close()
 
 
+class CounterScope:
+    def __init__(self, parser):
+        self.parser = parser
+        self.saved = parser.counters.copy()
+        self.closed = False
+
+    def close(self):
+        if not self.closed:
+            self.parser.counters = self.saved
+            self.closed = True
+
+
 class LLParser:
     def __init__(self, lexer: Lexer | None = None) -> None:
         self.lexer = lexer
@@ -126,6 +138,15 @@ class LLParser:
     def getContextErrors(self) -> list:
         """Diagnostics produced by hierarchical (context) recovery."""
         return self.context_errors
+
+    def counter_scope(self):
+        return CounterScope(self)
+
+    def bind_counter(self, name, value):
+        count = len(value) if isinstance(value, (list, tuple)) else int(not value.empty())
+        if name in self.counters and self.counters[name] != count:
+            raise RuntimeError(f"Shared counter '{name}' has a different count")
+        self.counters[name] = count
 
     def parse(self, source: Lexer | str, rule: Callable[[Cursor], MatchResult] | None = None) -> Any:
         lex = source if isinstance(source, Lexer) else self._make_lexer(source)
@@ -578,7 +599,7 @@ class LLParser:
             self._probes.pop()
 
     def counted(self, pos: Cursor, spec: CountSpec | tuple[int, int | None] | int,
-                expected: Any, callback: Callable | None = None) -> list[Node]:
+                expected: Any, callback: Callable | None = None, space=None) -> list[Node]:
         if isinstance(spec, int):
             spec = CountSpec.fixed(spec)
         elif isinstance(spec, tuple):
@@ -587,19 +608,22 @@ class LLParser:
         # otherwise `minimum`..`count` is an inclusive range (count=None means unbounded).
         recorded = self.counters.get(spec.name) if spec.name else None
         limit = recorded if recorded is not None else spec.count
-        minimum = recorded if recorded is not None else spec.minimum
-        original = pos.copy()
+        minimum = max(recorded, spec.minimum) if recorded is not None else spec.minimum
+        cursor = pos.copy()
         matches: list[Node] = []
         while limit is None or len(matches) < limit:
-            before = pos.index
-            item = self.optional(pos, expected, callback)
+            attempt = cursor.copy()
+            if matches and space is not None:
+                self.skip_spaces(attempt, space)
+            before = attempt.index
+            item = self.optional(attempt, expected, callback)
             if item.empty():
                 break
-            if pos.index == before:
+            if limit is None and attempt.index == before:
                 raise RuntimeError('Zero-length match in repetition')
             matches.append(item)
+            cursor.commit(attempt)
         if len(matches) < minimum:
-            pos.commit(original)
             self.reject_absent_rule()
             err = self._error(f'{minimum}..{limit} instances of {expected!r}', pos)
             self.errors.append(err)
@@ -607,6 +631,8 @@ class LLParser:
             raise err
         if spec.name:
             self.counters.setdefault(spec.name, len(matches))
+        pos.commit(cursor)
+        self.note_match()
         return matches
 
     def _repeat(self, pos: Cursor, expected: Any, callback: Callable | None,

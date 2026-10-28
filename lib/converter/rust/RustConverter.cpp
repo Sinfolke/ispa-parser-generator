@@ -65,23 +65,7 @@ namespace Rust {
     // ========================================================================
     // C++ converts a string literal to whatever the declaration asks for; Rust needs it spelled out.
     auto Construct::initializer(const LangAPI::Type &type, const LangAPI::Expression &value) -> std::string {
-        if (value.empty()) return "";
-        if (type.isValueType() && type.getValueType() == LangAPI::ValueType::FixedSizeArray &&
-            value.size() == 1 && value[0].type() == LangAPI::ExpressionValueType::RValue &&
-            value[0].getRValue().type() == LangAPI::RValueType::Array) {
-            const auto rendered = RustCore::convertRValue(value[0].getRValue());
-            if (rendered.starts_with("vec![")) return rendered.substr(4);
-        }
-        if (singleStringLiteral(value)) {
-            const auto &t = isValueTypeOf(type, LangAPI::ValueType::ImmutableSemantic) && !type.template_parameters.empty() &&
-                                    std::holds_alternative<LangAPI::Type>(type.template_parameters.front())
-                                ? std::get<LangAPI::Type>(type.template_parameters.front()) : type;
-            if (isValueTypeOf(t, LangAPI::ValueType::String))
-                return "String::from(" + RustCore::convertExpression(value) + ")";
-            if (isValueTypeOf(t, LangAPI::ValueType::NonOwnedString))
-                return "::ispa_std::Ptr::from_static(" + RustCore::convertExpression(value) + ")";
-        }
-        return RustCore::convertExpression(value);
+        return RustCore::convertInitializer(type, value);
     }
 
     // ========================================================================
@@ -167,6 +151,7 @@ namespace Rust {
             line += " = Default::default()";       // C++ default-initialises; the type has to implement Default
         }
         emitLine(o, line + ";");
+        RustCore::bind(variable.name);
         if (debug_instrumentation_ && !variable.value.empty() &&
             RustCore::convertExpression(variable.value).find("captures.") != std::string::npos)
             emitLine(o, "if ::ispa_std::debug::enabled() { ::ispa_std::debug::lexer_capture(\"" + variable.name + "\", &" +
@@ -234,7 +219,11 @@ namespace Rust {
     }
 
     auto Construct::convertStatements(const LangAPI::Statements &statements, Converter::Writer &o) -> void {
+        const auto saved_borrowed = RustCore::borrowed_parameters;
+        RustCore::locals.emplace_back();
         for (const auto &stmt : statements) convertStatement(stmt, o);
+        RustCore::locals.pop_back();
+        RustCore::borrowed_parameters = saved_borrowed;
     }
 
     auto Construct::convertStatement(const LangAPI::Statement &stmt, Converter::Writer &o) -> void {
@@ -268,13 +257,10 @@ namespace Rust {
                                  const std::string &scope, const std::vector<std::string> &bases) -> void {
         std::string name = kind == FnKind::Constructor ? "new" : RustCore::ident(func.name);
         const auto key = scope + "::" + name;
-        if (const auto n = ++context.fn_counts[key]; n > 1) {
-            name += "_" + std::to_string(n);
-            RustCore::warn("overload `" + func.name + "` in `" + scope + "` renamed to `" + name +
-                           "`; call sites are not redirected (Rust has no overloading)");
-        }
+        if (++context.fn_counts[key] > 1)
+            throw Error("Rust target: overloaded function `{}` needs a resolved callee identity in IR", key);
         if (func.override)
-            RustCore::warn("`override` on `" + func.name + "` ignored: Rust has no virtual dispatch through inheritance");
+            throw Error("Rust target: virtual method `{}` needs a semantic runtime/interface contract in IR", func.name);
 
         // generics + marker traits
         std::vector<std::string> generics;
@@ -291,6 +277,23 @@ namespace Rust {
             emitLine(aux, "pub trait " + marker + " {}");
             for (const auto &allowed : tp.second) emitLine(aux, "impl " + marker + " for " + RustCore::convertType(allowed) + " {}");
             generics.push_back(param + ": " + marker);
+        }
+
+        const auto saved_receiver = RustCore::receiver;
+        const auto saved_return_type = RustCore::return_type;
+        const auto saved_locals = RustCore::locals;
+        const auto saved_borrowed = RustCore::borrowed_parameters;
+        RustCore::borrowed_parameters.clear();
+        RustCore::locals.clear();
+        RustCore::locals.emplace_back();
+        RustCore::return_type = &func.type;
+        if (kind == FnKind::Constructor) RustCore::receiver = "this";
+        else if (kind != FnKind::Method || func.is_static) RustCore::receiver.clear();
+        else RustCore::receiver = "self";
+        for (const auto& parameter : func.parameters) {
+            RustCore::bind(parameter.second);
+            if (isValueTypeOf(parameter.first, LangAPI::ValueType::BorrowSemantic))
+                RustCore::borrowed_parameters.insert(parameter.second);
         }
 
         // signature
@@ -318,8 +321,7 @@ namespace Rust {
 
         if (kind == FnKind::Constructor) emitLine(w, "let mut this = Self::default();");
         if (func.statements.empty() && kind != FnKind::Constructor && !ret.empty()) {
-            RustCore::warn("`" + func.name + "` has no body but a return value: emitted as unimplemented!()");
-            emitLine(w, "unimplemented!()");
+            throw Error("Rust target: function `{}` has no implementation", func.name);
         }
         for (const auto &stmt : func.statements) {
             // `Base{args}` initialiser-list entries of a constructor assign the embedded base
@@ -342,6 +344,10 @@ namespace Rust {
 
         RustCore::counter = saved_counter;
         RustCore::loop_frames = saved_frames;
+        RustCore::receiver = saved_receiver;
+        RustCore::return_type = saved_return_type;
+        RustCore::locals = saved_locals;
+        RustCore::borrowed_parameters = saved_borrowed;
         w.decreaseIndentation();
         emitLine(w, "}");
     }
@@ -369,9 +375,33 @@ namespace Rust {
     //   constructor      -> `new`, built on Default
     //   nested types / statics were hoisted by Rust.Rewriter; anything that still shows up is emitted as a sibling
     auto Construct::emitClass(const LangAPI::Class &cls, Converter::Writer &w) -> void {
-        const std::string name = RustCore::convertSymbol(cls.name);
+        for (const auto& [visibility, base] : cls.inherit_members) {
+            if (const auto* library = std::get_if<LangAPI::IspaLibSymbol>(&base);
+                library && (library->exports == LangAPI::StdlibExports::Lexer ||
+                            library->exports == LangAPI::StdlibExports::Parser ||
+                            library->exports == LangAPI::StdlibExports::LRParser ||
+                            library->exports == LangAPI::StdlibExports::LRGeneralizedParser))
+                throw Error("Rust target: parser generation is incomplete: shared lowering still uses C++ container/iterator operations and implicit inherited runtime calls. IR needs semantic token-stream operations and explicit runtime interface contracts; refusing to emit an invalid Rust parser");
+        }
+        const std::string name = RustCore::convertSymbol(cls.name, false);
         const std::string generics = genericParams(cls.template_parameters);
         const bool templated = !cls.template_parameters.empty();
+        const auto saved_members = RustCore::members;
+        const auto saved_static_members = RustCore::static_members;
+        RustCore::members.clear();
+        RustCore::static_members.clear();
+        RustCore::scope.push_back(name);
+        for (const auto& [member, visibility] : cls.data) {
+            if (member->isVariable()) {
+                const auto& variable = member->getVariable();
+                (variable.is_static ? RustCore::static_members : RustCore::members).insert(variable.name);
+            } else if (member->isFunction()) {
+                const auto& function = member->getFunction();
+                (function.is_static ? RustCore::static_members : RustCore::members).insert(function.name);
+            }
+        }
+        if (cls.to_str_fun) RustCore::members.insert(cls.to_str_fun->name);
+
 
         std::vector<std::string> bases;
         for (const auto &inherit : cls.inherit_members) {
@@ -379,14 +409,14 @@ namespace Rust {
             else bases.push_back(RustCore::convertIspaLibSymbol(std::get<LangAPI::IspaLibSymbol>(inherit.second), false));
         }
 
-        struct Field { std::string name, type; const LangAPI::Expression *init; bool is_public; };
+        struct Field { std::string name, type; const LangAPI::Type* ir_type; const LangAPI::Expression *init; bool is_public; };
         std::vector<Field> fields;
         std::vector<std::string> methods;
         std::vector<const LangAPI::Declaration *> siblings;
         for (const auto &[declaration, visibility] : cls.data) {
             if (declaration->isVariable() && !declaration->getVariable().is_static) {
                 const auto &v = declaration->getVariable();
-                fields.push_back({RustCore::ident(v.name), RustCore::convertType(v.type), &v.value, visibility == LangAPI::Visibility::Public});
+                fields.push_back({RustCore::ident(v.name), RustCore::convertType(v.type), &v.type, &v.value, visibility == LangAPI::Visibility::Public});
             } else if (declaration->isFunction()) {
                 if (visibility == LangAPI::Visibility::Public) methods.push_back(declaration->getFunction().name);
             } else {
@@ -418,8 +448,7 @@ namespace Rust {
             w.increaseIndentation();
             for (std::size_t i = 0; i < bases.size(); ++i) emitLine(w, "base_" + std::to_string(i) + ": Default::default(),");
             for (const auto &f : fields) {
-                // the field type is not kept next to the initialiser here, so literals are converted by the plain path
-                emitLine(w, f.name + ": " + (f.init->empty() ? std::string("Default::default()") : RustCore::convertExpression(*f.init)) + ",");
+                emitLine(w, f.name + ": " + (f.init->empty() ? std::string("Default::default()") : initializer(*f.ir_type, *f.init)) + ",");
             }
             if (templated) emitLine(w, "__phantom: Default::default(),");
             w.decreaseIndentation();
@@ -430,7 +459,7 @@ namespace Rust {
             emitLine(w, "}");
         }
         if (!bases.empty()) {
-            if (bases.size() > 1) RustCore::warn("`" + name + "` has several bases: only the first one is reachable through Deref");
+            if (bases.size() > 1) throw Error("Rust target: multiple inheritance on `{}` needs resolved base-member identities in IR", name);
             emitLine(w, "impl" + generics + " ::std::ops::Deref for " + name + generics + " { type Target = " + bases[0] + "; fn deref(&self) -> &Self::Target { &self.base_0 } }");
             emitLine(w, "impl" + generics + " ::std::ops::DerefMut for " + name + generics + " { fn deref_mut(&mut self) -> &mut Self::Target { &mut self.base_0 } }");
         }
@@ -493,10 +522,12 @@ namespace Rust {
         if (!aux_text.empty()) w.dwrite("{}", aux_text);
 
         for (const auto *sibling : siblings) {
-            RustCore::warn("`" + name + "` still contains a nested declaration after rewriting: emitted as a sibling without reference renaming");
-            emitItem(*sibling, w);
+            throw Error("Rust target: nested declaration in `{}` was not resolved by structural lowering", name);
         }
         context.module_path = saved_modules;
+        RustCore::scope.pop_back();
+        RustCore::members = saved_members;
+        RustCore::static_members = saved_static_members;
     }
 
     // ========================================================================
@@ -583,12 +614,16 @@ namespace Rust {
     // declarations
     // ========================================================================
     auto Construct::emitNamespace(const LangAPI::Namespace &ns, Converter::Writer &w) -> void {
-        emitLine(w, "pub mod " + RustCore::ident(ns.name) + " {");
+        const bool root = context.module_path.empty() && ns.name == namespace_name;
+        emitLine(w, "pub mod " + (root ? RustCore::moduleIdent(ns.name) : RustCore::ident(ns.name)) + " {");
         w.increaseIndentation();
         emitLine(w, "#[allow(unused_imports)] use super::*;");
-        context.module_path.push_back(ns.name);
+        context.module_path.push_back(root ? RustCore::moduleIdent(ns.name) : ns.name);
+        RustCore::scope.push_back(ns.name);
         emitDeclarations(ns.declarations, w);
+        if (root) emitVariants(w);
         context.module_path.pop_back();
+        RustCore::scope.pop_back();
         w.decreaseIndentation();
         emitLine(w, "}");
     }
@@ -637,9 +672,8 @@ namespace Rust {
         emitLine(file, "#[allow(unused_imports)] use super::*;");
         emitItem(decl, file);
 
-        std::string path = std::string(namespace_name);
-        for (const auto &m : context.module_path) path += "/" + m;
-        context.files.emplace_back(path + "/" + module_name + ".rs", std::string(file.get()));
+        const auto path = joinStrings(context.module_path, "/");
+        context.files.emplace_back((path.empty() ? "" : path + "/") + module_name + ".rs", std::string(file.get()));
         emitLine(w, "pub mod " + module_name + ";");
         emitLine(w, "pub use self::" + module_name + "::*;");
     }
@@ -657,21 +691,28 @@ namespace Rust {
         RustCore::label_counter = 0;
         context = Context{};
 
+        writable_files.clear();
+        RustCore::scope.clear();
+        RustCore::locals.clear();
+        RustCore::borrowed_parameters.clear();
+        RustCore::members.clear();
+        RustCore::static_members.clear();
+        RustCore::receiver.clear();
+        RustCore::return_type = nullptr;
         program = Rust::Rewriter::rewrite(*source);
+        RustCore::indexFunctions(program);
 
         Converter::Writer body;
         emitDeclarations(program, body);
-        Converter::Writer variants;
-        emitVariants(variants);                         // must come last: variants are registered while types are converted
 
         std::string header = "// @generated by the ISPA Rust backend. Expects the `ispa_std` crate and to live at `crate::" +
-                             std::string(namespace_name) + "`.\n";
+                             RustCore::moduleIdent(std::string(namespace_name)) + "`.\n";
         header += kAllow;
         for (const auto &d : RustCore::diagnostics) header += "// ISPA-RUST-WARNING: " + d + "\n";
         header += "\n";
 
         writable_files.clear();
-        writable_files.emplace_back(std::string(namespace_name) + ".rs", header + std::string(body.get()) + std::string(variants.get()));
+        writable_files.emplace_back(std::string(namespace_name) + ".rs", header + std::string(body.get()));
         if (incremental)
             for (auto &file : context.files) writable_files.emplace_back(std::move(file));
     }

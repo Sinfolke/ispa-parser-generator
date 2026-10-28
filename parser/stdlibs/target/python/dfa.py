@@ -164,7 +164,7 @@ class TdfaLayout:
 def run_tdfa(source: str, pos: Position, table: Sequence[Sequence[int]],
              class_table: Sequence[int], action_table: Sequence[Sequence[int]],
              layout: TdfaLayout, semantic: Callable,
-             first_line: int = 1) -> tuple[Any, int]:
+             first_line: int = 1, debug_array=(), debug_index=None) -> tuple[Any, int]:
     """Faithful control flow for the supplied C++ `DFA::run` state encoding.
 
     Lexical states: [0, len(table)). Action states follow lexical states.
@@ -185,6 +185,8 @@ def run_tdfa(source: str, pos: Position, table: Sequence[Sequence[int]],
     nstates = len(table)
     nactions = len(action_table)
     semantic_accepts_cursor = len(signature(semantic).parameters) >= 7
+    import ispa_debug
+    tracing = ispa_debug.enabled()
     while state != NULL_STATE:
         if state < nstates:
             if immediate_action:
@@ -198,6 +200,15 @@ def run_tdfa(source: str, pos: Position, table: Sequence[Sequence[int]],
                 raise ValueError('TDFA char-class table does not cover code point ' + str(ch))
             klass = class_table[ch]
             next_state = table[state][klass]
+            if tracing:
+                slot = (debug_index or {}).get(state, {}).get(klass)
+                if slot is not None:
+                    debug = debug_array[slot]
+                    ispa_debug.event('dfa_transition', debug.token_name,
+                                     state=state, next_state=next_state, actual=pos.peek(),
+                                     member=debug.member, position_in_token=debug.position_in_token,
+                                     call=debug.call, group=debug.group, rule_run=debug.rule_run,
+                                     offset=debug.offset, length=debug.length, ch=debug.ch)
             if next_state == NULL_STATE or next_state < 0:
                 break
             state = next_state
