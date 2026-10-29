@@ -347,6 +347,9 @@ struct PythonConverter {
             if (auto found = local_types.find(n->id); found != local_types.end()) return found->second;
             if (!self_name.empty() && n->id == self_name && !self_class.empty()) return la::Type{pythonSymbol(self_class)};
         }
+        if (auto n = value->template get<py::Name>(); n && signatures && !locals.contains(n->id)) {
+            if (const auto it = signatures->variables.find(n->id); it != signatures->variables.end()) return declared(it->second);
+        }
         if (auto a = value->template get<py::Attribute>(); a && a->value) {
             const auto owner = symbol_id(inferred(a->value));
             if (!owner.empty()) return declared(member_annotation(owner, a->attr, false));
@@ -626,7 +629,9 @@ struct PythonConverter {
                     };
                     // A name that also belongs to a user class (`get(key)`) is a plain method call when the
                     // arguments do not fit the collection method.
-                    if (auto found = methods.find(method->attr); found != methods.end() &&
+                    // A receiver known to be a user class keeps its own methods (`TokenSet.values()`).
+                    const bool user_class = signatures && signatures->classes.contains(symbol_id(inferred(method->value)));
+                    if (auto found = methods.find(method->attr); found != methods.end() && !user_class &&
                         x.args.size() >= std::get<1>(found->second) && x.args.size() <= std::get<2>(found->second)) {
                         const auto& [kind, minimum, maximum] = found->second;
                         la::ArrayMethodCall call;

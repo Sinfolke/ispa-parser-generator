@@ -493,6 +493,8 @@ struct Signatures {
         std::map<std::string, ExprPtr> fields, methods;
     };
     std::map<std::string, ExprPtr> functions;
+    // Module variables: the annotation, or a synthesized one for literal initializers.
+    std::map<std::string, ExprPtr> variables;
     std::map<std::string, Class> classes;
 };
 } // namespace py

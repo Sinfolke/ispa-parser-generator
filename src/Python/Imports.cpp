@@ -488,7 +488,18 @@ std::string Imports::module(const Modules::Path& source_path, const std::string&
             };
             for (const auto& statement : syntax.body) {
                 if (auto f = statement->get<py::FunctionDef>()) signatures.functions[prefix + f->name] = record(f->returns);
-                else if (auto c = statement->get<py::ClassDef>()) {
+                else if (auto a = statement->get<py::AnnAssign>(); a && a->target && a->annotation) {
+                    if (auto n = a->target->get<py::Name>()) signatures.variables[prefix + n->id] = record(a->annotation);
+                } else if (auto a = statement->get<py::Assign>(); a && a->targets.size() == 1 && a->targets[0] && a->value) {
+                    // `NAME = "text"` / `NAME = 3`: the literal's type.
+                    auto n = a->targets[0]->get<py::Name>();
+                    auto literal = a->value->get<py::Constant>();
+                    if (n && literal) {
+                        const char* type = literal->kind == py::ConstantKind::Str ? "str" : literal->kind == py::ConstantKind::Int ? "int" :
+                            literal->kind == py::ConstantKind::Float ? "float" : literal->kind == py::ConstantKind::Bool ? "bool" : nullptr;
+                        if (type) signatures.variables[prefix + n->id] = std::make_shared<py::Expr>(py::Expr{a->value->pos, py::Name{type}});
+                    }
+                } else if (auto c = statement->get<py::ClassDef>()) {
                     auto& entry = signatures.classes[prefix + c->name];
                     for (auto& base : c->bases) {
                         walk(base, type_bind);
