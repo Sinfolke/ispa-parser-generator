@@ -191,8 +191,10 @@ auto RustCore::indexFunctions(const LangAPI::Declarations& declarations) -> void
     // dispatch slots: an overriding method registers in the first-base chain's topmost class that declares the method
     for (const auto* cls : all_classes) {
         for (const auto& [member, visibility] : cls->data) {
-            if (!member->isFunction() || !member->getFunction().override) continue;
+            if (!member->isFunction()) continue;
             const auto& function = member->getFunction();
+            // every non-static method but `__init__` is virtual (Python); generated code marks its overrides of runtime methods
+            if (function.is_static || function.name == "__init__" || (!function.is_virtual && !function.override)) continue;
             const LangAPI::Class* current = cls;
             const LangAPI::Function* introduced = nullptr;
             const LangAPI::Class* introducer = nullptr;
@@ -200,7 +202,8 @@ auto RustCore::indexFunctions(const LangAPI::Declarations& declarations) -> void
             while (!current->inherit_members.empty()) {
                 const auto* base = std::get_if<LangAPI::Symbol>(&current->inherit_members.front().second);
                 if (!base) break;
-                const auto it = class_decls.find(symbolKey(*base));
+                if (base->path.empty() || !std::holds_alternative<std::string>(base->path.back())) break;
+                const auto it = class_decls.find(std::get<std::string>(base->path.back()));
                 if (it == class_decls.end()) break;
                 current = it->second;
                 ++hops;
@@ -213,7 +216,8 @@ auto RustCore::indexFunctions(const LangAPI::Declarations& declarations) -> void
             }
             if (!introduced) {
                 // the base is the runtime (a library type): its slot lives there, registered like any other
-                if (!current->inherit_members.empty() && std::holds_alternative<LangAPI::IspaLibSymbol>(current->inherit_members.front().second))
+                if (function.override && !current->inherit_members.empty() &&
+                    std::holds_alternative<LangAPI::IspaLibSymbol>(current->inherit_members.front().second))
                     overrides[&function] = {"", hops + 1, true};
                 continue;
             }
@@ -1216,10 +1220,11 @@ auto RustCore::convertFunctionCall(const LangAPI::FunctionCall &call, bool membe
             !std::any_of(locals.rbegin(), locals.rend(), [&](const auto& frame) { return frame.contains(std::get<std::string>(symbol.path[0])); }))
             callee = receiver + "." + callee;
         if (!member)   // `Base.method(self, ...)` on a dispatching method runs the base implementation, not the dispatcher
-            if (const auto* function = resolveFunction(symbol); function && slot_functions.contains(function)) {
+            if (const auto* function = resolveFunction(symbol); function && (slot_functions.contains(function) || overrides.contains(function))) {
                 const auto at = callee.rfind("::");
                 const auto method = at == std::string::npos ? callee : callee.substr(at + 2);
-                callee = (at == std::string::npos ? std::string() : callee.substr(0, at + 2)) + "__base_" + method;
+                callee = (at == std::string::npos ? std::string() : callee.substr(0, at + 2)) +
+                         (overrides.contains(function) ? "__impl_" : "__base_") + method;
             }
         return callee + generic(convertTemplates(call.template_parameters), true) + "(" + joinStrings(args, ", ") + ")";
     }

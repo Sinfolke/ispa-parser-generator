@@ -493,10 +493,20 @@ pub mod python {
 				pub fn methods_str() -> [&'static str; 1] { ["read_byte"] }
 			}
 			#[repr(C)]
-			#[derive(Clone, Default)]
+			#[derive(Clone)]
 			pub struct ScopeBase {
 				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
+				pub __vt_close: fn(&mut ScopeBase),
 				pub serial: i64,
+			}
+			impl Default for ScopeBase {
+				fn default() -> Self {
+					Self {
+						__ispa_owner: Default::default(),
+						__vt_close: ScopeBase::__base_close,
+						serial: Default::default(),
+					}
+				}
 			}
 			impl ScopeBase {
 				pub fn shared_default() -> ::ispa_std::Shared<Self> {
@@ -506,10 +516,11 @@ pub mod python {
 					self.__ispa_owner = owner.clone();
 				}
 				pub fn __init__(&mut self) {}
-				pub fn close(&mut self) {
+				pub fn __base_close(&mut self) {
 					let __p = self as *const Self as *mut Self;
 					return;
 				}
+				pub fn close(&mut self) { (self.__vt_close)(self) }
 				pub fn members(&self) -> (&i64,) { (&self.serial,) }
 				pub fn members_mut(&mut self) -> (&mut i64,) { (&mut self.serial,) }
 				pub fn members_str() -> [&'static str; 1] { ["serial"] }
@@ -869,14 +880,26 @@ pub mod python {
 				}
 			}
 			#[repr(C)]
-			#[derive(Clone, Default)]
+			#[derive(Clone)]
 			pub struct RuleScope {
-				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
 				pub base_0: python::ispa_std::debug::ScopeBase,
+				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
 				pub name: String,
 				pub loc: ::ispa_std::Shared<python::ispa_std::debug::Location>,
 				pub previous: ::ispa_std::Shared<python::ispa_std::debug::Location>,
 				pub open: bool,
+			}
+			impl Default for RuleScope {
+				fn default() -> Self {
+					Self {
+						__ispa_owner: Default::default(),
+						base_0: { let mut __base: python::ispa_std::debug::ScopeBase = Default::default(); __base.__vt_close = RuleScope::__thunk_close; __base },
+						name: Default::default(),
+						loc: Default::default(),
+						previous: Default::default(),
+						open: Default::default(),
+					}
+				}
 			}
 			impl ::std::ops::Deref for RuleScope { type Target = python::ispa_std::debug::ScopeBase; fn deref(&self) -> &Self::Target { &self.base_0 } }
 			impl ::std::ops::DerefMut for RuleScope { fn deref_mut(&mut self) -> &mut Self::Target { &mut self.base_0 } }
@@ -901,7 +924,7 @@ pub mod python {
 					python::ispa_std::debug::rule_depth_enter();
 					(((*((*python::ispa_std::debug::_S.get())).borrow_mut())).scopes).push(self.__ispa_owner.upgrade().expect("instance has no shared owner").upcast());
 				}
-				pub fn close(&mut self) {
+				pub fn __impl_close(&mut self) {
 					let __p = self as *const Self as *mut Self;
 					if (!((self).open)) {
 						return;
@@ -912,20 +935,34 @@ pub mod python {
 					python::ispa_std::debug::exit_rule(&((self).name), (((self).loc).clone()).upcast());
 					((*((*python::ispa_std::debug::_S.get())).borrow_mut())).location = ((self).previous).clone();
 				}
+				pub fn close(&mut self) { (self.base_0.__vt_close)(&mut self.base_0) }
+				pub fn __thunk_close(base: &mut python::ispa_std::debug::ScopeBase) { let this = unsafe { &mut *(base as *const python::ispa_std::debug::ScopeBase as *mut RuleScope) }; this.__impl_close() }
 				pub fn members(&self) -> (&String, &::ispa_std::Shared<python::ispa_std::debug::Location>, &::ispa_std::Shared<python::ispa_std::debug::Location>, &bool) { (&self.name, &self.loc, &self.previous, &self.open) }
 				pub fn members_mut(&mut self) -> (&mut String, &mut ::ispa_std::Shared<python::ispa_std::debug::Location>, &mut ::ispa_std::Shared<python::ispa_std::debug::Location>, &mut bool) { (&mut self.name, &mut self.loc, &mut self.previous, &mut self.open) }
 				pub fn members_str() -> [&'static str; 4] { ["name", "loc", "previous", "open"] }
 				pub fn methods_str() -> [&'static str; 2] { ["__init__", "close"] }
 			}
 			#[repr(C)]
-			#[derive(Clone, Default)]
+			#[derive(Clone)]
 			pub struct ProductionScope {
-				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
 				pub base_0: python::ispa_std::debug::ScopeBase,
+				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
 				pub name: String,
 				pub loc: ::ispa_std::Shared<python::ispa_std::debug::Location>,
 				pub previous: ::ispa_std::Shared<python::ispa_std::debug::Location>,
 				pub open: bool,
+			}
+			impl Default for ProductionScope {
+				fn default() -> Self {
+					Self {
+						__ispa_owner: Default::default(),
+						base_0: { let mut __base: python::ispa_std::debug::ScopeBase = Default::default(); __base.__vt_close = ProductionScope::__thunk_close; __base },
+						name: Default::default(),
+						loc: Default::default(),
+						previous: Default::default(),
+						open: Default::default(),
+					}
+				}
 			}
 			impl ::std::ops::Deref for ProductionScope { type Target = python::ispa_std::debug::ScopeBase; fn deref(&self) -> &Self::Target { &self.base_0 } }
 			impl ::std::ops::DerefMut for ProductionScope { fn deref_mut(&mut self) -> &mut Self::Target { &mut self.base_0 } }
@@ -950,7 +987,7 @@ pub mod python {
 					python::ispa_std::debug::rule_depth_enter();
 					(((*((*python::ispa_std::debug::_S.get())).borrow_mut())).scopes).push(self.__ispa_owner.upgrade().expect("instance has no shared owner").upcast());
 				}
-				pub fn close(&mut self) {
+				pub fn __impl_close(&mut self) {
 					let __p = self as *const Self as *mut Self;
 					if (!((self).open)) {
 						return;
@@ -961,16 +998,18 @@ pub mod python {
 					python::ispa_std::debug::leave_production(&((self).name), (((self).loc).clone()).upcast());
 					((*((*python::ispa_std::debug::_S.get())).borrow_mut())).location = ((self).previous).clone();
 				}
+				pub fn close(&mut self) { (self.base_0.__vt_close)(&mut self.base_0) }
+				pub fn __thunk_close(base: &mut python::ispa_std::debug::ScopeBase) { let this = unsafe { &mut *(base as *const python::ispa_std::debug::ScopeBase as *mut ProductionScope) }; this.__impl_close() }
 				pub fn members(&self) -> (&String, &::ispa_std::Shared<python::ispa_std::debug::Location>, &::ispa_std::Shared<python::ispa_std::debug::Location>, &bool) { (&self.name, &self.loc, &self.previous, &self.open) }
 				pub fn members_mut(&mut self) -> (&mut String, &mut ::ispa_std::Shared<python::ispa_std::debug::Location>, &mut ::ispa_std::Shared<python::ispa_std::debug::Location>, &mut bool) { (&mut self.name, &mut self.loc, &mut self.previous, &mut self.open) }
 				pub fn members_str() -> [&'static str; 4] { ["name", "loc", "previous", "open"] }
 				pub fn methods_str() -> [&'static str; 2] { ["__init__", "close"] }
 			}
 			#[repr(C)]
-			#[derive(Clone, Default)]
+			#[derive(Clone)]
 			pub struct MatchScope {
-				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
 				pub base_0: python::ispa_std::debug::ScopeBase,
+				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
 				pub expected: String,
 				pub actual: String,
 				pub reason: String,
@@ -978,6 +1017,21 @@ pub mod python {
 				pub matched: bool,
 				pub active: bool,
 				pub open: bool,
+			}
+			impl Default for MatchScope {
+				fn default() -> Self {
+					Self {
+						__ispa_owner: Default::default(),
+						base_0: { let mut __base: python::ispa_std::debug::ScopeBase = Default::default(); __base.__vt_close = MatchScope::__thunk_close; __base },
+						expected: Default::default(),
+						actual: Default::default(),
+						reason: Default::default(),
+						loc: Default::default(),
+						matched: Default::default(),
+						active: Default::default(),
+						open: Default::default(),
+					}
+				}
 			}
 			impl ::std::ops::Deref for MatchScope { type Target = python::ispa_std::debug::ScopeBase; fn deref(&self) -> &Self::Target { &self.base_0 } }
 			impl ::std::ops::DerefMut for MatchScope { fn deref_mut(&mut self) -> &mut Self::Target { &mut self.base_0 } }
@@ -1014,7 +1068,7 @@ pub mod python {
 					let __p = self as *const Self as *mut Self;
 					(self).reason = ((*why)).clone();
 				}
-				pub fn close(&mut self) {
+				pub fn __impl_close(&mut self) {
 					let __p = self as *const Self as *mut Self;
 					if (!((self).open)) {
 						return;
@@ -1025,6 +1079,8 @@ pub mod python {
 						python::ispa_std::debug::lexer_result(&((self).expected), ((self).matched).clone(), &((self).actual), &((self).reason), (((self).loc).clone()).upcast());
 					}
 				}
+				pub fn close(&mut self) { (self.base_0.__vt_close)(&mut self.base_0) }
+				pub fn __thunk_close(base: &mut python::ispa_std::debug::ScopeBase) { let this = unsafe { &mut *(base as *const python::ispa_std::debug::ScopeBase as *mut MatchScope) }; this.__impl_close() }
 				pub fn members(&self) -> (&String, &String, &String, &::ispa_std::Shared<python::ispa_std::debug::Location>, &bool, &bool, &bool) { (&self.expected, &self.actual, &self.reason, &self.loc, &self.matched, &self.active, &self.open) }
 				pub fn members_mut(&mut self) -> (&mut String, &mut String, &mut String, &mut ::ispa_std::Shared<python::ispa_std::debug::Location>, &mut bool, &mut bool, &mut bool) { (&mut self.expected, &mut self.actual, &mut self.reason, &mut self.loc, &mut self.matched, &mut self.active, &mut self.open) }
 				pub fn members_str() -> [&'static str; 7] { ["expected", "actual", "reason", "loc", "matched", "active", "open"] }
@@ -2605,15 +2661,54 @@ pub mod python {
 				return ((((((((((*(a).borrow_mut())).kind()) == (((*(b).borrow_mut())).kind()))) && (((((*(a).borrow_mut())).index()) == (((*(b).borrow_mut())).index()))))) && (((((*(((*(a).borrow_mut())).meta()).borrow_mut())).startpos()) == (((*(((*(b).borrow_mut())).meta()).borrow_mut())).startpos()))))) && (((((*(((*(a).borrow_mut())).meta()).borrow_mut())).length()) == (((*(((*(b).borrow_mut())).meta()).borrow_mut())).length()))));
 			}
 			#[repr(C)]
-			#[derive(Clone, Default)]
+			#[derive(Clone)]
 			pub struct TokenCursor {
 				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
+				pub __vt_copy: fn(&mut TokenCursor) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>,
+				pub __vt_has_source: fn(&mut TokenCursor) -> bool,
+				pub __vt_sourceOrigin: fn(&mut TokenCursor) -> String,
+				pub __vt_getErrors: fn(&mut TokenCursor) -> Vec<String>,
+				pub __vt_sourcePosition: fn(&mut TokenCursor) -> i64,
+				pub __vt_consumeExternal: fn(&mut TokenCursor, i64),
+				pub __vt_isEnd: fn(&mut TokenCursor) -> bool,
+				pub __vt_next: fn(&mut TokenCursor) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>,
+				pub __vt_prev: fn(&mut TokenCursor) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>,
+				pub __vt_advance_by: fn(&mut TokenCursor, i64) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>,
+				pub __vt_current: fn(&mut TokenCursor) -> ::ispa_std::Shared<python::ispa_std::raw_token::RawToken>,
+				pub __vt_resumePosition: fn(&mut TokenCursor) -> i64,
+				pub __vt_advanceCharacters: fn(&mut TokenCursor, i64) -> bool,
 				pub owner: ::ispa_std::Shared<python::ispa_std::lexer::Lexer_base>,
 				pub state: ::ispa_std::Shared<python::ispa_std::lexer::_SharedState>,
 				pub token_index: i64,
 				pub distance_base: i64,
 				pub owned_owner: ::ispa_std::Shared<python::ispa_std::lexer::Lexer_base>,
 				pub has_owned: bool,
+			}
+			impl Default for TokenCursor {
+				fn default() -> Self {
+					Self {
+						__ispa_owner: Default::default(),
+						__vt_copy: TokenCursor::__base_copy,
+						__vt_has_source: TokenCursor::__base_has_source,
+						__vt_sourceOrigin: TokenCursor::__base_sourceOrigin,
+						__vt_getErrors: TokenCursor::__base_getErrors,
+						__vt_sourcePosition: TokenCursor::__base_sourcePosition,
+						__vt_consumeExternal: TokenCursor::__base_consumeExternal,
+						__vt_isEnd: TokenCursor::__base_isEnd,
+						__vt_next: TokenCursor::__base_next,
+						__vt_prev: TokenCursor::__base_prev,
+						__vt_advance_by: TokenCursor::__base_advance_by,
+						__vt_current: TokenCursor::__base_current,
+						__vt_resumePosition: TokenCursor::__base_resumePosition,
+						__vt_advanceCharacters: TokenCursor::__base_advanceCharacters,
+						owner: Default::default(),
+						state: Default::default(),
+						token_index: Default::default(),
+						distance_base: Default::default(),
+						owned_owner: Default::default(),
+						has_owned: Default::default(),
+					}
+				}
 			}
 			impl TokenCursor {
 				pub fn shared_default() -> ::ispa_std::Shared<Self> {
@@ -2631,11 +2726,12 @@ pub mod python {
 					(self).owned_owner = ((self).owner).clone();
 					(self).has_owned = false;
 				}
-				pub fn copy(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
+				pub fn __base_copy(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
 					let __p = self as *const Self as *mut Self;
 					python::ispa_std::failures::logic_error(&(String::from("TokenCursor.copy is abstract")));
 					return (self.__ispa_owner.upgrade().expect("instance has no shared owner")).upcast();
 				}
+				pub fn copy(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> { (self.__vt_copy)(self) }
 				pub fn assign(&mut self, mut other: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>) {
 					let __p = self as *const Self as *mut Self;
 					(self).owner = (((*(other).borrow_mut())).owner).clone();
@@ -2645,57 +2741,67 @@ pub mod python {
 					(self).owned_owner = (((*(other).borrow_mut())).owned_owner).clone();
 					(self).has_owned = (((*(other).borrow_mut())).has_owned).clone();
 				}
-				pub fn has_source(&mut self) -> bool {
+				pub fn __base_has_source(&mut self) -> bool {
 					let __p = self as *const Self as *mut Self;
 					return false;
 				}
-				pub fn sourceOrigin(&mut self) -> String {
+				pub fn has_source(&mut self) -> bool { (self.__vt_has_source)(self) }
+				pub fn __base_sourceOrigin(&mut self) -> String {
 					let __p = self as *const Self as *mut Self;
 					return String::from("");
 				}
-				pub fn getErrors(&mut self) -> Vec<String> {
+				pub fn sourceOrigin(&mut self) -> String { (self.__vt_sourceOrigin)(self) }
+				pub fn __base_getErrors(&mut self) -> Vec<String> {
 					let __p = self as *const Self as *mut Self;
 					return (((*((self).owner).borrow_mut())).getErrors()).clone();
 				}
-				pub fn sourcePosition(&mut self) -> i64 {
+				pub fn getErrors(&mut self) -> Vec<String> { (self.__vt_getErrors)(self) }
+				pub fn __base_sourcePosition(&mut self) -> i64 {
 					let __p = self as *const Self as *mut Self;
 					return ( - (1));
 				}
-				pub fn consumeExternal(&mut self, mut end: i64) {
+				pub fn sourcePosition(&mut self) -> i64 { (self.__vt_sourcePosition)(self) }
+				pub fn __base_consumeExternal(&mut self, mut end: i64) {
 					let __p = self as *const Self as *mut Self;
 					python::ispa_std::failures::logic_error(&(String::from("TokenCursor.consumeExternal needs a lazy cursor")));
 				}
-				pub fn isEnd(&mut self) -> bool {
+				pub fn consumeExternal(&mut self, end: i64) { (self.__vt_consumeExternal)(self, end) }
+				pub fn __base_isEnd(&mut self) -> bool {
 					let __p = self as *const Self as *mut Self;
 					python::ispa_std::failures::logic_error(&(String::from("TokenCursor.isEnd is abstract")));
 					return true;
 				}
-				pub fn next(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
+				pub fn isEnd(&mut self) -> bool { (self.__vt_isEnd)(self) }
+				pub fn __base_next(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
 					let __p = self as *const Self as *mut Self;
 					python::ispa_std::failures::logic_error(&(String::from("TokenCursor.next is abstract")));
 					return (self.__ispa_owner.upgrade().expect("instance has no shared owner")).upcast();
 				}
-				pub fn prev(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
+				pub fn next(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> { (self.__vt_next)(self) }
+				pub fn __base_prev(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
 					let __p = self as *const Self as *mut Self;
 					python::ispa_std::failures::logic_error(&(String::from("TokenCursor.prev is abstract")));
 					return (self.__ispa_owner.upgrade().expect("instance has no shared owner")).upcast();
 				}
-				pub fn advance_by(&mut self, mut count: i64) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
+				pub fn prev(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> { (self.__vt_prev)(self) }
+				pub fn __base_advance_by(&mut self, mut count: i64) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
 					let __p = self as *const Self as *mut Self;
 					python::ispa_std::failures::logic_error(&(String::from("TokenCursor.advance_by is abstract")));
 					return (self.__ispa_owner.upgrade().expect("instance has no shared owner")).upcast();
 				}
+				pub fn advance_by(&mut self, count: i64) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> { (self.__vt_advance_by)(self, count) }
 				pub fn plus(&mut self, mut count: i64) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
 					let __p = self as *const Self as *mut Self;
 					let mut out = ((self).copy()).clone();
 					((*(out).borrow_mut())).advance_by((count).clone());
 					return ((out).clone()).upcast();
 				}
-				pub fn current(&mut self) -> ::ispa_std::Shared<python::ispa_std::raw_token::RawToken> {
+				pub fn __base_current(&mut self) -> ::ispa_std::Shared<python::ispa_std::raw_token::RawToken> {
 					let __p = self as *const Self as *mut Self;
 					python::ispa_std::failures::logic_error(&(String::from("TokenCursor.current is abstract")));
 					return ((((*((self).owner).borrow_mut())).empty_token()).clone()).upcast();
 				}
+				pub fn current(&mut self) -> ::ispa_std::Shared<python::ispa_std::raw_token::RawToken> { (self.__vt_current)(self) }
 				pub fn minus(&mut self, mut other: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>) -> i64 {
 					let __p = self as *const Self as *mut Self;
 					return (((self).distance()) - (((*(other).borrow_mut())).distance()));
@@ -2704,31 +2810,47 @@ pub mod python {
 					let __p = self as *const Self as *mut Self;
 					return ((((self).distance_base).clone()) + &((self).token_index));
 				}
-				pub fn resumePosition(&mut self) -> i64 {
+				pub fn __base_resumePosition(&mut self) -> i64 {
 					let __p = self as *const Self as *mut Self;
 					return ( - (1));
 				}
-				pub fn advanceCharacters(&mut self, mut count: i64) -> bool {
+				pub fn resumePosition(&mut self) -> i64 { (self.__vt_resumePosition)(self) }
+				pub fn __base_advanceCharacters(&mut self, mut count: i64) -> bool {
 					let __p = self as *const Self as *mut Self;
 					python::ispa_std::failures::runtime_error(&(String::from("advanceCharacters needs a lazy cursor (external parser integration)")));
 					return false;
 				}
+				pub fn advanceCharacters(&mut self, count: i64) -> bool { (self.__vt_advanceCharacters)(self, count) }
 				pub fn members(&self) -> (&::ispa_std::Shared<python::ispa_std::lexer::Lexer_base>, &::ispa_std::Shared<python::ispa_std::lexer::_SharedState>, &i64, &i64, &::ispa_std::Shared<python::ispa_std::lexer::Lexer_base>, &bool) { (&self.owner, &self.state, &self.token_index, &self.distance_base, &self.owned_owner, &self.has_owned) }
 				pub fn members_mut(&mut self) -> (&mut ::ispa_std::Shared<python::ispa_std::lexer::Lexer_base>, &mut ::ispa_std::Shared<python::ispa_std::lexer::_SharedState>, &mut i64, &mut i64, &mut ::ispa_std::Shared<python::ispa_std::lexer::Lexer_base>, &mut bool) { (&mut self.owner, &mut self.state, &mut self.token_index, &mut self.distance_base, &mut self.owned_owner, &mut self.has_owned) }
 				pub fn members_str() -> [&'static str; 6] { ["owner", "state", "token_index", "distance_base", "owned_owner", "has_owned"] }
 				pub fn methods_str() -> [&'static str; 18] { ["__init__", "copy", "assign", "has_source", "sourceOrigin", "getErrors", "sourcePosition", "consumeExternal", "isEnd", "next", "prev", "advance_by", "plus", "current", "minus", "distance", "resumePosition", "advanceCharacters"] }
 			}
 			#[repr(C)]
-			#[derive(Clone, Default)]
+			#[derive(Clone)]
 			pub struct LazyIterator {
-				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
 				pub base_0: python::ispa_std::lexer::TokenCursor,
+				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
 				pub owner: ::ispa_std::Shared<python::ispa_std::lexer::Lexer_base>,
 				pub state: ::ispa_std::Shared<python::ispa_std::lexer::_SharedState>,
 				pub token_index: i64,
 				pub distance_base: i64,
 				pub owned_owner: ::ispa_std::Shared<python::ispa_std::lexer::Lexer_base>,
 				pub has_owned: bool,
+			}
+			impl Default for LazyIterator {
+				fn default() -> Self {
+					Self {
+						__ispa_owner: Default::default(),
+						base_0: { let mut __base: python::ispa_std::lexer::TokenCursor = Default::default(); __base.__vt_copy = LazyIterator::__thunk_copy; __base.__vt_has_source = LazyIterator::__thunk_has_source; __base.__vt_sourceOrigin = LazyIterator::__thunk_sourceOrigin; __base.__vt_getErrors = LazyIterator::__thunk_getErrors; __base.__vt_sourcePosition = LazyIterator::__thunk_sourcePosition; __base.__vt_consumeExternal = LazyIterator::__thunk_consumeExternal; __base.__vt_isEnd = LazyIterator::__thunk_isEnd; __base.__vt_next = LazyIterator::__thunk_next; __base.__vt_prev = LazyIterator::__thunk_prev; __base.__vt_advance_by = LazyIterator::__thunk_advance_by; __base.__vt_current = LazyIterator::__thunk_current; __base.__vt_resumePosition = LazyIterator::__thunk_resumePosition; __base.__vt_advanceCharacters = LazyIterator::__thunk_advanceCharacters; __base },
+						owner: Default::default(),
+						state: Default::default(),
+						token_index: Default::default(),
+						distance_base: Default::default(),
+						owned_owner: Default::default(),
+						has_owned: Default::default(),
+					}
+				}
 			}
 			impl ::std::ops::Deref for LazyIterator { type Target = python::ispa_std::lexer::TokenCursor; fn deref(&self) -> &Self::Target { &self.base_0 } }
 			impl ::std::ops::DerefMut for LazyIterator { fn deref_mut(&mut self) -> &mut Self::Target { &mut self.base_0 } }
@@ -2762,17 +2884,21 @@ pub mod python {
 					}
 					return ((it).clone()).upcast();
 				}
-				pub fn copy(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
+				pub fn __impl_copy(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
 					let __p = self as *const Self as *mut Self;
 					let mut out = { let __object = <python::ispa_std::lexer::LazyIterator>::shared_default(); __object.borrow_mut().__init__((((self).owner).clone()).upcast(), (((self).state).clone()).upcast(), ((self).token_index).clone(), ((self).distance_base).clone()); __object };
 					((*(out).borrow_mut())).owned_owner = ((self).owned_owner).clone();
 					((*(out).borrow_mut())).has_owned = ((self).has_owned).clone();
 					return ((out).clone()).upcast();
 				}
-				pub fn has_source(&mut self) -> bool {
+				pub fn copy(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> { (self.base_0.__vt_copy)(&mut self.base_0) }
+				pub fn __thunk_copy(base: &mut python::ispa_std::lexer::TokenCursor) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> { let this = unsafe { &mut *(base as *const python::ispa_std::lexer::TokenCursor as *mut LazyIterator) }; this.__impl_copy() }
+				pub fn __impl_has_source(&mut self) -> bool {
 					let __p = self as *const Self as *mut Self;
 					return true;
 				}
+				pub fn has_source(&mut self) -> bool { (self.base_0.__vt_has_source)(&mut self.base_0) }
+				pub fn __thunk_has_source(base: &mut python::ispa_std::lexer::TokenCursor) -> bool { let this = unsafe { &mut *(base as *const python::ispa_std::lexer::TokenCursor as *mut LazyIterator) }; this.__impl_has_source() }
 				pub fn ensure_token(&mut self) {
 					let __p = self as *const Self as *mut Self;
 					let mut owner = ((self).owner).clone();
@@ -2822,15 +2948,19 @@ pub mod python {
 						}
 					}
 				}
-				pub fn sourceOrigin(&mut self) -> String {
+				pub fn __impl_sourceOrigin(&mut self) -> String {
 					let __p = self as *const Self as *mut Self;
 					return (((*((self).owner).borrow_mut())).source()).clone();
 				}
-				pub fn getErrors(&mut self) -> Vec<String> {
+				pub fn sourceOrigin(&mut self) -> String { (self.base_0.__vt_sourceOrigin)(&mut self.base_0) }
+				pub fn __thunk_sourceOrigin(base: &mut python::ispa_std::lexer::TokenCursor) -> String { let this = unsafe { &mut *(base as *const python::ispa_std::lexer::TokenCursor as *mut LazyIterator) }; this.__impl_sourceOrigin() }
+				pub fn __impl_getErrors(&mut self) -> Vec<String> {
 					let __p = self as *const Self as *mut Self;
 					return (((*((self).owner).borrow_mut())).getErrors()).clone();
 				}
-				pub fn sourcePosition(&mut self) -> i64 {
+				pub fn getErrors(&mut self) -> Vec<String> { (self.base_0.__vt_getErrors)(&mut self.base_0) }
+				pub fn __thunk_getErrors(base: &mut python::ispa_std::lexer::TokenCursor) -> Vec<String> { let this = unsafe { &mut *(base as *const python::ispa_std::lexer::TokenCursor as *mut LazyIterator) }; this.__impl_getErrors() }
+				pub fn __impl_sourcePosition(&mut self) -> i64 {
 					let __p = self as *const Self as *mut Self;
 					if (((self).token_index) < ((((*((self).owner).borrow_mut())).tokens.len() as i64))) {
 						let mut token = ({ let __h3 = (self).token_index; ::ispa_std::pycoll::PyIndex::py_index(&(((*((self).owner).borrow_mut())).tokens), &(__h3)) }).clone();
@@ -2840,7 +2970,9 @@ pub mod python {
 					}
 					return (((*((self).state).borrow_mut())).pos).clone();
 				}
-				pub fn consumeExternal(&mut self, mut end: i64) {
+				pub fn sourcePosition(&mut self) -> i64 { (self.base_0.__vt_sourcePosition)(&mut self.base_0) }
+				pub fn __thunk_sourcePosition(base: &mut python::ispa_std::lexer::TokenCursor) -> i64 { let this = unsafe { &mut *(base as *const python::ispa_std::lexer::TokenCursor as *mut LazyIterator) }; this.__impl_sourcePosition() }
+				pub fn __impl_consumeExternal(&mut self, mut end: i64) {
 					let __p = self as *const Self as *mut Self;
 					let mut begin: i64 = ((self).sourcePosition()).clone();
 					let mut origin: String = (((*((self).owner).borrow_mut())).source()).clone();
@@ -2867,7 +2999,9 @@ pub mod python {
 					(self).owner = (branch).clone();
 					(self).state = { let __object = <python::ispa_std::lexer::_SharedState>::shared_default(); __object.borrow_mut().__init__((end).clone()); __object };
 				}
-				pub fn isEnd(&mut self) -> bool {
+				pub fn consumeExternal(&mut self, end: i64) { (self.base_0.__vt_consumeExternal)(&mut self.base_0, end) }
+				pub fn __thunk_consumeExternal(base: &mut python::ispa_std::lexer::TokenCursor, end: i64) { let this = unsafe { &mut *(base as *const python::ispa_std::lexer::TokenCursor as *mut LazyIterator) }; this.__impl_consumeExternal(end) }
+				pub fn __impl_isEnd(&mut self) -> bool {
 					let __p = self as *const Self as *mut Self;
 					(self).ensure_token();
 					if (((self).token_index) >= ((((*((self).owner).borrow_mut())).tokens.len() as i64))) {
@@ -2875,7 +3009,9 @@ pub mod python {
 					}
 					return python::ispa_std::lexer::is_token_end((({ let __h7 = (self).token_index; ::ispa_std::pycoll::PyIndex::py_index(&(((*((self).owner).borrow_mut())).tokens), &(__h7)) }).clone()).upcast());
 				}
-				pub fn next(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
+				pub fn isEnd(&mut self) -> bool { (self.base_0.__vt_isEnd)(&mut self.base_0) }
+				pub fn __thunk_isEnd(base: &mut python::ispa_std::lexer::TokenCursor) -> bool { let this = unsafe { &mut *(base as *const python::ispa_std::lexer::TokenCursor as *mut LazyIterator) }; this.__impl_isEnd() }
+				pub fn __impl_next(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
 					let __p = self as *const Self as *mut Self;
 					String::from("operator++");
 					if (!((self).isEnd())) {
@@ -2883,7 +3019,9 @@ pub mod python {
 					}
 					return (self.__ispa_owner.upgrade().expect("instance has no shared owner")).upcast();
 				}
-				pub fn prev(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
+				pub fn next(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> { (self.base_0.__vt_next)(&mut self.base_0) }
+				pub fn __thunk_next(base: &mut python::ispa_std::lexer::TokenCursor) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> { let this = unsafe { &mut *(base as *const python::ispa_std::lexer::TokenCursor as *mut LazyIterator) }; this.__impl_next() }
+				pub fn __impl_prev(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
 					let __p = self as *const Self as *mut Self;
 					String::from("operator--");
 					if (((self).token_index) > (0)) {
@@ -2891,7 +3029,9 @@ pub mod python {
 					}
 					return (self.__ispa_owner.upgrade().expect("instance has no shared owner")).upcast();
 				}
-				pub fn advance_by(&mut self, mut count: i64) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
+				pub fn prev(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> { (self.base_0.__vt_prev)(&mut self.base_0) }
+				pub fn __thunk_prev(base: &mut python::ispa_std::lexer::TokenCursor) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> { let this = unsafe { &mut *(base as *const python::ispa_std::lexer::TokenCursor as *mut LazyIterator) }; this.__impl_prev() }
+				pub fn __impl_advance_by(&mut self, mut count: i64) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
 					let __p = self as *const Self as *mut Self;
 					String::from("operator+=");
 					let mut left: i64 = (count).clone();
@@ -2901,7 +3041,9 @@ pub mod python {
 					}
 					return (self.__ispa_owner.upgrade().expect("instance has no shared owner")).upcast();
 				}
-				pub fn current(&mut self) -> ::ispa_std::Shared<python::ispa_std::raw_token::RawToken> {
+				pub fn advance_by(&mut self, count: i64) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> { (self.base_0.__vt_advance_by)(&mut self.base_0, count) }
+				pub fn __thunk_advance_by(base: &mut python::ispa_std::lexer::TokenCursor, count: i64) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> { let this = unsafe { &mut *(base as *const python::ispa_std::lexer::TokenCursor as *mut LazyIterator) }; this.__impl_advance_by(count) }
+				pub fn __impl_current(&mut self) -> ::ispa_std::Shared<python::ispa_std::raw_token::RawToken> {
 					let __p = self as *const Self as *mut Self;
 					String::from("operator* / operator->");
 					(self).ensure_token();
@@ -2910,7 +3052,9 @@ pub mod python {
 					}
 					return (({ let __h8 = (self).token_index; ::ispa_std::pycoll::PyIndex::py_index(&(((*((self).owner).borrow_mut())).tokens), &(__h8)) }).clone()).upcast();
 				}
-				pub fn resumePosition(&mut self) -> i64 {
+				pub fn current(&mut self) -> ::ispa_std::Shared<python::ispa_std::raw_token::RawToken> { (self.base_0.__vt_current)(&mut self.base_0) }
+				pub fn __thunk_current(base: &mut python::ispa_std::lexer::TokenCursor) -> ::ispa_std::Shared<python::ispa_std::raw_token::RawToken> { let this = unsafe { &mut *(base as *const python::ispa_std::lexer::TokenCursor as *mut LazyIterator) }; this.__impl_current() }
+				pub fn __impl_resumePosition(&mut self) -> i64 {
 					let __p = self as *const Self as *mut Self;
 					String::from("Source position just after the current token (-1 when unknown).");
 					(self).ensure_token();
@@ -2923,7 +3067,9 @@ pub mod python {
 					}
 					return (((*(((*(token).borrow_mut())).meta()).borrow_mut())).end_pos()).clone();
 				}
-				pub fn advanceCharacters(&mut self, mut count: i64) -> bool {
+				pub fn resumePosition(&mut self) -> i64 { (self.base_0.__vt_resumePosition)(&mut self.base_0) }
+				pub fn __thunk_resumePosition(base: &mut python::ispa_std::lexer::TokenCursor) -> i64 { let this = unsafe { &mut *(base as *const python::ispa_std::lexer::TokenCursor as *mut LazyIterator) }; this.__impl_resumePosition() }
+				pub fn __impl_advanceCharacters(&mut self, mut count: i64) -> bool {
 					let __p = self as *const Self as *mut Self;
 					String::from("Resume lexing `count` source units after the current token's start,\n        invalidating cached tokens from here on (for external parsers).");
 					(self).ensure_token();
@@ -2952,21 +3098,36 @@ pub mod python {
 					(self).ensure_token();
 					return true;
 				}
+				pub fn advanceCharacters(&mut self, count: i64) -> bool { (self.base_0.__vt_advanceCharacters)(&mut self.base_0, count) }
+				pub fn __thunk_advanceCharacters(base: &mut python::ispa_std::lexer::TokenCursor, count: i64) -> bool { let this = unsafe { &mut *(base as *const python::ispa_std::lexer::TokenCursor as *mut LazyIterator) }; this.__impl_advanceCharacters(count) }
 				pub fn members(&self) -> (&::ispa_std::Shared<python::ispa_std::lexer::Lexer_base>, &::ispa_std::Shared<python::ispa_std::lexer::_SharedState>, &i64, &i64, &::ispa_std::Shared<python::ispa_std::lexer::Lexer_base>, &bool) { (&self.owner, &self.state, &self.token_index, &self.distance_base, &self.owned_owner, &self.has_owned) }
 				pub fn members_mut(&mut self) -> (&mut ::ispa_std::Shared<python::ispa_std::lexer::Lexer_base>, &mut ::ispa_std::Shared<python::ispa_std::lexer::_SharedState>, &mut i64, &mut i64, &mut ::ispa_std::Shared<python::ispa_std::lexer::Lexer_base>, &mut bool) { (&mut self.owner, &mut self.state, &mut self.token_index, &mut self.distance_base, &mut self.owned_owner, &mut self.has_owned) }
 				pub fn members_str() -> [&'static str; 6] { ["owner", "state", "token_index", "distance_base", "owned_owner", "has_owned"] }
 				pub fn methods_str() -> [&'static str; 17] { ["__init__", "begin", "at_position", "copy", "has_source", "ensure_token", "sourceOrigin", "getErrors", "sourcePosition", "consumeExternal", "isEnd", "next", "prev", "advance_by", "current", "resumePosition", "advanceCharacters"] }
 			}
 			#[repr(C)]
-			#[derive(Clone, Default)]
+			#[derive(Clone)]
 			pub struct TokenIterator {
-				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
 				pub base_0: python::ispa_std::lexer::TokenCursor,
+				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
 				pub owner: ::ispa_std::Shared<python::ispa_std::lexer::Lexer_base>,
 				pub token_index: i64,
 				pub distance_base: i64,
 				pub owned_owner: ::ispa_std::Shared<python::ispa_std::lexer::Lexer_base>,
 				pub has_owned: bool,
+			}
+			impl Default for TokenIterator {
+				fn default() -> Self {
+					Self {
+						__ispa_owner: Default::default(),
+						base_0: { let mut __base: python::ispa_std::lexer::TokenCursor = Default::default(); __base.__vt_copy = TokenIterator::__thunk_copy; __base.__vt_next = TokenIterator::__thunk_next; __base.__vt_prev = TokenIterator::__thunk_prev; __base.__vt_advance_by = TokenIterator::__thunk_advance_by; __base.__vt_isEnd = TokenIterator::__thunk_isEnd; __base.__vt_current = TokenIterator::__thunk_current; __base.__vt_resumePosition = TokenIterator::__thunk_resumePosition; __base },
+						owner: Default::default(),
+						token_index: Default::default(),
+						distance_base: Default::default(),
+						owned_owner: Default::default(),
+						has_owned: Default::default(),
+					}
+				}
 			}
 			impl ::std::ops::Deref for TokenIterator { type Target = python::ispa_std::lexer::TokenCursor; fn deref(&self) -> &Self::Target { &self.base_0 } }
 			impl ::std::ops::DerefMut for TokenIterator { fn deref_mut(&mut self) -> &mut Self::Target { &mut self.base_0 } }
@@ -2991,42 +3152,54 @@ pub mod python {
 				pub fn begin(mut owner: ::ispa_std::Shared<python::ispa_std::lexer::Lexer_base>) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
 					return ({ let __object = <python::ispa_std::lexer::TokenIterator>::shared_default(); __object.borrow_mut().__init__(((owner).clone()).upcast(), 0); __object }).upcast();
 				}
-				pub fn copy(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
+				pub fn __impl_copy(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
 					let __p = self as *const Self as *mut Self;
 					return ({ let __object = <python::ispa_std::lexer::TokenIterator>::shared_default(); __object.borrow_mut().__init__((((self).owner).clone()).upcast(), ((self).token_index).clone()); __object }).upcast();
 				}
-				pub fn next(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
+				pub fn copy(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> { (self.base_0.__vt_copy)(&mut self.base_0) }
+				pub fn __thunk_copy(base: &mut python::ispa_std::lexer::TokenCursor) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> { let this = unsafe { &mut *(base as *const python::ispa_std::lexer::TokenCursor as *mut TokenIterator) }; this.__impl_copy() }
+				pub fn __impl_next(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
 					let __p = self as *const Self as *mut Self;
 					(self).token_index = ((((self).token_index).clone()) + &(1));
 					return (self.__ispa_owner.upgrade().expect("instance has no shared owner")).upcast();
 				}
-				pub fn prev(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
+				pub fn next(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> { (self.base_0.__vt_next)(&mut self.base_0) }
+				pub fn __thunk_next(base: &mut python::ispa_std::lexer::TokenCursor) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> { let this = unsafe { &mut *(base as *const python::ispa_std::lexer::TokenCursor as *mut TokenIterator) }; this.__impl_next() }
+				pub fn __impl_prev(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
 					let __p = self as *const Self as *mut Self;
 					if (((self).token_index) != (0)) {
 						(self).token_index = (((self).token_index) - (1));
 					}
 					return (self.__ispa_owner.upgrade().expect("instance has no shared owner")).upcast();
 				}
-				pub fn advance_by(&mut self, mut count: i64) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
+				pub fn prev(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> { (self.base_0.__vt_prev)(&mut self.base_0) }
+				pub fn __thunk_prev(base: &mut python::ispa_std::lexer::TokenCursor) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> { let this = unsafe { &mut *(base as *const python::ispa_std::lexer::TokenCursor as *mut TokenIterator) }; this.__impl_prev() }
+				pub fn __impl_advance_by(&mut self, mut count: i64) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
 					let __p = self as *const Self as *mut Self;
 					(self).token_index = ((((self).token_index).clone()) + &(count));
 					return (self.__ispa_owner.upgrade().expect("instance has no shared owner")).upcast();
 				}
-				pub fn isEnd(&mut self) -> bool {
+				pub fn advance_by(&mut self, count: i64) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> { (self.base_0.__vt_advance_by)(&mut self.base_0, count) }
+				pub fn __thunk_advance_by(base: &mut python::ispa_std::lexer::TokenCursor, count: i64) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> { let this = unsafe { &mut *(base as *const python::ispa_std::lexer::TokenCursor as *mut TokenIterator) }; this.__impl_advance_by(count) }
+				pub fn __impl_isEnd(&mut self) -> bool {
 					let __p = self as *const Self as *mut Self;
 					if (((self).token_index) >= ((((*((self).owner).borrow_mut())).tokens.len() as i64))) {
 						return true;
 					}
 					return python::ispa_std::lexer::is_token_end((({ let __h12 = (self).token_index; ::ispa_std::pycoll::PyIndex::py_index(&(((*((self).owner).borrow_mut())).tokens), &(__h12)) }).clone()).upcast());
 				}
-				pub fn current(&mut self) -> ::ispa_std::Shared<python::ispa_std::raw_token::RawToken> {
+				pub fn isEnd(&mut self) -> bool { (self.base_0.__vt_isEnd)(&mut self.base_0) }
+				pub fn __thunk_isEnd(base: &mut python::ispa_std::lexer::TokenCursor) -> bool { let this = unsafe { &mut *(base as *const python::ispa_std::lexer::TokenCursor as *mut TokenIterator) }; this.__impl_isEnd() }
+				pub fn __impl_current(&mut self) -> ::ispa_std::Shared<python::ispa_std::raw_token::RawToken> {
 					let __p = self as *const Self as *mut Self;
 					if (((self).token_index) >= ((((*((self).owner).borrow_mut())).tokens.len() as i64))) {
 						python::ispa_std::failures::out_of_range(&(String::from("token iterator: dereference beyond the token list")));
 					}
 					return (({ let __h13 = (self).token_index; ::ispa_std::pycoll::PyIndex::py_index(&(((*((self).owner).borrow_mut())).tokens), &(__h13)) }).clone()).upcast();
 				}
-				pub fn resumePosition(&mut self) -> i64 {
+				pub fn current(&mut self) -> ::ispa_std::Shared<python::ispa_std::raw_token::RawToken> { (self.base_0.__vt_current)(&mut self.base_0) }
+				pub fn __thunk_current(base: &mut python::ispa_std::lexer::TokenCursor) -> ::ispa_std::Shared<python::ispa_std::raw_token::RawToken> { let this = unsafe { &mut *(base as *const python::ispa_std::lexer::TokenCursor as *mut TokenIterator) }; this.__impl_current() }
+				pub fn __impl_resumePosition(&mut self) -> i64 {
 					let __p = self as *const Self as *mut Self;
 					String::from("Source position after the current token, -1 when it has none.\n        (The C++ body referenced members that do not exist and was never\n        instantiated; this is its documented intent.)");
 					if (((self).token_index) >= ((((*((self).owner).borrow_mut())).tokens.len() as i64))) {
@@ -3038,6 +3211,8 @@ pub mod python {
 					}
 					return (((*(((*(token).borrow_mut())).meta()).borrow_mut())).end_pos()).clone();
 				}
+				pub fn resumePosition(&mut self) -> i64 { (self.base_0.__vt_resumePosition)(&mut self.base_0) }
+				pub fn __thunk_resumePosition(base: &mut python::ispa_std::lexer::TokenCursor) -> i64 { let this = unsafe { &mut *(base as *const python::ispa_std::lexer::TokenCursor as *mut TokenIterator) }; this.__impl_resumePosition() }
 				pub fn members(&self) -> (&::ispa_std::Shared<python::ispa_std::lexer::Lexer_base>, &i64, &i64, &::ispa_std::Shared<python::ispa_std::lexer::Lexer_base>, &bool) { (&self.owner, &self.token_index, &self.distance_base, &self.owned_owner, &self.has_owned) }
 				pub fn members_mut(&mut self) -> (&mut ::ispa_std::Shared<python::ispa_std::lexer::Lexer_base>, &mut i64, &mut i64, &mut ::ispa_std::Shared<python::ispa_std::lexer::Lexer_base>, &mut bool) { (&mut self.owner, &mut self.token_index, &mut self.distance_base, &mut self.owned_owner, &mut self.has_owned) }
 				pub fn members_str() -> [&'static str; 5] { ["owner", "token_index", "distance_base", "owned_owner", "has_owned"] }
@@ -3471,9 +3646,22 @@ pub mod python {
 				pub fn methods_str() -> [&'static str; 2] { ["__init__", "initial"] }
 			}
 			#[repr(C)]
-			#[derive(Clone, Default)]
+			#[derive(Clone)]
 			pub struct FailHandler {
 				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
+				pub __vt_run: fn(&mut FailHandler, ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>, ::ispa_std::Shared<python::ispa_std::recovery::State>) -> ::ispa_std::Shared<python::ispa_std::recovery::Decision>,
+				pub __vt_is_custom: fn(&mut FailHandler) -> bool,
+				pub __vt_is_recovering: fn(&mut FailHandler) -> bool,
+			}
+			impl Default for FailHandler {
+				fn default() -> Self {
+					Self {
+						__ispa_owner: Default::default(),
+						__vt_run: FailHandler::__base_run,
+						__vt_is_custom: FailHandler::__base_is_custom,
+						__vt_is_recovering: FailHandler::__base_is_recovering,
+					}
+				}
 			}
 			impl FailHandler {
 				pub fn shared_default() -> ::ispa_std::Shared<Self> {
@@ -3483,29 +3671,32 @@ pub mod python {
 					self.__ispa_owner = owner.clone();
 				}
 				pub fn __init__(&mut self) {}
-				pub fn run(&mut self, mut pos: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>, mut state: ::ispa_std::Shared<python::ispa_std::recovery::State>) -> ::ispa_std::Shared<python::ispa_std::recovery::Decision> {
+				pub fn __base_run(&mut self, mut pos: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>, mut state: ::ispa_std::Shared<python::ispa_std::recovery::State>) -> ::ispa_std::Shared<python::ispa_std::recovery::Decision> {
 					let __p = self as *const Self as *mut Self;
 					python::ispa_std::failures::logic_error(&(String::from("FailHandler.run is abstract")));
 					return (python::ispa_std::recovery::Decision::initial()).upcast();
 				}
-				pub fn is_custom(&mut self) -> bool {
+				pub fn run(&mut self, pos: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>, state: ::ispa_std::Shared<python::ispa_std::recovery::State>) -> ::ispa_std::Shared<python::ispa_std::recovery::Decision> { (self.__vt_run)(self, pos, state) }
+				pub fn __base_is_custom(&mut self) -> bool {
 					let __p = self as *const Self as *mut Self;
 					return false;
 				}
-				pub fn is_recovering(&mut self) -> bool {
+				pub fn is_custom(&mut self) -> bool { (self.__vt_is_custom)(self) }
+				pub fn __base_is_recovering(&mut self) -> bool {
 					let __p = self as *const Self as *mut Self;
 					return true;
 				}
+				pub fn is_recovering(&mut self) -> bool { (self.__vt_is_recovering)(self) }
 				pub fn members(&self) -> () { () }
 				pub fn members_mut(&mut self) -> () { () }
 				pub fn members_str() -> [&'static str; 0] { [] }
 				pub fn methods_str() -> [&'static str; 3] { ["run", "is_custom", "is_recovering"] }
 			}
 			#[repr(C)]
-			#[derive(Clone, Default)]
+			#[derive(Clone)]
 			pub struct Handler {
-				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
 				pub base_0: python::ispa_std::recovery::FailHandler,
+				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
 				pub rule: String,
 				pub expected_text: String,
 				pub expected: ::ispa_std::Shared<python::ispa_std::recovery::TokenSet>,
@@ -3513,6 +3704,21 @@ pub mod python {
 				pub follow: ::ispa_std::Shared<python::ispa_std::recovery::TokenSet>,
 				pub synchronization: ::ispa_std::Shared<python::ispa_std::recovery::TokenSet>,
 				pub policy: ::ispa_std::Shared<python::ispa_std::recovery::Policy>,
+			}
+			impl Default for Handler {
+				fn default() -> Self {
+					Self {
+						__ispa_owner: Default::default(),
+						base_0: { let mut __base: python::ispa_std::recovery::FailHandler = Default::default(); __base.__vt_run = Handler::__thunk_run; __base },
+						rule: Default::default(),
+						expected_text: Default::default(),
+						expected: Default::default(),
+						continuation: Default::default(),
+						follow: Default::default(),
+						synchronization: Default::default(),
+						policy: Default::default(),
+					}
+				}
 			}
 			impl ::std::ops::Deref for Handler { type Target = python::ispa_std::recovery::FailHandler; fn deref(&self) -> &Self::Target { &self.base_0 } }
 			impl ::std::ops::DerefMut for Handler { fn deref_mut(&mut self) -> &mut Self::Target { &mut self.base_0 } }
@@ -3535,7 +3741,7 @@ pub mod python {
 					(self).synchronization = (synchronization).clone();
 					(self).policy = (policy).clone();
 				}
-				pub fn run(&mut self, mut pos: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>, mut state: ::ispa_std::Shared<python::ispa_std::recovery::State>) -> ::ispa_std::Shared<python::ispa_std::recovery::Decision> {
+				pub fn __impl_run(&mut self, mut pos: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>, mut state: ::ispa_std::Shared<python::ispa_std::recovery::State>) -> ::ispa_std::Shared<python::ispa_std::recovery::Decision> {
 					let __p = self as *const Self as *mut Self;
 					let mut plan: ::ispa_std::Shared<python::ispa_std::recovery::Plan> = { let __object = <python::ispa_std::recovery::Plan>::shared_default(); __object.borrow_mut().__init__(&((self).rule), &(((*((self).expected).borrow_mut())).values()), &(((*((self).continuation).borrow_mut())).values()), &(((*((self).follow).borrow_mut())).values()), &(((*((self).synchronization).borrow_mut())).values()), (((*((self).policy).borrow_mut())).allow_insertion).clone(), (((*((self).policy).borrow_mut())).allow_deletion).clone(), (((*((self).policy).borrow_mut())).allow_replacement).clone(), (((*((self).policy).borrow_mut())).max_skip).clone()); __object };
 					let mut decision = python::ispa_std::recovery::recover_default(((pos).clone()).upcast(), ((state).clone()).upcast(), (plan.clone()).upcast());
@@ -3564,6 +3770,8 @@ pub mod python {
 					}
 					return ((decision).clone()).upcast();
 				}
+				pub fn run(&mut self, pos: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>, state: ::ispa_std::Shared<python::ispa_std::recovery::State>) -> ::ispa_std::Shared<python::ispa_std::recovery::Decision> { (self.base_0.__vt_run)(&mut self.base_0, pos, state) }
+				pub fn __thunk_run(base: &mut python::ispa_std::recovery::FailHandler, pos: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>, state: ::ispa_std::Shared<python::ispa_std::recovery::State>) -> ::ispa_std::Shared<python::ispa_std::recovery::Decision> { let this = unsafe { &mut *(base as *const python::ispa_std::recovery::FailHandler as *mut Handler) }; this.__impl_run(pos, state) }
 				pub fn members(&self) -> (&String, &String, &::ispa_std::Shared<python::ispa_std::recovery::TokenSet>, &::ispa_std::Shared<python::ispa_std::recovery::TokenSet>, &::ispa_std::Shared<python::ispa_std::recovery::TokenSet>, &::ispa_std::Shared<python::ispa_std::recovery::TokenSet>, &::ispa_std::Shared<python::ispa_std::recovery::Policy>) { (&self.rule, &self.expected_text, &self.expected, &self.continuation, &self.follow, &self.synchronization, &self.policy) }
 				pub fn members_mut(&mut self) -> (&mut String, &mut String, &mut ::ispa_std::Shared<python::ispa_std::recovery::TokenSet>, &mut ::ispa_std::Shared<python::ispa_std::recovery::TokenSet>, &mut ::ispa_std::Shared<python::ispa_std::recovery::TokenSet>, &mut ::ispa_std::Shared<python::ispa_std::recovery::TokenSet>, &mut ::ispa_std::Shared<python::ispa_std::recovery::Policy>) { (&mut self.rule, &mut self.expected_text, &mut self.expected, &mut self.continuation, &mut self.follow, &mut self.synchronization, &mut self.policy) }
 				pub fn members_str() -> [&'static str; 7] { ["rule", "expected_text", "expected", "continuation", "follow", "synchronization", "policy"] }
@@ -3572,15 +3780,15 @@ pub mod python {
 			#[repr(C)]
 			// a Callable field makes this class neither Clone nor derivable Default
 			pub struct ActionFailure {
-				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
 				pub base_0: python::ispa_std::recovery::FailHandler,
+				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
 				pub action: Box<dyn FnMut(::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>, ::ispa_std::Shared<python::ispa_std::recovery::State>) -> ::ispa_std::Shared<python::ispa_std::recovery::Decision>>,
 			}
 			impl Default for ActionFailure {
 				fn default() -> Self {
 					Self {
 						__ispa_owner: Default::default(),
-						base_0: Default::default(),
+						base_0: { let mut __base: python::ispa_std::recovery::FailHandler = Default::default(); __base.__vt_run = ActionFailure::__thunk_run; __base.__vt_is_custom = ActionFailure::__thunk_is_custom; __base },
 						action: Box::new(|_, _| ::ispa_std::fail(9, "callable field was never set")),
 					}
 				}
@@ -3600,14 +3808,18 @@ pub mod python {
 					let __p = self as *const Self as *mut Self;
 					(self).action = Box::new(action);
 				}
-				pub fn run(&mut self, mut pos: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>, mut state: ::ispa_std::Shared<python::ispa_std::recovery::State>) -> ::ispa_std::Shared<python::ispa_std::recovery::Decision> {
+				pub fn __impl_run(&mut self, mut pos: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>, mut state: ::ispa_std::Shared<python::ispa_std::recovery::State>) -> ::ispa_std::Shared<python::ispa_std::recovery::Decision> {
 					let __p = self as *const Self as *mut Self;
 					return ((((self).action)((pos).clone(), (state).clone())).clone()).upcast();
 				}
-				pub fn is_custom(&mut self) -> bool {
+				pub fn run(&mut self, pos: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>, state: ::ispa_std::Shared<python::ispa_std::recovery::State>) -> ::ispa_std::Shared<python::ispa_std::recovery::Decision> { (self.base_0.__vt_run)(&mut self.base_0, pos, state) }
+				pub fn __thunk_run(base: &mut python::ispa_std::recovery::FailHandler, pos: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>, state: ::ispa_std::Shared<python::ispa_std::recovery::State>) -> ::ispa_std::Shared<python::ispa_std::recovery::Decision> { let this = unsafe { &mut *(base as *const python::ispa_std::recovery::FailHandler as *mut ActionFailure) }; this.__impl_run(pos, state) }
+				pub fn __impl_is_custom(&mut self) -> bool {
 					let __p = self as *const Self as *mut Self;
 					return true;
 				}
+				pub fn is_custom(&mut self) -> bool { (self.base_0.__vt_is_custom)(&mut self.base_0) }
+				pub fn __thunk_is_custom(base: &mut python::ispa_std::recovery::FailHandler) -> bool { let this = unsafe { &mut *(base as *const python::ispa_std::recovery::FailHandler as *mut ActionFailure) }; this.__impl_is_custom() }
 				pub fn members(&self) -> (&Box<dyn FnMut(::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>, ::ispa_std::Shared<python::ispa_std::recovery::State>) -> ::ispa_std::Shared<python::ispa_std::recovery::Decision>>,) { (&self.action,) }
 				pub fn members_mut(&mut self) -> (&mut Box<dyn FnMut(::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>, ::ispa_std::Shared<python::ispa_std::recovery::State>) -> ::ispa_std::Shared<python::ispa_std::recovery::Decision>>,) { (&mut self.action,) }
 				pub fn members_str() -> [&'static str; 1] { ["action"] }
@@ -3616,15 +3828,15 @@ pub mod python {
 			#[repr(C)]
 			// a Callable field makes this class neither Clone nor derivable Default
 			pub struct LegacyFail {
-				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
 				pub base_0: python::ispa_std::recovery::FailHandler,
+				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
 				pub action: Box<dyn FnMut(::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>)>,
 			}
 			impl Default for LegacyFail {
 				fn default() -> Self {
 					Self {
 						__ispa_owner: Default::default(),
-						base_0: Default::default(),
+						base_0: { let mut __base: python::ispa_std::recovery::FailHandler = Default::default(); __base.__vt_run = LegacyFail::__thunk_run; __base.__vt_is_recovering = LegacyFail::__thunk_is_recovering; __base },
 						action: Box::new(|_| ::ispa_std::fail(9, "callable field was never set")),
 					}
 				}
@@ -3644,15 +3856,19 @@ pub mod python {
 					let __p = self as *const Self as *mut Self;
 					(self).action = Box::new(action);
 				}
-				pub fn run(&mut self, mut pos: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>, mut state: ::ispa_std::Shared<python::ispa_std::recovery::State>) -> ::ispa_std::Shared<python::ispa_std::recovery::Decision> {
+				pub fn __impl_run(&mut self, mut pos: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>, mut state: ::ispa_std::Shared<python::ispa_std::recovery::State>) -> ::ispa_std::Shared<python::ispa_std::recovery::Decision> {
 					let __p = self as *const Self as *mut Self;
 					((self).action)((pos).clone());
 					return (python::ispa_std::recovery::Decision::initial()).upcast();
 				}
-				pub fn is_recovering(&mut self) -> bool {
+				pub fn run(&mut self, pos: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>, state: ::ispa_std::Shared<python::ispa_std::recovery::State>) -> ::ispa_std::Shared<python::ispa_std::recovery::Decision> { (self.base_0.__vt_run)(&mut self.base_0, pos, state) }
+				pub fn __thunk_run(base: &mut python::ispa_std::recovery::FailHandler, pos: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>, state: ::ispa_std::Shared<python::ispa_std::recovery::State>) -> ::ispa_std::Shared<python::ispa_std::recovery::Decision> { let this = unsafe { &mut *(base as *const python::ispa_std::recovery::FailHandler as *mut LegacyFail) }; this.__impl_run(pos, state) }
+				pub fn __impl_is_recovering(&mut self) -> bool {
 					let __p = self as *const Self as *mut Self;
 					return false;
 				}
+				pub fn is_recovering(&mut self) -> bool { (self.base_0.__vt_is_recovering)(&mut self.base_0) }
+				pub fn __thunk_is_recovering(base: &mut python::ispa_std::recovery::FailHandler) -> bool { let this = unsafe { &mut *(base as *const python::ispa_std::recovery::FailHandler as *mut LegacyFail) }; this.__impl_is_recovering() }
 				pub fn members(&self) -> (&Box<dyn FnMut(::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>)>,) { (&self.action,) }
 				pub fn members_mut(&mut self) -> (&mut Box<dyn FnMut(::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>)>,) { (&mut self.action,) }
 				pub fn members_str() -> [&'static str; 1] { ["action"] }
@@ -3884,14 +4100,30 @@ pub mod python {
 		pub mod parser_base {
 			#[allow(unused_imports)] use super::*;
 			#[repr(C)]
-			#[derive(Clone, Default)]
+			#[derive(Clone)]
 			pub struct Parser_base {
 				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
+				pub __vt_before_parse: fn(&mut Parser_base),
+				pub __vt_parseLazy: fn(&mut Parser_base) -> ::ispa_std::PyAny,
 				pub lexer: ::ispa_std::Shared<python::ispa_std::lexer::Lexer_base>,
 				pub has_lexer: bool,
 				pub text: String,
 				pub has_text: bool,
 				pub tree: ::ispa_std::PyAny,
+			}
+			impl Default for Parser_base {
+				fn default() -> Self {
+					Self {
+						__ispa_owner: Default::default(),
+						__vt_before_parse: Parser_base::__base_before_parse,
+						__vt_parseLazy: Parser_base::__base_parseLazy,
+						lexer: Default::default(),
+						has_lexer: Default::default(),
+						text: Default::default(),
+						has_text: Default::default(),
+						tree: Default::default(),
+					}
+				}
 			}
 			impl Parser_base {
 				pub fn shared_default() -> ::ispa_std::Shared<Self> {
@@ -3955,11 +4187,12 @@ pub mod python {
 					(self).parseFromTokens();
 					return ::ispa_std::pycoll::to_any(((self).tree).clone());
 				}
-				pub fn before_parse(&mut self) {
+				pub fn __base_before_parse(&mut self) {
 					let __p = self as *const Self as *mut Self;
 					return;
 				}
-				pub fn parseLazy(&mut self) -> ::ispa_std::PyAny {
+				pub fn before_parse(&mut self) { (self.__vt_before_parse)(self) }
+				pub fn __base_parseLazy(&mut self) -> ::ispa_std::PyAny {
 					let __p = self as *const Self as *mut Self;
 					if (!((self).has_text)) {
 						python::ispa_std::failures::api_error(&(String::from("Can't parse because no input text is provided")), &(Vec::new()));
@@ -3970,6 +4203,7 @@ pub mod python {
 					}
 					return ::ispa_std::pycoll::to_any(((self).tree).clone());
 				}
+				pub fn parseLazy(&mut self) -> ::ispa_std::PyAny { (self.__vt_parseLazy)(self) }
 				pub fn parseFromTokens(&mut self) {
 					let __p = self as *const Self as *mut Self;
 					python::ispa_std::failures::logic_error(&(String::from("Parser_base.parseFromTokens is abstract")));
@@ -4848,8 +5082,8 @@ return ((a) < (b));
 			#[repr(C)]
 			#[derive(Clone, Default)]
 			pub struct Ctx {
-				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
 				pub base_0: python::ispa_std::parser_ll::ActionCheckpoint,
+				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
 				pub start_pos: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>,
 				pub rule: String,
 				pub token_names: ::ispa_std::Shared<python::ispa_std::parser_ll::TokenNames>,
@@ -4906,8 +5140,8 @@ return ((a) < (b));
 			#[repr(C)]
 			#[derive(Clone, Default)]
 			pub struct RuleContext<AST> {
-				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
 				pub base_0: python::ispa_std::parser_ll::Ctx,
+				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
 				pub ast: AST,
 				pub __phantom: ::std::marker::PhantomData<(AST,)>,
 			}
@@ -4975,8 +5209,8 @@ return ((a) < (b));
 			#[repr(C)]
 			#[derive(Clone, Default)]
 			pub struct FailContext<AST> {
-				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
 				pub base_0: python::ispa_std::parser_ll::Ctx,
+				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
 				pub ast: AST,
 				pub failed_rule: String,
 				pub recovery_state: ::ispa_std::Shared<python::ispa_std::recovery::State>,
@@ -5378,10 +5612,10 @@ return ((a) < (b));
 				pub fn methods_str() -> [&'static str; 1] { ["__init__"] }
 			}
 			#[repr(C)]
-			#[derive(Clone, Default)]
+			#[derive(Clone)]
 			pub struct LLParser {
-				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
 				pub base_0: python::ispa_std::parser_base::Parser_base,
+				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
 				pub recovery_state_: ::ispa_std::Shared<python::ispa_std::recovery::State>,
 				pub counters_: ::ispa_std::Shared<python::ispa_std::sortedmap::StrIntMap>,
 				pub frames_: Vec<::ispa_std::Shared<python::ispa_std::parser_ll::Frame>>,
@@ -5396,6 +5630,28 @@ return ((a) < (b));
 				pub ambiguous_id_: i64,
 				pub space_token_: i64,
 				pub has_space_token_: bool,
+			}
+			impl Default for LLParser {
+				fn default() -> Self {
+					Self {
+						__ispa_owner: Default::default(),
+						base_0: { let mut __base: python::ispa_std::parser_base::Parser_base = Default::default(); __base.__vt_before_parse = LLParser::__thunk_before_parse; __base.__vt_parseLazy = LLParser::__thunk_parseLazy; __base },
+						recovery_state_: Default::default(),
+						counters_: Default::default(),
+						frames_: Default::default(),
+						frame_count: Default::default(),
+						unwind_: Default::default(),
+						last_resume_pos_: Default::default(),
+						recovering_: Default::default(),
+						context_max_skip_: Default::default(),
+						context_errors_: Default::default(),
+						probes_: Default::default(),
+						token_names_: Default::default(),
+						ambiguous_id_: Default::default(),
+						space_token_: Default::default(),
+						has_space_token_: Default::default(),
+					}
+				}
 			}
 			impl ::std::ops::Deref for LLParser { type Target = python::ispa_std::parser_base::Parser_base; fn deref(&self) -> &Self::Target { &self.base_0 } }
 			impl ::std::ops::DerefMut for LLParser { fn deref_mut(&mut self) -> &mut Self::Target { &mut self.base_0 } }
@@ -5456,11 +5712,13 @@ return ((a) < (b));
 					(self).recovering_ = false;
 					((self).context_errors_).clear();
 				}
-				pub fn before_parse(&mut self) {
+				pub fn __impl_before_parse(&mut self) {
 					let __p = self as *const Self as *mut Self;
 					(self).reset_recovery();
 				}
-				pub fn parseLazy(&mut self) -> ::ispa_std::PyAny {
+				pub fn before_parse(&mut self) { (self.base_0.__vt_before_parse)(&mut self.base_0) }
+				pub fn __thunk_before_parse(base: &mut python::ispa_std::parser_base::Parser_base) { let this = unsafe { &mut *(base as *const python::ispa_std::parser_base::Parser_base as *mut LLParser) }; this.__impl_before_parse() }
+				pub fn __impl_parseLazy(&mut self) -> ::ispa_std::PyAny {
 					let __p = self as *const Self as *mut Self;
 					(self).reset_recovery();
 					if (!((self).has_text)) {
@@ -5499,6 +5757,8 @@ return ((a) < (b));
 					}
 					return ::ispa_std::pycoll::to_any(((self).tree).clone());
 				}
+				pub fn parseLazy(&mut self) -> ::ispa_std::PyAny { (self.base_0.__vt_parseLazy)(&mut self.base_0) }
+				pub fn __thunk_parseLazy(base: &mut python::ispa_std::parser_base::Parser_base) -> ::ispa_std::PyAny { let this = unsafe { &mut *(base as *const python::ispa_std::parser_base::Parser_base as *mut LLParser) }; this.__impl_parseLazy() }
 				pub fn counter_scope(&mut self) -> ::ispa_std::Shared<python::ispa_std::parser_ll::CounterScope> {
 					let __p = self as *const Self as *mut Self;
 					return ({ let __object = <python::ispa_std::parser_ll::CounterScope>::shared_default(); __object.borrow_mut().__init__((self.__ispa_owner.upgrade().expect("instance has no shared owner")).upcast()); __object }).upcast();
@@ -7175,8 +7435,8 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 			#[repr(C)]
 			#[derive(Clone, Default)]
 			pub struct LRGeneralizedParser {
-				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
 				pub base_0: python::ispa_std::lr::LRParser,
+				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
 				pub work: i64,
 			}
 			impl ::std::ops::Deref for LRGeneralizedParser { type Target = python::ispa_std::lr::LRParser; fn deref(&self) -> &Self::Target { &self.base_0 } }

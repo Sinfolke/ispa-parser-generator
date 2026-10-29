@@ -262,12 +262,14 @@ namespace Rust {
         const auto w0 = w;
         const auto aux0 = aux;
         const auto counts = context.fn_counts;
+        const auto requested_name = RustCore::emit_name;
         RustCore::callable_moved = false;
         emitFunctionSurveyed(func, w, aux, kind, scope, bases);
         if (RustCore::callable_moved && !RustCore::force_static_callable) {
             w = w0;
             aux = aux0;
             context.fn_counts = counts;
+            RustCore::emit_name = requested_name;
             RustCore::force_static_callable = true;
             emitFunctionSurveyed(func, w, aux, kind, scope, bases);
             RustCore::force_static_callable = false;
@@ -536,8 +538,9 @@ namespace Rust {
         else emitLine(w, std::string("#[derive(Clone") + (has_defaults ? "" : ", Default") + ")]");
         emitLine(w, "pub struct " + name + generics + " {");
         w.increaseIndentation();
-        if (cls.shared_object) emitLine(w, "pub __ispa_owner: ::ispa_std::WeakShared<Self>,");
+        // the base part comes first: a pointer to it is a pointer to the derived object (dispatch thunks rely on it)
         for (std::size_t i = 0; i < bases.size(); ++i) emitLine(w, "pub base_" + std::to_string(i) + ": " + bases[i] + ",");
+        if (cls.shared_object) emitLine(w, "pub __ispa_owner: ::ispa_std::WeakShared<Self>,");
         for (const auto *slot : slots) emitLine(w, "pub __vt_" + RustCore::ident(slot->name) + ": " + fn_pointer_type(*slot, name) + ",");
         for (const auto &f : fields) emitLine(w, "pub " + f.name + ": " + f.type + ",");
         if (templated) {
@@ -654,22 +657,42 @@ namespace Rust {
                             (args.empty() ? "" : ", " + joinStrings(args, ", ")) + ") }");
                 continue;
             }
-            emitFunction(fn, w, aux, FnKind::Method, scope, bases);
-            if (RustCore::overrides.contains(&fn)) {
-                const auto &info = RustCore::overrides.at(&fn);
-                std::vector<std::string> params, args;
-                for (const auto &p : fn.parameters) {
-                    params.push_back(RustCore::ident(p.second) + ": " + RustCore::convertType(p.first));
-                    args.push_back(RustCore::ident(p.second));
-                }
-                const bool is_void = fn.type.isValueType() && fn.type.getValueType() == LangAPI::ValueType::Void;
-                const auto introducer = info.library ? bases[0] : info.introducer;
-                emitLine(w, "pub fn __thunk_" + RustCore::ident(fn.name) + "(base: " + (fn.is_const ? "&" : "&mut ") + introducer +
-                            (params.empty() ? "" : ", " + joinStrings(params, ", ")) + ")" +
-                            (is_void ? "" : " -> " + RustCore::convertType(fn.type)) + " { let this = unsafe { &" + (fn.is_const ? "" : "mut ") +
-                            "*(base as *const " + introducer + " as *" + (fn.is_const ? "const " : "mut ") + name + ") }; this." +
-                            RustCore::ident(fn.name) + "(" + joinStrings(args, ", ") + ") }");
+            if (!RustCore::overrides.contains(&fn)) {
+                emitFunction(fn, w, aux, FnKind::Method, scope, bases);
+                continue;
             }
+            // an overriding method: the body is the registered implementation, the method itself dispatches through the
+            // slot of the class that introduced it (so a call through any level of the hierarchy reaches the most derived)
+            const auto &info = RustCore::overrides.at(&fn);
+            RustCore::emit_name = "__impl_" + RustCore::ident(fn.name);
+            emitFunction(fn, w, aux, FnKind::Method, scope, bases);
+            std::vector<std::string> params, args;
+            for (const auto &p : fn.parameters) {
+                params.push_back(RustCore::ident(p.second) + ": " + RustCore::convertType(p.first));
+                args.push_back(RustCore::ident(p.second));
+            }
+            const bool is_void = fn.type.isValueType() && fn.type.getValueType() == LangAPI::ValueType::Void;
+            // the type of the class that owns the slot, spelled the way this class spells its own base
+            std::string introducer = bases[0];
+            if (!info.library) {
+                const LangAPI::Class *walker = &cls;
+                for (std::size_t hop = 0; hop < info.depth; ++hop) {
+                    const auto &symbol = std::get<LangAPI::Symbol>(walker->inherit_members.front().second);
+                    introducer = RustCore::convertSymbol(symbol);
+                    walker = RustCore::class_decls.at(std::get<std::string>(symbol.path.back()));
+                }
+            }
+            std::string path = "self.base_0";
+            for (std::size_t hop = 1; hop < info.depth; ++hop) path += ".base_0";
+            const auto ret = std::string(is_void ? "" : " -> " + RustCore::convertType(fn.type));
+            emitLine(w, "pub fn " + RustCore::ident(fn.name) + "(" + (fn.is_const ? "&self" : "&mut self") +
+                        (params.empty() ? "" : ", " + joinStrings(params, ", ")) + ")" + ret + " { (" + path + ".__vt_" +
+                        RustCore::ident(fn.name) + ")(" + (fn.is_const ? "&" : "&mut ") + path +
+                        (args.empty() ? "" : ", " + joinStrings(args, ", ")) + ") }");
+            emitLine(w, "pub fn __thunk_" + RustCore::ident(fn.name) + "(base: " + (fn.is_const ? "&" : "&mut ") + introducer +
+                        (params.empty() ? "" : ", " + joinStrings(params, ", ")) + ")" + ret + " { let this = unsafe { &" +
+                        (fn.is_const ? "" : "mut ") + "*(base as *const " + introducer + " as *" + (fn.is_const ? "const " : "mut ") +
+                        name + ") }; this.__impl_" + RustCore::ident(fn.name) + "(" + joinStrings(args, ", ") + ") }");
         }
         if (cls.to_str_fun) emitFunction(*cls.to_str_fun, w, aux, FnKind::Method, scope, bases);
 
