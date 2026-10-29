@@ -46,13 +46,11 @@ impl<T: ?Sized> Clone for WeakShared<T> {
 
 /// A live borrow. It owns a keep-alive reference to the allocation instead of borrowing the handle, so it does not
 /// hold the place the handle was read from (a field of `self`) borrowed while it is alive.
-pub struct Ref<T: ?Sized> { ptr: *const T, flag: *const Cell<isize>, _keep: Option<Rc<dyn KeepAlive>> }
-pub struct RefMut<T: ?Sized> { ptr: *mut T, flag: *const Cell<isize>, _keep: Option<Rc<dyn KeepAlive>> }
+pub struct Ref<T: ?Sized> { ptr: *const T, _keep: Option<Rc<dyn KeepAlive>> }
+pub struct RefMut<T: ?Sized> { ptr: *mut T, _keep: Option<Rc<dyn KeepAlive>> }
 impl<T: ?Sized> Deref for Ref<T> { type Target = T; fn deref(&self) -> &T { unsafe { &*self.ptr } } }
 impl<T: ?Sized> Deref for RefMut<T> { type Target = T; fn deref(&self) -> &T { unsafe { &*self.ptr } } }
 impl<T: ?Sized> DerefMut for RefMut<T> { fn deref_mut(&mut self) -> &mut T { unsafe { &mut *self.ptr } } }
-impl<T: ?Sized> Drop for Ref<T> { fn drop(&mut self) { unsafe { (*self.flag).set((*self.flag).get() - 1) } } }
-impl<T: ?Sized> Drop for RefMut<T> { fn drop(&mut self) { unsafe { (*self.flag).set(0) } } }
 
 impl<T: 'static> Shared<T> {
     pub fn new(value: T) -> Self { Self::new_with(|_| value) }
@@ -77,23 +75,15 @@ impl<T: ?Sized> Shared<T> {
     fn live(&self) -> bool { !self.ptr.is_null() && self.keep.is_some() }
     pub fn is_null(&self) -> bool { !self.live() }
 
+    // Python objects alias freely (`x.a = x.a + 1` borrows twice in one statement), so there is no dynamic borrow
+    // check: the handle keeps the allocation alive, the borrow only exposes the place.
     pub fn borrow(&self) -> Ref<T> {
         assert!(self.live(), "use of an uninitialized object handle");
-        unsafe {
-            let flag = &*self.flag;
-            assert!(flag.get() >= 0, "object is already mutably borrowed");
-            flag.set(flag.get() + 1);
-        }
-        Ref { ptr: self.ptr, flag: self.flag, _keep: self.keep.clone() }
+        Ref { ptr: self.ptr, _keep: self.keep.clone() }
     }
     pub fn borrow_mut(&self) -> RefMut<T> {
         assert!(self.live(), "use of an uninitialized object handle");
-        unsafe {
-            let flag = &*self.flag;
-            assert!(flag.get() == 0, "object is already borrowed");
-            flag.set(-1);
-        }
-        RefMut { ptr: self.ptr, flag: self.flag, _keep: self.keep.clone() }
+        RefMut { ptr: self.ptr, _keep: self.keep.clone() }
     }
     pub fn downgrade(&self) -> WeakShared<T> {
         WeakShared { keep: self.keep.as_ref().map(Rc::downgrade), flag: self.flag, ptr: self.ptr }
