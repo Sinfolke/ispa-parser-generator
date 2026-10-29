@@ -1,0 +1,14 @@
+# `--stdlib core`: the core runtime lowered to C++ plus its facade (C++17). Independent of the cpp-target package:
+# the few ispastdlib headers the facade still includes are bundled until it stops depending on them.
+name: cpp-core
+requires:
+  - target-core
+layout:
+  root: parser/stdlibs
+  ispalib: {}
+  ispatarget:
+    cpp-core: target/cpp-core
+    cpp-core/ispastdlib: target/cpp/ispastdlib
+  files:
+    ispatarget/cpp-core/ispastdlib.hpp: target/cpp/ispastdlib.hpp
+    ispatarget/cpp-core/src/ispastdlib_core.cpp: target/cpp/src/core.cpp

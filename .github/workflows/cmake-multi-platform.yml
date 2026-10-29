@@ -730,9 +730,14 @@ jobs:
             "-DCMAKE_CXX_FLAGS=-fno-modules-reduced-bmi"
             )
           fi
+          VCPKG_ICU="$GITHUB_WORKSPACE/build/vcpkg_installed/$MATRIX_TRIPLET"
           if [[ "$RUNNER_OS" == "macOS" ]]; then
             CMAKE_ARGS+=(
             "-DICU_ROOT=$GITHUB_WORKSPACE/build/vcpkg_installed/$MATRIX_TRIPLET"
+            "-DICU_INCLUDE_DIR=$VCPKG_ICU/include"
+            "-DICU_UC_LIBRARY=$VCPKG_ICU/lib/libicuuc.a"
+            "-DICU_DATA_LIBRARY=$VCPKG_ICU/lib/libicudata.a"
+            "-DCMAKE_IGNORE_PREFIX_PATH=$LLVM_PREFIX"
             )
           fi
           # -------------------------------------------------------
@@ -769,7 +774,7 @@ jobs:
           cmake --build build \
             --config Release \
             --parallel 3 \
-            "${verbose[@]}" 2>&1 | tee diag/build.log
+            ${verbose[@]+"${verbose[@]}"} 2>&1 | tee diag/build.log
 
       - name: Diagnose build failure
         if: failure()

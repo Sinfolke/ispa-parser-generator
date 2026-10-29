@@ -687,13 +687,10 @@ def shell_exports(variables, shell, manifest):
         for name, paths in path_exports(manifest, shell).items():
             for path in reversed(paths):
                 escaped = path.replace("'", "''")
-                lines += [
-                    f"$ispaPathEntry = '{escaped}'",
-                    f"if (-not (($env:{name} -split ';') -contains $ispaPathEntry)) {{",
-                    f"  $env:{name} = $ispaPathEntry + $(if ($env:{name}) {{ ';' + $env:{name} }})",
-                    '}',
-                ]
-        lines.append('Remove-Variable ispaPathEntry -ErrorAction SilentlyContinue')
+                # One statement per line so the output also works piped into Invoke-Expression.
+                lines.append(
+                    f"if (-not (($env:{name} -split ';') -contains '{escaped}')) "
+                    f"{{ $env:{name} = '{escaped}' + $(if ($env:{name}) {{ ';' + $env:{name} }}) }}")
         return '\n'.join(lines) + '\n'
     raise PackageError(f'Unsupported shell: {shell}')
 
@@ -709,6 +706,30 @@ def write_shell_export(root, shell, variables, manifest):
     script = root / '.ispa-exports' / ('env.ps1' if shell == 'powershell' else 'env.sh')
     script.write_text(shell_exports(variables, shell, manifest), encoding='utf-8')
     return script
+
+
+def windows_permanent_export(variables, manifest):
+    """Persist exports in the user environment (HKCU\\Environment), visible to every new process."""
+    import ctypes
+    import winreg
+    with winreg.CreateKey(winreg.HKEY_CURRENT_USER, 'Environment') as key:
+        def read(name):
+            try:
+                return winreg.QueryValueEx(key, name)
+            except FileNotFoundError:
+                return '', winreg.REG_SZ
+        for name, value in variables.items():
+            winreg.SetValueEx(key, name, 0, winreg.REG_SZ, value)
+        for name, paths in path_exports(manifest, 'powershell').items():
+            current, kind = read(name)
+            existing = [p for p in current.split(';') if p]
+            known = {p.lower() for p in existing}
+            added = [p for p in paths if p.lower() not in known]
+            if added:
+                winreg.SetValueEx(key, name, 0, kind if kind in (winreg.REG_SZ, winreg.REG_EXPAND_SZ) else winreg.REG_SZ,
+                                  ';'.join(added + existing))
+    result = ctypes.c_ulong()
+    ctypes.windll.user32.SendMessageTimeoutW(0xFFFF, 0x001A, 0, 'Environment', 0x2, 5000, ctypes.byref(result))
 
 
 def permanent_export(root, shell, variables, manifest):
@@ -859,7 +880,13 @@ def main(argv=None):
             output, manifest = write_export_files(root)
             variables = export_variables(root, output, manifest)
             shell = args.shell or default_shell()
-            if args.export_permanent:
+            if args.export_permanent and os.name == 'nt':
+                windows_permanent_export(variables, manifest)
+                write_shell_export(root, 'powershell', variables, manifest)
+                print("Saved exports to the user environment (HKCU\\Environment).")
+                print(f"CMake targets: {output / 'targets.cmake'}")
+                print("Open a new terminal for the changes to take effect.")
+            elif args.export_permanent:
                 profile, script = permanent_export(root, shell, variables, manifest)
                 print(f"Saved export script: {script}")
                 print(f"Updated shell profile: {profile}")
