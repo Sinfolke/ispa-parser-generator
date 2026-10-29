@@ -22,6 +22,8 @@ mod facade;
 pub use facade::*;
 mod bridge;
 pub use bridge::*;
+mod parser;
+pub use parser::*;
 mod primitives;
 pub use primitives::{StdError, fail, attempt, failure_message};
 
@@ -152,35 +154,6 @@ pub fn lr_node<T>(value: T) -> T { value }
 pub fn lr_capture_assign<T: Clone>(target: &mut T, value: &T) { *target = value.clone(); }
 pub fn lr_parse<T: Default>() -> T { T::default() }
 pub fn lr_parse_generalized<T: Default>() -> T { T::default() }
-
-pub mod recovery {
-    pub const END_OF_INPUT: usize = usize::MAX;
-    #[derive(Clone, Debug)]
-    pub struct Policy {
-        pub insertion: bool,
-        pub deletion: bool,
-        pub replacement: bool,
-        pub max_skip: usize,
-    }
-    #[derive(Clone, Debug)]
-    pub struct Handler {
-        pub expected: Vec<usize>,
-        pub continuation: Vec<usize>,
-        pub follow: Vec<usize>,
-        pub synchronization: Vec<usize>,
-        pub policy: Policy,
-        pub rule: String,
-        pub expected_text: String,
-    }
-    pub fn handler(expected: &[usize], continuation: &[usize], follow: &[usize], synchronization: &[usize],
-                   insertion: bool, deletion: bool, replacement: bool, max_skip: usize,
-                   rule: &str, expected_text: &str) -> Handler {
-        Handler { expected: expected.to_vec(), continuation: continuation.to_vec(),
-                  follow: follow.to_vec(), synchronization: synchronization.to_vec(),
-                  policy: Policy { insertion, deletion, replacement, max_skip },
-                  rule: rule.to_owned(), expected_text: expected_text.to_owned() }
-    }
-}
 
 pub mod debug {
     #[derive(Clone, Copy, Debug, Default)] pub struct Loc { pub file: &'static str, pub line: usize, pub column: usize }

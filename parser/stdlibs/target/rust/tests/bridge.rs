@@ -12,6 +12,7 @@ enum V { #[default] Empty, N(Num), W(Word) }
 
 impl TokenVariant for V {
     fn variant_index(&self) -> usize { match self { V::Empty => 0, V::N(_) => 1, V::W(_) => 2 } }
+    fn held(&self) -> &dyn std::any::Any { match self { V::Empty => &(), V::N(x) => x, V::W(x) => x } }
     fn index_of<T: 'static>() -> Option<usize> {
         let id = std::any::TypeId::of::<T>();
         if id == std::any::TypeId::of::<Num>() { Some(1) } else if id == std::any::TypeId::of::<Word>() { Some(2) } else { None }
@@ -32,14 +33,8 @@ impl VariantGet<Word> for V {
 
 type Token = RawToken<V>;
 
-fn cursor<T: Clone + Default + 'static>(tokens: Vec<Token>) -> Shared<ispa_std::python::ispa_std::lexer::TokenCursor>
-where V: VariantGet<T> {
-    TypedCursor::handle(
-        TokenIterator::new(Rc::new(tokens), 0),
-        Some(node_maker::<V, T>()),
-        |token: &Token| token.index() as i64,
-        |token: &Token| (token.start_pos, token.text(), true, token.length, token.line, token.column(), token.id as i64),
-    ).upcast()
+fn cursor<T: Clone + Default + 'static>(tokens: Vec<Token>) -> Shared<ispa_std::python::ispa_std::lexer::TokenCursor> {
+    TypedCursor::handle(TokenIterator::new(Rc::new(tokens), 0), Some(node_maker::<Token, T>())).upcast()
 }
 
 #[test]

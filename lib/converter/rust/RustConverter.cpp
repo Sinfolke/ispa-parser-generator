@@ -818,6 +818,17 @@ namespace Rust {
             emitLine(w, "impl ::ispa_std::TokenVariant for " + def.name + " {");
             w.increaseIndentation();
             emitLine(w, "fn variant_index(&self) -> usize { self.index() }");
+            emitLine(w, "fn held(&self) -> &dyn ::std::any::Any {");
+            w.increaseIndentation();
+            emitLine(w, "match self {");
+            w.increaseIndentation();
+            emitLine(w, def.name + "::Monostate => &(),");
+            for (std::size_t i = 0; i < def.alternatives.size(); ++i)
+                emitLine(w, def.name + "::V" + std::to_string(i) + "(x) => x,");
+            w.decreaseIndentation();
+            emitLine(w, "}");
+            w.decreaseIndentation();
+            emitLine(w, "}");
             emitLine(w, "fn index_of<__T: 'static>() -> Option<usize> {");
             w.increaseIndentation();
             emitLine(w, "let id = ::std::any::TypeId::of::<__T>();");

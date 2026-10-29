@@ -6,9 +6,31 @@ use crate::pycoll::to_any;
 use crate::{LazyIterator, Node, PyAny, RawToken, Shared, TokenIterator, TokenVariant, Upcast, VariantGet, WeakShared};
 use std::marker::PhantomData;
 
+/// A typed token as the core sees it.
+pub trait BridgeToken: Clone + 'static {
+    /// Position of the held alternative (the id the core addresses token types by).
+    fn alt_index(&self) -> i64;
+    /// Source span: (start, text, has_source, length, line, column, kind).
+    fn span(&self) -> (i64, String, bool, i64, i64, i64, i64);
+    /// The typed node of a `T` the token holds.
+    fn node<T: Clone + Default + 'static>(&self) -> Option<Shared<CoreNode>>;
+    /// The alternative index of `T`, if the token type has such an alternative.
+    fn alt_of<T: 'static>() -> Option<i64>;
+}
+impl<V: TokenVariant> BridgeToken for RawToken<V> {
+    fn alt_index(&self) -> i64 { self.index() as i64 }
+    fn span(&self) -> (i64, String, bool, i64, i64, i64, i64) {
+        (self.start_pos, self.text(), true, self.length, self.line, self.column(), self.id as i64)
+    }
+    fn node<T: Clone + Default + 'static>(&self) -> Option<Shared<CoreNode>> {
+        if self.value.held().is::<T>() { Some(core_node(self.node_of::<T>())) } else { None }
+    }
+    fn alt_of<T: 'static>() -> Option<i64> { V::index_of::<T>().map(|index| index as i64) }
+}
+
 /// A typed iterator the core can walk.
 pub trait BridgeCursor: Clone + 'static {
-    type Token: Clone + 'static;
+    type Token: BridgeToken;
     fn is_end(&self) -> bool;
     fn advance(&mut self);
     fn retreat(&mut self);
@@ -77,16 +99,11 @@ impl TypedRawToken {
 #[derive(Clone)]
 struct CarriedNode(Shared<CoreNode>);
 
-/// How a cursor makes the typed node of the rule/token type it was bridged for.
+/// How a cursor makes the typed node of the type it was bridged for.
 pub type MakeNode<Token> = fn(&Token) -> Option<Shared<CoreNode>>;
 
-/// `Token` as the typed node of `T` (what `to_node::<T>` does in the typed stdlib).
-pub fn node_maker<V: TokenVariant + VariantGet<T>, T: Clone + Default + 'static>() -> MakeNode<RawToken<V>> {
-    |token| {
-        if V::index_of::<T>().is_none() { return None; }
-        Some(core_node::<T>(token.to_node::<T>()))
-    }
-}
+/// Make the typed nodes of `T` out of tokens.
+pub fn node_maker<Token: BridgeToken, T: Clone + Default + 'static>() -> MakeNode<Token> { |token| token.node::<T>() }
 
 /// A core `TokenCursor` over a typed iterator.
 #[repr(C)]
@@ -94,8 +111,6 @@ pub struct TypedCursor<IT: BridgeCursor> {
     base_0: TokenCursor,
     pub it: IT,
     make_node: Option<MakeNode<IT::Token>>,
-    index_of: fn(&IT::Token) -> i64,
-    meta_of: fn(&IT::Token) -> (i64, String, bool, i64, i64, i64, i64),
     cached: Option<(i64, Shared<CoreToken>)>,
     _target: PhantomData<IT>,
 }
@@ -105,12 +120,10 @@ impl<IT: BridgeCursor> Upcast<TokenCursor> for TypedCursor<IT> {
 impl<IT: BridgeCursor> TypedCursor<IT> {
     fn this(base: &mut TokenCursor) -> &mut Self { unsafe { &mut *(base as *mut TokenCursor as *mut Self) } }
 
-    /// A handle to a cursor at `it`. `index_of` is the token's alternative index, `meta_of` its source span as
-    /// (start, text, has_source, length, line, column, kind).
-    pub fn handle(it: IT, make_node: Option<MakeNode<IT::Token>>, index_of: fn(&IT::Token) -> i64,
-                  meta_of: fn(&IT::Token) -> (i64, String, bool, i64, i64, i64, i64)) -> Shared<TypedCursor<IT>> {
+    /// A handle to a cursor at `it`; `make_node` makes the typed node of the type being matched, if it is a token's.
+    pub fn handle(it: IT, make_node: Option<MakeNode<IT::Token>>) -> Shared<TypedCursor<IT>> {
         Shared::new_with(|owner: &WeakShared<TypedCursor<IT>>| {
-            let mut cursor = TypedCursor { base_0: TokenCursor::default(), it, make_node, index_of, meta_of, cached: None, _target: PhantomData };
+            let mut cursor = TypedCursor { base_0: TokenCursor::default(), it, make_node, cached: None, _target: PhantomData };
             cursor.base_0.__bind_owner(&owner.upcast());
             cursor.install();
             cursor
@@ -132,7 +145,7 @@ impl<IT: BridgeCursor> TypedCursor<IT> {
         base.__vt_distance = |base| Self::this(base).it.distance();
         base.__vt_copy = |base| {
             let this = Self::this(base);
-            let copy = Self::handle(this.it.clone(), this.make_node, this.index_of, this.meta_of);
+            let copy = Self::handle(this.it.clone(), this.make_node);
             copy.borrow_mut().cached = this.cached.clone();
             copy.upcast()
         };
@@ -152,7 +165,7 @@ impl<IT: BridgeCursor> TypedCursor<IT> {
         };
         base.__vt_plus = |base, count| {
             let this = Self::this(base);
-            let moved = Self::handle(this.it.clone(), this.make_node, this.index_of, this.meta_of);
+            let moved = Self::handle(this.it.clone(), this.make_node);
             moved.borrow_mut().base_0.advance_by(count);
             moved.upcast()
         };
@@ -166,14 +179,14 @@ impl<IT: BridgeCursor> TypedCursor<IT> {
             let distance = this.it.distance();
             if let Some((at, token)) = &this.cached { if *at == distance { return token.clone(); } }
             let Some(token) = this.it.current() else { return CoreToken::empty_token() };
-            let (start, text, has_source, length, line, column, kind) = (this.meta_of)(&token);
+            let (start, text, has_source, length, line, column, kind) = token.span();
             let meta = RawTokenMeta::shared_default();
             meta.borrow_mut().__init__(start, &text, has_source, length, line, column, kind);
             let node = match this.make_node.and_then(|make| make(&token)) {
                 Some(node) => to_any(CarriedNode(node)),
                 None => PyAny::default(),
             };
-            let raw = TypedRawToken::handle(meta, (this.index_of)(&token), node);
+            let raw = TypedRawToken::handle(meta, token.alt_index(), node);
             this.cached = Some((distance, raw.clone()));
             raw
         };

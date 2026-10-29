@@ -9,6 +9,8 @@ use std::rc::Rc;
 pub trait TokenVariant: Clone + Default + 'static {
     /// 0 for the empty alternative, then 1 + the position of the held type.
     fn variant_index(&self) -> usize;
+    /// The held alternative (the unit value when empty), to read it as a `T` without a `VariantGet<T>` bound.
+    fn held(&self) -> &dyn std::any::Any;
     /// The position (1-based, like `variant_index`) of `T` among the alternatives; a rule type is none of them.
     fn index_of<T: 'static>() -> Option<usize>;
 }
@@ -53,6 +55,21 @@ impl<V: TokenVariant> RawToken<V> {
     pub fn index(&self) -> usize { self.value.variant_index() }
     pub fn text(&self) -> String { self.source.remaining().get(..self.length as usize).unwrap_or("").to_owned() }
     pub fn column(&self) -> i64 { self.source.column() as i64 }
+    /// The typed node of the token's value when it holds a `T` (an empty node otherwise).
+    pub fn node_of<T: Clone + Default + 'static>(&self) -> Node<T> {
+        match self.value.held().downcast_ref::<T>() {
+            Some(value) => {
+                let mut node = Node::create(value.clone());
+                node.start_pos = self.start_pos;
+                node.length = self.length;
+                node.line = self.line;
+                node.column = self.column();
+                node.name = self.id as i64;
+                node
+            }
+            None => Node::default(),
+        }
+    }
     /// The typed node of the token's value when it holds a `T`.
     pub fn to_node<T: Clone + Default>(&self) -> Node<T> where V: VariantGet<T> {
         if !VariantGet::<T>::holds(&self.value) { return Node::default(); }
@@ -173,15 +190,4 @@ impl<V: TokenVariant> TokenCursorKind for LazyIterator<RawToken<V>> {
     fn kind(&self) -> usize { unimplemented!("lazy lexing") }
 }
 
-pub trait LLParserApi { type Iterator; }
 
-/// Base of generated parsers.
-#[repr(C)]
-pub struct LLParser<Main, Token> {
-    pub lexer: Shared<LexerBase<Token>>,
-    pub text: Ptr,
-    pub tree: Main,
-    pub errors: Vec<Error>,
-    pub __vt_parseFromTokens: fn(&mut LLParser<Main, Token>),
-    pub __vt_lazyParse: fn(&mut LLParser<Main, Token>) -> MatchResult<Main, LazyIterator<Token>>,
-}
