@@ -19,7 +19,7 @@ impl<T> std::ops::Deref for Lazy<T> {
     fn deref(&self) -> &T { self.value.get_or_init(self.init) }
 }
 
-/// A small, copyable cursor into UTF-8 source text. Positions are byte offsets.
+/// A small, copyable cursor into UTF-8 source text. DFA input is classified one byte at a time.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Ptr {
     input: &'static str,
@@ -31,9 +31,9 @@ impl Ptr {
     pub fn from_static(input: &'static str) -> Self { Self::new(input) }
     pub fn offset(self) -> usize { self.offset }
     pub fn is_eof(self) -> bool { self.offset >= self.input.len() }
-    pub fn get(self) -> Option<char> { self.input.get(self.offset..)?.chars().next() }
+    pub fn get(self) -> Option<u8> { self.input.as_bytes().get(self.offset).copied() }
     pub fn inc(&mut self) -> Self {
-        if let Some(ch) = self.get() { self.offset += ch.len_utf8(); }
+        if self.get().is_some() { self.offset += 1; }
         *self
     }
     pub fn advance(mut self, count: usize) -> Self { for _ in 0..count { self.inc(); } self }
@@ -42,11 +42,10 @@ impl Ptr {
     }
     pub fn starts_with(self, text: &str) -> bool { self.input.get(self.offset..).is_some_and(|s| s.starts_with(text)) }
     pub fn remaining(self) -> &'static str { self.input.get(self.offset..).unwrap_or("") }
-    pub fn line(self) -> usize { self.input[..self.offset.min(self.input.len())].bytes().filter(|b| *b == b'\n').count() + 1 }
-    pub fn column(self) -> usize { self.remaining_line_prefix().chars().count() + 1 }
-    fn remaining_line_prefix(self) -> &'static str {
-        let prefix = &self.input[..self.offset.min(self.input.len())];
-        prefix.rsplit('\n').next().unwrap_or("")
+    pub fn line(self) -> usize { self.input.as_bytes()[..self.offset.min(self.input.len())].iter().filter(|b| **b == b'\n').count() + 1 }
+    pub fn column(self) -> usize {
+        self.input.as_bytes()[..self.offset.min(self.input.len())].iter().rev()
+            .take_while(|b| **b != b'\n').count() + 1
     }
 }
 
@@ -57,7 +56,7 @@ impl std::ops::Add<i64> for Ptr {
 }
 pub fn string_range(start: Ptr, end: Ptr) -> String {
     assert!(std::ptr::eq(start.input, end.input) && start.offset <= end.offset);
-    start.input[start.offset..end.offset].to_owned()
+    String::from_utf8_lossy(&start.input.as_bytes()[start.offset..end.offset]).into_owned()
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -108,7 +107,7 @@ impl std::error::Error for Error {}
 pub fn starts_with(pos: Ptr, value: &str) -> bool { pos.starts_with(value) }
 pub fn skip_spaces<T>(pos: &mut Ptr) {
     let _ = std::marker::PhantomData::<T>;
-    while let Some(ch) = pos.get() { if !ch.is_whitespace() { break; } pos.inc(); }
+    while let Some(ch) = pos.get() { if !ch.is_ascii_whitespace() { break; } pos.inc(); }
 }
 pub fn concat<T: AsRef<str>>(values: &[T]) -> String { values.iter().map(AsRef::as_ref).collect() }
 
@@ -157,6 +156,15 @@ impl<T> Iterator for LexerBase<T> {
     }
 }
 pub trait LexerTypes { type Token; type Iterator; }
+/// Cursor operations required by generated parser entry points.
+pub trait TokenStream {
+    type Cursor;
+    type LazyCursor;
+
+    fn token_cursor(&mut self) -> Self::Cursor;
+    fn lazy_token_cursor(&mut self, input: Ptr) -> Self::LazyCursor;
+    fn reset_token_stream(&mut self);
+}
 /// Token stream with transactional rule calls and useful failure positions.
 #[derive(Clone)]
 pub struct LLParser<AST, T> { tokens: Vec<T>, position: usize, errors: Vec<Error>, ast: PhantomData<AST> }
@@ -429,17 +437,50 @@ mod execution_tests {
     use super::*;
 
     #[test]
+    fn token_stream_interface_resets_and_creates_cursors() {
+        #[derive(Default)]
+        struct Stream { tokens: Vec<u8> }
+        impl TokenStream for Stream {
+            type Cursor = usize;
+            type LazyCursor = Ptr;
+            fn token_cursor(&mut self) -> usize { self.tokens.len() }
+            fn lazy_token_cursor(&mut self, input: Ptr) -> Ptr { input }
+            fn reset_token_stream(&mut self) { self.tokens.clear(); }
+        }
+        let mut stream = Stream { tokens: vec![1, 2] };
+        assert_eq!(stream.token_cursor(), 2);
+        stream.reset_token_stream();
+        assert_eq!(stream.token_cursor(), 0);
+        assert_eq!(stream.lazy_token_cursor(Ptr::new("é")).get(), Some(0xc3));
+    }
+
+    #[test]
     fn lexer_and_parser_execute_and_backtrack() {
         let lexer = LexerBase::new("a b", |pos| {
-            while pos.get() == Some(' ') { pos.inc(); }
+            while pos.get() == Some(b' ') { pos.inc(); }
             if let Some(ch) = pos.get() { pos.inc(); Ok(Some(ch)) } else { Ok(None) }
         });
-        let mut parser = LLParser::<(), char>::new(lexer.collect_tokens().unwrap());
-        assert_eq!(parser.optional(|p| Ok(p.take_if(|ch| *ch == 'z').copied())).unwrap(), None);
+        let mut parser = LLParser::<(), u8>::new(lexer.collect_tokens().unwrap());
+        assert_eq!(parser.optional(|p| Ok(p.take_if(|ch| *ch == b'z').copied())).unwrap(), None);
         assert_eq!(parser.position(), 0);
-        assert_eq!(parser.required("a", |p| Ok(p.take_if(|ch| *ch == 'a').copied())).unwrap(), 'a');
-        assert_eq!(parser.repeated(1, None, |p| Ok(p.take_if(|ch| *ch == 'b').copied())).unwrap(), vec!['b']);
+        assert_eq!(parser.required("a", |p| Ok(p.take_if(|ch| *ch == b'a').copied())).unwrap(), b'a');
+        assert_eq!(parser.repeated(1, None, |p| Ok(p.take_if(|ch| *ch == b'b').copied())).unwrap(), vec![b'b']);
         assert!(parser.is_eof());
+    }
+
+    #[test]
+    fn cursor_classifies_each_utf8_byte() {
+        let mut cursor = Ptr::new("é\n!");
+        let start = cursor;
+        assert_eq!(cursor.get(), Some(0xc3));
+        cursor.inc();
+        assert_eq!(cursor.get(), Some(0xa9));
+        assert_eq!(cursor.column(), 2);
+        cursor.inc();
+        assert_eq!(cursor.get(), Some(b'\n'));
+        assert_eq!(string_range(start, cursor), "é");
+        cursor.inc();
+        assert_eq!((cursor.line(), cursor.column(), cursor.get()), (2, 1, Some(b'!')));
     }
 
     #[test]

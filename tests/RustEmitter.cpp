@@ -54,6 +54,26 @@ TEST(RustEmitter, NeutralValuesCallsBorrowingAndControlFlowExecute) {
     copies.statements.push_back(Return::createStatement(Return{.value = call("identity", {symbol("text")})}));
     declarations.push_back(copies);
 
+    const auto collection = [](const char* name, ArrayMethods method, stdu::vector<Expression> args = {}) {
+        StorageSymbol access;
+        access.what = symbol(name);
+        access.path.emplace_back(ArrayMethodCall{.method = method, .args = std::move(args)});
+        return StorageSymbol::createExpression(access);
+    };
+    Function collections{.type = ValueType::LargeUInt, .name = "collections"};
+    Array initial;
+    initial.values = {integer(1), integer(2)};
+    collections.statements.push_back(Variable{.name = "first", .type = Type{ValueType::Array, Type{ValueType::Int}},
+        .value = Array::createExpression(initial)});
+    Array second_values;
+    second_values.values = {integer(1), integer(2)};
+    collections.statements.push_back(Variable{.name = "second", .type = Type{ValueType::Array, Type{ValueType::Int}},
+        .value = Array::createExpression(second_values)});
+    collections.statements.push_back(Expression::createStatement(collection("first", ArrayMethods::Extend, {symbol("second")})));
+    collections.statements.push_back(Expression::createStatement(collection("second", ArrayMethods::Clear)));
+    collections.statements.push_back(Return::createStatement(Return{.value = collection("first", ArrayMethods::Size)}));
+    declarations.push_back(collections);
+
     Function loop{.type = ValueType::Int, .name = "loop"};
     loop.statements.push_back(Variable{.name = "n", .type = ValueType::Int, .value = integer(0)});
     Expression condition = symbol("n");
@@ -104,6 +124,8 @@ TEST(RustEmitter, NeutralValuesCallsBorrowingAndControlFlowExecute) {
         const auto files = generate(program, incremental);
         for (const auto& [name, source] : files) {
             EXPECT_EQ(source.find("__ispa_rust_"), std::string::npos);
+            if (name.find("collections") != std::string::npos)
+                EXPECT_NE(source.find(".extend("), std::string::npos) << source;
             std::filesystem::create_directories((directory / name).parent_path());
             std::ofstream(directory / name) << source;
         }
@@ -113,6 +135,7 @@ pub use generated::Emitter;
 fn main() {
     assert_eq!(Emitter::run(), 5);
     assert_eq!(Emitter::copies(), "value");
+    assert_eq!(Emitter::collections(), 4);
     assert_eq!(Emitter::literal(), "quote\" backslash\\n newline\n tab\t\0 café");
     assert_eq!(Emitter::r#loop(), 3);
     assert_eq!(Emitter::steps(), 4);
@@ -149,4 +172,21 @@ TEST(RustEmitter, ReportsMissingParserRuntimeContract) {
     } catch (const std::exception& error) {
         EXPECT_NE(std::string(error.what()).find("semantic token-stream operations"), std::string::npos);
     }
+}
+
+TEST(RustEmitter, EmitsTokenStreamInterfaceCalls) {
+    Function function{.type = ValueType::Void, .name = "cursor_ops",
+        .parameters = {{Type{Symbol{"Stream"}}, "stream"}, {ValueType::NonOwnedString, "text"}}};
+    for (auto operation : {StdlibExports::TokenCursor, StdlibExports::LazyTokenCursor,
+                           StdlibExports::ResetTokenStream}) {
+        IspaLibFunctionCall call{.symbol = IspaLibSymbol{.exports = operation}, .args = {symbol("stream")}};
+        if (operation == StdlibExports::LazyTokenCursor) call.args.push_back(symbol("text"));
+        function.statements.push_back(IspaLibFunctionCall::createStatement(std::move(call)));
+    }
+    const auto files = generate({Function::createDeclaration(function)});
+    std::string output;
+    for (const auto& [name, source] : files) output += source;
+    EXPECT_NE(output.find("TokenStream::token_cursor(&mut stream)"), std::string::npos);
+    EXPECT_NE(output.find("TokenStream::lazy_token_cursor(&mut stream, text)"), std::string::npos);
+    EXPECT_NE(output.find("TokenStream::reset_token_stream(&mut stream)"), std::string::npos);
 }

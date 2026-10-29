@@ -1,5 +1,7 @@
 """Common helpers implemented in the Python subset accepted by ISPA."""
 
+from langapi import size, push, extend
+
 
 def zip(keys: list, values: list) -> dict:
     """Build a mapping from corresponding elements of two lists.
@@ -8,9 +10,9 @@ def zip(keys: list, values: list) -> dict:
     grammar capture utilities, rather than Python's iterator-of-tuples shape.
     If the lists have different lengths, extra elements are ignored.
     """
-    result: dict = {}
+    result = {}
     i = 0
-    while i < len(keys) and i < len(values):
+    while i < size(keys) and i < size(values):
         result[keys[i]] = values[i]
         i += 1
     return result
@@ -21,7 +23,7 @@ def range(stop: int) -> list[int]:
     result: list[int] = []
     i = 0
     while i < stop:
-        result.append(i)
+        push(result, i)
         i += 1
     return result
 
@@ -29,26 +31,32 @@ def range(stop: int) -> list[int]:
 def sum(values: list[int]) -> int:
     """Return the sum of integer values."""
     result = 0
-    for value in values:
-        result += value
+    i = 0
+    while i < size(values):
+        result += values[i]
+        i += 1
     return result
 
 
 def min(values: list[int]) -> int:
     """Return the smallest integer in a non-empty list."""
     result = values[0]
-    for value in values:
-        if value < result:
-            result = value
+    i = 0
+    while i < size(values):
+        if values[i] < result:
+            result = values[i]
+        i += 1
     return result
 
 
 def max(values: list[int]) -> int:
     """Return the largest integer in a non-empty list."""
     result = values[0]
-    for value in values:
-        if value > result:
-            result = value
+    i = 0
+    while i < size(values):
+        if values[i] > result:
+            result = values[i]
+        i += 1
     return result
 
 
@@ -61,35 +69,42 @@ def abs(value: int) -> int:
 
 def all(values: list[bool]) -> bool:
     """Return whether every boolean in the list is true."""
-    for value in values:
-        if not value:
+    i = 0
+    while i < size(values):
+        if not values[i]:
             return False
+        i += 1
     return True
 
 
 def any(values: list[bool]) -> bool:
     """Return whether at least one boolean in the list is true."""
-    for value in values:
-        if value:
+    i = 0
+    while i < size(values):
+        if values[i]:
             return True
+        i += 1
     return False
 
 
 def reversed(values: list[int]) -> list[int]:
     """Return a new list containing the integers in reverse order."""
     result: list[int] = []
-    i = len(values) - 1
+    i = size(values) - 1
     while i >= 0:
-        result.append(values[i])
+        push(result, values[i])
         i -= 1
     return result
 
 
 def sorted(values: list[int]) -> list[int]:
     """Return a stable ascending copy of an integer list."""
-    result: list[int] = values.copy()
+    result: list[int] = []
+    extend(result, values)
     i = 1
-    while i < len(result):
+    value = 0
+    j = 0
+    while i < size(result):
         value = result[i]
         j = i
         while j > 0 and result[j - 1] > value:

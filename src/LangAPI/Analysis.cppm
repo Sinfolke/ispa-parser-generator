@@ -152,8 +152,11 @@ class DependencyGraph {
     static std::string declarationName(const Declaration& decl) {
         return std::visit([](const auto& value) -> std::string {
             using T = std::remove_cvref_t<decltype(value)>;
-            if constexpr (std::same_as<T, Class>) {
+            if constexpr (std::same_as<T, Class> || std::same_as<T, Interface>) {
                 if (auto path = symbolPath(value.name)) return leafName(*path);
+                return {};
+            } else if constexpr (std::same_as<T, Implementation>) {
+                if (auto path = symbolPath(value.target)) return leafName(*path);
                 return {};
             } else return value.name;
         }, decl.value);

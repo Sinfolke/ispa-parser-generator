@@ -859,6 +859,13 @@ namespace LangRepr {
                 .name = std::make_shared<LangAPI::Symbol>(LangAPI::Symbol{method}), .args = std::move(args)});
             return LangAPI::StorageSymbol::createExpression(storage);
         };
+        const auto collectionCall = [](const std::string& object, LangAPI::ArrayMethods method,
+                                       stdu::vector<LangAPI::Expression> args = {}) -> LangAPI::Expression {
+            LangAPI::StorageSymbol storage;
+            storage.what = LangAPI::Symbol::createExpression(LangAPI::Symbol{object});
+            storage.path.emplace_back(LangAPI::ArrayMethodCall{.method = method, .args = std::move(args)});
+            return LangAPI::StorageSymbol::createExpression(storage);
+        };
         const auto callStatement = [](const LangAPI::Expression& expression) {
             return LangAPI::Expression::createStatement(expression);
         };
@@ -985,10 +992,9 @@ namespace LangRepr {
         lexer.data.emplace_back(std::make_shared<LangAPI::Declaration>(LangAPI::Function::createDeclaration(token_error)),
             LangAPI::Visibility::Private);
         LangAPI::Statements flush;
-        flush.push_back(callStatement(memberCall("tokens", "insert", {
-            memberCall("tokens", "end"), memberCall("ispa_pending_tokens", "begin"),
-            memberCall("ispa_pending_tokens", "end")})));
-        flush.push_back(callStatement(memberCall("ispa_pending_tokens", "clear")));
+        flush.push_back(callStatement(collectionCall("tokens", LangAPI::ArrayMethods::Extend,
+            {LangAPI::Symbol::createExpression(LangAPI::Symbol{"ispa_pending_tokens"})})));
+        flush.push_back(callStatement(collectionCall("ispa_pending_tokens", LangAPI::ArrayMethods::Clear)));
         LangAPI::Function push_token;
         push_token.name = "on_token";
         push_token.type = LangAPI::ValueType::Void;
@@ -1072,7 +1078,7 @@ namespace LangRepr {
                 }
         }
         push_eof.statements.insert(push_eof.statements.end(), flush.begin(), flush.end());
-        push_eof.statements.push_back(callStatement(memberCall("tokens", "emplace_back")));
+        push_eof.statements.push_back(callStatement(collectionCall("tokens", LangAPI::ArrayMethods::Push)));
         lexer.data.emplace_back(std::make_shared<LangAPI::Declaration>(LangAPI::Function::createDeclaration(push_eof)),
             LangAPI::Visibility::Public);
         if (std::ranges::any_of(tree.getTreeMap(), [](const auto& entry) { return entry.second.external.has_value(); })) {

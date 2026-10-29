@@ -14,10 +14,10 @@ The structural rewriter only merges scopes and hoists declarations.
 
 Missing or uncertain IR contracts:
 
-- Token-stream operations: shared lexer lowering uses `insert(end(), begin(),
-  end())`, `emplace_back`, `clearTokens`, and C++ iterator construction. These need
-  semantic append-range, EOF emission, cursor creation, reset, and advancement
-  operations. Rust must not recognize and translate those C++ spellings.
+- Token-stream operations: pending-token append, clear, EOF insertion, cursor
+  creation, and reset use semantic operations. The Rust runtime defines the
+  `TokenStream` interface; generated lexers still need to implement it, and
+  cursor advancement needs a shared contract.
 - Runtime interfaces: lexer callbacks and parser entry points currently depend
   on implicit inherited fields, methods, and virtual dispatch. The IR needs
   explicit receiver/interface bindings and callback signatures. Embedding the
@@ -30,9 +30,9 @@ Missing or uncertain IR contracts:
   and lifetime relationships. Existing borrow/move type wrappers suffice for
   simple function parameters, but do not describe those relationships.
 - Character semantics: legacy `Char::escaped` stores source syntax. Source
-  lowering must decode this before Rust emission. Byte versus Unicode character
-  semantics also need a consistent contract: the existing Rust cursor walks
-  Unicode characters while DFA tables classify bytes.
+  lowering must decode this before Rust emission. The Rust cursor now classifies
+  individual UTF-8 bytes, matching the DFA tables; text operations at positions
+  inside a multibyte character still need an explicit contract.
 - Foreign helpers: pseudo-symbols such as `__ispa_python_self`, Python-specific
   collection method enum values, and packed source strings such as
   `std::ostream&` are not neutral operations. They require source lowering into

@@ -1,6 +1,35 @@
 module LangAPI;
 import cpuf.op;
 
+auto LangAPI::operator<<(std::ostream& os, const Interface& value) -> std::ostream& {
+    os << "interface " << value.name << " {";
+    for (const auto& parameter : value.template_parameters) os << " parameter " << parameter;
+    for (const auto& base : value.super_interfaces) os << " requires " << base;
+    for (const auto& associated : value.associated_types) {
+        os << " type " << associated.name;
+        if (associated.default_type) os << " = " << *associated.default_type;
+        for (const auto& bound : associated.bounds) os << " bound " << bound;
+    }
+    for (const auto& constant : value.associated_constants) {
+        os << " constant " << constant.name << ": " << constant.type;
+        if (constant.value) os << " = " << *constant.value;
+    }
+    for (const auto& [member, visibility] : value.data)
+        if (member) os << visibility << ' ' << *member;
+    for (const auto& constraint : value.constraints) {
+        os << " constraint " << constraint.type;
+        for (const auto& bound : constraint.interfaces) os << ' ' << bound;
+    }
+    for (const auto& dependency : value.dependencies) os << " dependency " << dependency;
+    return os << '}';
+}
+
+auto LangAPI::AssociatedConstant::operator==(const AssociatedConstant& other) const -> bool {
+    return std::tie(name, type, value) == std::tie(other.name, other.type, other.value);
+}
+auto LangAPI::AssociatedConstant::operator<(const AssociatedConstant& other) const -> bool {
+    return std::tie(name, type, value) < std::tie(other.name, other.type, other.value);
+}
 namespace LangAPI {
     template<typename Param>
     inline void printTemplateParameters(std::ostream &os, stdu::vector<Param> params) {
@@ -179,6 +208,8 @@ namespace LangAPI {
             case ArrayMethods::Push: os << "Push"; break;
             case ArrayMethods::Pop: os << "Pop"; break;
             case ArrayMethods::Size: os << "Size"; break;
+            case ArrayMethods::Extend: os << "Extend"; break;
+            case ArrayMethods::Clear: os << "Clear"; break;
             case ArrayMethods::PythonAppend: os << "PythonAppend"; break;
             case ArrayMethods::PythonExtend: os << "PythonExtend"; break;
             case ArrayMethods::PythonInsert: os << "PythonInsert"; break;
@@ -221,6 +252,9 @@ namespace LangAPI {
         switch (e) {
             case StdlibExports::TextOutput: os << "TextOutput"; break;
             case StdlibExports::RecoveryHandler: os << "RecoveryHandler"; break;
+            case StdlibExports::TokenCursor: os << "TokenCursor"; break;
+            case StdlibExports::LazyTokenCursor: os << "LazyTokenCursor"; break;
+            case StdlibExports::ResetTokenStream: os << "ResetTokenStream"; break;
             case StdlibExports::Node: os << "Node"; break;
             case StdlibExports::MatchResult: os << "MatchResult"; break;
             case StdlibExports::Lexer: os << "Lexer"; break;

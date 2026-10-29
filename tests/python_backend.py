@@ -22,6 +22,9 @@ def main():
         root = Path(temporary)
         grammar = root / "grammar"
         grammar.mkdir()
+        library = runtime.parent / "python"
+        (grammar / "langapi.py").write_text((library / "langapi.py").read_text())
+        (grammar / "stdfun.py").write_text((library / "stdfun.py").read_text())
         (grammar / "simple.isc").write_text("WORD: @ [a-z]+ {@};\nmain: @ WORD {@};\n")
         (grammar / "foreign.isc").write_text(
             "module expression -> value;\nWORD: @ [a-z]+ {@};\nvalue: @ WORD {@};\n"
@@ -51,7 +54,18 @@ def main():
             "A:'a'; B:'b'; main: @ A=x ':' @ body @ B=2 '!' @{first, body, last};\n"
             "body: @ item=x {@}; item: @ A {@};\n"
         )
-        (grammar / "helpers.py").write_text('''def sorting() -> int:
+        (grammar / "helpers.py").write_text('''from langapi import size, push, extend, clear
+def semantic_collections() -> int:
+    values: list[int] = []
+    other: list[int] = []
+    push(values, 1)
+    push(other, 2)
+    push(other, 3)
+    extend(values, other)
+    clear(other)
+    push(values, 4)
+    return size(values) + size(other)
+def sorting() -> int:
     xs = [1, 3, 2]
     xs.sort(reverse=True)
     return xs[0]
@@ -74,7 +88,7 @@ class Box:
     def get(self) -> int:
         return self.value
 ''')
-        (grammar / "helpers.isc").write_text("import py helpers; main: 'x';\n")
+        (grammar / "helpers.isc").write_text("import py helpers; import py stdfun; main: 'x';\n")
 
         def generate(name, *options):
             result = subprocess.run(
@@ -98,6 +112,9 @@ class Box:
         execute('''import Helpers
 h = Helpers.python.helpers
 assert h.sorting() == 3 and h.keyed() == 3
+assert h.semantic_collections() == 4
+assert Helpers.python.stdfun.range(4) == [0, 1, 2, 3]
+assert Helpers.python.stdfun.reversed([1, 2, 3]) == [3, 2, 1]
 assert h.updating() == 12
 assert h.division(5.0, 2.0) == 2.5
 assert h.Box(7).get() == 7

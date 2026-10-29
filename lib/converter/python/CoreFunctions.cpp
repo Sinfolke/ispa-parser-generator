@@ -309,6 +309,8 @@ std::string Core::storage(const LangAPI::StorageSymbol& s) {
                 case M::PythonAppend: name = "append"; break;
                 case M::Pop: name = "pop"; break;
                 case M::Size: result = "len(" + result + ")"; continue;
+                case M::Extend: name = "extend"; break;
+                case M::Clear: name = "clear"; break;
                 case M::PythonExtend: name = "extend"; break;
                 case M::PythonInsert: name = "insert"; break;
                 case M::PythonRemove: name = "remove"; break;
@@ -327,6 +329,10 @@ std::string Core::storage(const LangAPI::StorageSymbol& s) {
                 case M::PythonItems: name = "items"; break;
                 case M::PythonFromKeys: name = "fromkeys"; break;
                 default: unsupported("ArrayMethodCall");
+            }
+            if (method->method == M::Push && method->args.empty()) {
+                result += ".append(None)";
+                continue;
             }
             result += "." + name + "(" + join(method->args, ", ", [this](const auto& a) { return expression(a); }) + ")";
         } else if (const auto* func = std::get_if<LangAPI::FunctionCall>(&piece)) {
@@ -515,9 +521,18 @@ std::string Core::call(const LangAPI::FunctionCall& c) {
     return fn + "(" + args + ")";
 }
 std::string Core::lib_call(const LangAPI::IspaLibFunctionCall& c) {
+    using S = LangAPI::StdlibExports;
+    if (c.symbol.exports == S::TokenCursor || c.symbol.exports == S::LazyTokenCursor ||
+        c.symbol.exports == S::ResetTokenStream) {
+        const auto expected = c.symbol.exports == S::LazyTokenCursor ? 2u : 1u;
+        if (c.args.size() != expected) throw std::runtime_error("invalid token cursor operation arguments");
+        const auto lexer = expression(c.args[0]);
+        if (c.symbol.exports == S::ResetTokenStream) return lexer + ".tokens.clear()";
+        if (c.symbol.exports == S::TokenCursor) return lexer + ".iterator()";
+        return "(" + lexer + ".set_input(" + expression(c.args[1]) + "), " + lexer + ".lazy_iterator())[1]";
+    }
     if (c.symbol.exports == LangAPI::StdlibExports::CloneSelfBox) return "__import__('copy').copy(self)";
     std::string fn = lib(c.symbol);
-    using S = LangAPI::StdlibExports;
     const auto kind = c.symbol.exports;
     const bool parser_match = kind == S::ParserRequired || kind == S::ParserOptional ||
         kind == S::ParserRange || kind == S::ParserRangeOptional || kind == S::ParserCounted;

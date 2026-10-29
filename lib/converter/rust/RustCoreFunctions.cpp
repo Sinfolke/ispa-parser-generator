@@ -361,10 +361,16 @@ auto RustCore::convertStorageSymbol(const LangAPI::StorageSymbol &symbol) -> std
                 case LangAPI::ArrayMethods::Push: res += "push"; break;
                 case LangAPI::ArrayMethods::Pop: res += "pop"; break;
                 case LangAPI::ArrayMethods::Size: res += "len"; break;
+                case LangAPI::ArrayMethods::Extend: res += "extend"; break;
+                case LangAPI::ArrayMethods::Clear: res += "clear"; break;
                 default: throw Error("Unknown array method");
             }
             std::vector<std::string> args;
             for (const auto &param : method_call.args) args.push_back(convertExpression(param));
+            if (method_call.method == LangAPI::ArrayMethods::Push && args.empty())
+                args.push_back("Default::default()");
+            if (method_call.method == LangAPI::ArrayMethods::Extend && args.size() == 1)
+                args[0] += ".iter().cloned()";
             res += "(" + joinStrings(args, ", ") + ")";
         } else if (std::holds_alternative<LangAPI::Property>(part)) {
             res += ident(std::get<LangAPI::Property>(part).name) + "()";
@@ -713,6 +719,15 @@ auto RustCore::convertFunctionCall(const LangAPI::FunctionCall &call) -> std::st
 
 auto RustCore::convertIspaLibFunctionCall(const LangAPI::IspaLibFunctionCall &call) -> std::string {
     const auto kind = call.symbol.exports;
+    if (kind == LangAPI::StdlibExports::TokenCursor || kind == LangAPI::StdlibExports::LazyTokenCursor ||
+        kind == LangAPI::StdlibExports::ResetTokenStream) {
+        const auto expected = kind == LangAPI::StdlibExports::LazyTokenCursor ? 2u : 1u;
+        if (call.args.size() != expected) throw Error("invalid token cursor operation arguments");
+        const auto method = kind == LangAPI::StdlibExports::TokenCursor ? "token_cursor" :
+            kind == LangAPI::StdlibExports::LazyTokenCursor ? "lazy_token_cursor" : "reset_token_stream";
+        return std::string("ispa_std::TokenStream::") + method + "(&mut " + convertExpression(call.args[0]) +
+            (expected == 2 ? ", " + convertExpression(call.args[1]) : "") + ")";
+    }
     if (kind == LangAPI::StdlibExports::CloneSelfBox)
         return "::std::rc::Rc::new(::std::clone::Clone::clone(&self.base_0))";
     const bool parser_match = kind == LangAPI::StdlibExports::ParserRequired ||

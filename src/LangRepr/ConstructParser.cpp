@@ -502,15 +502,13 @@ namespace LangRepr {
 
         auto add_stream_parse_wrapper = [&](
             std::string name,
-            std::string iterator_type,
+            LangAPI::StdlibExports iterator_type,
             stdu::vector<LangAPI::Expression> iterator_args,
             LangAPI::Statements pre_statements = {}
         ) {
-            auto iterator = LangAPI::FunctionCall::createExpression(
-                LangAPI::FunctionCall{
-                    .name = std::make_shared<LangAPI::Symbol>(
-                        LangAPI::Symbol{"Lexer", std::move(iterator_type)}
-                    ),
+            auto iterator = LangAPI::IspaLibFunctionCall::createExpression(
+                LangAPI::IspaLibFunctionCall{
+                    .symbol = LangAPI::IspaLibSymbol{.exports = iterator_type},
                     .args = std::move(iterator_args)
                 }
             );
@@ -559,15 +557,13 @@ namespace LangRepr {
         };
         auto add_lazy_parse_wrapper = [&](
             std::string name,
-            std::string iterator_type,
+            LangAPI::StdlibExports iterator_type,
             stdu::vector<LangAPI::Expression> iterator_args,
             LangAPI::Statements pre_statements = {}
         ) {
-            auto iterator = LangAPI::FunctionCall::createExpression(
-                LangAPI::FunctionCall{
-                    .name = std::make_shared<LangAPI::Symbol>(
-                        LangAPI::Symbol{"Lexer", std::move(iterator_type)}
-                    ),
+            auto iterator = LangAPI::IspaLibFunctionCall::createExpression(
+                LangAPI::IspaLibFunctionCall{
+                    .symbol = LangAPI::IspaLibSymbol{.exports = iterator_type},
                     .args = std::move(iterator_args)
                 }
             );
@@ -582,7 +578,7 @@ namespace LangRepr {
                 }
             ));
             auto parse_wrapper = LangAPI::Function{
-                .type = LangAPI::Type{LangAPI::ValueType::RuleResult, LangAPI::Type {LangAPI::Symbol {"Types", "main"}}, LangAPI::Type {LangAPI::Symbol {"Lexer", "lazy_iterator"}}},
+                .type = LangAPI::Type{LangAPI::ValueType::RuleResult, LangAPI::Type {LangAPI::Symbol {"Types", "main"}}, LangAPI::Type {LangAPI::IspaLibSymbol{.exports = LangAPI::StdlibExports::LexerLazyIterator}}},
                 .name = std::move(name),
                 .statements = {
                     std::move(pre_statements),
@@ -602,17 +598,16 @@ namespace LangRepr {
         };
         LangAPI::Expression lexer_reference;
         lexer_reference.push_back(LangAPI::Symbol::createRValue(LangAPI::Symbol {"lexer"}));
-        add_stream_parse_wrapper("parseFromTokens", "iterator", {lexer_reference});
+        add_stream_parse_wrapper("parseFromTokens", LangAPI::StdlibExports::TokenCursor, {lexer_reference});
         parser.data.emplace_back(std::make_shared<LangAPI::Declaration>(
             LangAPI::Variable::createDeclaration(LangAPI::Variable{
                 .name = "lazy_lexer_", .type = LangAPI::Type{LangAPI::Symbol{"Lexer"}}
             })), LangAPI::Visibility::Private);
         LangAPI::Statements pre_statements;
-        LangAPI::StorageSymbol ss {
-            LangAPI::Symbol::createExpression(LangAPI::Symbol {"lazy_lexer_"}), stdu::vector<LangAPI::StorageSymbol::PathPart> {LangAPI::FunctionCall {.name = std::make_shared<LangAPI::Symbol>("clearTokens")}}
-        };
-        pre_statements.push_back(LangAPI::StorageSymbol::createStatement(ss));
-        add_lazy_parse_wrapper("lazyParse", "lazy_iterator", {
+        pre_statements.push_back(LangAPI::IspaLibFunctionCall::createStatement(LangAPI::IspaLibFunctionCall{
+            .symbol = LangAPI::IspaLibSymbol{.exports = LangAPI::StdlibExports::ResetTokenStream},
+            .args = {LangAPI::Symbol::createExpression(LangAPI::Symbol{"lazy_lexer_"})}}));
+        add_lazy_parse_wrapper("lazyParse", LangAPI::StdlibExports::LazyTokenCursor, {
             LangAPI::Symbol::createExpression(LangAPI::Symbol {"lazy_lexer_"}),
             LangAPI::Symbol::createExpression(LangAPI::Symbol {"text"})
         }, pre_statements);

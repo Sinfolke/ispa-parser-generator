@@ -95,7 +95,7 @@ export namespace LangAPI {
         ResetPosCounter, PushPosCounter, PopPosCounter, SkipSpaces, DfaLookup, ReportError, Lambda, DFADebug
     };
     enum class ArrayMethods {
-        Push, Pop, Size, PythonAppend, PythonExtend, PythonInsert, PythonRemove, PythonPop,
+        Push, Pop, Size, Extend, Clear, PythonAppend, PythonExtend, PythonInsert, PythonRemove, PythonPop,
         PythonClear, PythonCopy, PythonCount, PythonIndex, PythonReverse, PythonSort,
         PythonGet, PythonSetDefault, PythonUpdate, PythonKeys, PythonValues, PythonItems, PythonFromKeys
     };
@@ -118,7 +118,7 @@ export namespace LangAPI {
         ParserRequired, ParserOptional, ParserRange, ParserRangeOptional,
         RecoveryDecision, RecoveryState, RecoverEncoded, ParserCounted,
         RecoveryTokenSet, RecoveryEndOfInput, RecoveryPolicy, CloneSelfBox, LookaheadKind,
-        TextOutput, RecoveryHandler
+        TextOutput, RecoveryHandler, TokenCursor, LazyTokenCursor, ResetTokenStream
     };
 
 
@@ -1299,11 +1299,140 @@ export namespace LangAPI {
             return std::tie(type, name, parameters, statements, template_parameters);
         }
     };
+    enum class ImplementationKind {
+        Inherent,   // impl Type { ... }
+        Interface   // impl Trait for Type { ... }
+    };
+
+    struct GenericParameter {
+        std::string name;
+        bool operator==(const GenericParameter&) const = default;
+        bool operator<(const GenericParameter& other) const { return name < other.name; }
+
+        // Could eventually support:
+        // Type, Const, Lifetime
+        // and bounds / default arguments.
+    };
+
+    struct TypeConstraint {
+        Symbol type;
+        stdu::vector<Symbol> interfaces;
+        bool operator==(const TypeConstraint&) const = default;
+        bool operator<(const TypeConstraint& other) const { return std::tie(type, interfaces) < std::tie(other.type, other.interfaces); }
+    };
+
+    struct AssociatedType {
+        Symbol name;
+        std::optional<Symbol> default_type;
+        stdu::vector<Symbol> bounds;
+        bool operator==(const AssociatedType&) const = default;
+        bool operator<(const AssociatedType& other) const { return std::tie(name, default_type, bounds) < std::tie(other.name, other.default_type, other.bounds); }
+    };
+
+    struct AssociatedConstant {
+        Symbol name;
+        Symbol type;
+        std::optional<Expression> value;
+        bool operator==(const AssociatedConstant& other) const;
+        bool operator<(const AssociatedConstant& other) const;
+    };
+    struct Interface : DeclarationLevel {
+        Symbol name;
+
+        stdu::vector<std::string> template_parameters;
+
+        stdu::vector<std::pair<
+            std::shared_ptr<Declaration>,
+            Visibility
+        >> data;
+
+        // Interfaces this interface extends or requires.
+        stdu::vector<Symbol> super_interfaces;
+
+        stdu::vector<AssociatedType> associated_types;
+        stdu::vector<AssociatedConstant> associated_constants;
+
+        stdu::vector<TypeConstraint> constraints;
+
+        stdu::vector<Symbol> dependencies;
+
+        bool operator==(const Interface& other) const {
+            return std::tie(name, template_parameters, data, super_interfaces, associated_types, associated_constants, constraints, dependencies) ==
+                std::tie(other.name, other.template_parameters, other.data, other.super_interfaces, other.associated_types, other.associated_constants, other.constraints, other.dependencies);
+        }
+
+        bool operator!=(const Interface& other) const {
+            return !(*this == other);
+        }
+        bool operator<(const Interface& other) const {
+            return std::tie(
+                name,
+                template_parameters,
+                data,
+                super_interfaces,
+                associated_types,
+                associated_constants,
+                constraints,
+                dependencies
+            ) < std::tie(
+                other.name,
+                other.template_parameters,
+                other.data,
+                other.super_interfaces,
+                other.associated_types,
+                other.associated_constants,
+                other.constraints,
+                other.dependencies
+            );
+        }
+        friend auto operator<<(std::ostream& os, const Interface &c) -> std::ostream&;
+    private:
+        friend struct ::uhash;
+        friend struct ::LangAPI::MembersAccess;
+        auto members() const {
+            return std::tie(name, template_parameters, data, super_interfaces, associated_types, associated_constants, constraints, dependencies);
+        }
+        auto members() {
+            return std::tie(name, template_parameters, data, super_interfaces, associated_types, associated_constants, constraints, dependencies);
+        }
+    };
+    struct Implementation : DeclarationLevel {
+        ImplementationKind kind =
+            ImplementationKind::Inherent;
+
+        // Type receiving the implementation.
+        Symbol target;
+
+        // Interface being implemented, when applicable.
+        std::optional<Symbol> interface;
+
+        stdu::vector<std::string> template_parameters;
+
+        stdu::vector<TypeConstraint> constraints;
+
+        stdu::vector<std::shared_ptr<Declaration>> data;
+
+        stdu::vector<AssociatedType> associated_types;
+        stdu::vector<AssociatedConstant> associated_constants;
+
+        stdu::vector<Symbol> dependencies;
+
+        bool operator==(const Implementation& other) const {
+            return std::tie(kind, target, interface, template_parameters, constraints, data, associated_types, associated_constants, dependencies) ==
+                std::tie(other.kind, other.target, other.interface, other.template_parameters, other.constraints, other.data, other.associated_types, other.associated_constants, other.dependencies);
+        }
+        bool operator!=(const Implementation& other) const { return !(*this == other); }
+        bool operator<(const Implementation& other) const {
+            return std::tie(kind, target, interface, template_parameters, constraints, data, associated_types, associated_constants, dependencies) <
+                std::tie(other.kind, other.target, other.interface, other.template_parameters, other.constraints, other.data, other.associated_types, other.associated_constants, other.dependencies);
+        }
+    };
     struct Class : DeclarationLevel {
         Symbol name;
         stdu::vector<std::string> template_parameters;
         stdu::vector<std::pair<std::shared_ptr<Declaration>, Visibility>> data;
         stdu::vector<std::pair<Visibility, std::variant<Symbol, IspaLibSymbol>>> inherit_members;
+        stdu::vector<Symbol> interfaces;
         Visibility default_visibility = Visibility::Public;
         std::optional<Function> constructor;
         std::optional<Function> to_str_fun;
@@ -1437,7 +1566,7 @@ export namespace LangAPI {
     };
     struct Declaration : DeclarationsLevel {
         using promote_to = Declarations;
-        std::variant<Class, ForwardDeclaredClass, Namespace, Function, TypeAlias, Enum, Variable> value;
+        std::variant<Class, ForwardDeclaredClass, Interface, Implementation, Namespace, Function, TypeAlias, Enum, Variable> value;
 
         Declaration() {};
         template<typename T>
@@ -1456,6 +1585,8 @@ export namespace LangAPI {
         friend auto operator<<(std::ostream& os, const Declaration &c) -> std::ostream&;
         // Is functions
         bool isClass() const { return std::holds_alternative<Class>(value); }
+        bool isInterface() const { return std::holds_alternative<Interface>(value); }
+        bool isImplementation() const { return std::holds_alternative<Implementation>(value); }
         bool isForwardDeclaredClass() const { return std::holds_alternative<ForwardDeclaredClass>(value); }
         bool isNamespace() const { return std::holds_alternative<Namespace>(value); }
         bool isFunction() const { return std::holds_alternative<Function>(value); }
@@ -1466,6 +1597,11 @@ export namespace LangAPI {
         // Get functions
         auto& getClass() { return std::get<Class>(value); }
         const auto& getClass() const { return std::get<Class>(value); }
+        auto& getInterface() { return std::get<Interface>(value); }
+        const auto& getInterface() const { return std::get<Interface>(value); }
+
+        auto& getImplementation() { return std::get<Implementation>(value); }
+        const auto& getImplementation() const { return std::get<Implementation>(value); }
 
         auto& getForwardDeclaredClass() { return std::get<ForwardDeclaredClass>(value); }
         const auto& getForwardDeclaredClass() const { return std::get<ForwardDeclaredClass>(value); }

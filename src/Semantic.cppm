@@ -243,6 +243,8 @@ namespace {
     bool assignable(const Ty& dest, const Ty& src) {
         if (!known(dest) || !known(src)) return true;
         if (dest == src) return true;
+        if (dest.kind == src.kind && (dest.kind == TK::List || dest.kind == TK::Dict || dest.kind == TK::Tuple) &&
+            (dest.args.empty() || src.args.empty())) return true;
         if (dest.kind == TK::Float && numeric(src)) return true;
         if (dest.kind == TK::Int && src.kind == TK::Bool) return true;
         return false;

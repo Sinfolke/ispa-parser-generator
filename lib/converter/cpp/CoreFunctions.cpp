@@ -206,6 +206,13 @@ auto Core::convertStorageSymbol(const LangAPI::StorageSymbol &symbol) -> std::st
             res = call + ")";
             continue;
         }
+        if (const auto* method = std::get_if<LangAPI::ArrayMethodCall>(&part);
+            method && method->method == LangAPI::ArrayMethods::Extend) {
+            if (method->args.size() != 1) throw Error("Extend requires one collection");
+            const auto source = convertExpression(method->args.front());
+            res += ".insert(" + res + ".end(), " + source + ".begin(), " + source + ".end())";
+            continue;
+        }
         if (!std::holds_alternative<LangAPI::StorageOffset>(part))
             res += ".";
         if (std::holds_alternative<std::string>(part)) {
@@ -214,13 +221,16 @@ auto Core::convertStorageSymbol(const LangAPI::StorageSymbol &symbol) -> std::st
             const auto &method_call = std::get<LangAPI::ArrayMethodCall>(part);
             switch (method_call.method) {
                 case LangAPI::ArrayMethods::Push:
-                    res += "push_back";
+                    res += method_call.args.empty() ? "emplace_back" : "push_back";
                     break;
                 case LangAPI::ArrayMethods::Pop:
                     res += "pop_back";
                     break;
                 case LangAPI::ArrayMethods::Size:
                     res += "size";
+                    break;
+                case LangAPI::ArrayMethods::Clear:
+                    res += "clear";
                     break;
                 default:
                     throw Error("Unknown array method");
@@ -550,6 +560,16 @@ auto Core::convertFunctionCall(const LangAPI::FunctionCall &call, bool need_temp
     return str;
 }
 auto Core::convertIspaLibFunctionCall(const LangAPI::IspaLibFunctionCall &call) -> std::string {
+    using S = LangAPI::StdlibExports;
+    if (call.symbol.exports == S::TokenCursor || call.symbol.exports == S::LazyTokenCursor ||
+        call.symbol.exports == S::ResetTokenStream) {
+        const auto expected = call.symbol.exports == S::LazyTokenCursor ? 2u : 1u;
+        if (call.args.size() != expected) throw Error("invalid token cursor operation arguments");
+        const auto lexer = convertExpression(call.args[0]);
+        if (call.symbol.exports == S::ResetTokenStream) return lexer + ".clearTokens()";
+        return scopePrefix() + "Lexer::" + (call.symbol.exports == S::TokenCursor ? "iterator(" : "lazy_iterator(") +
+            lexer + (expected == 2 ? ", " + convertExpression(call.args[1]) : "") + ")";
+    }
     if (call.symbol.exports == LangAPI::StdlibExports::CloneSelfBox)
         return "std::make_shared<" + convertTemplates(call.template_parameters) + ">(*this)";
     std::ostringstream out;

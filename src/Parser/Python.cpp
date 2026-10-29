@@ -137,7 +137,8 @@ struct PythonConverter {
             case py::BinOp::Add: return la::ExpressionElement::Add;
             case py::BinOp::Sub: return la::ExpressionElement::Minus;
             case py::BinOp::Mult: return la::ExpressionElement::Multiply;
-            case py::BinOp::Div: return la::ExpressionElement::Divide;
+            // `//` lowers to the typed Divide: exact for the non-negative ints the runtime uses.
+            case py::BinOp::Div: case py::BinOp::FloorDiv: return la::ExpressionElement::Divide;
             case py::BinOp::Mod: return la::ExpressionElement::Modulo;
             default: unsupported(p, "operator has no LangAPI representation");
         }
@@ -314,6 +315,34 @@ struct PythonConverter {
                 else s.path.emplace_back(la::StorageOffset{.offset = expr(x.slice)});
                 return la::StorageSymbol::createExpression(s);
             } else if constexpr (std::is_same_v<T, py::Call>) {
+                if (const auto* intrinsic = x.func ? x.func->template get<py::Name>() : nullptr;
+                    intrinsic && intrinsic->id.starts_with("__ispa_ir__.")) {
+                    const auto name = intrinsic->id.substr(12);
+                    if (!x.keywords.empty()) unsupported(e.pos, "IR operations require positional arguments");
+                    const std::map<std::string, std::pair<la::ArrayMethods, std::size_t>> collections{
+                        {"size", {la::ArrayMethods::Size, 1}}, {"push", {la::ArrayMethods::Push, 2}},
+                        {"extend", {la::ArrayMethods::Extend, 2}}, {"clear", {la::ArrayMethods::Clear, 1}}};
+                    if (const auto found = collections.find(name); found != collections.end()) {
+                        if (x.args.size() != found->second.second) unsupported(e.pos, "wrong IR operation arity");
+                        la::StorageSymbol access;
+                        access.what = expr(x.args[0]);
+                        la::ArrayMethodCall call{.method = found->second.first};
+                        for (std::size_t i = 1; i < x.args.size(); ++i) call.args.push_back(expr(x.args[i]));
+                        access.path.emplace_back(std::move(call));
+                        return la::StorageSymbol::createExpression(access);
+                    }
+                    const std::map<std::string, std::pair<la::StdlibExports, std::size_t>> streams{
+                        {"token_cursor", {la::StdlibExports::TokenCursor, 1}},
+                        {"lazy_token_cursor", {la::StdlibExports::LazyTokenCursor, 2}},
+                        {"reset_token_stream", {la::StdlibExports::ResetTokenStream, 1}}};
+                    if (const auto found = streams.find(name); found != streams.end()) {
+                        if (x.args.size() != found->second.second) unsupported(e.pos, "wrong IR operation arity");
+                        la::IspaLibFunctionCall call{.symbol = la::IspaLibSymbol{.exports = found->second.first}};
+                        for (const auto& argument : x.args) call.args.push_back(expr(argument));
+                        return la::IspaLibFunctionCall::createExpression(call);
+                    }
+                    unsupported(e.pos, "unknown IR operation " + name);
+                }
                 if (!token_rule.empty() && !failure_context) if (auto method = x.func ? x.func->template get<py::Attribute>() : nullptr)
                     if (auto owner = method->value ? method->value->template get<py::Name>() : nullptr;
                         owner && owner->id == "ctx") {
@@ -740,7 +769,7 @@ struct PythonConverter {
                     case py::BinOp::Add: op = la::OperatorType::Add; break;
                     case py::BinOp::Sub: op = la::OperatorType::Minus; break;
                     case py::BinOp::Mult: op = la::OperatorType::Multiply; break;
-                    case py::BinOp::Div: op = la::OperatorType::Divide; break;
+                    case py::BinOp::Div: case py::BinOp::FloorDiv: op = la::OperatorType::Divide; break;
                     case py::BinOp::Mod: op = la::OperatorType::Modulo; break;
                     default: unsupported(s.pos, "augmented operator is unsupported");
                 }
