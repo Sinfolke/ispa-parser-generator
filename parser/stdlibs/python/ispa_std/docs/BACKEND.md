@@ -1,8 +1,8 @@
 # Language-agnostic ispa_std backend
 
 The C++ runtime (`ispastdlib`) is ported to the restricted Python subset in `ispa_std/`, so the
-generator can lower it to any target. What cannot be language-agnostic is in `cpp_residue/`
-(see its `MANIFEST.md`).
+generator can lower it to any target. What cannot be language-agnostic is in the host
+runtimes under `parser/stdlibs/target/`.
 
 ## Header -> module
 
@@ -51,7 +51,7 @@ Note: the supplied `LangAPI.StdlibExports` has no `StdFail`, so it is older than
 Only `prim.fail` crosses the compiler boundary today. C++ catch sites (NoMatch probing, external parser
 errors, recovery) need `attempt(fn, report) -> bool` (`report = [kind, message]`). Add it to
 `StdlibExports`, regenerate `prim.py`, and map the new `ErrorKind` values 6-11 (LogicError, RuntimeFailure,
-InternalError, ApiError, NoMatch, ExternalParse). `prim_cpython.py` and `cpp_residue/ispastdlib/std_prims.hpp` are reference implementations.
+InternalError, ApiError, NoMatch, ExternalParse). `prim_cpython.py` is the reference implementation.
 
 Subset extension used: class inheritance (Parser_base -> LLParser, LRParser -> LRGeneralizedParser, FailHandler -> Handler).
 `reflect.py` is host-only and not lowered.
@@ -64,12 +64,10 @@ Subset extension used: class inheritance (Parser_base -> LLParser, LRParser -> L
 
 - `ISPA_DEBUG_REGISTERS` macro tracing in dfa_run is dropped.
 - Embedded NUL: `""` stands for NUL past the end, so an in-source NUL is distinguishable only by `code_of`.
-- File I/O and debug transport are host adapters (cpp_residue).
+- File I/O and debug transport are host adapters (host runtime).
 - Debug scopes abandoned by an error are closed only through `unwind_to`.
 
 ## Verification
 
-- `tests/test_diff_cpp.py`: random-input comparison against the ORIGINAL headers for `scan_balanced`,
-  `recover`, and `dfa_run` (set `ISPASTDLIB_ORIG` to the dir containing `ispastdlib/`).
 - `tests/test_lr.py`, `test_ll.py`, `test_lexer.py`, `test_util.py`: unit/integration tests.
 - `python3 tools/check_subset.py ispa_std`: subset linter.

@@ -15,4 +15,4 @@ Everything builds into `./build` (ignored). Needs a built `ispa` (`ISPA=` or `cm
 
 `counted_parity.cpp` prints its results; build it once with the C++ stdlib include path and once with `-DCORE -I.../cpp-core`, then `diff` the output.
 
-After changing `parser/stdlibs/python/ispa_std/out`, run `parser/stdlibs/target/cpp-core/regen.py` first.
+After changing `parser/stdlibs/python/ispa_std`, run `parser/stdlibs/target/cpp-core/regen.py` first.

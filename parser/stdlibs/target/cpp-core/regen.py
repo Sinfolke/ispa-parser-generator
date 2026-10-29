@@ -7,7 +7,7 @@ import argparse, os, shutil, subprocess, sys, tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-LIBRARY = HERE.parents[1] / 'python' / 'ispa_std' / 'out'
+LIBRARY = HERE.parents[1] / 'python' / 'ispa_std'
 MODULES = ('parser_ll', 'lr_conflicts', 'debug', 'external', 'optional', 'map', 'span', 'vector', 'algorithm',
            'ast_printer', 'to_string')
 

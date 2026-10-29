@@ -6,7 +6,7 @@ is a host concern: call `configure(sink, control)` with
   sink.write(text) -> bool        receives each framed record (8-bit units)
   control.read_byte() -> int      next command byte, -1 at end   (may be omitted)
 The C++ side (ISPA_DEBUG_FD / ISPA_DEBUG_CONTROL_FD, getenv, write(2), mutex)
-stays C++: cpp_residue/ispastdlib/debug_transport.hpp. With nothing configured
+stays in the host runtime (debug transport). With nothing configured
 every call is a no-op, like the C++ build without ISPA_DEBUG_FD.
 
 Where C++ used RAII (RuleScope, ProductionScope, MatchScope) call `close()` on

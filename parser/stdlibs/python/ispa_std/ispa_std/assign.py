@@ -2,7 +2,7 @@
 
 The C++ function is overload resolution over target/source types (vectors,
 variants, tuples with omitted strings, node-storage conversions); that part is
-static typing and stays in cpp_residue. What is language-neutral is how a
+static typing and stays in the host runtime. What is language-neutral is how a
 matched node becomes a String, a one-character String, or a list of those."""
 from typing import Callable, TypeVar
 

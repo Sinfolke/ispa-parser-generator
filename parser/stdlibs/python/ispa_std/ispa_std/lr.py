@@ -12,7 +12,7 @@ marks a missing cell, LR_CONFLICT a cell with several candidate actions
 
 The type-directed capture conversion (lr_convert & co) is expressed with an
 explicit `Shape` instead of the target's static type; the typed C++ version
-stays in cpp_residue."""
+stays in the host runtime."""
 from typing import ClassVar, Generic, TypeVar, cast
 
 from ispa_std.failures import logic_error, runtime_error

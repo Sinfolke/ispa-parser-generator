@@ -9,7 +9,7 @@ Differences forced by the language-neutral model:
   * `makeToken(cur)` receives a Cursor (position + line) instead of `const char*&`;
   * C++ overloads are split: push(token) / push_eof() (was push()),
     makeTokens() / makeTokensFromText(text); file loading is the host's job
-    (cpp_residue/ispastdlib/file_io.hpp);
+    (host runtime file I/O);
   * cursors are mutable objects: use copy() where C++ copies an iterator and
     assign() where it assigns one."""
 from typing import Callable, ClassVar

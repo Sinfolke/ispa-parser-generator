@@ -2,7 +2,7 @@
 
 Python has no static target types, so a generated LR parser describes each AST
 field with a Shape and converts dynamically. The typed targets convert with
-their own static dispatch (cpp_residue: lr_machine.hpp), which is why this
+their own static dispatch (host runtime: lr_machine.hpp), which is why this
 module is reflection and stays out of the lowered set."""
 from ispa_std import reflect
 from ispa_std.failures import runtime_error

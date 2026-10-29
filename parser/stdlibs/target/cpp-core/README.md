@@ -1,6 +1,6 @@
 # cpp-core: `--stdlib core`
 
-The language-neutral runtime (`parser/stdlibs/python/ispa_std/out`, package **target-core**) lowered to C++ by ispa itself,
+The language-neutral runtime (`parser/stdlibs/python/ispa_std`, package **target-core**) lowered to C++ by ispa itself,
 plus a thin native facade. A parser generated with `--stdlib core` behaves like one generated against the hand-written
 `ispastdlib` (same AST, diagnostics and recovery); only the implementation is shared with the other targets.
 

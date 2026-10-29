@@ -3,7 +3,7 @@
 The C++ Node<DataStorageType> stores the payload inline or behind a
 shared_ptr, with converting constructors between the two. Values here are
 references already, so only the metadata and the "empty" flag remain; the
-storage-conversion machinery is C++-only (see cpp_residue/MANIFEST.md).
+storage-conversion machinery is C++-only (host runtime only).
 
 Positions are Int offsets into `source`, a native String shared by reference
 (C++: `const char* start/end`). `copy()` replaces C++ value semantics: a Node

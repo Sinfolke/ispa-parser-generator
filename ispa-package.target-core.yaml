@@ -2,7 +2,7 @@
 # Targets call it and add only their native residue; they list it under `requires`.
 name: target-core
 layout:
-  root: parser/stdlibs/python/ispa_std/out
+  root: parser/stdlibs/python/ispa_std
   ispalib:
     python/ispa_std: ispa_std
   ispatarget: {}

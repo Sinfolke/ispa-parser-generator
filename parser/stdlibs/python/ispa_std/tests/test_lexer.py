@@ -1,4 +1,4 @@
-import test_diff_cpp as d
+import helpers as d
 from ispa_std.lexer import Lexer_base
 from ispa_std.refs import Cursor
 
