@@ -797,7 +797,7 @@ def main(argv=None):
                          help="Print each install/build step on its own line instead of a single status line")
     sub = parser.add_subparsers(dest="command")
     tool = sub.add_parser("tool", help="Install a compiled ISPA tool")
-    tool.add_argument("name", choices=("antlr-to-ispa",))
+    tool.add_argument("name", choices=("antlr-to-ispa", "cpp-to-ispa"))
     tool.add_argument("--version", help="Release tag (default: latest)")
     tool.add_argument("--bin-dir", type=Path, help="Executable destination (default: ROOT/../bin)")
     tool.add_argument("--force", action="store_true", help="Replace an installed executable")

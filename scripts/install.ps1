@@ -91,6 +91,15 @@ try {
   if ($processEntries -notcontains $bin) {
     $env:Path = (@($processEntries) + $bin) -join ';'
   }
+  # Optional converters: never fail the installation if they are unavailable.
+  foreach ($optional in @('antlr-to-ispa', 'cpp-to-ispa')) {
+    try {
+      & (Join-Path $target 'ispa-pkg.exe') tool $optional --version $tag --bin-dir $bin --force *> $null
+      if ($LASTEXITCODE -ne 0) { throw 'not available' }
+    } catch {
+      Write-Warning "Optional tool $optional was not installed (not available for this release/platform)."
+    }
+  }
   Write-Host "Installed ISPA $tag to $target"
   Write-Host 'Open a new terminal and run: ispa-ai --help'
 } finally {

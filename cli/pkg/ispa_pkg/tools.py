@@ -9,7 +9,7 @@ from urllib.parse import quote
 
 
 REPOSITORY = 'Sinfolke/ispa-parser-generator'
-TOOLS = ('antlr-to-ispa',)
+TOOLS = ('antlr-to-ispa', 'cpp-to-ispa')
 
 
 def release_platform():

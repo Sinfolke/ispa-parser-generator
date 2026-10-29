@@ -119,6 +119,16 @@ try {
         [Environment]::SetEnvironmentVariable('Path', (($entries + $bin) -join ';'), 'User')
         Write-Host "Added $bin to user PATH. Open a new terminal."
     }
+    # Optional converters: never fail the installation if they are unavailable.
+    foreach ($optional in @('antlr-to-ispa', 'cpp-to-ispa')) {
+      try {
+        & (Join-Path (Join-Path $versions $latest) 'ispa-pkg.exe') tool $optional --version $latest --bin-dir $bin --force *> $null
+        if ($LASTEXITCODE -ne 0) { throw 'not available' }
+      } catch {
+        Write-Warning "Optional tool $optional was not installed (not available for this release/platform)."
+      }
+    }
+
     Write-Host "Installed ISPA $latest. Commands: ispa, ispa-pkg, ispadbg, ispa-ai, ispa-update"
 }
 finally {

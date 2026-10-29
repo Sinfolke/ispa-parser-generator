@@ -23,7 +23,9 @@ The shape of a `.isc` file will feel familiar — rules, terminals, productions 
 
 See [Performance](#performance) below for a measured comparison against ANTLR's C++ target.
 
-Use `ispa-pkg tool antlr-to-ispa` to install the compiled ANTLR 4 migration tool.
+Use `ispa-pkg tool antlr-to-ispa` to install the compiled ANTLR 4 migration tool, and
+`ispa-pkg tool cpp-to-ispa` for the C++ source converter. The install scripts try both and skip
+them silently if no matching release asset exists.
 It preserves left recursion and emits a report of required manual changes.
 See [ANTLR conversion](docs/ANTLR_TO_ISPA.md) for usage and translation limits.
 
