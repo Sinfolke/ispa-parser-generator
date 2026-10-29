@@ -153,8 +153,8 @@ pub mod debug {
     impl Loc { pub fn new(file: &'static str, line: usize, column: usize) -> Self { Self { file, line, column } } }
     #[derive(Default)] pub struct Snapshot;
     impl Snapshot { pub fn new() -> Self { Self } pub fn add<T: ?Sized>(self, _: &'static str, _: &T) -> Self { self } }
-    pub trait DebugValue: std::fmt::Debug {}
-    impl<T: std::fmt::Debug> DebugValue for T {}
+    pub trait DebugValue {}
+    impl<T: ?Sized> DebugValue for T {}
     pub trait DebugFields {
         fn ispa_debug_type(&self) -> &'static str;
         fn ispa_debug_fields(&self, field: &mut dyn FnMut(&str, &dyn DebugValue));
@@ -164,8 +164,8 @@ pub mod debug {
     impl ProductionScope { pub fn new(_: &str, _: Loc) -> Self { Self } }
     pub fn enabled() -> bool { false }
     pub fn line(_: Loc, _: Snapshot, _: &str) {}
-    pub fn value<T: ?Sized + std::fmt::Debug>(_: &str, _: &T, _: Loc) {}
-    pub fn lexer_capture<T: ?Sized + std::fmt::Debug>(_: &str, _: &T) {}
+    pub fn value<T: ?Sized>(_: &str, _: &T, _: Loc) {}
+    pub fn lexer_capture<T: ?Sized>(_: &str, _: &T) {}
     pub fn active_location() -> Loc { Loc::default() }
 }
 

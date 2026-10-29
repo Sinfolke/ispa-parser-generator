@@ -35,6 +35,16 @@ fn core_source(text: &'static str) -> Shared<dfa_api::SourceText> {
 }
 
 impl<Token: Clone + Default + 'static> LexerBase<Token> {
+    /// `lookup` for a lexer generated with debugger tables: they are not used here.
+    pub fn lookup_debug<const S: usize, const A: usize, const R: usize, const O: usize, D, I>(
+        &mut self, table: &[Vec<i64>; S], classes: &CharToClass, actions: &[Vec<i64>; A], layout: TdfaLayout<R, O>,
+        semantic: impl FnMut(i64, &Captures, i64, Ptr, i64, i64, &mut Ptr) -> (i64, Token), _debug: &D, _index: &I, pos: &mut Ptr,
+    ) -> Token {
+        self.lookup(table, classes, actions, layout, semantic, pos)
+    }
+}
+
+impl<Token: Clone + Default + 'static> LexerBase<Token> {
     /// Scan one token at `pos` with a generated DFA; `pos` ends where the scan stopped. The semantic action gets
     /// (state, captures, start offset, start, length, line, cursor) and returns the next state and the token.
     pub fn lookup<const S: usize, const A: usize, const R: usize, const O: usize>(

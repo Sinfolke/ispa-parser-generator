@@ -50,11 +50,13 @@ namespace Rust {
             return e.size() == 1 && e[0].type() == LangAPI::ExpressionValueType::RValue &&
                    e[0].getRValue().type() == LangAPI::RValueType::String;
         }
+        // outer attributes: the file can be `include!`d as well as be a module file
         constexpr const char *kAllow =
-            "#![allow(non_snake_case, non_camel_case_types, non_upper_case_globals, unused_mut, unused_variables,\n"
+            "#[allow(unused_imports)]\nuse ::ispa_std::pycoll::{PyContains, PyPop};\n";
+        constexpr const char *kRootAllow =
+            "#[allow(non_snake_case, non_camel_case_types, non_upper_case_globals, unused_mut, unused_variables,\n"
             "         unused_parens, unused_labels, unused_imports, unreachable_patterns, unreachable_code, dead_code,\n"
-            "         unused_braces, invalid_reference_casting, unused_must_use, clippy::all)]\n"
-            "use ::ispa_std::pycoll::{PyContains, PyPop};\n";
+            "         unused_braces, invalid_reference_casting, unused_must_use, clippy::all)]";
     }
 
     // ========================================================================
@@ -1029,6 +1031,7 @@ namespace Rust {
     // ========================================================================
     auto Construct::emitNamespace(const LangAPI::Namespace &ns, Converter::Writer &w) -> void {
         const bool root = context.module_path.empty() && ns.name == namespace_name;
+        if (root) emitLine(w, kRootAllow);
         emitLine(w, "pub mod " + (root ? RustCore::moduleIdent(ns.name) : RustCore::ident(ns.name)) + " {");
         w.increaseIndentation();
         emitLine(w, "#[allow(unused_imports)] use super::*;");

@@ -27,7 +27,7 @@ def main():
         subprocess.run([args.ispa, '-l', 'rust', '-a', 'LL', '--no-incremental', '--no-debug-instrumentation', '--library-only',
                         '--dir', str(LIBRARY), '--dir', str(work), str(entry), '-o', str(work / 'o')],
                        check=True, env=env)
-        source = re.sub(r'#!\[allow\(.*?\)\]\n', '', (work / 'o.rs').read_text(), count=1, flags=re.S)
+        source = (work / 'o.rs').read_text()
     (HERE / 'src' / 'lowered.rs').write_text(source)
     print('regenerated src/lowered.rs')
 

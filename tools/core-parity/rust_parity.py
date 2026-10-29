@@ -60,11 +60,10 @@ def build(ispa, work, grammar):
     gen, gen_cpp = work / 'gen_rust', work / 'gen_cpp'
     gen.mkdir(parents=True, exist_ok=True)
     gen_cpp.mkdir(parents=True, exist_ok=True)
-    common = ['-a', 'LL', '--no-incremental', '--no-ai-recovery', '--no-debug-instrumentation', '--dir', str(GRAMMARS[grammar][0]), str(GRAMMARS[grammar][0] / GRAMMARS[grammar][1])]
+    common = ['-a', 'LL', '--no-incremental', '--no-ai-recovery', '--dir', str(GRAMMARS[grammar][0]), str(GRAMMARS[grammar][0] / GRAMMARS[grammar][1])]
     run([ispa, '-l', 'rust', *common, '-o', str(gen / 'generated')], env=env)
     run([ispa, '-l', 'cpp', *common, '-o', str(gen_cpp / 'generated')], env=env)
-    # the generated Rust file is a module root: its crate-level attributes move to the including crate
-    source = re.sub(r'#!\[allow\(.*?\)\]\n', '', (gen / 'generated.rs').read_text(), count=1, flags=re.S)
+    source = (gen / 'generated.rs').read_text()
     crate = work / 'crate'
     (crate / 'src' / 'bin').mkdir(parents=True, exist_ok=True)
     (crate / 'Cargo.toml').write_text(f'[package]\nname = "parity"\nversion = "0.1.0"\nedition = "2021"\n[dependencies]\nispa_std = {{ path = "{RUNTIME}" }}\n')

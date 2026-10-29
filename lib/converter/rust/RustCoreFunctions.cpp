@@ -1273,6 +1273,8 @@ auto RustCore::convertFunctionCall(const LangAPI::FunctionCall &call, bool membe
             !members.contains(std::get<std::string>(symbol.path[0])) &&
             !std::any_of(locals.rbegin(), locals.rend(), [&](const auto& frame) { return frame.contains(std::get<std::string>(symbol.path[0])); }))
             callee = receiver + "." + callee;
+        // the DFA entry point with debugger tables (debug instrumentation on) is a separate method here
+        if (!member && args.size() == 8 && callee.ends_with(".lookup")) callee += "_debug";
         if (!member)   // `Base.method(self, ...)` on a dispatching method runs the base implementation, not the dispatcher
             if (const auto* function = resolveFunction(symbol); function && (slot_functions.contains(function) || overrides.contains(function))) {
                 const auto at = callee.rfind("::");
