@@ -38,6 +38,7 @@ export namespace RustCore {
     auto isConstScalar(const LangAPI::Type &t) -> bool;
     std::vector<std::unordered_set<std::string>> locals;
     std::unordered_set<std::string> borrowed_parameters;
+    std::unordered_set<std::string> const_borrowed_parameters;   // `const T&` parameters (a subset of borrowed_parameters)
     std::unordered_set<std::string> callable_parameters;   // `impl FnMut` parameters; stored into fields they are boxed
     std::unordered_set<std::string> callable_fields;       // fields holding a Box<dyn FnMut>, called as `(x.field)(...)`
     std::unordered_set<std::string> any_fields;            // fields typed `Any` (PyAny): assigned values are wrapped, None is empty
@@ -48,11 +49,18 @@ export namespace RustCore {
     std::unordered_map<std::string, std::vector<const LangAPI::Function*>> class_methods;   // "Class::method" (bare class name)
     std::unordered_map<std::string, std::unordered_map<std::string, const LangAPI::Type*>> class_fields;
     std::unordered_map<std::string, const LangAPI::Type*> local_types;   // declared types of locals/parameters of the function being emitted
+    std::unordered_map<std::string, std::size_t> class_generics;   // bare class name -> number of type parameters
+    std::vector<std::string>* hoist_sink = nullptr;        // call arguments that re-borrow `self` are bound before the receiver is borrowed
+    bool hoist_self = false;                               // ... and the receiver is rooted at `self`, so arguments touching `self` are hoisted too
+    int hoist_counter = 0;
     auto currentClass() -> std::string;
     auto isSharedObjectInitializer(const LangAPI::Expression &value) -> bool;
     auto typeOfExpression(const LangAPI::Expression &e) -> const LangAPI::Type *;
     auto classOfType(const LangAPI::Type *t) -> std::string;
     std::unordered_map<std::string, const LangAPI::Type*> callable_types;   // Callable parameter name -> its type, for call arguments
+    bool callable_moved = false;                           // the body being emitted moved a callable parameter into another object
+    bool force_static_callable = false;
+    bool static_callable = false;                          // Callable parameters that outlive the call (`+ 'static`)
     bool owned_callable = false;                           // Callable converts to an owning Box<dyn FnMut> (struct fields)
     std::string receiver;
     bool shared_receiver = false;

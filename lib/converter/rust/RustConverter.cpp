@@ -255,7 +255,26 @@ namespace Rust {
     // Constrained templates (every type parameter has a fixed type list, C++ `enable_if<is_same<..> || ...>`) get a
     // marker trait implemented for exactly those types.
     // ISPA_RUST_SURVEY=1 records each function that cannot be emitted and keeps going, to inventory every blocker at once.
+    // A callable parameter that the body moves into another object (a constructor argument) has to outlive the call:
+    // the signature is only known to need `+ 'static` once the body has been seen, so such a function is emitted again.
     auto Construct::emitFunction(const LangAPI::Function &func, Converter::Writer &w, Converter::Writer &aux, FnKind kind,
+                                 const std::string &scope, const std::vector<std::string> &bases) -> void {
+        const auto w0 = w;
+        const auto aux0 = aux;
+        const auto counts = context.fn_counts;
+        RustCore::callable_moved = false;
+        emitFunctionSurveyed(func, w, aux, kind, scope, bases);
+        if (RustCore::callable_moved && !RustCore::force_static_callable) {
+            w = w0;
+            aux = aux0;
+            context.fn_counts = counts;
+            RustCore::force_static_callable = true;
+            emitFunctionSurveyed(func, w, aux, kind, scope, bases);
+            RustCore::force_static_callable = false;
+        }
+    }
+
+    auto Construct::emitFunctionSurveyed(const LangAPI::Function &func, Converter::Writer &w, Converter::Writer &aux, FnKind kind,
                                  const std::string &scope, const std::vector<std::string> &bases) -> void {
         if (!std::getenv("ISPA_RUST_SURVEY")) return emitFunctionChecked(func, w, aux, kind, scope, bases);
         const auto saved_receiver = RustCore::receiver;
@@ -313,6 +332,7 @@ namespace Rust {
         const auto saved_borrowed = RustCore::borrowed_parameters;
         RustCore::borrowed_parameters.clear();
         RustCore::callable_parameters.clear();
+        RustCore::const_borrowed_parameters.clear();
         RustCore::callable_types.clear();
         RustCore::local_types.clear();
         RustCore::locals.clear();
@@ -324,8 +344,12 @@ namespace Rust {
         for (const auto& parameter : func.parameters) {
             RustCore::bind(parameter.second);
             RustCore::local_types[parameter.second] = &parameter.first;
-            if (isValueTypeOf(parameter.first, LangAPI::ValueType::BorrowSemantic))
+            if (isValueTypeOf(parameter.first, LangAPI::ValueType::BorrowSemantic)) {
                 RustCore::borrowed_parameters.insert(parameter.second);
+                if (parameter.first.template_parameters.size() == 1 && std::holds_alternative<LangAPI::Type>(parameter.first.template_parameters[0]) &&
+                    isValueTypeOf(std::get<LangAPI::Type>(parameter.first.template_parameters[0]), LangAPI::ValueType::ImmutableSemantic))
+                    RustCore::const_borrowed_parameters.insert(parameter.second);
+            }
             if (isValueTypeOf(parameter.first, LangAPI::ValueType::Callable))
                 { RustCore::callable_parameters.insert(parameter.second); RustCore::callable_types[parameter.second] = &parameter.first; }
         }
@@ -333,10 +357,12 @@ namespace Rust {
         // signature
         std::vector<std::string> params;
         if (kind == FnKind::Method && !func.is_static) params.push_back(func.is_const ? "&self" : "&mut self");
+        RustCore::static_callable = RustCore::force_static_callable || kind == FnKind::Constructor || func.name == "__init__";   // stored in a field
         for (const auto &p : func.parameters) {
             const auto type = RustCore::convertType(p.first);
             params.push_back((type.starts_with("&") ? "" : "mut ") + RustCore::ident(p.second) + ": " + type);
         }
+        RustCore::static_callable = false;
         std::string ret;
         if (kind == FnKind::Constructor) ret = " -> Self";
         else if (!(func.type.isValueType() && func.type.getValueType() == LangAPI::ValueType::Void)) {
@@ -347,13 +373,14 @@ namespace Rust {
         emitLine(w, "pub fn " + name + (generics.empty() ? "" : "<" + joinStrings(generics, ", ") + ">") + "(" +
                     joinStrings(params, ", ") + ")" + ret + " {");
         w.increaseIndentation();
+        if (kind == FnKind::Method && !func.is_static) emitLine(w, "let __p = (&mut *self) as *mut Self;");   // for closures that reach the object
 
         const auto saved_counter = RustCore::counter;
         const auto saved_frames = RustCore::loop_frames;
         RustCore::counter = {RustCore::base_pointer};
         RustCore::loop_frames.clear();
 
-        if (kind == FnKind::Constructor) emitLine(w, "let mut this = Self::default();");
+        if (kind == FnKind::Constructor) { emitLine(w, "let mut this = Self::default();"); emitLine(w, "let __p = (&mut this) as *mut Self;"); }
         if (func.statements.empty() && kind != FnKind::Constructor && !ret.empty()) {
             throw Error("Rust target: function `{}` has no implementation", func.name);
         }

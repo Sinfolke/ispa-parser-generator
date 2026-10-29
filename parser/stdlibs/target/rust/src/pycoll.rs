@@ -92,3 +92,26 @@ pub fn py_cast<S: 'static, T: Clone + 'static>(value: S) -> T {
     }
     crate::fail(4, "invalid cast")
 }
+
+/// `container[index] = value` as a write: Python semantics (negative indices, dict insert/replace).
+pub trait PySetIndex<I, V> { fn py_set_index(&mut self, index: I, value: V); }
+impl<T> PySetIndex<i64, T> for Vec<T> {
+    fn py_set_index(&mut self, index: i64, value: T) { let at = py_position(index, self.len()); self[at] = value; }
+}
+impl<T, const N: usize> PySetIndex<i64, T> for [T; N] {
+    fn py_set_index(&mut self, index: i64, value: T) { let at = py_position(index, N); self[at] = value; }
+}
+impl<K: Eq + Hash, V> PySetIndex<K, V> for HashMap<K, V> {
+    fn py_set_index(&mut self, index: K, value: V) { self.insert(index, value); }
+}
+impl<K: Ord, V> PySetIndex<K, V> for BTreeMap<K, V> {
+    fn py_set_index(&mut self, index: K, value: V) { self.insert(index, value); }
+}
+pub fn py_set_index<C: PySetIndex<I, V>, I, V>(container: &mut C, index: I, value: V) { container.py_set_index(index, value) }
+impl<I, V, C: PySetIndex<I, V> + ?Sized> PySetIndex<I, V> for &mut C {
+    fn py_set_index(&mut self, index: I, value: V) { (**self).py_set_index(index, value) }
+}
+
+/// A container the frontend saw only being handed on (so it was passed `const&`) that the callee mutates.
+#[allow(clippy::mut_from_ref, invalid_reference_casting)]
+pub fn unshare<T: ?Sized>(shared: &T) -> &mut T { unsafe { &mut *(shared as *const T as *mut T) } }
