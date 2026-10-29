@@ -13,15 +13,17 @@ marks a missing cell, LR_CONFLICT a cell with several candidate actions
 The type-directed capture conversion (lr_convert & co) is expressed with an
 explicit `Shape` instead of the target's static type; the typed C++ version
 stays in cpp_residue."""
-from typing import ClassVar, cast
+from typing import ClassVar, Generic, TypeVar, cast
 
-from ispa_std.failures import runtime_error
+from ispa_std.failures import logic_error, runtime_error
 from ispa_std.format import int_to_string
 from ispa_std.lexer import TokenCursor
 from ispa_std.match_result import MatchResult
 from ispa_std.node import Node
 from ispa_std.raw_token import RawToken
 from ispa_std.recovery import Diagnostic
+
+V = TypeVar("V")
 
 LR_INVALID = -9223372036854775807
 LR_CONFLICT = 9223372036854775807
@@ -67,12 +69,12 @@ class LRRuleSpan:
         return LRRuleSpan(self.begin, self.end, self.leading, self.trailing, self.empty)
 
 
-class LRRegionFrame:
+class LRRegionFrame(Generic[V]):
     """A region owns its recognition stack and the values produced inside it.
     The deterministic parser currently uses one root region."""
     pos: TokenCursor
     states: list[int]
-    values: list[object]
+    values: list[V]
     spans: list[LRRuleSpan]
     capture_destinations: list[int]
     cursor: int
@@ -91,7 +93,7 @@ class LRRegionFrame:
         self.control.continuation = continuation
 
 
-class LRGrammar:
+class LRGrammar(Generic[V]):
     """Base class for generated LR tables. Override the required methods."""
 
     def lr_k(self) -> int:
@@ -103,14 +105,16 @@ class LRGrammar:
     def lr_conflict(self, state: int, window: list[int]) -> list[int]:
         return []
 
-    def lr_shift(self, token: RawToken) -> object:
-        return token
+    def lr_shift(self, token: RawToken) -> V:
+        logic_error("LRGrammar.lr_shift is abstract")
+        return self.lr_reduce(0, [])
 
     def lr_length(self, rule: int) -> int:
         return 0
 
-    def lr_reduce(self, rule: int, rhs: list[object]) -> object:
-        return 0
+    def lr_reduce(self, rule: int, rhs: list[V]) -> V:
+        logic_error("LRGrammar.lr_reduce is abstract")
+        return rhs[0]
 
     def lr_lhs(self, rule: int) -> int:
         return 0
@@ -157,14 +161,14 @@ class LRGrammar:
     def has_recover(self) -> bool:
         return False
 
-    def lr_recover(self, region: LRRegionFrame, diagnostic: Diagnostic) -> bool:
+    def lr_recover(self, region: LRRegionFrame[V], diagnostic: Diagnostic) -> bool:
         return False
 
     def has_semantic_reduce(self) -> bool:
         return False
 
-    def lr_semantic_reduce(self, rule: int, region: LRRegionFrame, span: LRRuleSpan, rhs: list[object]) -> object:
-        return 0
+    def lr_semantic_reduce(self, rule: int, region: LRRegionFrame[V], span: LRRuleSpan, rhs: list[V]) -> V:
+        return self.lr_reduce(rule, rhs)
 
 
 class LRTokenValue:
@@ -185,12 +189,12 @@ def lr_token(node: Node) -> LRTokenValue:
     return LRTokenValue(node, text)
 
 
-class LRCaptures:
+class LRCaptures(Generic[V]):
     """Captured values per destination column; `repeated` marks a repetition."""
-    columns: list[list[object]]
+    columns: list[list[V]]
     repeated: bool
 
-    def __init__(self, columns: list[list[object]], repeated: bool):
+    def __init__(self, columns: list[list[V]], repeated: bool):
         self.columns = columns
         self.repeated = repeated
 
@@ -203,8 +207,13 @@ class LRCaptures:
         return True
 
 
-def lr_pack(values: list[object], indices: list[int], offsets: list[int], splice: list[int], count: int, repeated: bool) -> LRCaptures:
-    columns: list[list[object]] = []
+def lr_captures_of(value: V) -> LRCaptures[V]:
+    """The captures alternative of a value (V is std::any or a closed variant containing LRCaptures[V])."""
+    return cast(LRCaptures[V], value)
+
+
+def lr_pack(values: list[V], indices: list[int], offsets: list[int], splice: list[int], count: int, repeated: bool) -> LRCaptures[V]:
+    columns: list[list[V]] = []
     i = 0
     while i < count:
         columns.append([])
@@ -214,17 +223,17 @@ def lr_pack(values: list[object], indices: list[int], offsets: list[int], splice
         value = values[indices[i]]
         if splice[i] != 0:
             c = 0
-            spliced: LRCaptures = cast(LRCaptures, value)
+            spliced: LRCaptures[V] = lr_captures_of(value)
             while c < len(spliced.columns):
                 columns[offsets[i] + c].extend(spliced.columns[c])
                 c = c + 1
         else:
             columns[offsets[i]].append(value)
         i = i + 1
-    return LRCaptures(columns, repeated)
+    return LRCaptures[V](columns, repeated)
 
 
-def lr_get(values: list[object], index: int) -> object:
+def lr_get(values: list[V], index: int) -> V:
     return values[index]
 
 
@@ -245,19 +254,19 @@ class LRParser:
     def getErrors(self) -> list[Diagnostic]:
         return self.errors_
 
-    def _skip(self, g: LRGrammar, it: TokenCursor, offset: list[int]) -> None:
+    def _skip(self, g: LRGrammar[V], it: TokenCursor, offset: list[int]) -> None:
         if g.has_is_space():
             while (not it.isEnd()) and g.lr_is_space(it.current()):
                 it.next()
                 if len(offset) > 0:
                     offset[0] = offset[0] + 1
 
-    def _gap(self, g: LRGrammar, rule: int, index: int) -> bool:
+    def _gap(self, g: LRGrammar[V], rule: int, index: int) -> bool:
         if g.has_space():
             return g.lr_space(rule, index)
         return False
 
-    def _window(self, g: LRGrammar, position: TokenCursor) -> list[int]:
+    def _window(self, g: LRGrammar[V], position: TokenCursor) -> list[int]:
         peek = position.copy()
         window: list[int] = []
         scratch: list[int] = []
@@ -273,7 +282,7 @@ class LRParser:
             i = i + 1
         return window
 
-    def _unexpected(self, g: LRGrammar, states: list[int], window: list[int], position: TokenCursor) -> Diagnostic:
+    def _unexpected(self, g: LRGrammar[V], states: list[int], window: list[int], position: TokenCursor) -> Diagnostic:
         d = Diagnostic()
         d.unexpected = window[0]
         if g.has_expected():
@@ -308,7 +317,7 @@ class LRParser:
         d.code = "lr-unexpected-token"
         return d
 
-    def _reduce_span(self, g: LRGrammar, rule: int, count: int, begin: int, spans: list[LRRuleSpan], cursor: int) -> LRRuleSpan:
+    def _reduce_span(self, g: LRGrammar[V], rule: int, count: int, begin: int, spans: list[LRRuleSpan], cursor: int) -> LRRuleSpan:
         span = LRRuleSpan(cursor, cursor, False, False, True)
         allowed = self._gap(g, rule, 0)
         i = 0
@@ -332,9 +341,9 @@ class LRParser:
             span.leading = allowed
         return span
 
-    def lr_parse(self, g: LRGrammar, pos: TokenCursor) -> MatchResult:
+    def lr_parse(self, g: LRGrammar[V], pos: TokenCursor) -> MatchResult:
         self.errors_ = []
-        region = LRRegionFrame(pos, 0)
+        region: LRRegionFrame[V] = LRRegionFrame[V](pos, 0)
         states = region.states
         values = region.values
         spans = region.spans
@@ -342,7 +351,7 @@ class LRParser:
         position = region.pos
         while True:
             control.phase = LRControlPhase.Decide
-            offset = [region.cursor]
+            offset: list[int] = [region.cursor]
             self._skip(g, position, offset)
             region.cursor = offset[0]
             window = self._window(g, position)
@@ -393,13 +402,13 @@ class LRParser:
                 if count > len(values):
                     runtime_error("LR stack underflow")
                 begin = len(values) - count
-                rhs = []
+                rhs: list[V] = []
                 i = begin
                 while i < len(values):
                     rhs.append(values[i])
                     i = i + 1
                 span = self._reduce_span(g, rule, count, begin, spans, region.cursor)
-                value: object = 0
+                value: V
                 if g.has_semantic_reduce():
                     # Semantic reductions run at the ACTION table's exact reduce
                     # point. The callback may update the cursor and span, and

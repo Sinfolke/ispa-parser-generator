@@ -57,6 +57,47 @@ class PackageError(Exception):
     pass
 
 
+class Status:
+    """A single progress line for install/build steps.
+
+    On a terminal it overwrites itself in place; piped output (or --verbose) gets one line per step instead,
+    since an overwritten line is useless in a log."""
+
+    def __init__(self):
+        self.verbose = False
+        self.tty = sys.stderr.isatty()
+        self._width = 0
+
+    def update(self, message):
+        if self.verbose or not self.tty:
+            print(message, file=sys.stderr)
+            return
+        sys.stderr.write('\r' + message + ' ' * max(0, self._width - len(message)))
+        sys.stderr.flush()
+        self._width = len(message)
+
+    def done(self):
+        if self.tty and not self.verbose and self._width:
+            sys.stderr.write('\r' + ' ' * self._width + '\r')
+            sys.stderr.flush()
+            self._width = 0
+
+
+STATUS = Status()
+
+
+def run_build_step(command, cwd=None):
+    """Run a noisy build command (cmake, cargo): streamed under --verbose, captured and shown only on failure otherwise."""
+    if STATUS.verbose:
+        subprocess.run(command, check=True, cwd=cwd, stdout=sys.stderr)
+        return
+    result = subprocess.run(command, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    if result.returncode != 0:
+        STATUS.done()
+        sys.stderr.write(result.stdout)
+        raise subprocess.CalledProcessError(result.returncode, command)
+
+
 def read_yaml(data, label):
     try:
         parsed = yaml.safe_load(data) or {}
@@ -211,7 +252,7 @@ def build_cpp_library(package, name, root, required=False, kind='cpp', standard=
     if not cmake:
         if required:
             raise PackageError('Building C++ libraries requires CMake')
-        print(f'{name}: skipping C++ build (CMake not found)', file=sys.stderr)
+        STATUS.update(f'{name}: skipping C++ build (CMake not found)')
         return None
     compiler = shlex.split(os.environ.get('CXX', ''))
     includes = [cpp, cpp / 'include']
@@ -249,17 +290,16 @@ def build_cpp_library(package, name, root, required=False, kind='cpp', standard=
             flags.extend(shlex.split(os.environ['CXXFLAGS']))
         if flags:
             configure.append('-DCMAKE_CXX_FLAGS=' + ' '.join(shlex.quote(arg) for arg in flags))
-        print(f'{name}: configuring CMake C++ library', file=sys.stderr)
+        STATUS.update(f'{name}: configuring CMake C++ library')
         try:
-            subprocess.run(configure, check=True, stdout=sys.stderr)
+            run_build_step(configure)
         except subprocess.CalledProcessError as error:
             if required:
                 raise PackageError(f'{name}: CMake could not configure a C++ toolchain') from error
-            print(f'{name}: skipping C++ build (CMake could not configure a C++ toolchain)', file=sys.stderr)
+            STATUS.update(f'{name}: skipping C++ build (CMake could not configure a C++ toolchain)')
             return None
-        print(f'{name}: building C++ library', file=sys.stderr)
-        subprocess.run([cmake, '--build', str(work / 'build'), '--config', 'Release', '--parallel'],
-                       check=True, stdout=sys.stderr)
+        STATUS.update(f'{name}: building C++ library')
+        run_build_step([cmake, '--build', str(work / 'build'), '--config', 'Release', '--parallel'])
         archive_names = (f'{output}.lib', f'lib{output}.a')
         matches = [candidate for search_root in (work, work / 'build')
                    for archive_name in archive_names for candidate in search_root.rglob(archive_name)]
@@ -285,7 +325,7 @@ def build_missing_cpp_library(package, name, root):
 def build_cpp_core(package, name, root, only_missing=False):
     """Build the opt-in `cpp-core` directory (the core lowered to C++ for `--stdlib core`).
 
-    It needs a C++23 compiler, so a failure only skips it: the plain C++ target keeps working."""
+    A failure only skips it: the plain C++ target keeps working."""
     core = package / 'ispatarget' / 'cpp-core'
     if not core.is_dir() or not any(core.rglob('*.cpp')):
         return None
@@ -294,9 +334,9 @@ def build_cpp_core(package, name, root, only_missing=False):
     if only_missing and ((library_dir / f'lib{output}.a').is_file() or (library_dir / f'{output}.lib').is_file()):
         return None
     try:
-        return build_cpp_library(package, name, root, kind='cpp-core', standard=23, output=output)
+        return build_cpp_library(package, name, root, kind='cpp-core', standard=17, output=output)
     except (PackageError, subprocess.CalledProcessError) as error:
-        print(f'{name}: skipping the core C++ build ({error}); --stdlib core needs a C++23 compiler', file=sys.stderr)
+        STATUS.update(f'{name}: skipping the core C++ build ({error})')
         return None
 
 
@@ -316,7 +356,7 @@ def ensure_requirements(name, config, root, allow_scripts, catalog_path, active)
         spec = packages.get(dependency) if isinstance(packages, dict) else None
         if not isinstance(spec, dict):
             raise PackageError(f"{name} requires {dependency}, which is not installed and not in the catalog")
-        print(f"{name}: installing required package {dependency}", file=sys.stderr)
+        STATUS.update(f"{name}: installing required package {dependency}")
         install(dependency, dict(spec), root, allow_scripts, from_catalog=True,
                 catalog_path=catalog_path, _active=(*active, name))
 
@@ -331,13 +371,12 @@ def build_rust_package(package, name, required=False):
     if not cargo:
         if required:
             raise PackageError('Building Rust packages requires Cargo (install the Rust toolchain)')
-        print(f'{name}: skipping Rust build (Cargo not found)', file=sys.stderr)
+        STATUS.update(f'{name}: skipping Rust build (Cargo not found)')
         return None
     for manifest in manifests:
-        print(f'{name}: building Rust crate {manifest.parent.relative_to(rust)}', file=sys.stderr)
+        STATUS.update(f'{name}: building Rust crate {manifest.parent.relative_to(rust)}')
         try:
-            subprocess.run([cargo, 'build', '--release', '--manifest-path', str(manifest)],
-                           cwd=manifest.parent, check=True, stdout=sys.stderr)
+            run_build_step([cargo, 'build', '--release', '--manifest-path', str(manifest)], cwd=manifest.parent)
         except subprocess.CalledProcessError as error:
             if required:
                 raise PackageError(f'{name}: Cargo could not build {manifest.parent.name}') from error
@@ -419,6 +458,7 @@ def install(name, spec, root, allow_scripts=False, force=False, from_catalog=Fal
                 if json.loads(marker.read_text())["fingerprint"] == fingerprint:
                     if build_missing_cpp_library(target, name, root):
                         refresh_saved_exports(root)
+                    STATUS.done()
                     print(f"{name}: up to date ({revision[:12]})")
                     return
             except (ValueError, KeyError):
@@ -474,6 +514,7 @@ def install(name, spec, root, allow_scripts=False, force=False, from_catalog=Fal
                 backup.rename(target)
             raise
         refresh_saved_exports(root)
+        STATUS.done()
         print(f"{name}: installed ({revision[:12]}) at {target}")
 
 
@@ -752,6 +793,8 @@ def main(argv=None):
     exports.add_argument("--build", metavar="PACKAGE", help="Build an installed package's C++ library and Rust crates")
     parser.add_argument("--export-path", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--shell", choices=("bash", "zsh", "powershell"), help="Shell used for exports")
+    parser.add_argument("--verbose", action="store_true",
+                         help="Print each install/build step on its own line instead of a single status line")
     sub = parser.add_subparsers(dest="command")
     add = sub.add_parser("install", help="Install a catalog name, GitHub repository, or archive")
     add.add_argument("source")
@@ -767,6 +810,7 @@ def main(argv=None):
     catalog_cmd.add_argument("action", choices=["update", "list"])
     catalog_cmd.add_argument("--url", default=CATALOG_URL, help="GitHub raw YAML URL")
     args = parser.parse_args(argv)
+    STATUS.verbose = args.verbose
     if args.export_path and not args.export:
         parser.error("--export-path requires --export")
     root = args.root.expanduser().resolve()
@@ -786,6 +830,7 @@ def main(argv=None):
             rust_crates = build_rust_package(package, args.build, required=True)
             if archive or rust_crates:
                 refresh_saved_exports(root)
+                STATUS.done()
                 if archive:
                     print(f"{args.build}: built {archive}")
                 if rust_crates:
@@ -852,6 +897,7 @@ def main(argv=None):
                         catalog_path=args.catalog)
         return 0
     except (PackageError, OSError, ValueError, subprocess.CalledProcessError, zipfile.BadZipFile, tarfile.TarError) as error:
+        STATUS.done()
         print(f"ispa-pkg: {error}", file=sys.stderr)
         return 1
 

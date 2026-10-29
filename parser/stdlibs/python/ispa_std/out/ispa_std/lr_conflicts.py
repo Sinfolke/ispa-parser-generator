@@ -5,10 +5,13 @@ prefixes and reductions share a packed forest. No semantic callbacks run until
 the complete input has exactly one surviving derivation."""
 from ispa_std.failures import runtime_error
 from ispa_std.format import int_to_string, join
+from typing import Generic, TypeVar
 from ispa_std.lr import ABSENT, lr_node, LR_CONFLICT, LR_INVALID, LRGrammar, LRParser
 from ispa_std.lexer import TokenCursor
 from ispa_std.match_result import MatchResult
 from ispa_std.sortedmap import IntSet, StrIntMap
+
+V = TypeVar("V")
 
 NODE_LIMIT = 250000
 WORK_LIMIT = 2000000
@@ -48,11 +51,11 @@ class _Alternative:
         return True
 
 
-class _Eval:
+class _Eval(Generic[V]):
     """One frame of the iterative tree evaluation."""
     node: int
     child: int
-    rhs: list[object]
+    rhs: list[V]
 
     def __init__(self, node: int):
         self.node = node
@@ -102,7 +105,7 @@ class LRGeneralizedParser(LRParser):
         if self.work > WORK_LIMIT or len(forest) + len(stacks) > NODE_LIMIT:
             runtime_error("LR automatic conflict resolution resource limit exceeded")
 
-    def lr_parse_generalized(self, g: LRGrammar, pos: TokenCursor) -> MatchResult:
+    def lr_parse_generalized(self, g: LRGrammar[V], pos: TokenCursor) -> MatchResult:
         self.work = 0
         forest: list[_Forest] = []
         stacks = [_Stack(ABSENT, 0, ABSENT)]
@@ -296,18 +299,18 @@ class LRGeneralizedParser(LRParser):
         # Evaluate the chosen tree after recognition. Semantic results are not
         # memoized: two occurrences of a shared epsilon subtree still need two
         # action invocations. The traversal is iterative so deep trees work.
-        evaluating: list[_Eval] = [_Eval(roots.smallest())]
-        result: object = 0
+        evaluating: list[_Eval[V]] = [_Eval[V](roots.smallest())]
+        result: V
         while len(evaluating) > 0:
             self._tick(forest, stacks)
-            frame = evaluating[len(evaluating) - 1]
+            frame: _Eval[V] = evaluating[len(evaluating) - 1]
             node = forest[frame.node]
             if (not node.has_token) and frame.child < len(node.alternatives[0].children):
                 child = node.alternatives[0].children[frame.child]
                 frame.child = frame.child + 1
-                evaluating.append(_Eval(child))
+                evaluating.append(_Eval[V](child))
             else:
-                produced: object = 0
+                produced: V
                 if node.has_token:
                     produced = g.lr_shift(node.token.current())
                 else:

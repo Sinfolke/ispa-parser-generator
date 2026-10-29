@@ -25,7 +25,7 @@ from ispa_std.counter import CountSpec
 from ispa_std.errors import ErrorKind
 from ispa_std.failures import api_error, invalid_argument, length_error, logic_error, no_match, out_of_range, rethrow, runtime_error
 from ispa_std.format import fmt, int_to_string, replace_all
-from typing import Callable
+from typing import Callable, Generic, TypeVar
 from ispa_std.chars import at, is_space
 from ispa_std.lexer import LazyIterator, Lexer_base, TokenCursor, TokenIterator, is_token_end
 from ispa_std.raw_token import RawToken
@@ -36,6 +36,8 @@ from ispa_std.scan import scan_balanced
 from ispa_std.sortedmap import StrIntMap
 from ispa_std.string import ends_with, substr
 from ispa_std.utility import maximum, minimum
+
+AST = TypeVar("AST")
 
 MAX_ACTION_LOOKAHEAD = 64
 MAX_ACTION_CHECKPOINTS = 32
@@ -272,18 +274,17 @@ class ActionCheckpoint:
             self.saved.pop()
 
 
-class RuleContext(ActionCheckpoint):
-    """`ctx` inside a rule action. Cursor and AST changes are immediately
-    visible to subsequent matches and to the rule's caller."""
-    ast: object
+class Ctx(ActionCheckpoint):
+    """`ctx` inside any parser action: the cursor, the rule's start, token
+    lookahead and named checkpoints. RuleContext and FailContext add the AST
+    being built and what their action kind may do."""
     start_pos: TokenCursor
     rule: str
     token_names: TokenNames
     ambiguous_id: int
 
-    def __init__(self, pos: TokenCursor, ast: object, start_pos: TokenCursor, rule: str, token_names: TokenNames, ambiguous_id: int):
+    def __init__(self, pos: TokenCursor, start_pos: TokenCursor, rule: str, token_names: TokenNames, ambiguous_id: int):
         ActionCheckpoint.__init__(self, pos)
-        self.ast = ast
         self.start_pos = start_pos
         self.rule = rule
         self.token_names = token_names
@@ -306,6 +307,16 @@ class RuleContext(ActionCheckpoint):
 
     def prev(self) -> ActionToken:
         return context_prev(self.pos, self.start_pos, self.token_names, self.ambiguous_id)
+
+
+class RuleContext(Ctx, Generic[AST]):
+    """`ctx` inside a rule action. Cursor and AST changes are immediately
+    visible to subsequent matches and to the rule's caller."""
+    ast: AST
+
+    def __init__(self, pos: TokenCursor, ast: AST, start_pos: TokenCursor, rule: str, token_names: TokenNames, ambiguous_id: int):
+        Ctx.__init__(self, pos, start_pos, rule, token_names, ambiguous_id)
+        self.ast = ast
 
     def collect_braced(self) -> list[RawToken]:
         """Collect a braced region's contents after its opening token has been
@@ -340,57 +351,31 @@ class RuleContext(ActionCheckpoint):
         return collected
 
 
-class FailContext(ActionCheckpoint):
+class FailContext(Ctx, Generic[AST]):
     """`ctx` inside a `fail` block: the same queries plus the repair requests."""
-    ast: object
-    start_pos: TokenCursor
-    rule: str
+    ast: AST
     failed_rule: str
     recovery_state: recovery.State
     source: str
     has_source_text: bool
     diagnostic_begin: int
-    token_names: TokenNames
-    ambiguous_id: int
     requested: int
     has_request: bool
     skipped: int
 
-    def __init__(self, pos: TokenCursor, ast: object, start_pos: TokenCursor, rule: str, failed_rule: str, state: recovery.State,
+    def __init__(self, pos: TokenCursor, ast: AST, start_pos: TokenCursor, rule: str, failed_rule: str, state: recovery.State,
                  source: str, has_source_text: bool, diagnostic_begin: int, token_names: TokenNames,
                  ambiguous_id: int):
-        ActionCheckpoint.__init__(self, pos)
+        Ctx.__init__(self, pos, start_pos, rule, token_names, ambiguous_id)
         self.ast = ast
-        self.start_pos = start_pos
-        self.rule = rule
         self.failed_rule = failed_rule
         self.recovery_state = state
         self.source = source
         self.has_source_text = has_source_text
         self.diagnostic_begin = diagnostic_begin
-        self.token_names = token_names
-        self.ambiguous_id = ambiguous_id
         self.requested = recovery.Mode.Propagate
         self.has_request = False
         self.skipped = 0
-
-    def at(self, text: str, lookahead: int) -> bool:
-        return context_at(self.pos, text, lookahead, self.token_names, False, self.ambiguous_id)
-
-    def at_token(self, name: str, lookahead: int) -> bool:
-        return context_at(self.pos, name, lookahead, self.token_names, True, self.ambiguous_id)
-
-    def peek(self, lookahead: int) -> ActionToken:
-        return context_peek(self.pos, lookahead, self.token_names, self.ambiguous_id)
-
-    def take(self) -> ActionToken:
-        token = self.peek(0)
-        if not token.empty():
-            self.pos.next()
-        return token
-
-    def prev(self) -> ActionToken:
-        return context_prev(self.pos, self.start_pos, self.token_names, self.ambiguous_id)
 
     def error(self, message: str, code: str, source_offset: int, source_length: int) -> None:
         """Custom diagnostics share the collection with automatic repairs.
@@ -1450,11 +1435,11 @@ class LLParser(Parser_base):
         return result
 
     # --- contexts ------------------------------------------------------------
-    def rule_context(self, pos: TokenCursor, ast: object, start: TokenCursor, rule: str) -> RuleContext:
-        return RuleContext(pos, ast, start, rule, self.token_names_, self.ambiguous_id_)
+    def rule_context(self, pos: TokenCursor, ast: AST, start: TokenCursor, rule: str) -> RuleContext[AST]:
+        return RuleContext[AST](pos, ast, start, rule, self.token_names_, self.ambiguous_id_)
 
-    def fail_context(self, pos: TokenCursor, ast: object, start: TokenCursor, rule: str, failed_rule: str) -> FailContext:
-        return FailContext(pos, ast, start, rule, failed_rule, self.recovery_state_, self.text,
+    def fail_context(self, pos: TokenCursor, ast: AST, start: TokenCursor, rule: str, failed_rule: str) -> FailContext[AST]:
+        return FailContext[AST](pos, ast, start, rule, failed_rule, self.recovery_state_, self.text,
                            self.has_text, len(self.recovery_state_.diagnostics), self.token_names_,
                            self.ambiguous_id_)
 
@@ -1466,7 +1451,7 @@ class LLParser(Parser_base):
             decision.mode = recovery.Mode.Retry
         return decision
 
-    def custom_failure_decision_ctx(self, before: TokenCursor, ctx: FailContext) -> recovery.Decision:
+    def custom_failure_decision_ctx(self, before: TokenCursor, ctx: FailContext[AST]) -> recovery.Decision:
         return ctx.finish(before)
 
     def custom_failure(self, action: Callable[[TokenCursor, recovery.State], recovery.Decision]) -> recovery.ActionFailure:

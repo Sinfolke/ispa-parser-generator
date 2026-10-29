@@ -22,6 +22,9 @@ template<class T, class Token>
 constexpr long long token_index_of = static_cast<long long>(alternative_index<T>(static_cast<const Token*>(nullptr)));
 
 // A core Node that carries the typed node: how a typed AST value passes through the core combinators.
+// The core's contexts are generic over the AST they carry; the facade keeps its AST native.
+struct NoAst {};
+
 template<class T>
 struct TypedNode : lo::node::Node {
     ISPA_STD::Node<T> value;
@@ -66,7 +69,9 @@ struct TypedRawToken : lo::raw_token::RawToken {
     }
 };
 
-template<class IT> concept HasSource = requires(const IT& it) { it.sourceOrigin(); };
+template<class IT> using source_origin_op = decltype(std::declval<const IT&>().sourceOrigin());
+template<class IT> using decrement_op = decltype(--std::declval<IT&>());
+template<class IT> inline constexpr bool HasSource = ISPA_STD::detail::detected_v<source_origin_op, IT>;
 
 // A core TokenCursor over a typed iterator.
 template<class IT, class Token, class T>
@@ -108,7 +113,7 @@ struct TypedCursor : lo::lexer::TokenCursor {
     auto isEnd() -> bool override { return it.isEnd(); }
     auto next() -> std::shared_ptr<lo::lexer::TokenCursor> override { if (!it.isEnd()) ++it; return shared_self(); }
     auto prev() -> std::shared_ptr<lo::lexer::TokenCursor> override {
-        if constexpr (requires { --it; }) --it;
+        if constexpr (ISPA_STD::detail::detected_v<decrement_op, IT>) --it;
         return shared_self();
     }
     auto advance_by(long long count) -> std::shared_ptr<lo::lexer::TokenCursor> override {
@@ -171,6 +176,20 @@ std::shared_ptr<lo::recovery::TokenSet> token_set() {
     return ISPA_STD::construct<lo::recovery::TokenSet>(std::vector<long long>(values.begin(), values.end()));
 }
 
+// token ids are hashes, so the names come from the generated function instead of a table
+struct FnTokenNames : lo::parser_ll::TokenNames {
+    const char* (*fn)(std::size_t) = nullptr;
+    explicit FnTokenNames(const char* (*f)(std::size_t)) : fn(f) {}
+    auto lookup(long long id) -> std::string override {
+        try {
+            const char* name = fn(static_cast<std::size_t>(id));
+            return name ? name : "";
+        } catch (...) {  // the generated switch throws for an id that is not a token
+            return "";
+        }
+    }
+};
+
 inline lo::recovery::Decision* unused_decision = nullptr;
 // custom_failure(lambda): kept typed until a combinator supplies the iterator type.
 template<class Action>
@@ -206,7 +225,19 @@ class LLParser : public ISPA_STD::LLParser<MainNode, Token> {
     using Base = ISPA_STD::LLParser<MainNode, Token>;
 public:
     using Base::parse;
-    using Base::getErrors;
+    // The core owns recovery state while a parse runs; reading it (or starting a new parse) folds it into the typed state first.
+    [[nodiscard]] const std::vector<ISPA_STD::Recovery::Diagnostic>& getErrors() const {
+        const_cast<LLParser*>(this)->drain_core();
+        return Base::getErrors();
+    }
+    [[nodiscard]] const std::vector<ISPA_STD::Recovery::ContextDiagnostic>& getContextErrors() const {
+        const_cast<LLParser*>(this)->drain_core();
+        return Base::getContextErrors();
+    }
+    void reset_recovery() {
+        Base::reset_recovery();
+        core()->reset_recovery();
+    }
     auto& core() {
         if (!core_) { ISPA_STD::HeapScope heap; core_ = ISPA_STD::construct<core_detail::lo::parser_ll::LLParser>(); }
         return core_;
@@ -339,7 +370,7 @@ public:
         const std::string rule;
         const std::string failed_rule;
         const char* (*token_name)(std::size_t) = nullptr;
-        std::shared_ptr<core_detail::lo::parser_ll::FailContext> core_context;
+        std::shared_ptr<core_detail::lo::parser_ll::FailContext<core_detail::NoAst>> core_context;
         std::shared_ptr<core_detail::TypedCursor<IT, Token, void>> cursor;
         std::vector<std::pair<std::string, IT>> checkpoints;
 
@@ -384,6 +415,21 @@ public:
             core_context->sync(std::vector<std::string>{std::string(boundaries)...});
             pull();
         }
+        auto token_boundary(std::string_view name) const {
+            return core_detail::lo::parser_ll::token_boundary(std::string(name));
+        }
+        template<class... Boundaries>
+        void sync_tokens(Boundaries... boundaries) {
+            push();
+            auto make = [](auto&& b) {
+                if constexpr (std::is_convertible_v<decltype(b), std::string_view>)
+                    return core_detail::lo::parser_ll::spelling(std::string(std::string_view(b)));
+                else
+                    return b;
+            };
+            core_context->sync_tokens(std::vector<std::shared_ptr<core_detail::lo::parser_ll::TokenBoundary>>{make(boundaries)...});
+            pull();
+        }
         void skip() { push(); core_context->skip(); pull(); }
         void insert() { core_context->insert(); }
         void replace() { push(); core_context->replace(); pull(); }
@@ -408,9 +454,21 @@ public:
     auto fail_context(IT& pos, AST& ast, IT start, std::string rule, std::string failed_rule,
                       const char* (*token_name)(std::size_t) = nullptr) {
         FailContext<IT, AST> ctx{pos, ast, start, rule, failed_rule, token_name, nullptr, nullptr, {}};
+        if (token_name) {
+            static thread_local std::vector<std::pair<const char* (*)(std::size_t), std::shared_ptr<core_detail::FnTokenNames>>> names;
+            auto found = std::find_if(names.begin(), names.end(), [&](const auto& n) { return n.first == token_name; });
+            if (found == names.end()) {
+                ISPA_STD::HeapScope heap;
+                names.emplace_back(token_name, core_detail::counted<core_detail::FnTokenNames>(token_name));
+                found = names.end() - 1;
+            }
+            long long ambiguous = -1;
+            if constexpr (ISPA_STD::detail::detected_v<ISPA_STD::detail::ambiguous_id, Token>) ambiguous = static_cast<long long>(Token::ambiguous_id);
+            core()->set_token_names(found->second, ambiguous);
+        }
         ctx.cursor = core_detail::counted<core_detail::TypedCursor<IT, Token, void>>(pos);
         auto start_cursor = core_detail::counted<core_detail::TypedCursor<IT, Token, void>>(start);
-        ctx.core_context = core()->fail_context(ctx.cursor, std::any{}, start_cursor, rule, failed_rule);
+        ctx.core_context = core()->fail_context(ctx.cursor, core_detail::NoAst{}, start_cursor, rule, failed_rule);
         return ctx;
     }
     template<class IT, class AST>
@@ -425,8 +483,17 @@ public:
         return required<NodeStruct>(pos, std::forward<Recursive>(rec), core_detail::CoreFail{custom_handler<IT>(fail.action)});
     }
 
-    // --- not available through the core yet: fail loudly instead of mixing two recovery states -----------------
-    template<class... A> auto rule_context(A&&...) = delete;
+    template<typename NodeStruct, typename SpaceToken = void, typename IT, typename Action>
+    auto range(IT& pos, const core_detail::CustomFail<Action>& fail) -> std::vector<ISPA_STD::Node<NodeStruct>> {
+        return range<NodeStruct, SpaceToken>(pos, core_detail::CoreFail{custom_handler<IT>(fail.action)});
+    }
+    template<typename NodeStruct, typename SpaceToken = void, typename IT, typename Recursive, typename Action>
+    auto range(IT& pos, Recursive&& rec, const core_detail::CustomFail<Action>& fail) -> std::vector<ISPA_STD::Node<NodeStruct>> {
+        return range<NodeStruct, SpaceToken>(pos, std::forward<Recursive>(rec), core_detail::CoreFail{custom_handler<IT>(fail.action)});
+    }
+
+    // --- rule actions (ctx in advanced rule bodies): pure cursor queries, no recovery state, so the native context is used as is ---
+    using Base::rule_context;
 
     // --- counted repetitions: the counters live in the core, so every count is shared with its recovery state ----
     struct CounterScope {
@@ -542,7 +609,26 @@ protected:
         };
     }
 
+    void drain_core() {
+        if (core()->getErrors().empty() && core()->getContextErrors().empty()) return;
+        merge_diagnostics();
+        core()->reset_recovery();
+    }
+
     void merge_diagnostics() {
+        for (const auto& d : core()->getContextErrors()) {
+            ISPA_STD::Recovery::ContextDiagnostic out;
+            out.kind = static_cast<ISPA_STD::Recovery::ContextKind>(d->kind);
+            out.message = d->message;
+            out.position = static_cast<std::size_t>(d->position);
+            out.offset = d->offset < 0 ? std::numeric_limits<std::size_t>::max() : static_cast<std::size_t>(d->offset);
+            out.length = static_cast<std::size_t>(d->length);
+            out.skipped = static_cast<std::size_t>(d->skipped);
+            out.rule = d->rule;
+            out.resume_rule = d->resume_rule;
+            out.claim = d->claim;
+            this->context_errors_.push_back(std::move(out));
+        }
         auto& diagnostics = this->recovery_state_.diagnostics;
         std::vector<ISPA_STD::Recovery::Diagnostic> merged;
         for (const auto& d : core()->getErrors()) {

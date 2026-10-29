@@ -1,9 +1,12 @@
 #pragma once
-#include "ispastdlib/ispa_debug.hpp"
+#include "ispa_core/ispa_debug.hpp"
 #include <PyRawParser.h>
-#include "ispastdlib/external.hpp"
+#include "ispa_core/external.hpp"
 
-#include <ispastdlib.hpp>
+#include <ispa_core/variant_io.hpp>
+#include <ispa_core/assign.hpp>
+#include <ispa_core/to_string.hpp>
+#include <ispa_core/parser_ll.hpp>
 
 namespace Parser {
 	namespace Tokens {
@@ -4352,7 +4355,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct __WS {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -4387,7 +4390,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_common_template_params_LESS_THAN_SIGN {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -4430,7 +4433,7 @@ namespace Parser {
 			using ispa_python = ::Parser::FlatTypes::modules_ispa_python;
 			using __external = ::Parser::FlatTypes::modules___external;
 			using main = ::Parser::FlatTypes::modules_main;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -4475,7 +4478,7 @@ namespace Parser {
 			using template_param = ::Parser::FlatTypes::modules_common_template_param;
 			template<typename params>
 			using name = ::Parser::FlatTypes::modules_common_name<params>;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -4510,7 +4513,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_fail_block_fail_block_FAIL {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -4546,7 +4549,7 @@ namespace Parser {
 	namespace FlatTypes {
 		struct modules_fail_block {
 			using fail_block = ::Parser::FlatTypes::modules_fail_block_fail_block;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -4581,7 +4584,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_grammar_modifier_RIGHT_SQUARE_BRACKET {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -4618,7 +4621,7 @@ namespace Parser {
 		struct modules_grammar {
 			using modifier = ::Parser::FlatTypes::modules_grammar_modifier;
 			using grammar = ::Parser::FlatTypes::modules_grammar_grammar;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -4653,7 +4656,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_grammar_modifier_AUTO {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -4688,7 +4691,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_forward_declaration_cls_class_method_METHOD {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -4727,7 +4730,7 @@ namespace Parser {
 			using fun = ::Parser::FlatTypes::modules_forward_declaration_fun;
 			using fun_forward = ::Parser::FlatTypes::modules_forward_declaration_fun_forward;
 			using fwd = ::Parser::FlatTypes::modules_forward_declaration_fwd;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -4762,7 +4765,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_advanced_advanced_rule_dep_decl_DEPENDS {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -4799,7 +4802,7 @@ namespace Parser {
 		struct modules_rule {
 			using advanced = ::Parser::FlatTypes::modules_rule_advanced;
 			using regular = ::Parser::FlatTypes::modules_rule_regular;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -4835,7 +4838,7 @@ namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_advanced {
 			using advanced_rule = ::Parser::FlatTypes::modules_rule_advanced_advanced_rule;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -4870,7 +4873,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_advanced_advanced_rule_regular_match_unpack_AUTO {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -4905,7 +4908,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct FULL_STOP {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -4940,7 +4943,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_value_var_capture_AMPERSAND {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -4980,7 +4983,7 @@ namespace Parser {
 			using ast = ::Parser::FlatTypes::modules_rule_regular_ast;
 			using f_binding = ::Parser::FlatTypes::modules_rule_regular_f_binding;
 			using regular_rule = ::Parser::FlatTypes::modules_rule_regular_regular_rule;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5015,7 +5018,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_value {
-			std::variant<std::monostate, ::ISPA_STD::Node<std::shared_ptr<::Parser::FlatTypes::modules_rule_regular_value_one_capture>>, ::ISPA_STD::Node<std::shared_ptr<::Parser::FlatTypes::modules_rule_regular_value_mul_capture>>> value;
+			std::variant<std::monostate, ::ISPA_CORE::Node<std::shared_ptr<::Parser::FlatTypes::modules_rule_regular_value_one_capture>>, ::ISPA_CORE::Node<std::shared_ptr<::Parser::FlatTypes::modules_rule_regular_value_mul_capture>>> value;
 			using var_capture = ::Parser::FlatTypes::modules_rule_regular_value_var_capture;
 			using dyn = ::Parser::FlatTypes::modules_rule_regular_value_dyn;
 			using alternative = ::Parser::FlatTypes::modules_rule_regular_value_alternative;
@@ -5034,7 +5037,7 @@ namespace Parser {
 			using ast_capture = ::Parser::FlatTypes::modules_rule_regular_value_ast_capture;
 			using mul_capture = ::Parser::FlatTypes::modules_rule_regular_value_mul_capture;
 			using one_capture = ::Parser::FlatTypes::modules_rule_regular_value_one_capture;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5070,7 +5073,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct PERCENT_SIGN {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5105,7 +5108,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_value_dyn_DOLLAR_SIGN {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5140,7 +5143,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_value_alternative_VERTICAL_LINE {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5175,9 +5178,9 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_value_alternative {
-			::ISPA_STD::Node<std::shared_ptr<::Parser::FlatTypes::modules_rule_regular_value_pattern>> value;
+			::ISPA_CORE::Node<std::shared_ptr<::Parser::FlatTypes::modules_rule_regular_value_pattern>> value;
 			using VERTICAL_LINE = ::Parser::FlatTypes::modules_rule_regular_value_alternative_VERTICAL_LINE;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5213,7 +5216,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_common_template_params_GREATER_THAN_SIGN {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5248,7 +5251,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_value_shared_counter_registration_AUTO {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5283,7 +5286,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct COLON {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5318,7 +5321,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct EQUALS_SIGN {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5353,7 +5356,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_nested_rule_NUMBER_SIGN {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5388,9 +5391,9 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_nested_rule {
-			::ISPA_STD::Node<std::shared_ptr<::Parser::FlatTypes::modules_grammar_grammar>> value;
+			::ISPA_CORE::Node<std::shared_ptr<::Parser::FlatTypes::modules_grammar_grammar>> value;
 			using NUMBER_SIGN = ::Parser::FlatTypes::modules_rule_regular_nested_rule_NUMBER_SIGN;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5426,7 +5429,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_value_not_a_EXCLAMATION_MARK {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5461,7 +5464,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_value_NOSPACE {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5496,7 +5499,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct LEFT_CURLY_BRACKET {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5533,7 +5536,7 @@ namespace Parser {
 		struct modules_rule_regular_value_CGROUP {
 			char negative;
 			std::string v;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5570,7 +5573,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_ast_full_AUTO {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5606,7 +5609,7 @@ namespace Parser {
 	namespace FlatTypes {
 		struct modules_grammar_modifier_MOD {
 			std::string value;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5642,7 +5645,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct RIGHT_CURLY_BRACKET {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5677,7 +5680,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_common_call_params_AUTO {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5713,7 +5716,7 @@ namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_value_QUANTIFIER {
 			char value;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5750,7 +5753,7 @@ namespace Parser {
 	namespace FlatTypes {
 		struct modules_common_ID {
 			std::string value;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5786,7 +5789,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_value_SPACE {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5821,7 +5824,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_forward_declaration_fun_FN {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5856,7 +5859,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct COMMERCIAL_AT {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5891,7 +5894,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_forward_declaration_cls_class_property_PROPERTY {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5926,7 +5929,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct SEMICOLON {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5961,7 +5964,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_forward_declaration_cls_CLASS {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -5997,7 +6000,7 @@ namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_value_STRING {
 			std::string value;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -6033,7 +6036,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_advanced_advanced_rule_regular_match_MATCH {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -6068,7 +6071,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_value_ANY {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -6103,7 +6106,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct COMMA {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -6138,7 +6141,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct RIGHT_PARENTHESIS {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -6173,7 +6176,7 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct LEFT_PARENTHESIS {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -6208,8 +6211,8 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_value_group {
-			std::vector<::ISPA_STD::Node<std::shared_ptr<::Parser::FlatTypes::modules_rule_regular_value>>> value;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			std::vector<::ISPA_CORE::Node<std::shared_ptr<::Parser::FlatTypes::modules_rule_regular_value>>> value;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -6247,7 +6250,7 @@ namespace Parser {
 		struct modules_ispa_python {
 			using stmt = ::Parser::FlatTypes::modules_ispa_python_stmt;
 			using expr = ::Parser::FlatTypes::modules_ispa_python_expr;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -6283,7 +6286,7 @@ namespace Parser {
 	namespace FlatTypes {
 		struct modules___external {
 			using python = ::Parser::FlatTypes::modules___external_python;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -6320,7 +6323,7 @@ namespace Parser {
 		struct modules___external_python {
 			using symbol_1 = ::Parser::FlatTypes::modules___external_python_symbol_1;
 			using symbol_0 = ::Parser::FlatTypes::modules___external_python_symbol_0;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -6356,7 +6359,7 @@ namespace Parser {
 	namespace FlatTypes {
 		struct modules_main {
 			using main = ::Parser::FlatTypes::modules_main_main;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -6391,11 +6394,11 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_grammar_modifier {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_grammar_modifier_MOD> value;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_grammar_modifier_MOD> value;
 			using RIGHT_SQUARE_BRACKET = ::Parser::FlatTypes::modules_grammar_modifier_RIGHT_SQUARE_BRACKET;
 			using AUTO = ::Parser::FlatTypes::modules_grammar_modifier_AUTO;
 			using MOD = ::Parser::FlatTypes::modules_grammar_modifier_MOD;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -6431,9 +6434,9 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_advanced_advanced_rule_regular_match_unpack {
-			std::vector<::ISPA_STD::Node<::Parser::FlatTypes::modules_common_ID>> value;
+			std::vector<::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_ID>> value;
 			using AUTO = ::Parser::FlatTypes::modules_rule_advanced_advanced_rule_regular_match_unpack_AUTO;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -6469,9 +6472,9 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_value_var_capture {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_common_ID> value;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_ID> value;
 			using AMPERSAND = ::Parser::FlatTypes::modules_rule_regular_value_var_capture_AMPERSAND;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -6507,9 +6510,9 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_value_shared_counter_registration {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_common_ID> value;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_ID> value;
 			using AUTO = ::Parser::FlatTypes::modules_rule_regular_value_shared_counter_registration_AUTO;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -6545,10 +6548,10 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_forward_declaration_cls_class_property {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_common_ID> name;
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_common_ID> type;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_ID> name;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_ID> type;
 			using PROPERTY = ::Parser::FlatTypes::modules_forward_declaration_cls_class_property_PROPERTY;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -6585,8 +6588,8 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_value_ast_capture {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_common_ID> value;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_ID> value;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -6622,9 +6625,9 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_f_binding {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_common_ID> f;
-			std::vector<::ISPA_STD::Node<::Parser::FlatTypes::modules_common_ID>> seq;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_ID> f;
+			std::vector<::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_ID>> seq;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -6661,9 +6664,9 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_common_type_annotation {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_common_ID> base;
-			std::vector<::ISPA_STD::Node<::Parser::FlatTypes::modules_common_ID>> nested;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_ID> base;
+			std::vector<::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_ID>> nested;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -6700,10 +6703,10 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_forward_declaration_fun_forward {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_common_ID> name;
-			std::vector<::ISPA_STD::Node<::Parser::FlatTypes::modules_common_ID>> param_names;
-			std::vector<::ISPA_STD::Node<::Parser::FlatTypes::modules_common_ID>> param_types;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_ID> name;
+			std::vector<::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_ID>> param_names;
+			std::vector<::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_ID>> param_types;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -6741,8 +6744,8 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_advanced_advanced_rule_regular_match_source {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_common_ID> value;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_ID> value;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -6778,9 +6781,9 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_common_template_param {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_common_ID> first_p;
-			std::vector<::ISPA_STD::Node<::Parser::FlatTypes::modules_common_ID>> following_p;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_ID> first_p;
+			std::vector<::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_ID>> following_p;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -6817,9 +6820,9 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_ast_abbr {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_common_ID> f;
-			std::vector<::ISPA_STD::Node<::Parser::FlatTypes::modules_common_ID>> seq;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_ID> f;
+			std::vector<::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_ID>> seq;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -6856,9 +6859,9 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_value_mul_capture {
-			std::variant<std::monostate, ::ISPA_STD::Node<::Parser::FlatTypes::COMMERCIAL_AT>, ::ISPA_STD::Node<::Parser::FlatTypes::PERCENT_SIGN>> type;
-			std::vector<::ISPA_STD::Node<std::shared_ptr<::Parser::FlatTypes::modules_rule_regular_value_one_capture>>> cap;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			std::variant<std::monostate, ::ISPA_CORE::Node<::Parser::FlatTypes::COMMERCIAL_AT>, ::ISPA_CORE::Node<::Parser::FlatTypes::PERCENT_SIGN>> type;
+			std::vector<::ISPA_CORE::Node<std::shared_ptr<::Parser::FlatTypes::modules_rule_regular_value_one_capture>>> cap;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -6895,8 +6898,8 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_ispa_python_stmt {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules___external_python_symbol_1> value;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules___external_python_symbol_1> value;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -6932,8 +6935,8 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_ispa_python_expr {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules___external_python_symbol_0> value;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules___external_python_symbol_0> value;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -6969,9 +6972,9 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_common_parameter {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_common_ID> name;
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_common_type_annotation> annotation;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_ID> name;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_type_annotation> annotation;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -7008,9 +7011,9 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_forward_declaration_cls_class_method {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_forward_declaration_fun_forward> value;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_forward_declaration_fun_forward> value;
 			using METHOD = ::Parser::FlatTypes::modules_forward_declaration_cls_class_method_METHOD;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -7046,9 +7049,9 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_forward_declaration_fun {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_forward_declaration_fun_forward> value;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_forward_declaration_fun_forward> value;
 			using FN = ::Parser::FlatTypes::modules_forward_declaration_fun_FN;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -7084,13 +7087,13 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_advanced_advanced_rule_regular_match {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_advanced_advanced_rule_regular_match_source> stream;
-			std::vector<::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_value>> patterns;
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_advanced_advanced_rule_regular_match_unpack> assign_names;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_advanced_advanced_rule_regular_match_source> stream;
+			std::vector<::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_value>> patterns;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_advanced_advanced_rule_regular_match_unpack> assign_names;
 			using unpack = ::Parser::FlatTypes::modules_rule_advanced_advanced_rule_regular_match_unpack;
 			using MATCH = ::Parser::FlatTypes::modules_rule_advanced_advanced_rule_regular_match_MATCH;
 			using source = ::Parser::FlatTypes::modules_rule_advanced_advanced_rule_regular_match_source;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -7128,10 +7131,10 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_common_template_params {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_common_template_param> value;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_template_param> value;
 			using LESS_THAN_SIGN = ::Parser::FlatTypes::modules_common_template_params_LESS_THAN_SIGN;
 			using GREATER_THAN_SIGN = ::Parser::FlatTypes::modules_common_template_params_GREATER_THAN_SIGN;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -7167,8 +7170,8 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_value_counter_bounded {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_ispa_python_expr> value;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_ispa_python_expr> value;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -7204,8 +7207,8 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_value_dyn_dyn_expr {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_ispa_python_expr> value;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_ispa_python_expr> value;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -7241,9 +7244,9 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_ast_full_part {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_common_ID> key;
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_ispa_python_expr> e;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_ID> key;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_ispa_python_expr> e;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -7280,8 +7283,8 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_ast_single_value {
-			std::variant<std::monostate, ::ISPA_STD::Node<::Parser::FlatTypes::modules_ispa_python_expr>, ::ISPA_STD::Node<::Parser::FlatTypes::COMMERCIAL_AT>> value;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			std::variant<std::monostate, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_ispa_python_expr>, ::ISPA_CORE::Node<::Parser::FlatTypes::COMMERCIAL_AT>> value;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -7317,9 +7320,9 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_common_param {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_common_parameter> first_p;
-			std::vector<::ISPA_STD::Node<::Parser::FlatTypes::modules_common_parameter>> following_p;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_parameter> first_p;
+			std::vector<::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_parameter>> following_p;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -7356,12 +7359,12 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_forward_declaration_cls {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_common_ID> name;
-			std::variant<std::monostate, ::ISPA_STD::Node<::Parser::FlatTypes::modules_forward_declaration_cls_class_method>, ::ISPA_STD::Node<::Parser::FlatTypes::modules_forward_declaration_cls_class_property>> decls;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_ID> name;
+			std::variant<std::monostate, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_forward_declaration_cls_class_method>, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_forward_declaration_cls_class_property>> decls;
 			using class_method = ::Parser::FlatTypes::modules_forward_declaration_cls_class_method;
 			using class_property = ::Parser::FlatTypes::modules_forward_declaration_cls_class_property;
 			using CLASS = ::Parser::FlatTypes::modules_forward_declaration_cls_CLASS;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -7394,11 +7397,11 @@ namespace Parser {
 	namespace FlatTypes {
 		template<typename params>
 		struct modules_common_name {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_common_ID> primary;
-			std::vector<::ISPA_STD::Node<::Parser::FlatTypes::modules_common_ID>> nested;
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_common_template_params> temp_params;
-			::ISPA_STD::Node<params> param;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void {
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_ID> primary;
+			std::vector<::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_ID>> nested;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_template_params> temp_params;
+			::ISPA_CORE::Node<params> param;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void {
 				printer.node("modules_common_name", false);
 				printer.up(false);
 				printer.node("primary", false);
@@ -7417,11 +7420,11 @@ namespace Parser {
 				printer.down();
 			}
 			auto print(std::ostream& os) const -> void {
-				::ISPA_STD::ASTPrinter<std::ostream> printer = ::ISPA_STD::ASTPrinter<std::ostream>{os};
+				::ISPA_CORE::ASTPrinter<std::ostream> printer = ::ISPA_CORE::ASTPrinter<std::ostream>{os};
 				write_to_output(printer);
 			}
 			auto to_string() const -> std::string {
-				return ::ISPA_STD::concat("modules_common_name {", "primary = ", primary.to_string(), ", ", "nested = ", nested, ", ", "temp_params = ", temp_params.to_string(), ", ", "param = ", param.to_string(), "}");
+				return ::ISPA_CORE::concat("modules_common_name {", "primary = ", primary.to_string(), ", ", "nested = ", nested, ", ", "temp_params = ", temp_params.to_string(), ", ", "param = ", param.to_string(), "}");
 			}
 			constexpr auto members() {
 				return std::tie(primary, nested, temp_params, param);
@@ -7452,9 +7455,9 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_value_counter_quantified {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_value_QUANTIFIER> quantifier;
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_value_counter_bounded> repetitions;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_value_QUANTIFIER> quantifier;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_value_counter_bounded> repetitions;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -7491,10 +7494,10 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_value_dyn {
-			std::variant<std::monostate, ::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_value_dyn_dyn_expr>, ::ISPA_STD::Node<::Parser::FlatTypes::modules_common_ID>> value;
+			std::variant<std::monostate, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_value_dyn_dyn_expr>, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_ID>> value;
 			using DOLLAR_SIGN = ::Parser::FlatTypes::modules_rule_regular_value_dyn_DOLLAR_SIGN;
 			using dyn_expr = ::Parser::FlatTypes::modules_rule_regular_value_dyn_dyn_expr;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -7530,10 +7533,10 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_ast_full {
-			std::vector<::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_ast_full_part>> value;
+			std::vector<::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_ast_full_part>> value;
 			using AUTO = ::Parser::FlatTypes::modules_rule_regular_ast_full_AUTO;
 			using part = ::Parser::FlatTypes::modules_rule_regular_ast_full_part;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -7569,9 +7572,9 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_common_call_params {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_common_param> value;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_param> value;
 			using AUTO = ::Parser::FlatTypes::modules_common_call_params_AUTO;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -7607,8 +7610,8 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_common_rule_params {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_common_param> value;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_param> value;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -7644,8 +7647,8 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_forward_declaration_fwd {
-			std::variant<std::monostate, ::ISPA_STD::Node<::Parser::FlatTypes::modules_forward_declaration_cls>, ::ISPA_STD::Node<::Parser::FlatTypes::modules_forward_declaration_fun>> value;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			std::variant<std::monostate, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_forward_declaration_cls>, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_forward_declaration_fun>> value;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -7681,10 +7684,10 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_value_counter {
-			std::variant<std::monostate, ::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_value_counter_bounded>, ::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_value_counter_quantified>> value;
+			std::variant<std::monostate, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_value_counter_bounded>, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_value_counter_quantified>> value;
 			using bounded = ::Parser::FlatTypes::modules_rule_regular_value_counter_bounded;
 			using quantified = ::Parser::FlatTypes::modules_rule_regular_value_counter_quantified;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -7720,11 +7723,11 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_ast {
-			std::variant<std::monostate, ::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_ast_abbr>, ::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_ast_full>, ::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_ast_single_value>> value;
+			std::variant<std::monostate, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_ast_abbr>, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_ast_full>, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_ast_single_value>> value;
 			using full = ::Parser::FlatTypes::modules_rule_regular_ast_full;
 			using single_value = ::Parser::FlatTypes::modules_rule_regular_ast_single_value;
 			using abbr = ::Parser::FlatTypes::modules_rule_regular_ast_abbr;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -7760,9 +7763,9 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_value_not_a {
-			std::variant<std::monostate, ::ISPA_STD::Node<::Parser::FlatTypes::modules_common_name<::Parser::FlatTypes::modules_common_call_params>>, ::ISPA_STD::Node<std::shared_ptr<::Parser::FlatTypes::modules_rule_regular_value_group>>, ::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_value_dyn>, ::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_value_STRING>, ::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_value_CGROUP>, ::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_value_ANY>, ::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_value_SPACE>, ::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_value_NOSPACE>> value;
+			std::variant<std::monostate, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_name<::Parser::FlatTypes::modules_common_call_params>>, ::ISPA_CORE::Node<std::shared_ptr<::Parser::FlatTypes::modules_rule_regular_value_group>>, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_value_dyn>, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_value_STRING>, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_value_CGROUP>, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_value_ANY>, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_value_SPACE>, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_value_NOSPACE>> value;
 			using EXCLAMATION_MARK = ::Parser::FlatTypes::modules_rule_regular_value_not_a_EXCLAMATION_MARK;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -7798,8 +7801,8 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_value_pattern {
-			std::variant<std::monostate, ::ISPA_STD::Node<::Parser::FlatTypes::modules_common_name<::Parser::FlatTypes::modules_common_call_params>>, ::ISPA_STD::Node<std::shared_ptr<::Parser::FlatTypes::modules_rule_regular_value_group>>, ::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_value_dyn>, ::ISPA_STD::Node<std::shared_ptr<::Parser::FlatTypes::modules_rule_regular_value_not_a>>, ::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_value_STRING>, ::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_value_CGROUP>, ::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_value_ANY>, ::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_value_SPACE>, ::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_value_NOSPACE>> value;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			std::variant<std::monostate, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_name<::Parser::FlatTypes::modules_common_call_params>>, ::ISPA_CORE::Node<std::shared_ptr<::Parser::FlatTypes::modules_rule_regular_value_group>>, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_value_dyn>, ::ISPA_CORE::Node<std::shared_ptr<::Parser::FlatTypes::modules_rule_regular_value_not_a>>, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_value_STRING>, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_value_CGROUP>, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_value_ANY>, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_value_SPACE>, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_value_NOSPACE>> value;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -7835,8 +7838,8 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_value_fail_capture {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_common_name<::Parser::FlatTypes::modules_common_call_params>> value;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_name<::Parser::FlatTypes::modules_common_call_params>> value;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -7872,10 +7875,10 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_fail_block_fail_block {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_common_name<::Parser::FlatTypes::modules_common_rule_params>> name;
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_ispa_python_stmt> val;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_name<::Parser::FlatTypes::modules_common_rule_params>> name;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_ispa_python_stmt> val;
 			using FAIL = ::Parser::FlatTypes::modules_fail_block_fail_block_FAIL;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -7912,9 +7915,9 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_advanced_advanced_rule_dep_decl {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_forward_declaration_fwd> value;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_forward_declaration_fwd> value;
 			using DEPENDS = ::Parser::FlatTypes::modules_rule_advanced_advanced_rule_dep_decl_DEPENDS;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -7950,11 +7953,11 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_regular_rule {
-			std::vector<::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_value>> v;
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_ast> ast_pointer;
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_f_binding> fail_pointer;
-			std::vector<::ISPA_STD::Node<std::shared_ptr<::Parser::FlatTypes::modules_rule_regular_nested_rule>>> nested;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			std::vector<::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_value>> v;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_ast> ast_pointer;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_f_binding> fail_pointer;
+			std::vector<::ISPA_CORE::Node<std::shared_ptr<::Parser::FlatTypes::modules_rule_regular_nested_rule>>> nested;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -7993,14 +7996,14 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_regular_value_one_capture {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_value_var_capture> v_cap;
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_value_ast_capture> ast_cap;
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_value_fail_capture> fail_cap;
-			::ISPA_STD::Node<std::shared_ptr<::Parser::FlatTypes::modules_rule_regular_value_pattern>> val;
-			std::vector<::ISPA_STD::Node<std::shared_ptr<::Parser::FlatTypes::modules_rule_regular_value_alternative>>> alts;
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_value_counter> quantifier;
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_regular_value_shared_counter_registration> registration;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_value_var_capture> v_cap;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_value_ast_capture> ast_cap;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_value_fail_capture> fail_cap;
+			::ISPA_CORE::Node<std::shared_ptr<::Parser::FlatTypes::modules_rule_regular_value_pattern>> val;
+			std::vector<::ISPA_CORE::Node<std::shared_ptr<::Parser::FlatTypes::modules_rule_regular_value_alternative>>> alts;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_value_counter> quantifier;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_regular_value_shared_counter_registration> registration;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -8042,11 +8045,11 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_rule_advanced_advanced_rule {
-			std::vector<::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_advanced_advanced_rule_dep_decl>> dep;
-			std::vector<std::variant<std::monostate, ::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_advanced_advanced_rule_regular_match>, ::ISPA_STD::Node<::Parser::FlatTypes::modules_ispa_python_stmt>>> body;
+			std::vector<::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_advanced_advanced_rule_dep_decl>> dep;
+			std::vector<std::variant<std::monostate, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_advanced_advanced_rule_regular_match>, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_ispa_python_stmt>>> body;
 			using dep_decl = ::Parser::FlatTypes::modules_rule_advanced_advanced_rule_dep_decl;
 			using regular_match = ::Parser::FlatTypes::modules_rule_advanced_advanced_rule_regular_match;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -8083,10 +8086,10 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_grammar_grammar {
-			std::vector<::ISPA_STD::Node<::Parser::FlatTypes::modules_grammar_modifier>> mod;
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_common_name<::Parser::FlatTypes::modules_common_rule_params>> name;
-			std::variant<std::monostate, ::ISPA_STD::Node<std::shared_ptr<::Parser::FlatTypes::modules_rule_regular_regular_rule>>, ::ISPA_STD::Node<::Parser::FlatTypes::modules_rule_advanced_advanced_rule>> entry;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			std::vector<::ISPA_CORE::Node<::Parser::FlatTypes::modules_grammar_modifier>> mod;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_common_name<::Parser::FlatTypes::modules_common_rule_params>> name;
+			std::variant<std::monostate, ::ISPA_CORE::Node<std::shared_ptr<::Parser::FlatTypes::modules_rule_regular_regular_rule>>, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_rule_advanced_advanced_rule>> entry;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -8124,8 +8127,8 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct modules_main_main {
-			std::vector<std::variant<std::monostate, ::ISPA_STD::Node<::Parser::FlatTypes::modules_grammar_grammar>, ::ISPA_STD::Node<::Parser::FlatTypes::modules_fail_block_fail_block>>> value;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			std::vector<std::variant<std::monostate, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_grammar_grammar>, ::ISPA_CORE::Node<::Parser::FlatTypes::modules_fail_block_fail_block>>> value;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -8161,8 +8164,8 @@ namespace Parser {
 namespace Parser {
 	namespace FlatTypes {
 		struct main {
-			::ISPA_STD::Node<::Parser::FlatTypes::modules_main_main> value;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			::ISPA_CORE::Node<::Parser::FlatTypes::modules_main_main> value;
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
 			constexpr auto members() {
@@ -8261,12 +8264,12 @@ namespace Parser {
 	} // namespace Types
 } // namespace Parser
 namespace Parser {
-	using Token = ::ISPA_STD::RawToken<Types::__WS, Types::modules::common::template_params::LESS_THAN_SIGN, Types::modules::fail_block::fail_block::FAIL, Types::modules::grammar::modifier::RIGHT_SQUARE_BRACKET, Types::modules::grammar::modifier::AUTO, Types::modules::forward_declaration::cls::class_method::METHOD, Types::modules::rule::advanced::advanced_rule::dep_decl::DEPENDS, Types::modules::rule::advanced::advanced_rule::regular_match::unpack::AUTO, Types::FULL_STOP, Types::modules::rule::regular::value::var_capture::AMPERSAND, Types::PERCENT_SIGN, Types::modules::rule::regular::value::dyn::DOLLAR_SIGN, Types::modules::rule::regular::value::alternative::VERTICAL_LINE, Types::modules::common::template_params::GREATER_THAN_SIGN, Types::modules::rule::regular::value::shared_counter_registration::AUTO, Types::COLON, Types::EQUALS_SIGN, Types::modules::rule::regular::nested_rule::NUMBER_SIGN, Types::modules::rule::regular::value::not_a::EXCLAMATION_MARK, Types::modules::rule::regular::value::NOSPACE, Types::LEFT_CURLY_BRACKET, Types::modules::rule::regular::value::CGROUP, Types::modules::rule::regular::ast::full::AUTO, Types::modules::grammar::modifier::MOD, Types::RIGHT_CURLY_BRACKET, Types::modules::common::call_params::AUTO, Types::modules::rule::regular::value::QUANTIFIER, Types::modules::common::ID, Types::modules::rule::regular::value::SPACE, Types::modules::forward_declaration::fun::FN, Types::COMMERCIAL_AT, Types::modules::forward_declaration::cls::class_property::PROPERTY, Types::SEMICOLON, Types::modules::forward_declaration::cls::CLASS, Types::modules::rule::regular::value::STRING, Types::modules::rule::advanced::advanced_rule::regular_match::MATCH, Types::modules::rule::regular::value::ANY, Types::COMMA, Types::RIGHT_PARENTHESIS, Types::LEFT_PARENTHESIS>;
+	using Token = ::ISPA_CORE::RawToken<Types::__WS, Types::modules::common::template_params::LESS_THAN_SIGN, Types::modules::fail_block::fail_block::FAIL, Types::modules::grammar::modifier::RIGHT_SQUARE_BRACKET, Types::modules::grammar::modifier::AUTO, Types::modules::forward_declaration::cls::class_method::METHOD, Types::modules::rule::advanced::advanced_rule::dep_decl::DEPENDS, Types::modules::rule::advanced::advanced_rule::regular_match::unpack::AUTO, Types::FULL_STOP, Types::modules::rule::regular::value::var_capture::AMPERSAND, Types::PERCENT_SIGN, Types::modules::rule::regular::value::dyn::DOLLAR_SIGN, Types::modules::rule::regular::value::alternative::VERTICAL_LINE, Types::modules::common::template_params::GREATER_THAN_SIGN, Types::modules::rule::regular::value::shared_counter_registration::AUTO, Types::COLON, Types::EQUALS_SIGN, Types::modules::rule::regular::nested_rule::NUMBER_SIGN, Types::modules::rule::regular::value::not_a::EXCLAMATION_MARK, Types::modules::rule::regular::value::NOSPACE, Types::LEFT_CURLY_BRACKET, Types::modules::rule::regular::value::CGROUP, Types::modules::rule::regular::ast::full::AUTO, Types::modules::grammar::modifier::MOD, Types::RIGHT_CURLY_BRACKET, Types::modules::common::call_params::AUTO, Types::modules::rule::regular::value::QUANTIFIER, Types::modules::common::ID, Types::modules::rule::regular::value::SPACE, Types::modules::forward_declaration::fun::FN, Types::COMMERCIAL_AT, Types::modules::forward_declaration::cls::class_property::PROPERTY, Types::SEMICOLON, Types::modules::forward_declaration::cls::CLASS, Types::modules::rule::regular::value::STRING, Types::modules::rule::advanced::advanced_rule::regular_match::MATCH, Types::modules::rule::regular::value::ANY, Types::COMMA, Types::RIGHT_PARENTHESIS, Types::LEFT_PARENTHESIS>;
 } // namespace Parser
 namespace Parser {
-	class Lexer : public ::ISPA_STD::Lexer_base<Token> {
+	class Lexer : public ::ISPA_CORE::Lexer_base<Token> {
 	public:
-		auto clone() const -> std::shared_ptr<::ISPA_STD::Lexer_base<Token>> override;
+		auto clone() const -> std::shared_ptr<::ISPA_CORE::Lexer_base<Token>> override;
 	private:
 		std::vector<Token> ispa_pending_tokens;
 		bool ispa_skip_token = false;
@@ -8277,14 +8280,14 @@ namespace Parser {
 		auto on_eof() -> void override;
 		auto hasExternalRules() const -> bool override;
 	private:
-		static ::ISPA_STD::DFA::API::CharToClass char_class_table;
-		static ::ISPA_STD::DFA::API::Table<106, 54> dfa_table;
-		static ::ISPA_STD::DFA::API::Table<139, 4> action_table;
-		auto semantic_action_exec(long long state, const ::ISPA_STD::DFA::API::Captures& captures, long long start_pos, const char* start, long long length, long long line, const char*& cursor) -> std::pair<long long, Token>;
+		static ::ISPA_CORE::DFA::API::CharToClass char_class_table;
+		static ::ISPA_CORE::DFA::API::Table<106, 54> dfa_table;
+		static ::ISPA_CORE::DFA::API::Table<139, 4> action_table;
+		auto semantic_action_exec(long long state, const ::ISPA_CORE::DFA::API::Captures& captures, long long start_pos, const char* start, long long length, long long line, const char*& cursor) -> std::pair<long long, Token>;
 		bool init_done = false;
 		auto init() -> void override;
-		::ISPA_STD::DFA::API::TdfaLayout<23, 22> tdfa_registers;
-		static std::array<::ISPA_STD::DFA::API::DFADebug, 1> debug_array;
+		::ISPA_CORE::DFA::API::TdfaLayout<23, 22> tdfa_registers;
+		static std::array<::ISPA_CORE::DFA::API::DFADebug, 1> debug_array;
 		static std::unordered_map<long long, std::unordered_map<long long, long long>> debug_index;
 	public:
 		auto makeToken(const char*& pos) -> Token override;
@@ -8309,68 +8312,68 @@ namespace Parser {
 	};
 } // namespace Parser
 namespace Parser {
-	class Parser : public ::ISPA_STD::LLParser<Types::main, Token> {
+	class Parser : public ::ISPA_CORE::LLParser<Types::main, Token> {
 	protected:
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularNested_rule(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::regular::nested_rule, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueCounterBounded(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::regular::value::counter::bounded, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueShared_counter_registration(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::regular::value::shared_counter_registration, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueCounterQuantified(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::regular::value::counter::quantified, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueAlternative(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::regular::value::alternative, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueDynDyn_expr(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::regular::value::dyn::dyn_expr, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueDyn(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::regular::value::dyn, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueNot_a(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::regular::value::not_a, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueGroup(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::regular::value::group, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValuePattern(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::regular::value::pattern, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueFail_capture(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::regular::value::fail_capture, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueAst_capture(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::regular::value::ast_capture, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueCounter(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::regular::value::counter, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueVar_capture(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::regular::value::var_capture, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularF_binding(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::regular::f_binding, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesCommonType_annotation(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::common::type_annotation, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularAstFullPart(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::regular::ast::full::part, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleAdvancedAdvanced_ruleRegular_matchUnpack(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::advanced::advanced_rule::regular_match::unpack, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularAst(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::regular::ast, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularRegular_rule(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::regular::regular_rule, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueMul_capture(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::regular::value::mul_capture, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesIspa_pythonStmt(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::ispa_python::stmt, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValue(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::regular::value, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesGrammarGrammar(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::grammar::grammar, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleAdvancedAdvanced_ruleDep_decl(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::advanced::advanced_rule::dep_decl, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesForward_declarationFun_forward(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::forward_declaration::fun_forward, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesForward_declarationFun(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::forward_declaration::fun, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularAstSingle_value(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::regular::ast::single_value, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesForward_declarationClsClass_property(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::forward_declaration::cls::class_property, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesCommonRule_params(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::common::rule_params, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleAdvancedAdvanced_ruleRegular_match(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::advanced::advanced_rule::regular_match, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesForward_declarationClsClass_method(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::forward_declaration::cls::class_method, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesForward_declarationCls(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::forward_declaration::cls, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto main(IT pos) -> ::ISPA_STD::MatchResult<Types::main, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesIspa_pythonExpr(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::ispa_python::expr, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesCommonParameter(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::common::parameter, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesGrammarModifier(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::grammar::modifier, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesCommonParam(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::common::param, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesCommonTemplate_params(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::common::template_params, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleAdvancedAdvanced_ruleRegular_matchSource(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::advanced::advanced_rule::regular_match::source, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesForward_declarationFwd(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::forward_declaration::fwd, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesCommonTemplate_param(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::common::template_param, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleAdvancedAdvanced_rule(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::advanced::advanced_rule, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesFail_blockFail_block(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::fail_block::fail_block, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modules__externalPythonSymbol_1(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::__external::python::symbol_1, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularAstFull(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::regular::ast::full, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueOne_capture(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::regular::value::one_capture, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularAstAbbr(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::rule::regular::ast::abbr, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesCommonCall_params(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::common::call_params, IT>;
-		template<typename params, typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesCommonName(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::common::name<params>, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesMainMain(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::main::main, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modules__externalPythonSymbol_0(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::__external::python::symbol_0, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto ispa_match_template(std::type_identity<Types::modules::common::call_params> tag, IT pos) -> ::ISPA_STD::MatchResult<Types::modules::common::call_params, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto ispa_match_template(std::type_identity<Types::modules::common::rule_params> tag, IT pos) -> ::ISPA_STD::MatchResult<Types::modules::common::rule_params, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularNested_rule(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::regular::nested_rule, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueCounterBounded(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::regular::value::counter::bounded, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueShared_counter_registration(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::regular::value::shared_counter_registration, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueCounterQuantified(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::regular::value::counter::quantified, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueAlternative(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::regular::value::alternative, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueDynDyn_expr(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::regular::value::dyn::dyn_expr, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueDyn(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::regular::value::dyn, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueNot_a(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::regular::value::not_a, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueGroup(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::regular::value::group, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValuePattern(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::regular::value::pattern, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueFail_capture(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::regular::value::fail_capture, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueAst_capture(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::regular::value::ast_capture, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueCounter(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::regular::value::counter, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueVar_capture(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::regular::value::var_capture, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularF_binding(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::regular::f_binding, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesCommonType_annotation(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::common::type_annotation, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularAstFullPart(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::regular::ast::full::part, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleAdvancedAdvanced_ruleRegular_matchUnpack(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::advanced::advanced_rule::regular_match::unpack, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularAst(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::regular::ast, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularRegular_rule(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::regular::regular_rule, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueMul_capture(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::regular::value::mul_capture, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesIspa_pythonStmt(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::ispa_python::stmt, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValue(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::regular::value, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesGrammarGrammar(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::grammar::grammar, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleAdvancedAdvanced_ruleDep_decl(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::advanced::advanced_rule::dep_decl, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesForward_declarationFun_forward(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::forward_declaration::fun_forward, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesForward_declarationFun(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::forward_declaration::fun, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularAstSingle_value(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::regular::ast::single_value, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesForward_declarationClsClass_property(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::forward_declaration::cls::class_property, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesCommonRule_params(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::common::rule_params, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleAdvancedAdvanced_ruleRegular_match(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::advanced::advanced_rule::regular_match, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesForward_declarationClsClass_method(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::forward_declaration::cls::class_method, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesForward_declarationCls(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::forward_declaration::cls, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto main(IT pos) -> ::ISPA_CORE::MatchResult<Types::main, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesIspa_pythonExpr(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::ispa_python::expr, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesCommonParameter(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::common::parameter, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesGrammarModifier(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::grammar::modifier, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesCommonParam(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::common::param, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesCommonTemplate_params(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::common::template_params, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleAdvancedAdvanced_ruleRegular_matchSource(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::advanced::advanced_rule::regular_match::source, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesForward_declarationFwd(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::forward_declaration::fwd, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesCommonTemplate_param(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::common::template_param, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleAdvancedAdvanced_rule(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::advanced::advanced_rule, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesFail_blockFail_block(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::fail_block::fail_block, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modules__externalPythonSymbol_1(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::__external::python::symbol_1, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularAstFull(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::regular::ast::full, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularValueOne_capture(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::regular::value::one_capture, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesRuleRegularAstAbbr(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::rule::regular::ast::abbr, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesCommonCall_params(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::common::call_params, IT>;
+		template<typename params, typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesCommonName(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::common::name<params>, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modulesMainMain(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::main::main, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto modules__externalPythonSymbol_0(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::__external::python::symbol_0, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto ispa_match_template(::ISPA_CORE::type_tag<Types::modules::common::call_params> tag, IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::common::call_params, IT>;
+		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::Parser::Lexer::lazy_iterator>>> auto ispa_match_template(::ISPA_CORE::type_tag<Types::modules::common::rule_params> tag, IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::common::rule_params, IT>;
 	public:
 		auto parseFromTokens() -> void override;
 	private:
 		Lexer lazy_lexer_;
 	public:
-		auto lazyParse() -> ::ISPA_STD::MatchResult<Types::main, Lexer::lazy_iterator> override;
+		auto lazyParse() -> ::ISPA_CORE::MatchResult<Types::main, ::Parser::Lexer::lazy_iterator> override;
 		constexpr auto members() {
 			return std::tie();
 		}
@@ -8391,365 +8394,365 @@ namespace Parser {
 		}
 	};
 } // namespace Parser
-template<typename params, typename IT, class> auto Parser::Parser::modulesCommonName(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::common::name<params>, IT> {
+template<typename params, typename IT, class> auto Parser::Parser::modulesCommonName(IT pos) -> ::ISPA_CORE::MatchResult<Types::modules::common::name<params>, IT> {
 	try {
 		::ispa::debug::RuleScope ispa_debug_rule{"modules.common.name", {"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/ispa/grammar/common.isc", 13, 1}};
 		::ispa::debug::ProductionScope ispa_debug_production{"modules.common.name", {"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/ispa/grammar/common.isc", 13, 1}};
 		if (::ispa::debug::enabled()) ::ispa::debug::line({"/mnt/5EE9F38E0E9F2DC9/ispa-parser/parser/ispa/grammar/common.isc", 13, 1}, ::ispa::debug::Snapshot{}.add("pos", pos), "before");
 		Types::modules::common::name<params> result = {};
-		::ISPA_STD::Node<Types::modules::common::ID> value_modules_common_ID;
-		::ISPA_STD::Node<Types::FULL_STOP> value_FULL_STOP;
-		::ISPA_STD::Node<Types::modules::common::ID> value_modules_common_ID_1;
-		std::pair<::ISPA_STD::Node<Types::FULL_STOP>, ::ISPA_STD::Node<Types::modules::common::ID>> group0;
-		std::vector<std::pair<::ISPA_STD::Node<Types::FULL_STOP>, ::ISPA_STD::Node<Types::modules::common::ID>>> group_list1;
-		std::vector<::ISPA_STD::Node<Types::modules::common::ID>> capture_list2;
-		::ISPA_STD::Node<Types::modules::common::template_params> value_modules_common_template_params;
-		::ISPA_STD::Node<params> value_modules_common_name_ispa_template_params;
+		::ISPA_CORE::Node<Types::modules::common::ID> value_modules_common_ID;
+		::ISPA_CORE::Node<Types::FULL_STOP> value_FULL_STOP;
+		::ISPA_CORE::Node<Types::modules::common::ID> value_modules_common_ID_1;
+		std::pair<::ISPA_CORE::Node<Types::FULL_STOP>, ::ISPA_CORE::Node<Types::modules::common::ID>> group0;
+		std::vector<std::pair<::ISPA_CORE::Node<Types::FULL_STOP>, ::ISPA_CORE::Node<Types::modules::common::ID>>> group_list1;
+		std::vector<::ISPA_CORE::Node<Types::modules::common::ID>> capture_list2;
+		::ISPA_CORE::Node<Types::modules::common::template_params> value_modules_common_template_params;
+		::ISPA_CORE::Node<params> value_modules_common_name_ispa_template_params;
 		auto recovery_scope = recovery_frame("modules::common::name");
 		if (unwinding()) {
 			return action_result(result, pos);
 		}
-		recovery_at<::ISPA_STD::Recovery::Tokens<Tokens::modules::common::ID::id>, ::ISPA_STD::Recovery::Tokens<>, ::ISPA_STD::Recovery::Tokens<Tokens::FULL_STOP::id, Tokens::modules::common::ID::id>, ::ISPA_STD::Recovery::Tokens<>, ::ISPA_STD::Recovery::Tokens<Tokens::COMMA::id, Tokens::modules::common::ID::id, Tokens::modules::common::template_params::GREATER_THAN_SIGN::id, Tokens::modules::common::template_params::LESS_THAN_SIGN::id>, ::ISPA_STD::Recovery::Tokens<>, ::ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id, Tokens::modules::common::call_params::AUTO::id>>("modules::common::ID", "modules::common::ID", "__WS", "<group>", "__WS", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
-		value_modules_common_ID = required<Types::modules::common::ID>(pos, ::ISPA_STD::Recovery::handler<::ISPA_STD::Recovery::Tokens<Tokens::modules::common::ID::id>, ::ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMERCIAL_AT::id, Tokens::EQUALS_SIGN::id, Tokens::FULL_STOP::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::LEFT_PARENTHESIS::id, Tokens::PERCENT_SIGN::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::SEMICOLON::id, Tokens::modules::common::ID::id, Tokens::modules::common::call_params::AUTO::id, Tokens::modules::common::template_params::LESS_THAN_SIGN::id, Tokens::modules::rule::advanced::advanced_rule::regular_match::unpack::AUTO::id, Tokens::modules::rule::regular::ast::full::AUTO::id, Tokens::modules::rule::regular::nested_rule::NUMBER_SIGN::id, Tokens::modules::rule::regular::value::ANY::id, Tokens::modules::rule::regular::value::CGROUP::id, Tokens::modules::rule::regular::value::NOSPACE::id, Tokens::modules::rule::regular::value::QUANTIFIER::id, Tokens::modules::rule::regular::value::SPACE::id, Tokens::modules::rule::regular::value::STRING::id, Tokens::modules::rule::regular::value::alternative::VERTICAL_LINE::id, Tokens::modules::rule::regular::value::dyn::DOLLAR_SIGN::id, Tokens::modules::rule::regular::value::not_a::EXCLAMATION_MARK::id, Tokens::modules::rule::regular::value::shared_counter_registration::AUTO::id, Tokens::modules::rule::regular::value::var_capture::AMPERSAND::id>, ::ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMERCIAL_AT::id, Tokens::EQUALS_SIGN::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::LEFT_PARENTHESIS::id, Tokens::PERCENT_SIGN::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::SEMICOLON::id, Tokens::modules::common::ID::id, Tokens::modules::rule::advanced::advanced_rule::regular_match::unpack::AUTO::id, Tokens::modules::rule::regular::ast::full::AUTO::id, Tokens::modules::rule::regular::nested_rule::NUMBER_SIGN::id, Tokens::modules::rule::regular::value::ANY::id, Tokens::modules::rule::regular::value::CGROUP::id, Tokens::modules::rule::regular::value::NOSPACE::id, Tokens::modules::rule::regular::value::QUANTIFIER::id, Tokens::modules::rule::regular::value::SPACE::id, Tokens::modules::rule::regular::value::STRING::id, Tokens::modules::rule::regular::value::alternative::VERTICAL_LINE::id, Tokens::modules::rule::regular::value::dyn::DOLLAR_SIGN::id, Tokens::modules::rule::regular::value::not_a::EXCLAMATION_MARK::id, Tokens::modules::rule::regular::value::shared_counter_registration::AUTO::id, Tokens::modules::rule::regular::value::var_capture::AMPERSAND::id>, ::ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id, Tokens::modules::common::call_params::AUTO::id, Tokens::modules::common::template_params::GREATER_THAN_SIGN::id, Tokens::modules::common::template_params::LESS_THAN_SIGN::id>, ::ISPA_STD::Recovery::Policy<true, true, true, 32>>("modules::common::name", "modules::common::ID"));
-		::ISPA_STD::assign_compatible(result.primary, value_modules_common_ID);
+		recovery_at<::ISPA_CORE::Recovery::Tokens<Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::FULL_STOP::id, Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::COMMA::id, Tokens::modules::common::ID::id, Tokens::modules::common::template_params::GREATER_THAN_SIGN::id, Tokens::modules::common::template_params::LESS_THAN_SIGN::id>, ::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id, Tokens::modules::common::call_params::AUTO::id>>("modules::common::ID", "modules::common::ID", "__WS", "<group>", "__WS", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
+		value_modules_common_ID = required<Types::modules::common::ID>(pos, ::ISPA_CORE::Recovery::handler<::ISPA_CORE::Recovery::Tokens<Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMERCIAL_AT::id, Tokens::EQUALS_SIGN::id, Tokens::FULL_STOP::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::LEFT_PARENTHESIS::id, Tokens::PERCENT_SIGN::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::SEMICOLON::id, Tokens::modules::common::ID::id, Tokens::modules::common::call_params::AUTO::id, Tokens::modules::common::template_params::LESS_THAN_SIGN::id, Tokens::modules::rule::advanced::advanced_rule::regular_match::unpack::AUTO::id, Tokens::modules::rule::regular::ast::full::AUTO::id, Tokens::modules::rule::regular::nested_rule::NUMBER_SIGN::id, Tokens::modules::rule::regular::value::ANY::id, Tokens::modules::rule::regular::value::CGROUP::id, Tokens::modules::rule::regular::value::NOSPACE::id, Tokens::modules::rule::regular::value::QUANTIFIER::id, Tokens::modules::rule::regular::value::SPACE::id, Tokens::modules::rule::regular::value::STRING::id, Tokens::modules::rule::regular::value::alternative::VERTICAL_LINE::id, Tokens::modules::rule::regular::value::dyn::DOLLAR_SIGN::id, Tokens::modules::rule::regular::value::not_a::EXCLAMATION_MARK::id, Tokens::modules::rule::regular::value::shared_counter_registration::AUTO::id, Tokens::modules::rule::regular::value::var_capture::AMPERSAND::id>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMERCIAL_AT::id, Tokens::EQUALS_SIGN::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::LEFT_PARENTHESIS::id, Tokens::PERCENT_SIGN::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::SEMICOLON::id, Tokens::modules::common::ID::id, Tokens::modules::rule::advanced::advanced_rule::regular_match::unpack::AUTO::id, Tokens::modules::rule::regular::ast::full::AUTO::id, Tokens::modules::rule::regular::nested_rule::NUMBER_SIGN::id, Tokens::modules::rule::regular::value::ANY::id, Tokens::modules::rule::regular::value::CGROUP::id, Tokens::modules::rule::regular::value::NOSPACE::id, Tokens::modules::rule::regular::value::QUANTIFIER::id, Tokens::modules::rule::regular::value::SPACE::id, Tokens::modules::rule::regular::value::STRING::id, Tokens::modules::rule::regular::value::alternative::VERTICAL_LINE::id, Tokens::modules::rule::regular::value::dyn::DOLLAR_SIGN::id, Tokens::modules::rule::regular::value::not_a::EXCLAMATION_MARK::id, Tokens::modules::rule::regular::value::shared_counter_registration::AUTO::id, Tokens::modules::rule::regular::value::var_capture::AMPERSAND::id>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id, Tokens::modules::common::call_params::AUTO::id, Tokens::modules::common::template_params::GREATER_THAN_SIGN::id, Tokens::modules::common::template_params::LESS_THAN_SIGN::id>, ::ISPA_CORE::Recovery::Policy<true, true, true, 32>>("modules::common::name", "modules::common::ID"));
+		::ISPA_CORE::assign_compatible(result.primary, value_modules_common_ID);
 		if (::ispa::debug::enabled()) ::ispa::debug::value("result", result, ::ispa::debug::active_location());
 		if (unwinding()) {
 			return action_result(result, pos);
 		}
-		recovery_at<::ISPA_STD::Recovery::Tokens<>, ::ISPA_STD::Recovery::Tokens<Tokens::FULL_STOP::id, Tokens::modules::common::ID::id>, ::ISPA_STD::Recovery::Tokens<>, ::ISPA_STD::Recovery::Tokens<Tokens::COMMA::id, Tokens::modules::common::ID::id, Tokens::modules::common::template_params::GREATER_THAN_SIGN::id, Tokens::modules::common::template_params::LESS_THAN_SIGN::id>, ::ISPA_STD::Recovery::Tokens<>, ::ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id, Tokens::modules::common::call_params::AUTO::id>>("__WS", "__WS", "<group>", "__WS", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
+		recovery_at<::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::FULL_STOP::id, Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::COMMA::id, Tokens::modules::common::ID::id, Tokens::modules::common::template_params::GREATER_THAN_SIGN::id, Tokens::modules::common::template_params::LESS_THAN_SIGN::id>, ::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id, Tokens::modules::common::call_params::AUTO::id>>("__WS", "__WS", "<group>", "__WS", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
 		skip_spaces<Types::__WS>(pos);
 		if (unwinding()) {
 			return action_result(result, pos);
 		}
-		recovery_at<::ISPA_STD::Recovery::Tokens<Tokens::FULL_STOP::id, Tokens::modules::common::ID::id>, ::ISPA_STD::Recovery::Tokens<>, ::ISPA_STD::Recovery::Tokens<Tokens::COMMA::id, Tokens::modules::common::ID::id, Tokens::modules::common::template_params::GREATER_THAN_SIGN::id, Tokens::modules::common::template_params::LESS_THAN_SIGN::id>, ::ISPA_STD::Recovery::Tokens<>, ::ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id, Tokens::modules::common::call_params::AUTO::id>>("<group>", "<group>", "__WS", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
+		recovery_at<::ISPA_CORE::Recovery::Tokens<Tokens::FULL_STOP::id, Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::COMMA::id, Tokens::modules::common::ID::id, Tokens::modules::common::template_params::GREATER_THAN_SIGN::id, Tokens::modules::common::template_params::LESS_THAN_SIGN::id>, ::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id, Tokens::modules::common::call_params::AUTO::id>>("<group>", "<group>", "__WS", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
 		// grammar ` ( FULL_STOP  __WS?; @  modules::common::ID)*;`: repeat while lookahead is in FIRST
-		while ((::ISPA_STD::lookahead_kind(pos) == Tokens::FULL_STOP::id)) {
-			value_FULL_STOP = required<Types::FULL_STOP>(pos, ::ISPA_STD::Recovery::handler<::ISPA_STD::Recovery::Tokens<Tokens::FULL_STOP::id>, ::ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMERCIAL_AT::id, Tokens::EQUALS_SIGN::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::LEFT_PARENTHESIS::id, Tokens::PERCENT_SIGN::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::SEMICOLON::id, Tokens::modules::common::ID::id, Tokens::modules::common::call_params::AUTO::id, Tokens::modules::common::template_params::LESS_THAN_SIGN::id, Tokens::modules::rule::advanced::advanced_rule::regular_match::unpack::AUTO::id, Tokens::modules::rule::regular::ast::full::AUTO::id, Tokens::modules::rule::regular::nested_rule::NUMBER_SIGN::id, Tokens::modules::rule::regular::value::ANY::id, Tokens::modules::rule::regular::value::CGROUP::id, Tokens::modules::rule::regular::value::NOSPACE::id, Tokens::modules::rule::regular::value::QUANTIFIER::id, Tokens::modules::rule::regular::value::SPACE::id, Tokens::modules::rule::regular::value::STRING::id, Tokens::modules::rule::regular::value::alternative::VERTICAL_LINE::id, Tokens::modules::rule::regular::value::dyn::DOLLAR_SIGN::id, Tokens::modules::rule::regular::value::not_a::EXCLAMATION_MARK::id, Tokens::modules::rule::regular::value::shared_counter_registration::AUTO::id, Tokens::modules::rule::regular::value::var_capture::AMPERSAND::id>, ::ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMERCIAL_AT::id, Tokens::EQUALS_SIGN::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::LEFT_PARENTHESIS::id, Tokens::PERCENT_SIGN::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::SEMICOLON::id, Tokens::modules::common::ID::id, Tokens::modules::rule::advanced::advanced_rule::regular_match::unpack::AUTO::id, Tokens::modules::rule::regular::ast::full::AUTO::id, Tokens::modules::rule::regular::nested_rule::NUMBER_SIGN::id, Tokens::modules::rule::regular::value::ANY::id, Tokens::modules::rule::regular::value::CGROUP::id, Tokens::modules::rule::regular::value::NOSPACE::id, Tokens::modules::rule::regular::value::QUANTIFIER::id, Tokens::modules::rule::regular::value::SPACE::id, Tokens::modules::rule::regular::value::STRING::id, Tokens::modules::rule::regular::value::alternative::VERTICAL_LINE::id, Tokens::modules::rule::regular::value::dyn::DOLLAR_SIGN::id, Tokens::modules::rule::regular::value::not_a::EXCLAMATION_MARK::id, Tokens::modules::rule::regular::value::shared_counter_registration::AUTO::id, Tokens::modules::rule::regular::value::var_capture::AMPERSAND::id>, ::ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id, Tokens::modules::common::call_params::AUTO::id, Tokens::modules::common::template_params::GREATER_THAN_SIGN::id, Tokens::modules::common::template_params::LESS_THAN_SIGN::id>, ::ISPA_STD::Recovery::Policy<false, true, false, 32>>("modules::common::name", "<group>"));
+		while ((::ISPA_CORE::lookahead_kind(pos) == Tokens::FULL_STOP::id)) {
+			value_FULL_STOP = required<Types::FULL_STOP>(pos, ::ISPA_CORE::Recovery::handler<::ISPA_CORE::Recovery::Tokens<Tokens::FULL_STOP::id>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMERCIAL_AT::id, Tokens::EQUALS_SIGN::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::LEFT_PARENTHESIS::id, Tokens::PERCENT_SIGN::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::SEMICOLON::id, Tokens::modules::common::ID::id, Tokens::modules::common::call_params::AUTO::id, Tokens::modules::common::template_params::LESS_THAN_SIGN::id, Tokens::modules::rule::advanced::advanced_rule::regular_match::unpack::AUTO::id, Tokens::modules::rule::regular::ast::full::AUTO::id, Tokens::modules::rule::regular::nested_rule::NUMBER_SIGN::id, Tokens::modules::rule::regular::value::ANY::id, Tokens::modules::rule::regular::value::CGROUP::id, Tokens::modules::rule::regular::value::NOSPACE::id, Tokens::modules::rule::regular::value::QUANTIFIER::id, Tokens::modules::rule::regular::value::SPACE::id, Tokens::modules::rule::regular::value::STRING::id, Tokens::modules::rule::regular::value::alternative::VERTICAL_LINE::id, Tokens::modules::rule::regular::value::dyn::DOLLAR_SIGN::id, Tokens::modules::rule::regular::value::not_a::EXCLAMATION_MARK::id, Tokens::modules::rule::regular::value::shared_counter_registration::AUTO::id, Tokens::modules::rule::regular::value::var_capture::AMPERSAND::id>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMERCIAL_AT::id, Tokens::EQUALS_SIGN::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::LEFT_PARENTHESIS::id, Tokens::PERCENT_SIGN::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::SEMICOLON::id, Tokens::modules::common::ID::id, Tokens::modules::rule::advanced::advanced_rule::regular_match::unpack::AUTO::id, Tokens::modules::rule::regular::ast::full::AUTO::id, Tokens::modules::rule::regular::nested_rule::NUMBER_SIGN::id, Tokens::modules::rule::regular::value::ANY::id, Tokens::modules::rule::regular::value::CGROUP::id, Tokens::modules::rule::regular::value::NOSPACE::id, Tokens::modules::rule::regular::value::QUANTIFIER::id, Tokens::modules::rule::regular::value::SPACE::id, Tokens::modules::rule::regular::value::STRING::id, Tokens::modules::rule::regular::value::alternative::VERTICAL_LINE::id, Tokens::modules::rule::regular::value::dyn::DOLLAR_SIGN::id, Tokens::modules::rule::regular::value::not_a::EXCLAMATION_MARK::id, Tokens::modules::rule::regular::value::shared_counter_registration::AUTO::id, Tokens::modules::rule::regular::value::var_capture::AMPERSAND::id>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id, Tokens::modules::common::call_params::AUTO::id, Tokens::modules::common::template_params::GREATER_THAN_SIGN::id, Tokens::modules::common::template_params::LESS_THAN_SIGN::id>, ::ISPA_CORE::Recovery::Policy<false, true, false, 32>>("modules::common::name", "<group>"));
 			skip_spaces<Types::__WS>(pos);
-			value_modules_common_ID_1 = required<Types::modules::common::ID>(pos, ::ISPA_STD::Recovery::handler<::ISPA_STD::Recovery::Tokens<Tokens::FULL_STOP::id>, ::ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMERCIAL_AT::id, Tokens::EQUALS_SIGN::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::LEFT_PARENTHESIS::id, Tokens::PERCENT_SIGN::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::SEMICOLON::id, Tokens::modules::common::ID::id, Tokens::modules::common::call_params::AUTO::id, Tokens::modules::common::template_params::LESS_THAN_SIGN::id, Tokens::modules::rule::advanced::advanced_rule::regular_match::unpack::AUTO::id, Tokens::modules::rule::regular::ast::full::AUTO::id, Tokens::modules::rule::regular::nested_rule::NUMBER_SIGN::id, Tokens::modules::rule::regular::value::ANY::id, Tokens::modules::rule::regular::value::CGROUP::id, Tokens::modules::rule::regular::value::NOSPACE::id, Tokens::modules::rule::regular::value::QUANTIFIER::id, Tokens::modules::rule::regular::value::SPACE::id, Tokens::modules::rule::regular::value::STRING::id, Tokens::modules::rule::regular::value::alternative::VERTICAL_LINE::id, Tokens::modules::rule::regular::value::dyn::DOLLAR_SIGN::id, Tokens::modules::rule::regular::value::not_a::EXCLAMATION_MARK::id, Tokens::modules::rule::regular::value::shared_counter_registration::AUTO::id, Tokens::modules::rule::regular::value::var_capture::AMPERSAND::id>, ::ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMERCIAL_AT::id, Tokens::EQUALS_SIGN::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::LEFT_PARENTHESIS::id, Tokens::PERCENT_SIGN::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::SEMICOLON::id, Tokens::modules::common::ID::id, Tokens::modules::rule::advanced::advanced_rule::regular_match::unpack::AUTO::id, Tokens::modules::rule::regular::ast::full::AUTO::id, Tokens::modules::rule::regular::nested_rule::NUMBER_SIGN::id, Tokens::modules::rule::regular::value::ANY::id, Tokens::modules::rule::regular::value::CGROUP::id, Tokens::modules::rule::regular::value::NOSPACE::id, Tokens::modules::rule::regular::value::QUANTIFIER::id, Tokens::modules::rule::regular::value::SPACE::id, Tokens::modules::rule::regular::value::STRING::id, Tokens::modules::rule::regular::value::alternative::VERTICAL_LINE::id, Tokens::modules::rule::regular::value::dyn::DOLLAR_SIGN::id, Tokens::modules::rule::regular::value::not_a::EXCLAMATION_MARK::id, Tokens::modules::rule::regular::value::shared_counter_registration::AUTO::id, Tokens::modules::rule::regular::value::var_capture::AMPERSAND::id>, ::ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id, Tokens::modules::common::call_params::AUTO::id, Tokens::modules::common::template_params::GREATER_THAN_SIGN::id, Tokens::modules::common::template_params::LESS_THAN_SIGN::id>, ::ISPA_STD::Recovery::Policy<false, true, false, 32>>("modules::common::name", "<group>"));
+			value_modules_common_ID_1 = required<Types::modules::common::ID>(pos, ::ISPA_CORE::Recovery::handler<::ISPA_CORE::Recovery::Tokens<Tokens::FULL_STOP::id>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMERCIAL_AT::id, Tokens::EQUALS_SIGN::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::LEFT_PARENTHESIS::id, Tokens::PERCENT_SIGN::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::SEMICOLON::id, Tokens::modules::common::ID::id, Tokens::modules::common::call_params::AUTO::id, Tokens::modules::common::template_params::LESS_THAN_SIGN::id, Tokens::modules::rule::advanced::advanced_rule::regular_match::unpack::AUTO::id, Tokens::modules::rule::regular::ast::full::AUTO::id, Tokens::modules::rule::regular::nested_rule::NUMBER_SIGN::id, Tokens::modules::rule::regular::value::ANY::id, Tokens::modules::rule::regular::value::CGROUP::id, Tokens::modules::rule::regular::value::NOSPACE::id, Tokens::modules::rule::regular::value::QUANTIFIER::id, Tokens::modules::rule::regular::value::SPACE::id, Tokens::modules::rule::regular::value::STRING::id, Tokens::modules::rule::regular::value::alternative::VERTICAL_LINE::id, Tokens::modules::rule::regular::value::dyn::DOLLAR_SIGN::id, Tokens::modules::rule::regular::value::not_a::EXCLAMATION_MARK::id, Tokens::modules::rule::regular::value::shared_counter_registration::AUTO::id, Tokens::modules::rule::regular::value::var_capture::AMPERSAND::id>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMERCIAL_AT::id, Tokens::EQUALS_SIGN::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::LEFT_PARENTHESIS::id, Tokens::PERCENT_SIGN::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::SEMICOLON::id, Tokens::modules::common::ID::id, Tokens::modules::rule::advanced::advanced_rule::regular_match::unpack::AUTO::id, Tokens::modules::rule::regular::ast::full::AUTO::id, Tokens::modules::rule::regular::nested_rule::NUMBER_SIGN::id, Tokens::modules::rule::regular::value::ANY::id, Tokens::modules::rule::regular::value::CGROUP::id, Tokens::modules::rule::regular::value::NOSPACE::id, Tokens::modules::rule::regular::value::QUANTIFIER::id, Tokens::modules::rule::regular::value::SPACE::id, Tokens::modules::rule::regular::value::STRING::id, Tokens::modules::rule::regular::value::alternative::VERTICAL_LINE::id, Tokens::modules::rule::regular::value::dyn::DOLLAR_SIGN::id, Tokens::modules::rule::regular::value::not_a::EXCLAMATION_MARK::id, Tokens::modules::rule::regular::value::shared_counter_registration::AUTO::id, Tokens::modules::rule::regular::value::var_capture::AMPERSAND::id>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id, Tokens::modules::common::call_params::AUTO::id, Tokens::modules::common::template_params::GREATER_THAN_SIGN::id, Tokens::modules::common::template_params::LESS_THAN_SIGN::id>, ::ISPA_CORE::Recovery::Policy<false, true, false, 32>>("modules::common::name", "<group>"));
 			group0 = std::make_pair(value_FULL_STOP, value_modules_common_ID_1);
 			group_list1.push_back(group0);
 			capture_list2.push_back(value_modules_common_ID_1);
 			skip_spaces<Types::__WS>(pos);
 		}
-		::ISPA_STD::assign_compatible(result.nested, capture_list2);
+		::ISPA_CORE::assign_compatible(result.nested, capture_list2);
 		if (::ispa::debug::enabled()) ::ispa::debug::value("result", result, ::ispa::debug::active_location());
 		if (unwinding()) {
 			return action_result(result, pos);
 		}
-		recovery_at<::ISPA_STD::Recovery::Tokens<>, ::ISPA_STD::Recovery::Tokens<Tokens::COMMA::id, Tokens::modules::common::ID::id, Tokens::modules::common::template_params::GREATER_THAN_SIGN::id, Tokens::modules::common::template_params::LESS_THAN_SIGN::id>, ::ISPA_STD::Recovery::Tokens<>, ::ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id, Tokens::modules::common::call_params::AUTO::id>>("__WS", "__WS", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
+		recovery_at<::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::COMMA::id, Tokens::modules::common::ID::id, Tokens::modules::common::template_params::GREATER_THAN_SIGN::id, Tokens::modules::common::template_params::LESS_THAN_SIGN::id>, ::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id, Tokens::modules::common::call_params::AUTO::id>>("__WS", "__WS", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
 		skip_spaces<Types::__WS>(pos);
 		if (unwinding()) {
 			return action_result(result, pos);
 		}
-		recovery_at<::ISPA_STD::Recovery::Tokens<Tokens::COMMA::id, Tokens::modules::common::ID::id, Tokens::modules::common::template_params::GREATER_THAN_SIGN::id, Tokens::modules::common::template_params::LESS_THAN_SIGN::id>, ::ISPA_STD::Recovery::Tokens<>, ::ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id, Tokens::modules::common::call_params::AUTO::id>>("modules::common::template_params", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
+		recovery_at<::ISPA_CORE::Recovery::Tokens<Tokens::COMMA::id, Tokens::modules::common::ID::id, Tokens::modules::common::template_params::GREATER_THAN_SIGN::id, Tokens::modules::common::template_params::LESS_THAN_SIGN::id>, ::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id, Tokens::modules::common::call_params::AUTO::id>>("modules::common::template_params", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
 		value_modules_common_template_params = optional<Types::modules::common::template_params>(pos, [this](auto cursor) { return this->modulesCommonTemplate_params(cursor); });
-		::ISPA_STD::assign_compatible(result.temp_params, value_modules_common_template_params);
+		::ISPA_CORE::assign_compatible(result.temp_params, value_modules_common_template_params);
 		if (::ispa::debug::enabled()) ::ispa::debug::value("result", result, ::ispa::debug::active_location());
 		if (unwinding()) {
 			return action_result(result, pos);
 		}
-		recovery_at<::ISPA_STD::Recovery::Tokens<>, ::ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id, Tokens::modules::common::call_params::AUTO::id>>("__WS", "__WS", "modules::common::name::ispa_template_params");
+		recovery_at<::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id, Tokens::modules::common::call_params::AUTO::id>>("__WS", "__WS", "modules::common::name::ispa_template_params");
 		skip_spaces<Types::__WS>(pos);
 		if (unwinding()) {
 			return action_result(result, pos);
 		}
-		recovery_at<::ISPA_STD::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id, Tokens::modules::common::call_params::AUTO::id>>("modules::common::name::ispa_template_params", "modules::common::name::ispa_template_params");
+		recovery_at<::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id, Tokens::modules::common::call_params::AUTO::id>>("modules::common::name::ispa_template_params", "modules::common::name::ispa_template_params");
 		value_modules_common_name_ispa_template_params = optional<params>(pos, [&](IT rule_pos) {
-return ispa_match_template(std::type_identity<params>{}, rule_pos);
+return ispa_match_template(::ISPA_CORE::type_tag<params>{}, rule_pos);
 });
-		::ISPA_STD::assign_compatible(result.param, value_modules_common_name_ispa_template_params);
+		::ISPA_CORE::assign_compatible(result.param, value_modules_common_name_ispa_template_params);
 		if (::ispa::debug::enabled()) ::ispa::debug::value("result", result, ::ispa::debug::active_location());
-		::ISPA_STD::MatchResult<Types::modules::common::name<params>, IT> match_result;
+		::ISPA_CORE::MatchResult<Types::modules::common::name<params>, IT> match_result;
 		match_result.status = true;
 		match_result.node.set_data(result);
 		match_result.it = pos;
 		return match_result;
 	} catch (const NoMatch&) { throw;
-	} catch (const ::ISPA_STD::ExternalParseError&) { throw;
+	} catch (const ::ISPA_CORE::ExternalParseError&) { throw;
 	} catch (...) { ::ispa::debug::breakpoint("uncaught parser failure"); throw; }
 }
 
-#include <ispastdlib/external.hpp>
+#include <ispa_core/external.hpp>
 namespace Parser::Exports {
 struct symbol_0 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::main::main;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_1 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::advanced::advanced_rule;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_2 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::advanced::advanced_rule::dep_decl;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_3 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::advanced::advanced_rule::regular_match;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_4 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::advanced::advanced_rule::regular_match::source;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_5 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::advanced::advanced_rule::regular_match::unpack;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_6 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::common::ID;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_7 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::common::call_params;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_8 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::common::param;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_9 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::common::parameter;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_10 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::common::rule_params;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_11 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::common::template_param;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_12 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::common::template_params;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_13 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::common::type_annotation;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_14 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::fail_block::fail_block;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_15 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::forward_declaration::cls;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_16 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::forward_declaration::cls::class_method;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_17 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::forward_declaration::cls::class_property;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_18 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::forward_declaration::fun;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_19 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::forward_declaration::fun_forward;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_20 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::forward_declaration::fwd;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_21 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::grammar::grammar;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_22 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::grammar::modifier;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_23 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::grammar::modifier::MOD;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_24 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::ispa_python::expr;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_25 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::ispa_python::stmt;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_26 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::ast;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_27 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::ast::abbr;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_28 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::ast::full;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_29 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::ast::full::part;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_30 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::ast::single_value;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_31 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::f_binding;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_32 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::nested_rule;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_33 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::regular_rule;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_34 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::value;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_35 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::value::ANY;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_36 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::value::CGROUP;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_37 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::value::NOSPACE;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_38 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::value::QUANTIFIER;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_39 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::value::SPACE;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_40 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::value::STRING;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_41 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::value::alternative;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_42 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::value::ast_capture;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_43 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::value::counter;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_44 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::value::counter::bounded;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_45 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::value::counter::quantified;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_46 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::value::dyn;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_47 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::value::dyn::dyn_expr;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_48 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::value::fail_capture;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_49 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::value::group;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_50 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::value::mul_capture;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_51 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::value::not_a;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_52 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::value::one_capture;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_53 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::value::pattern;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_54 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::value::shared_counter_registration;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_55 : ::Parser::Parser {
 using node_type = ::Parser::Types::modules::rule::regular::value::var_capture;
 static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+static ISPA_CORE::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 }

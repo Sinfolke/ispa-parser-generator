@@ -413,6 +413,7 @@ std::string Core::lib(const LangAPI::IspaLibSymbol& s) {
         case S::LRToken: return "ispa_std.lr_token";
         case S::LRPack: return "ispa_std.lr_pack";
         case S::LRNode: return "ispa_std.lr_node";
+        case S::LRValue: return "typing.Any";
         case S::LRCaptureAssign: return "ispa_std.lr_capture_assign";
     }
     unsupported("StdlibExports");

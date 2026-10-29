@@ -96,7 +96,7 @@ auto Core::convertType(const LangAPI::Type &type) -> std::string {
             case LangAPI::ValueType::Span:
                 return "::ISPA_STD::Span<" + convertTemplates(type.template_parameters) + ">";
             case LangAPI::ValueType::TypeTag:
-                return "std::type_identity<" + convertTemplates(type.template_parameters) + ">";
+                return "::ISPA_STD::type_tag<" + convertTemplates(type.template_parameters) + ">";
             case LangAPI::ValueType::Callable: {
                 if (type.template_parameters.empty()) throw Error("Callable type requires a return type");
                 std::string args;
@@ -296,6 +296,8 @@ auto Core::convertIspaLibSymbol(const LangAPI::IspaLibSymbol &symbol) -> std::st
         case LangAPI::StdlibExports::LRPack: return "lr_pack";
         case LangAPI::StdlibExports::LRCaptureAssign: return "lr_capture_assign";
         case LangAPI::StdlibExports::LRNode: return "lr_node";
+        case LangAPI::StdlibExports::LRValue:
+            return std::string("::ISPA_STD::LRValueOf<") + convertTemplates(symbol.template_parameters) + ">";
         case LangAPI::StdlibExports::LRParse:
             return "lr_parse";
         case LangAPI::StdlibExports::Parser:

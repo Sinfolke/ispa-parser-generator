@@ -155,6 +155,9 @@ namespace ISPA_STD {
     template <typename T>
     inline constexpr bool has_index_v = has_index<T>::value;
 
+    // A type passed as a function argument (std::type_identity is C++20).
+    template<class T> struct type_tag { using type = T; };
+
     namespace detail {
         template<template<class...> class Op, class, class... Args>
         struct detector : std::false_type {};

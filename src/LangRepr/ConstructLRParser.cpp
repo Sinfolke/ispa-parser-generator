@@ -45,7 +45,25 @@ auto ConstructParser::constructLRParser(LangAPI::Class &parser) -> void {
     };
     const Type size{ValueType::LargeUInt};
     const Type number{ValueType::Int};
-    const Type any{Symbol{"std", "any"}};
+    // The value held on the LR stack. A stdlib maps LRValueOf<Token, Node<Types::...>...> onto its own storage
+    // (std::any for ispastdlib; closed tagged storage for the core), so reductions never name std::any.
+    IspaLibSymbol value_symbol{.exports = StdlibExports::LRValue};
+    value_symbol.template_parameters.push_back(std::make_shared<Type>(Symbol{"Token"}));
+    {
+        std::set<LRBase::Name> value_types;
+        for (std::size_t i = 1; i < lr->getProductions().size(); ++i)
+            if (!lr->getProductions()[i].source.normalization_source) value_types.insert(lr->getProductions()[i].lhs);
+        // Shifted tokens are stored as their typed nodes next to the rule nodes.
+        for (const auto& [name, block] : lexer_builder.getDataBlocks()) value_types.insert(name);
+        for (const auto& name : value_types) {
+            IspaLibSymbol node{.exports = StdlibExports::Node};
+            node.template_parameters.push_back(std::make_shared<Type>(Symbol{"Types", name}));
+            value_symbol.template_parameters.push_back(std::make_shared<Type>(node));
+        }
+    }
+    parser.data.emplace_back(std::make_shared<Declaration>(TypeAlias::createDeclaration(TypeAlias{
+        .name = "LRValue", .type = Type{value_symbol}})), Visibility::Public);
+    const Type any{Symbol{"LRValue"}};
     const Type sizes{ValueType::Array, size};
     const Type values{ValueType::Array, any};
     auto &base = std::get<IspaLibSymbol>(parser.inherit_members.front().second);

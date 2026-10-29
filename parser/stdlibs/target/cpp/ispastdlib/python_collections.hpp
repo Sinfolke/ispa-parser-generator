@@ -8,6 +8,7 @@
 #include <string_view>
 #include <type_traits>
 #include <map>
+#include <variant>
 #include <unordered_map>
 #include <stdexcept>
 #include <tuple>
@@ -20,7 +21,21 @@ inline long long python_char_code(const std::string& ch) { return ch.empty() ? 0
 inline std::string python_char_from_code(long long code) { return code < 0 || code > 255 ? std::string() : std::string(1, static_cast<char>(code)); }
 // Cast with Python meaning: an object held as std::any comes back as its dynamic type; other values convert.
 template<typename T> T python_cast(const std::any& value) { return std::any_cast<T>(value); }
-template<typename T, typename V, typename = std::enable_if_t<!std::is_same_v<std::decay_t<V>, std::any>>>
+// A closed value variant (or a type derived from one) yields the alternative named by T; so does a
+// RawToken-style tagged storage (member get<T>()), which compiles far faster than a large variant.
+namespace cast_detail {
+template<class T, class V, class = void> struct has_std_get : std::false_type {};
+template<class T, class V> struct has_std_get<T, V, std::void_t<decltype(std::get<T>(std::declval<V>()))>> : std::true_type {};
+template<class T, class V, class = void> struct has_member_get : std::false_type {};
+template<class T, class V> struct has_member_get<T, V, std::void_t<decltype(std::declval<V>().template get<T>())>> : std::true_type {};
+}
+template<typename T, typename V, std::enable_if_t<!std::is_same_v<std::decay_t<V>, std::any> && cast_detail::has_std_get<T, V>::value, int> = 0>
+T python_cast(V&& value) { return std::get<T>(std::forward<V>(value)); }
+template<typename T, typename V, std::enable_if_t<!std::is_same_v<std::decay_t<V>, std::any> && !cast_detail::has_std_get<T, V>::value &&
+                                                     cast_detail::has_member_get<T, V>::value, long> = 0>
+T python_cast(V&& value) { return std::forward<V>(value).template get<T>(); }
+template<typename T, typename V, std::enable_if_t<!std::is_same_v<std::decay_t<V>, std::any> && !cast_detail::has_std_get<T, V>::value &&
+                                                     !cast_detail::has_member_get<T, V>::value, char> = 0>
 T python_cast(V&& value) { return static_cast<T>(std::forward<V>(value)); }
 // `needle in container`: vectors, strings and associative containers (C++17 overloads).
 template<class T, class A, class V>

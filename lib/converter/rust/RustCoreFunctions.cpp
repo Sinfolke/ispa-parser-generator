@@ -412,6 +412,7 @@ auto RustCore::convertIspaLibSymbol(const LangAPI::IspaLibSymbol &symbol, bool e
         case LangAPI::StdlibExports::LRPack: return "::ispa_std::lr_pack";
         case LangAPI::StdlibExports::LRCaptureAssign: return "::ispa_std::lr_capture_assign";
         case LangAPI::StdlibExports::LRNode: return "::ispa_std::lr_node";
+        case LangAPI::StdlibExports::LRValue: return "::std::boxed::Box<dyn ::std::any::Any>";
         case LangAPI::StdlibExports::LRParse: return "::ispa_std::lr_parse";
         case LangAPI::StdlibExports::Parser: return "::ispa_std::LLParser" + g();
         case LangAPI::StdlibExports::LexerMakeTokenParameter:

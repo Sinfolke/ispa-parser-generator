@@ -87,9 +87,9 @@ namespace {
     template<class T> AST::SourcePosition position(const UAST::Node<T>& node) {
         return position(where(node));
     }
-    AST::PythonNode python(const UAST::PythonNode& n) {
+    AST::PythonNode lower_python(const UAST::PythonNode& n) {
         AST::PythonNode out{n.kind, n.field, n.scalar, position(n.position), n.absent, {}};
-        for (const auto& child : n.children) out.children.push_back(python(child));
+        for (const auto& child : n.children) out.children.push_back(lower_python(child));
         return out;
     }
 
@@ -217,9 +217,9 @@ namespace {
             PN node(const py::IspaMatch& x, std::string f, const Pos& p) const { return make("IspaMatch", std::move(f), p, x.source); }
         };
     }
-    AST::PythonNode python(const UAST::py::ExprPtr& e, const UAST::SourcePosition& fallback) { return pylower::Lower{}.expr(e, {}, fallback); }
-    AST::PythonNode python(const UAST::py::Expr& e, const UAST::SourcePosition& fallback) { return pylower::Lower{}.expr(std::make_shared<UAST::py::Expr>(e), {}, fallback); }
-    AST::PythonNode python(const UAST::py::Module& m, const UAST::SourcePosition&) { return pylower::Lower{}.module(m); }
+    AST::PythonNode lower_python(const UAST::py::ExprPtr& e, const UAST::SourcePosition& fallback) { return pylower::Lower{}.expr(e, {}, fallback); }
+    AST::PythonNode lower_python(const UAST::py::Expr& e, const UAST::SourcePosition& fallback) { return pylower::Lower{}.expr(std::make_shared<UAST::py::Expr>(e), {}, fallback); }
+    AST::PythonNode lower_python(const UAST::py::Module& m, const UAST::SourcePosition&) { return pylower::Lower{}.module(m); }
     template<class Params> stdu::vector<std::string> parameters(const Params& p) {
         stdu::vector<std::string> out;
         if (p.empty() || payload(p).value.empty()) return out;
@@ -247,7 +247,7 @@ namespace {
             else result.code = UAST::convertPythonModule(n.value, body);
             bindPython(result);
             std::visit([&](const auto& syntax) {
-                if constexpr (!std::is_same_v<std::decay_t<decltype(syntax)>, std::monostate>) result.python = python(syntax, body);
+                if constexpr (!std::is_same_v<std::decay_t<decltype(syntax)>, std::monostate>) result.python = lower_python(syntax, body);
             }, result.code);
             return result;
         } else {
@@ -261,7 +261,7 @@ namespace {
         else result.code = UAST::parsePythonModule(source, body);
         bindPython(result);
         std::visit([&](const auto& syntax) {
-            if constexpr (!std::is_same_v<std::decay_t<decltype(syntax)>, std::monostate>) result.python = python(syntax, body);
+            if constexpr (!std::is_same_v<std::decay_t<decltype(syntax)>, std::monostate>) result.python = lower_python(syntax, body);
         }, result.code);
         return result;
         }
@@ -281,7 +281,7 @@ namespace {
                     AST::PythonAction converted;
                     converted.position = position(annotation);
                     converted.code = *UAST::parsePythonExpr(spelling, where(annotation));
-                    converted.python = python(std::get<UAST::py::Expr>(converted.code), where(annotation));
+                    converted.python = lower_python(std::get<UAST::py::Expr>(converted.code), where(annotation));
                     bindPython(converted);
                     out.push_back(std::move(converted));
                 } else out.push_back(action(annotation));
@@ -604,7 +604,7 @@ void AST::Builder::convertGrammar(const Grammar& grammar) {
         out.features = std::move(rule_features);
         rule_features.clear();
         const auto& advanced = std::get<UAST::Node<UAST::advanced_rule>>(grammar.entry);
-        out.features.push_back(AST::AdvancedRule{python(UAST::describe(payload(advanced), where(advanced))), position(advanced)});
+        out.features.push_back(AST::AdvancedRule{lower_python(UAST::describe(payload(advanced), where(advanced))), position(advanced)});
         for (const auto& entry : payload(advanced).body) {
             if (const auto* statement = std::get_if<UAST::Node<UAST::stmt>>(&entry)) {
                 auto code = action(*statement);

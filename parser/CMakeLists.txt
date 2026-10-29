@@ -8,6 +8,12 @@ option(ISPA_BUILD_DEP_PARSER "Build the dependency scanner" ON)
 option(ISPA_BUILD_PYTHON_PARSER "Build the Python grammar parser" ON)
 option(ISPA_ENABLE_PCH "Enable precompiled headers for parsers" ON)
 
+set(ISPA_PARSER_STDLIB "core" CACHE STRING "Runtime the in-tree parsers are generated against: ispastdlib (hand-written C++) or core (ispa_std lowered to C++ plus the cpp-core facade)")
+set_property(CACHE ISPA_PARSER_STDLIB PROPERTY STRINGS ispastdlib core)
+if(NOT ISPA_PARSER_STDLIB MATCHES "^(ispastdlib|core)$")
+    message(FATAL_ERROR "Invalid ISPA_PARSER_STDLIB='${ISPA_PARSER_STDLIB}' (expected ispastdlib or core)")
+endif()
+
 set(ISPA_BOOTSTRAPPED_DIR "" CACHE PATH "Override the ISPA grammar bootstrap directory (for example ispa/bootstrapped_ll)")
 
 set(ISPA_PARSER_MODE "AUTO" CACHE STRING "Parser sources: AUTO, INCREMENTAL, or BOOTSTRAPPED")
@@ -37,6 +43,19 @@ endfunction()
 set(STDLIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/stdlibs/target/cpp")
 if(NOT TARGET ispastdlib::ispastdlib)
     add_subdirectory("${STDLIB_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/ispastdlib_build")
+endif()
+
+set(ISPA_STDLIB_TARGET ispastdlib::ispastdlib)
+if(ISPA_PARSER_STDLIB STREQUAL "core")
+    # The lowered core is compiled once; parsers generated with --stdlib core include <ispa_core/...>.
+    set(CORE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/stdlibs/target/cpp-core")
+    if(NOT TARGET ispa_core)
+        add_library(ispa_core STATIC "${CORE_DIR}/src/ispa_core_lowered.cpp")
+        target_include_directories(ispa_core PUBLIC "${CORE_DIR}")
+        target_compile_features(ispa_core PUBLIC cxx_std_17)
+        target_link_libraries(ispa_core PUBLIC ispastdlib::ispastdlib)
+    endif()
+    set(ISPA_STDLIB_TARGET ispa_core)
 endif()
 
 function(add_ispa_generated_parser parser_name directory executable_name)
@@ -135,7 +154,7 @@ function(add_ispa_generated_parser parser_name directory executable_name)
                     "${ROOT_DIR}"
                     "${CMAKE_CURRENT_SOURCE_DIR}"
             )
-            target_link_libraries(${target} PRIVATE ispastdlib::ispastdlib)
+            target_link_libraries(${target} PRIVATE ${ISPA_STDLIB_TARGET})
 
             if(ISPA_ENABLE_PCH)
                 if(kind STREQUAL "parser_impl" AND EXISTS "${INCREMENTAL_DIR}/Parser/Parser/def.h")
@@ -209,7 +228,7 @@ function(add_ispa_generated_parser parser_name directory executable_name)
 
     target_compile_features(${parser_name}_lib PUBLIC cxx_std_20)
     set_target_properties(${parser_name}_lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    target_link_libraries(${parser_name}_lib PUBLIC ispastdlib::ispastdlib)
+    target_link_libraries(${parser_name}_lib PUBLIC ${ISPA_STDLIB_TARGET})
 
     if(ISPA_BUILD_EXECUTABLES)
         if(EXISTS "${ROOT_DIR}/main.cpp")

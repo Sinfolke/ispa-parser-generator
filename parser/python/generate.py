@@ -13,6 +13,7 @@ def main():
     options = argparse.ArgumentParser(description=__doc__)
     options.add_argument("generator", type=Path)
     options.add_argument("--output", type=Path, default=root / "bootstrapped2")
+    options.add_argument("--stdlib", help="generate against another stdlib (a directory with ispa-stdlib.yaml, e.g. parser/stdlibs/target/cpp-core)")
     args = options.parse_args()
     generator = args.generator.resolve()
     output = args.output.resolve()
@@ -37,7 +38,8 @@ def main():
         source = Path(temporary) / "python.isc"
         source.write_text(grammar)
         subprocess.run([str(generator), str(source), "-l", "cpp", "-a", "LL",
-                        "--no-incremental", "-o", str(output / "PyRawParser"), "--ai-recovery", str(root / "ai.json")],
+                        "--no-incremental", "-o", str(output / "PyRawParser"), "--ai-recovery", str(root / "ai.json"),
+                        *(["--stdlib", str(Path(args.stdlib).resolve())] if args.stdlib else [])],
                        cwd=temporary, check=True)
         # The flattened source is temporary. Map debug checkpoints back to the
         # grammar files so breakpoints remain usable after generation.

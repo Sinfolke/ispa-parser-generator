@@ -109,7 +109,7 @@ export namespace LangAPI {
         Cpp, Rust, Python
     };
     enum class StdlibExports {
-        Node, MatchResult, Lexer, Parser, LRParser, LRGeneralizedParser, LRParse, LRParseGeneralized, LRGet, LRNode, LRPack, LRCaptureAssign, LRToken, LexerMakeTokenParameter,
+        Node, MatchResult, Lexer, Parser, LRParser, LRGeneralizedParser, LRParse, LRParseGeneralized, LRGet, LRNode, LRPack, LRCaptureAssign, LRToken, LRValue, LexerMakeTokenParameter,
         DfaState, DfaTable, DfaClassTable, DfaAcceptTable, DfaLRTable, DfaNullState, DfaDynamicFailState,
         ParserFunctionParameter, Error,
         TokenNodeConstruct, RawTokenNodeConstruct, ParserNodeConstructor,

@@ -1577,6 +1577,9 @@ auto python::ispa_std::lexer::is_token_end(std::shared_ptr<python::ispa_std::raw
 	"End-of-stream: an empty token that is not the ambiguous marker.";
 	return ((((*token)).empty()) && ((!(((*token)).isAmbiguous()))));
 }
+auto python::ispa_std::lexer::Checkpoint::__init__() -> void {
+	return ;
+}
 auto python::ispa_std::lexer::_SharedState::__init__(long long pos) -> void {
 	((*this)).pos = pos;
 	((*this)).eof_processed = false;
@@ -1611,10 +1614,10 @@ auto python::ispa_std::lexer::Lexer_base::clone() -> std::shared_ptr<python::isp
 	python::ispa_std::failures::logic_error("External parser handoff requires a cloneable lexer");
 	return ::ISPA_STD::self_ptr(this);
 }
-auto python::ispa_std::lexer::Lexer_base::checkpoint() -> std::any {
-	return 0;
+auto python::ispa_std::lexer::Lexer_base::checkpoint() -> std::shared_ptr<python::ispa_std::lexer::Checkpoint> {
+	return ISPA_STD::construct<python::ispa_std::lexer::Checkpoint>();
 }
-auto python::ispa_std::lexer::Lexer_base::restoreCheckpoint(std::any state) -> void {
+auto python::ispa_std::lexer::Lexer_base::restoreCheckpoint(std::shared_ptr<python::ispa_std::lexer::Checkpoint> state) -> void {
 	return ;
 }
 auto python::ispa_std::lexer::Lexer_base::externalAdvance(long long begin, long long end) -> void {
@@ -3029,298 +3032,31 @@ auto python::ispa_std::parser_ll::ActionCheckpoint::commit(const std::string& na
 		ISPA_STD::python_pop((((*this)).saved));
 	}
 }
-auto python::ispa_std::parser_ll::RuleContext::__init__(std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos, std::any ast, std::shared_ptr<python::ispa_std::lexer::TokenCursor> start_pos, const std::string& rule, std::shared_ptr<python::ispa_std::parser_ll::TokenNames> token_names, long long ambiguous_id) -> void {
+auto python::ispa_std::parser_ll::Ctx::__init__(std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos, std::shared_ptr<python::ispa_std::lexer::TokenCursor> start_pos, const std::string& rule, std::shared_ptr<python::ispa_std::parser_ll::TokenNames> token_names, long long ambiguous_id) -> void {
 	python::ispa_std::parser_ll::ActionCheckpoint::__init__(pos);
-	((*this)).ast = ast;
 	((*this)).start_pos = start_pos;
 	((*this)).rule = rule;
 	((*this)).token_names = token_names;
 	((*this)).ambiguous_id = ambiguous_id;
 }
-auto python::ispa_std::parser_ll::RuleContext::at(const std::string& text, long long lookahead) -> bool {
+auto python::ispa_std::parser_ll::Ctx::at(const std::string& text, long long lookahead) -> bool {
 	return python::ispa_std::parser_ll::context_at(((*this)).pos, text, lookahead, ((*this)).token_names, false, ((*this)).ambiguous_id);
 }
-auto python::ispa_std::parser_ll::RuleContext::at_token(const std::string& name, long long lookahead) -> bool {
+auto python::ispa_std::parser_ll::Ctx::at_token(const std::string& name, long long lookahead) -> bool {
 	return python::ispa_std::parser_ll::context_at(((*this)).pos, name, lookahead, ((*this)).token_names, true, ((*this)).ambiguous_id);
 }
-auto python::ispa_std::parser_ll::RuleContext::peek(long long lookahead) -> std::shared_ptr<python::ispa_std::parser_ll::ActionToken> {
+auto python::ispa_std::parser_ll::Ctx::peek(long long lookahead) -> std::shared_ptr<python::ispa_std::parser_ll::ActionToken> {
 	return python::ispa_std::parser_ll::context_peek(((*this)).pos, lookahead, ((*this)).token_names, ((*this)).ambiguous_id);
 }
-auto python::ispa_std::parser_ll::RuleContext::take() -> std::shared_ptr<python::ispa_std::parser_ll::ActionToken> {
+auto python::ispa_std::parser_ll::Ctx::take() -> std::shared_ptr<python::ispa_std::parser_ll::ActionToken> {
 	auto token = ((*this)).peek(0);
 	if ((!(((*token)).empty()))) {
 		((*((*this)).pos)).next();
 	}
 	return token;
 }
-auto python::ispa_std::parser_ll::RuleContext::prev() -> std::shared_ptr<python::ispa_std::parser_ll::ActionToken> {
+auto python::ispa_std::parser_ll::Ctx::prev() -> std::shared_ptr<python::ispa_std::parser_ll::ActionToken> {
 	return python::ispa_std::parser_ll::context_prev(((*this)).pos, ((*this)).start_pos, ((*this)).token_names, ((*this)).ambiguous_id);
-}
-auto python::ispa_std::parser_ll::RuleContext::collect_braced() -> std::vector<std::shared_ptr<python::ispa_std::raw_token::RawToken>> {
-	"Collect a braced region\'s contents after its opening token has been\n        consumed. The closing token is consumed but not included; nested braces\n        are preserved.";
-	std::vector<std::shared_ptr<python::ispa_std::raw_token::RawToken>> collected = std::vector<std::shared_ptr<python::ispa_std::raw_token::RawToken>>{};
-	if (((*((*this)).pos)).has_source()) {
-		long long begin = ((*((*this)).pos)).sourcePosition();
-		std::string origin = ((*((*this)).pos)).sourceOrigin();
-		auto scanned = python::ispa_std::scan::scan_balanced(origin, begin, std::vector<std::string>{"}"}, ((origin.size()) - (begin)));
-		if (((((((*scanned)).exhausted) || (((((*scanned)).end) >= (origin.size()))))) || (((std::string(1, (origin)[((*scanned)).end])) != ("}"))))) {
-			python::ispa_std::failures::runtime_error("unterminated braced region in parser action");
-		}
-		while ((((!(((*((*this)).pos)).isEnd()))) && (((((*((*this)).pos)).sourcePosition()) < (((*scanned)).end))))) {
-			(collected).push_back(((*((*this)).pos)).current());
-			((*((*this)).pos)).next();
-		}
-		if (((((((*((*this)).pos)).isEnd()) || (((((*((*this)).pos)).sourcePosition()) != (((*scanned)).end))))) || ((!(((*this)).at("}", 0)))))) {
-			python::ispa_std::failures::runtime_error("braced region boundary is not a token");
-		}
-		((*((*this)).pos)).next();
-		return collected;
-	}
-	long long depth = 1;
-	while ((!(((*((*this)).pos)).isEnd()))) {
-		if (((*this)).at("{", 0)) {
-			depth = ((depth) + (1));
-		} else {
-			if (((*this)).at("}", 0)) {
-				depth = ((depth) - (1));
-				if (((depth) == (0))) {
-					((*((*this)).pos)).next();
-					return collected;
-				}
-			}
-		}
-		(collected).push_back(((*((*this)).pos)).current());
-		((*((*this)).pos)).next();
-	}
-	python::ispa_std::failures::runtime_error("unterminated braced region in parser action");
-	return collected;
-}
-auto python::ispa_std::parser_ll::FailContext::__init__(std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos, std::any ast, std::shared_ptr<python::ispa_std::lexer::TokenCursor> start_pos, const std::string& rule, const std::string& failed_rule, std::shared_ptr<python::ispa_std::recovery::State> state, const std::string& source, bool has_source_text, long long diagnostic_begin, std::shared_ptr<python::ispa_std::parser_ll::TokenNames> token_names, long long ambiguous_id) -> void {
-	python::ispa_std::parser_ll::ActionCheckpoint::__init__(pos);
-	((*this)).ast = ast;
-	((*this)).start_pos = start_pos;
-	((*this)).rule = rule;
-	((*this)).failed_rule = failed_rule;
-	((*this)).recovery_state = state;
-	((*this)).source = source;
-	((*this)).has_source_text = has_source_text;
-	((*this)).diagnostic_begin = diagnostic_begin;
-	((*this)).token_names = token_names;
-	((*this)).ambiguous_id = ambiguous_id;
-	((*this)).requested = python::ispa_std::recovery::Mode::Propagate;
-	((*this)).has_request = false;
-	((*this)).skipped = 0;
-}
-auto python::ispa_std::parser_ll::FailContext::at(const std::string& text, long long lookahead) -> bool {
-	return python::ispa_std::parser_ll::context_at(((*this)).pos, text, lookahead, ((*this)).token_names, false, ((*this)).ambiguous_id);
-}
-auto python::ispa_std::parser_ll::FailContext::at_token(const std::string& name, long long lookahead) -> bool {
-	return python::ispa_std::parser_ll::context_at(((*this)).pos, name, lookahead, ((*this)).token_names, true, ((*this)).ambiguous_id);
-}
-auto python::ispa_std::parser_ll::FailContext::peek(long long lookahead) -> std::shared_ptr<python::ispa_std::parser_ll::ActionToken> {
-	return python::ispa_std::parser_ll::context_peek(((*this)).pos, lookahead, ((*this)).token_names, ((*this)).ambiguous_id);
-}
-auto python::ispa_std::parser_ll::FailContext::take() -> std::shared_ptr<python::ispa_std::parser_ll::ActionToken> {
-	auto token = ((*this)).peek(0);
-	if ((!(((*token)).empty()))) {
-		((*((*this)).pos)).next();
-	}
-	return token;
-}
-auto python::ispa_std::parser_ll::FailContext::prev() -> std::shared_ptr<python::ispa_std::parser_ll::ActionToken> {
-	return python::ispa_std::parser_ll::context_prev(((*this)).pos, ((*this)).start_pos, ((*this)).token_names, ((*this)).ambiguous_id);
-}
-auto python::ispa_std::parser_ll::FailContext::error(const std::string& message, const std::string& code, long long source_offset, long long source_length) -> void {
-	"Custom diagnostics share the collection with automatic repairs.\n        Pass source_offset = -1 to take the span from the current token.";
-	if (((((source_offset) < (0))) != (((source_length) < (0))))) {
-		python::ispa_std::failures::invalid_argument("ctx.error source span requires both offset and length");
-	}
-	if (((*((*this)).recovery_state)).exhausted()) {
-		((*this)).abort();
-		return ;
-	}
-	auto diagnostic = ISPA_STD::construct<python::ispa_std::recovery::Diagnostic>();
-	((*diagnostic)).rule = ((*this)).rule;
-	((*diagnostic)).expected_text = ((*this)).failed_rule;
-	((*diagnostic)).message = message;
-	((*diagnostic)).code = code;
-	if (((*((*this)).pos)).has_source()) {
-		long long p = ((*((*this)).pos)).sourcePosition();
-		if (((p) >= (0))) {
-			((*diagnostic)).offset = p;
-			((*diagnostic)).length = 0;
-			if (((p) < (((*((*this)).pos)).sourceOrigin().size()))) {
-				((*diagnostic)).length = 1;
-			}
-		}
-	} else {
-		if ((!(((*((*this)).pos)).isEnd()))) {
-			((*diagnostic)).unexpected = python::ispa_std::recovery::token_id(((*((*this)).pos)).current());
-			((*diagnostic)).offset = ((*((*((*((*this)).pos)).current())).meta())).startpos();
-			((*diagnostic)).length = ((*((*((*((*this)).pos)).current())).meta())).length();
-		} else {
-			if (((*this)).has_source_text) {
-				((*diagnostic)).offset = ((*this)).source.size();
-			}
-		}
-	}
-	if (((source_offset) >= (0))) {
-		long long input_length = 0;
-		if (((*this)).has_source_text) {
-			input_length = ((*this)).source.size();
-		}
-		if (((((source_offset) > (input_length))) || (((source_length) > (((input_length) - (source_offset))))))) {
-			python::ispa_std::failures::out_of_range("ctx.error source span is outside parser input");
-		}
-		((*diagnostic)).offset = source_offset;
-		((*diagnostic)).length = source_length;
-	}
-	(((*((*this)).recovery_state)).diagnostics).push_back(diagnostic);
-}
-auto python::ispa_std::parser_ll::FailContext::note(const std::string& message) -> void {
-	if (((((*((*this)).recovery_state)).diagnostics.size()) <= (((*this)).diagnostic_begin))) {
-		python::ispa_std::failures::logic_error("ctx.note requires a preceding ctx.error in this fail block");
-	}
-	(((*(((*((*this)).recovery_state)).diagnostics)[((((*((*this)).recovery_state)).diagnostics.size()) - (1))])).notes).push_back(message);
-}
-auto python::ispa_std::parser_ll::FailContext::sync(const std::vector<std::string>& boundaries) -> void {
-	"Skip source text to one of `boundaries` (Strings). Lazy cursors only.";
-	if (((boundaries.size()) == (0))) {
-		python::ispa_std::failures::logic_error("ctx.sync requires at least one boundary");
-	}
-	if (((((*((*this)).recovery_state)).exhausted()) || (((((*this)).has_request) && (((((*this)).requested) == (python::ispa_std::recovery::Mode::Abort))))))) {
-		((*this)).abort();
-		return ;
-	}
-	long long i = 0;
-	while (((i) < (boundaries.size()))) {
-		if ((((boundaries)[i].size()) == (0))) {
-			python::ispa_std::failures::invalid_argument("ctx.sync requires nonempty boundaries");
-		}
-		i = ((i) + (1));
-	}
-	if ((!(((*((*this)).pos)).has_source()))) {
-		python::ispa_std::failures::logic_error("ctx.sync requires a lazy source cursor");
-		return ;
-	}
-	long long begin = ((*((*this)).pos)).sourcePosition();
-	long long cap = 4096;
-	auto budget = python::ispa_std::utility::minimum(cap, ((((*((*this)).recovery_state)).max_total_skipped) - (((*((*this)).recovery_state)).total_skipped)));
-	auto scanned = python::ispa_std::scan::scan_balanced(((*((*this)).pos)).sourceOrigin(), begin, boundaries, budget);
-	long long count = ((((*scanned)).end) - (begin));
-	if (((count) > (0))) {
-		((*((*this)).pos)).consumeExternal(((*scanned)).end);
-	}
-	((*this)).skipped = ((((*this)).skipped) + (count));
-	((*((*this)).recovery_state)).total_skipped = ((((*((*this)).recovery_state)).total_skipped) + (count));
-	if (((((*scanned)).exhausted) || (((*((*this)).recovery_state)).exhausted()))) {
-		((*this)).abort();
-	}
-}
-auto python::ispa_std::parser_ll::FailContext::sync_tokens(const std::vector<std::shared_ptr<python::ispa_std::parser_ll::TokenBoundary>>& boundaries) -> void {
-	"Skip whole tokens to one of `boundaries` (TokenBoundary), preserving\n        token-stream structure (including synthetic indentation).";
-	if (((boundaries.size()) == (0))) {
-		python::ispa_std::failures::logic_error("ctx.sync_tokens requires at least one boundary");
-	}
-	long long i = 0;
-	while (((i) < (boundaries.size()))) {
-		if (((((*(boundaries)[i])).value.size()) == (0))) {
-			python::ispa_std::failures::invalid_argument("ctx.sync_tokens requires nonempty boundaries");
-		}
-		i = ((i) + (1));
-	}
-	while (true) {
-		if (((((*((*this)).recovery_state)).exhausted()) || (((((*this)).has_request) && (((((*this)).requested) == (python::ispa_std::recovery::Mode::Abort))))))) {
-			((*this)).abort();
-			return ;
-		}
-		if (((*((*this)).pos)).isEnd()) {
-			return ;
-		}
-		long long j = 0;
-		while (((j) < (boundaries.size()))) {
-			auto stop = (boundaries)[j];
-			if (((*stop)).token_name) {
-				if (((*this)).at_token(((*stop)).value, 0)) {
-					return ;
-				}
-			} else {
-				if (((*this)).at(((*stop)).value, 0)) {
-					return ;
-				}
-			}
-			j = ((j) + (1));
-		}
-		((*this)).skip();
-	}
-}
-auto python::ispa_std::parser_ll::FailContext::skip() -> void {
-	if (((*((*this)).recovery_state)).exhausted()) {
-		((*this)).abort();
-		return ;
-	}
-	if ((!(((*((*this)).pos)).isEnd()))) {
-		((*((*this)).pos)).next();
-		((*this)).skipped = ((((*this)).skipped) + (1));
-		((*((*this)).recovery_state)).total_skipped = ((((*((*this)).recovery_state)).total_skipped) + (1));
-	}
-}
-auto python::ispa_std::parser_ll::FailContext::insert() -> void {
-	if ((!(((((*this)).has_request) && (((((*this)).requested) == (python::ispa_std::recovery::Mode::Abort))))))) {
-		((*this)).requested = python::ispa_std::recovery::Mode::Insert;
-		((*this)).has_request = true;
-	}
-}
-auto python::ispa_std::parser_ll::FailContext::replace() -> void {
-	((*this)).skip();
-	((*this)).insert();
-}
-auto python::ispa_std::parser_ll::FailContext::retry() -> void {
-	if ((!(((((*this)).has_request) && (((((*this)).requested) == (python::ispa_std::recovery::Mode::Abort))))))) {
-		((*this)).requested = python::ispa_std::recovery::Mode::Retry;
-		((*this)).has_request = true;
-	}
-}
-auto python::ispa_std::parser_ll::FailContext::abort() -> void {
-	((*this)).requested = python::ispa_std::recovery::Mode::Abort;
-	((*this)).has_request = true;
-}
-auto python::ispa_std::parser_ll::FailContext::finish(std::shared_ptr<python::ispa_std::lexer::TokenCursor> before) -> std::shared_ptr<python::ispa_std::recovery::Decision> {
-	long long begin = python::ispa_std::parser_ll::cursor_position(before);
-	long long end = python::ispa_std::parser_ll::cursor_position(((*this)).pos);
-	long long moved = 0;
-	if (((end) > (begin))) {
-		moved = ((end) - (begin));
-	}
-	if (((moved) > (((*this)).skipped))) {
-		((*((*this)).recovery_state)).total_skipped = ((((*((*this)).recovery_state)).total_skipped) + (((moved) - (((*this)).skipped))));
-	}
-	auto decision = python::ispa_std::recovery::Decision::initial();
-	if (((*((*this)).recovery_state)).exhausted()) {
-		((*decision)).mode = python::ispa_std::recovery::Mode::Abort;
-	} else {
-		if (((*this)).has_request) {
-			((*decision)).mode = ((*this)).requested;
-		} else {
-			if (((begin) == (end))) {
-				((*decision)).mode = python::ispa_std::recovery::Mode::Insert;
-			} else {
-				((*decision)).mode = python::ispa_std::recovery::Mode::Retry;
-			}
-		}
-	}
-	if (((((((*decision)).mode) == (python::ispa_std::recovery::Mode::Insert))) && (((moved) > (0))))) {
-		((*decision)).mode = python::ispa_std::recovery::Mode::Replace;
-	}
-	((*decision)).skipped = python::ispa_std::utility::maximum(moved, ((*this)).skipped);
-	long long i = ((*this)).diagnostic_begin;
-	while (((i) < (((*((*this)).recovery_state)).diagnostics.size()))) {
-		auto diagnostic = (((*((*this)).recovery_state)).diagnostics)[i];
-		((*diagnostic)).decision = ((*decision)).copy();
-		((*((*diagnostic)).decision)).unexpected = ((*diagnostic)).unexpected;
-		i = ((i) + (1));
-	}
-	return decision;
 }
 auto python::ispa_std::parser_ll::Frame::__init__(const std::string& rule) -> void {
 	((*this)).rule = rule;
@@ -4290,12 +4026,6 @@ return ((*this)).optional_rule(attempt, rec);
 	((*this)).sync_loop(pos);
 	return result;
 }
-auto python::ispa_std::parser_ll::LLParser::rule_context(std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos, std::any ast, std::shared_ptr<python::ispa_std::lexer::TokenCursor> start, const std::string& rule) -> std::shared_ptr<python::ispa_std::parser_ll::RuleContext> {
-	return ISPA_STD::construct<python::ispa_std::parser_ll::RuleContext>(pos, ast, start, rule, ((*this)).token_names_, ((*this)).ambiguous_id_);
-}
-auto python::ispa_std::parser_ll::LLParser::fail_context(std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos, std::any ast, std::shared_ptr<python::ispa_std::lexer::TokenCursor> start, const std::string& rule, const std::string& failed_rule) -> std::shared_ptr<python::ispa_std::parser_ll::FailContext> {
-	return ISPA_STD::construct<python::ispa_std::parser_ll::FailContext>(pos, ast, start, rule, failed_rule, ((*this)).recovery_state_, ((*this)).text, ((*this)).has_text, ((*((*this)).recovery_state_)).diagnostics.size(), ((*this)).token_names_, ((*this)).ambiguous_id_);
-}
 auto python::ispa_std::parser_ll::LLParser::custom_failure_decision(std::shared_ptr<python::ispa_std::lexer::TokenCursor> before, std::shared_ptr<python::ispa_std::lexer::TokenCursor> after) -> std::shared_ptr<python::ispa_std::recovery::Decision> {
 	auto decision = python::ispa_std::recovery::Decision::initial();
 	if (((python::ispa_std::parser_ll::cursor_position(before)) == (python::ispa_std::parser_ll::cursor_position(after)))) {
@@ -4304,9 +4034,6 @@ auto python::ispa_std::parser_ll::LLParser::custom_failure_decision(std::shared_
 		((*decision)).mode = python::ispa_std::recovery::Mode::Retry;
 	}
 	return decision;
-}
-auto python::ispa_std::parser_ll::LLParser::custom_failure_decision_ctx(std::shared_ptr<python::ispa_std::lexer::TokenCursor> before, std::shared_ptr<python::ispa_std::parser_ll::FailContext> ctx) -> std::shared_ptr<python::ispa_std::recovery::Decision> {
-	return ((*ctx)).finish(before);
 }
 auto python::ispa_std::parser_ll::LLParser::custom_failure(std::function<std::shared_ptr<python::ispa_std::recovery::Decision>(std::shared_ptr<python::ispa_std::lexer::TokenCursor>, std::shared_ptr<python::ispa_std::recovery::State>)> action) -> std::shared_ptr<python::ispa_std::recovery::ActionFailure> {
 	return ISPA_STD::construct<python::ispa_std::recovery::ActionFailure>(action);
@@ -4337,89 +4064,6 @@ auto python::ispa_std::lr::LRRuleSpan::__init__(long long begin, long long end, 
 auto python::ispa_std::lr::LRRuleSpan::copy() -> std::shared_ptr<python::ispa_std::lr::LRRuleSpan> {
 	return ISPA_STD::construct<python::ispa_std::lr::LRRuleSpan>(((*this)).begin, ((*this)).end, ((*this)).leading, ((*this)).trailing, ((*this)).empty);
 }
-auto python::ispa_std::lr::LRRegionFrame::__init__(std::shared_ptr<python::ispa_std::lexer::TokenCursor> start, long long continuation) -> void {
-	((*this)).pos = start;
-	((*this)).states = std::vector<long long>{0};
-	((*this)).values = {};
-	((*this)).spans = {};
-	((*this)).capture_destinations = {};
-	((*this)).cursor = 0;
-	((*this)).recovered_prefix = false;
-	((*this)).control = ISPA_STD::construct<python::ispa_std::lr::LRControlState>();
-	((*((*this)).control)).continuation = continuation;
-}
-auto python::ispa_std::lr::LRGrammar::lr_k() -> long long {
-	return 1;
-}
-auto python::ispa_std::lr::LRGrammar::lr_action(long long state, const std::vector<long long>& window) -> long long {
-	return python::ispa_std::lr::LR_INVALID;
-}
-auto python::ispa_std::lr::LRGrammar::lr_conflict(long long state, const std::vector<long long>& window) -> std::vector<long long> {
-	return {};
-}
-auto python::ispa_std::lr::LRGrammar::lr_shift(std::shared_ptr<python::ispa_std::raw_token::RawToken> token) -> std::any {
-	return token;
-}
-auto python::ispa_std::lr::LRGrammar::lr_length(long long rule) -> long long {
-	return 0;
-}
-auto python::ispa_std::lr::LRGrammar::lr_reduce(long long rule, const std::vector<std::any>& rhs) -> std::any {
-	return 0;
-}
-auto python::ispa_std::lr::LRGrammar::lr_lhs(long long rule) -> long long {
-	return 0;
-}
-auto python::ispa_std::lr::LRGrammar::lr_goto(long long state, long long lhs) -> long long {
-	return 0;
-}
-auto python::ispa_std::lr::LRGrammar::has_is_space() -> bool {
-	return false;
-}
-auto python::ispa_std::lr::LRGrammar::lr_is_space(std::shared_ptr<python::ispa_std::raw_token::RawToken> token) -> bool {
-	return false;
-}
-auto python::ispa_std::lr::LRGrammar::has_space() -> bool {
-	return false;
-}
-auto python::ispa_std::lr::LRGrammar::lr_space(long long rule, long long index) -> bool {
-	return false;
-}
-auto python::ispa_std::lr::LRGrammar::has_expected() -> bool {
-	return false;
-}
-auto python::ispa_std::lr::LRGrammar::lr_expected(long long state) -> std::vector<long long> {
-	return {};
-}
-auto python::ispa_std::lr::LRGrammar::has_context() -> bool {
-	return false;
-}
-auto python::ispa_std::lr::LRGrammar::lr_context(long long state) -> std::string {
-	return "";
-}
-auto python::ispa_std::lr::LRGrammar::has_token_name() -> bool {
-	return false;
-}
-auto python::ispa_std::lr::LRGrammar::lr_token_name(long long id) -> std::string {
-	return "";
-}
-auto python::ispa_std::lr::LRGrammar::has_rule_label() -> bool {
-	return false;
-}
-auto python::ispa_std::lr::LRGrammar::lr_rule_label(long long rule) -> std::string {
-	return "";
-}
-auto python::ispa_std::lr::LRGrammar::has_recover() -> bool {
-	return false;
-}
-auto python::ispa_std::lr::LRGrammar::lr_recover(std::shared_ptr<python::ispa_std::lr::LRRegionFrame> region, std::shared_ptr<python::ispa_std::recovery::Diagnostic> diagnostic) -> bool {
-	return false;
-}
-auto python::ispa_std::lr::LRGrammar::has_semantic_reduce() -> bool {
-	return false;
-}
-auto python::ispa_std::lr::LRGrammar::lr_semantic_reduce(long long rule, std::shared_ptr<python::ispa_std::lr::LRRegionFrame> region, std::shared_ptr<python::ispa_std::lr::LRRuleSpan> span, const std::vector<std::any>& rhs) -> std::any {
-	return 0;
-}
 auto python::ispa_std::lr::LRTokenValue::__init__(std::shared_ptr<python::ispa_std::node::Node> node, const std::string& text) -> void {
 	((*this)).node = node;
 	((*this)).text = text;
@@ -4431,47 +4075,6 @@ auto python::ispa_std::lr::lr_token(std::shared_ptr<python::ispa_std::node::Node
 	}
 	return ISPA_STD::construct<python::ispa_std::lr::LRTokenValue>(node, text);
 }
-auto python::ispa_std::lr::LRCaptures::__init__(const std::vector<std::vector<std::any>>& columns, bool repeated) -> void {
-	((*this)).columns = columns;
-	((*this)).repeated = repeated;
-}
-auto python::ispa_std::lr::LRCaptures::is_empty() -> bool {
-	long long i = 0;
-	while (((i) < (((*this)).columns.size()))) {
-		if ((((((*this)).columns)[i].size()) > (0))) {
-			return false;
-		}
-		i = ((i) + (1));
-	}
-	return true;
-}
-auto python::ispa_std::lr::lr_pack(const std::vector<std::any>& values, const std::vector<long long>& indices, const std::vector<long long>& offsets, const std::vector<long long>& splice, long long count, bool repeated) -> std::shared_ptr<python::ispa_std::lr::LRCaptures> {
-	std::vector<std::vector<std::any>> columns = std::vector<std::vector<std::any>>{};
-	long long i = 0;
-	while (((i) < (count))) {
-		(columns).push_back({});
-		i = ((i) + (1));
-	}
-	i = 0;
-	while (((i) < (indices.size()))) {
-		auto value = (values)[(indices)[i]];
-		if ((((splice)[i]) != (0))) {
-			long long c = 0;
-			std::shared_ptr<python::ispa_std::lr::LRCaptures> spliced = ::ISPA_STD::python_cast<std::shared_ptr<python::ispa_std::lr::LRCaptures>>(value);
-			while (((c) < (((*spliced)).columns.size()))) {
-				ISPA_STD::python_extend(((columns)[(((offsets)[i]) + (c))]), (((*spliced)).columns)[c]);
-				c = ((c) + (1));
-			}
-		} else {
-			((columns)[(offsets)[i]]).push_back(value);
-		}
-		i = ((i) + (1));
-	}
-	return ISPA_STD::construct<python::ispa_std::lr::LRCaptures>(columns, repeated);
-}
-auto python::ispa_std::lr::lr_get(const std::vector<std::any>& values, long long index) -> std::any {
-	return (values)[index];
-}
 auto python::ispa_std::lr::lr_node(std::any value) -> std::shared_ptr<python::ispa_std::node::Node> {
 	auto node = python::ispa_std::node::Node::blank();
 	((*node)).set_data(value);
@@ -4482,217 +4085,6 @@ auto python::ispa_std::lr::LRParser::__init__() -> void {
 }
 auto python::ispa_std::lr::LRParser::getErrors() -> const std::vector<std::shared_ptr<python::ispa_std::recovery::Diagnostic>>& {
 	return ((*this)).errors_;
-}
-auto python::ispa_std::lr::LRParser::_skip(std::shared_ptr<python::ispa_std::lr::LRGrammar> g, std::shared_ptr<python::ispa_std::lexer::TokenCursor> it, std::vector<long long>& offset) -> void {
-	if (((*g)).has_is_space()) {
-		while ((((!(((*it)).isEnd()))) && (((*g)).lr_is_space(((*it)).current())))) {
-			((*it)).next();
-			if (((offset.size()) > (0))) {
-				(offset)[0] = (((offset)[0]) + (1));
-			}
-		}
-	}
-}
-auto python::ispa_std::lr::LRParser::_gap(std::shared_ptr<python::ispa_std::lr::LRGrammar> g, long long rule, long long index) -> bool {
-	if (((*g)).has_space()) {
-		return ((*g)).lr_space(rule, index);
-	}
-	return false;
-}
-auto python::ispa_std::lr::LRParser::_window(std::shared_ptr<python::ispa_std::lr::LRGrammar> g, std::shared_ptr<python::ispa_std::lexer::TokenCursor> position) -> std::vector<long long> {
-	auto peek = ((*position)).copy();
-	std::vector<long long> window = std::vector<long long>{};
-	std::vector<long long> scratch = std::vector<long long>{};
-	long long i = 0;
-	while (((i) < (((*g)).lr_k()))) {
-		((*this))._skip(g, peek, scratch);
-		bool end = ((*peek)).isEnd();
-		if (end) {
-			(window).push_back(python::ispa_std::lr::ABSENT);
-		} else {
-			(window).push_back(((*((*peek)).current())).kind());
-			((*peek)).next();
-		}
-		i = ((i) + (1));
-	}
-	return window;
-}
-auto python::ispa_std::lr::LRParser::_unexpected(std::shared_ptr<python::ispa_std::lr::LRGrammar> g, const std::vector<long long>& states, const std::vector<long long>& window, std::shared_ptr<python::ispa_std::lexer::TokenCursor> position) -> std::shared_ptr<python::ispa_std::recovery::Diagnostic> {
-	auto d = ISPA_STD::construct<python::ispa_std::recovery::Diagnostic>();
-	((*d)).unexpected = (window)[0];
-	if (((*g)).has_expected()) {
-		((*d)).expected = ((*g)).lr_expected((states)[((states.size()) - (1))]);
-	}
-	if (((*g)).has_context()) {
-		((*d)).rule = ((*g)).lr_context((states)[((states.size()) - (1))]);
-	} else {
-		((*d)).rule = "<rule>";
-	}
-	if ((!(((*position)).isEnd()))) {
-		((*d)).offset = ((*((*((*position)).current())).meta())).startpos();
-		((*d)).length = ((*((*((*position)).current())).meta())).length();
-	}
-	std::string message = "Unexpected ";
-	if (((*g)).has_token_name()) {
-		message = ((message) + (((*g)).lr_token_name(((*d)).unexpected)));
-	} else {
-		message = ((((message) + ("token "))) + (python::ispa_std::format::int_to_string(((*d)).unexpected)));
-	}
-	if (((((*d)).offset) != (( - (1))))) {
-		message = ((((message) + (" at offset "))) + (python::ispa_std::format::int_to_string(((*d)).offset)));
-	}
-	message = ((((message) + (" in rule "))) + (((*d)).rule));
-	if (((((*d)).expected.size()) > (0))) {
-		message = ((message) + ("; expected "));
-		long long i = 0;
-		while (((i) < (((*d)).expected.size()))) {
-			if (((i) > (0))) {
-				message = ((message) + (", "));
-			}
-			if (((*g)).has_token_name()) {
-				message = ((message) + (((*g)).lr_token_name((((*d)).expected)[i])));
-			} else {
-				message = ((((message) + ("token "))) + (python::ispa_std::format::int_to_string((((*d)).expected)[i])));
-			}
-			i = ((i) + (1));
-		}
-	}
-	((*d)).message = message;
-	((*d)).code = "lr-unexpected-token";
-	return d;
-}
-auto python::ispa_std::lr::LRParser::_reduce_span(std::shared_ptr<python::ispa_std::lr::LRGrammar> g, long long rule, long long count, long long begin, const std::vector<std::shared_ptr<python::ispa_std::lr::LRRuleSpan>>& spans, long long cursor) -> std::shared_ptr<python::ispa_std::lr::LRRuleSpan> {
-	auto span = ISPA_STD::construct<python::ispa_std::lr::LRRuleSpan>(cursor, cursor, false, false, true);
-	bool allowed = ((*this))._gap(g, rule, 0);
-	long long i = 0;
-	while (((i) < (count))) {
-		auto child = (spans)[((begin) + (i))];
-		if (((*child)).empty) {
-			allowed = ((((allowed) || (((*child)).leading))) || (((*child)).trailing));
-		} else {
-			if (((*span)).empty) {
-				((*span)).begin = ((*child)).begin;
-				((*span)).leading = ((allowed) || (((*child)).leading));
-			} else {
-				if (((((((*child)).begin) > (((*span)).end))) && ((!(((allowed) || (((*child)).leading))))))) {
-					python::ispa_std::failures::runtime_error("Whitespace is not allowed between these rule members");
-				}
-			}
-			((*span)).empty = false;
-			((*span)).end = ((*child)).end;
-			allowed = ((*child)).trailing;
-		}
-		allowed = ((allowed) || (((*this))._gap(g, rule, ((i) + (1)))));
-		i = ((i) + (1));
-	}
-	((*span)).trailing = allowed;
-	if (((*span)).empty) {
-		((*span)).leading = allowed;
-	}
-	return span;
-}
-auto python::ispa_std::lr::LRParser::lr_parse(std::shared_ptr<python::ispa_std::lr::LRGrammar> g, std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos) -> std::shared_ptr<python::ispa_std::match_result::MatchResult> {
-	((*this)).errors_ = {};
-	auto region = ISPA_STD::construct<python::ispa_std::lr::LRRegionFrame>(pos, 0);
-	std::vector<long long>& states = ((*region)).states;
-	std::vector<std::any>& values = ((*region)).values;
-	std::vector<std::shared_ptr<python::ispa_std::lr::LRRuleSpan>>& spans = ((*region)).spans;
-	auto control = ((*region)).control;
-	auto position = ((*region)).pos;
-	while (true) {
-		((*control)).phase = python::ispa_std::lr::LRControlPhase::Decide;
-		auto offset = std::vector<long long>{((*region)).cursor};
-		((*this))._skip(g, position, offset);
-		((*region)).cursor = (offset)[0];
-		auto window = ((*this))._window(g, position);
-		long long action = ((*g)).lr_action((states)[((states.size()) - (1))], window);
-		if (((action) == (python::ispa_std::lr::LR_INVALID))) {
-			(((*this)).errors_).push_back(((*this))._unexpected(g, states, window, position));
-			bool recovered = false;
-			if (((*g)).has_recover()) {
-				((*control)).phase = python::ispa_std::lr::LRControlPhase::Recover;
-				long long old_cursor = ((*region)).cursor;
-				long long old_size = states.size();
-				long long old_state = (states)[((states.size()) - (1))];
-				if (((*g)).lr_recover(region, (((*this)).errors_)[((((*this)).errors_.size()) - (1))])) {
-					if (((((((((*region)).cursor) == (old_cursor))) && (((states.size()) == (old_size))))) && ((((states)[((states.size()) - (1))]) == (old_state))))) {
-						python::ispa_std::failures::runtime_error("LR recovery handler made no progress");
-					}
-					if (((((*region)).cursor) != (old_cursor))) {
-						if (((spans.size()) == (0))) {
-							((*region)).recovered_prefix = true;
-						} else {
-							((*(spans)[((spans.size()) - (1))])).trailing = true;
-						}
-					}
-					recovered = true;
-				}
-			}
-			if ((!(recovered))) {
-				python::ispa_std::failures::runtime_error(((*(((*this)).errors_)[((((*this)).errors_.size()) - (1))])).message);
-			}
-		} else {
-			if (((action) == (0))) {
-				((*control)).phase = python::ispa_std::lr::LRControlPhase::Accept;
-				if (((((values.size()) != (1))) || ((!(((*position)).isEnd()))))) {
-					python::ispa_std::failures::runtime_error("Invalid LR accept stack");
-				}
-				auto last = (spans)[((spans.size()) - (1))];
-				if (((((((((((*last)).begin) != (0))) && ((!(((*last)).leading))))) && ((!(((*region)).recovered_prefix))))) || (((((((*region)).cursor) > (((*last)).end))) && ((!(((*last)).trailing))))))) {
-					python::ispa_std::failures::runtime_error("Whitespace is not allowed at the input boundary");
-				}
-				return ISPA_STD::construct<python::ispa_std::match_result::MatchResult>(true, python::ispa_std::lr::lr_node((values)[((values.size()) - (1))]), position);
-			} else {
-				if (((action) > (0))) {
-					((*control)).phase = python::ispa_std::lr::LRControlPhase::Shift;
-					if (((*position)).isEnd()) {
-						python::ispa_std::failures::runtime_error("LR shift past end of input");
-					}
-					(values).push_back(((*g)).lr_shift(((*position)).current()));
-					(spans).push_back(ISPA_STD::construct<python::ispa_std::lr::LRRuleSpan>(((*region)).cursor, ((((*region)).cursor) + (1)), false, false, false));
-					((*region)).cursor = ((((*region)).cursor) + (1));
-					(states).push_back(((action) - (1)));
-					((*position)).next();
-				} else {
-					long long rule = ((( - (action))) - (1));
-					((*control)).phase = python::ispa_std::lr::LRControlPhase::Reduce;
-					((*control)).production = rule;
-					long long count = ((*g)).lr_length(rule);
-					if (((count) > (values.size()))) {
-						python::ispa_std::failures::runtime_error("LR stack underflow");
-					}
-					long long begin = ((values.size()) - (count));
-					std::vector<std::any> rhs = std::vector<std::any>{};
-					long long i = begin;
-					while (((i) < (values.size()))) {
-						(rhs).push_back((values)[i]);
-						i = ((i) + (1));
-					}
-					auto span = ((*this))._reduce_span(g, rule, count, begin, spans, ((*region)).cursor);
-					std::any value = 0;
-					if (((*g)).has_semantic_reduce()) {
-						((*control)).phase = python::ispa_std::lr::LRControlPhase::Semantic;
-						value = ((*g)).lr_semantic_reduce(rule, region, span, rhs);
-					} else {
-						value = ((*g)).lr_reduce(rule, rhs);
-					}
-					while (((values.size()) > (begin))) {
-						ISPA_STD::python_pop((values));
-					}
-					while (((spans.size()) > (begin))) {
-						ISPA_STD::python_pop((spans));
-					}
-					while (((states.size()) > (((begin) + (1))))) {
-						ISPA_STD::python_pop((states));
-					}
-					long long nxt = ((*g)).lr_goto((states)[((states.size()) - (1))], ((*g)).lr_lhs(rule));
-					(values).push_back(value);
-					(spans).push_back(span);
-					(states).push_back(nxt);
-				}
-			}
-		}
-	}
 }
 auto python::ispa_std::lr_conflicts::_Span::__init__(long long begin, long long end, bool leading, bool trailing, bool empty) -> void {
 	((*this)).begin = begin;
@@ -4717,11 +4109,6 @@ auto python::ispa_std::lr_conflicts::_Alternative::equals(std::shared_ptr<python
 		i = ((i) + (1));
 	}
 	return true;
-}
-auto python::ispa_std::lr_conflicts::_Eval::__init__(long long node) -> void {
-	((*this)).node = node;
-	((*this)).child = 0;
-	((*this)).rhs = {};
 }
 auto python::ispa_std::lr_conflicts::_Forest::__init__(std::shared_ptr<python::ispa_std::lr_conflicts::_Span> span, bool has_token, std::shared_ptr<python::ispa_std::lexer::TokenCursor> token) -> void {
 	((*this)).span = span;
@@ -4749,267 +4136,6 @@ auto python::ispa_std::lr_conflicts::LRGeneralizedParser::_tick(const std::vecto
 	if (((((((*this)).work) > (python::ispa_std::lr_conflicts::WORK_LIMIT))) || (((((forest.size()) + (stacks.size()))) > (python::ispa_std::lr_conflicts::NODE_LIMIT))))) {
 		python::ispa_std::failures::runtime_error("LR automatic conflict resolution resource limit exceeded");
 	}
-}
-auto python::ispa_std::lr_conflicts::LRGeneralizedParser::lr_parse_generalized(std::shared_ptr<python::ispa_std::lr::LRGrammar> g, std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos) -> std::shared_ptr<python::ispa_std::match_result::MatchResult> {
-	long long i;
-	((*this)).work = 0;
-	std::vector<std::shared_ptr<python::ispa_std::lr_conflicts::_Forest>> forest = std::vector<std::shared_ptr<python::ispa_std::lr_conflicts::_Forest>>{};
-	auto stacks = std::vector<std::shared_ptr<python::ispa_std::lr_conflicts::_Stack>>{ISPA_STD::construct<python::ispa_std::lr_conflicts::_Stack>(python::ispa_std::lr::ABSENT, 0, python::ispa_std::lr::ABSENT)};
-	auto forest_index = ISPA_STD::construct<python::ispa_std::sortedmap::StrIntMap>();
-	auto stack_index = ISPA_STD::construct<python::ispa_std::sortedmap::StrIntMap>();
-	long long cursor = 0;
-	auto active = ISPA_STD::construct<python::ispa_std::sortedmap::IntSet>();
-	((*active)).add(0);
-	python::ispa_std::sortedmap::IntSet roots = ISPA_STD::make_value<python::ispa_std::sortedmap::IntSet>();
-	bool running = true;
-	while (running) {
-		auto offset = std::vector<long long>{cursor};
-		((*this))._skip(g, pos, offset);
-		cursor = (offset)[0];
-		auto window = ((*this))._window(g, pos);
-		std::vector<long long> pending = std::vector<long long>{};
-		ISPA_STD::python_extend((pending), ((*active)).items);
-		auto closure = ((*active)).copy();
-		auto shifted = ISPA_STD::construct<python::ispa_std::sortedmap::IntSet>();
-		long long nxt = 0;
-		while (((nxt) < (pending.size()))) {
-			((*this))._tick(forest, stacks);
-			long long top_id = (pending)[nxt];
-			nxt = ((nxt) + (1));
-			auto top = (stacks)[top_id];
-			long long selected = ((*g)).lr_action(((*top)).state, window);
-			std::vector<long long> actions = std::vector<long long>{};
-			if (((selected) == (python::ispa_std::lr::LR_CONFLICT))) {
-				actions = ((*g)).lr_conflict(((*top)).state, window);
-			} else {
-				if (((selected) != (python::ispa_std::lr::LR_INVALID))) {
-					(actions).push_back(selected);
-				}
-			}
-			long long ai = 0;
-			while (((ai) < (actions.size()))) {
-				long long action = (actions)[ai];
-				ai = ((ai) + (1));
-				((*this))._tick(forest, stacks);
-				if (((action) == (0))) {
-					if (((((((*pos)).isEnd()) && (((((*top)).forest) != (python::ispa_std::lr::ABSENT))))) && (((((*top)).previous) == (0))))) {
-						auto span = ((*(forest)[((*top)).forest])).span;
-						if ((!(((((((((*span)).begin) != (0))) && ((!(((*span)).leading))))) || (((((cursor) > (((*span)).end))) && ((!(((*span)).trailing))))))))) {
-							(roots).add(((*top)).forest);
-						}
-					}
-				} else {
-					if (((action) > (0))) {
-						if ((!(((*pos)).isEnd()))) {
-							auto span = ISPA_STD::construct<python::ispa_std::lr_conflicts::_Span>(cursor, ((cursor) + (1)), false, false, false);
-							long long leaf = ((*this))._intern(forest, forest_index, true, ((*((*pos)).current())).kind(), span, true, ((*pos)).copy());
-							((*shifted)).add(((*this))._push(stacks, stack_index, top_id, ((action) - (1)), leaf));
-						}
-					} else {
-						long long rule = ((( - (action))) - (1));
-						long long count = ((*g)).lr_length(rule);
-						std::vector<long long> children = std::vector<long long>{};
-						long long base = top_id;
-						i = 0;
-						while (((((i) < (count))) && (((base) != (0))))) {
-							(children).push_back(((*(stacks)[base])).forest);
-							base = ((*(stacks)[base])).previous;
-							i = ((i) + (1));
-						}
-						if (((children.size()) == (count))) {
-							ISPA_STD::python_reverse((children));
-							auto span = ISPA_STD::construct<python::ispa_std::lr_conflicts::_Span>(cursor, cursor, false, false, true);
-							bool allowed = ((*this))._gap(g, rule, 0);
-							bool valid = true;
-							i = 0;
-							while (((i) < (children.size()))) {
-								auto child = ((*(forest)[(children)[i]])).span;
-								if (((*child)).empty) {
-									allowed = ((((allowed) || (((*child)).leading))) || (((*child)).trailing));
-								} else {
-									if (((*span)).empty) {
-										((*span)).begin = ((*child)).begin;
-										((*span)).leading = ((allowed) || (((*child)).leading));
-									} else {
-										if (((((((*child)).begin) > (((*span)).end))) && ((!(((allowed) || (((*child)).leading))))))) {
-											valid = false;
-										}
-									}
-									((*span)).empty = false;
-									((*span)).end = ((*child)).end;
-									allowed = ((*child)).trailing;
-								}
-								allowed = ((allowed) || (((*this))._gap(g, rule, ((i) + (1)))));
-								i = ((i) + (1));
-							}
-							if (valid) {
-								((*span)).trailing = allowed;
-								if (((*span)).empty) {
-									((*span)).leading = allowed;
-								}
-								long long lhs = ((*g)).lr_lhs(rule);
-								long long value = ((*this))._intern(forest, forest_index, false, lhs, span, false, 0);
-								auto alternative = ISPA_STD::construct<python::ispa_std::lr_conflicts::_Alternative>(rule, children);
-								bool known = false;
-								long long k = 0;
-								while (((k) < (((*(forest)[value])).alternatives.size()))) {
-									if (((*(((*(forest)[value])).alternatives)[k])).equals(alternative)) {
-										known = true;
-									}
-									k = ((k) + (1));
-								}
-								if ((!(known))) {
-									(((*(forest)[value])).alternatives).push_back(alternative);
-								}
-								long long dest = ((*this))._push(stacks, stack_index, base, ((*g)).lr_goto(((*(stacks)[base])).state, lhs), value);
-								if (((*closure)).add(dest)) {
-									(pending).push_back(dest);
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-		if (((*pos)).isEnd()) {
-			running = false;
-		} else {
-			if (((*shifted)).empty()) {
-				python::ispa_std::failures::runtime_error((("Unexpected input during LR automatic conflict resolution at token ") + (python::ispa_std::format::int_to_string(cursor))));
-			}
-			active = shifted;
-			((*pos)).next();
-			cursor = ((cursor) + (1));
-		}
-	}
-	if ((roots).empty()) {
-		python::ispa_std::failures::runtime_error("Unexpected end of input during LR automatic conflict resolution");
-	}
-	std::vector<long long> visiting = std::vector<long long>{};
-	std::vector<long long> ways = std::vector<long long>{};
-	i = 0;
-	while (((i) < (forest.size()))) {
-		(visiting).push_back(0);
-		(ways).push_back(0);
-		i = ((i) + (1));
-	}
-	auto ambiguous = python::ispa_std::lr::ABSENT;
-	std::vector<long long> order = std::vector<long long>{};
-	long long ri = 0;
-	while (((((ri) < ((roots).items.size()))) && (((ambiguous) == (python::ispa_std::lr::ABSENT))))) {
-		long long root = ((roots).items)[ri];
-		ri = ((ri) + (1));
-		if ((((visiting)[root]) != (2))) {
-			auto pending_nodes = std::vector<std::vector<long long>>{std::vector<long long>{root, 0, 0}};
-			(visiting)[root] = 1;
-			while (((((pending_nodes.size()) > (0))) && (((ambiguous) == (python::ispa_std::lr::ABSENT))))) {
-				((*this))._tick(forest, stacks);
-				auto frame = (pending_nodes)[((pending_nodes.size()) - (1))];
-				auto node = (forest)[(frame)[0]];
-				if ((((frame)[1]) == (((*node)).alternatives.size()))) {
-					(visiting)[(frame)[0]] = 2;
-					(order).push_back((frame)[0]);
-					ISPA_STD::python_pop((pending_nodes));
-				} else {
-					auto alt = (((*node)).alternatives)[(frame)[1]];
-					if ((((frame)[2]) == (((*alt)).children.size()))) {
-						(frame)[1] = (((frame)[1]) + (1));
-						(frame)[2] = 0;
-					} else {
-						long long child = (((*alt)).children)[(frame)[2]];
-						(frame)[2] = (((frame)[2]) + (1));
-						if ((((visiting)[child]) == (1))) {
-							ambiguous = child;
-						} else {
-							if ((((visiting)[child]) == (0))) {
-								(visiting)[child] = 1;
-								(pending_nodes).push_back(std::vector<long long>{child, 0, 0});
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-	long long total = 0;
-	if (((ambiguous) != (python::ispa_std::lr::ABSENT))) {
-		total = 2;
-	} else {
-		long long oi = 0;
-		while (((oi) < (order.size()))) {
-			long long ident = (order)[oi];
-			oi = ((oi) + (1));
-			long long n = 0;
-			if (((*(forest)[ident])).has_token) {
-				n = 1;
-			}
-			long long ai = 0;
-			while (((ai) < (((*(forest)[ident])).alternatives.size()))) {
-				long long product = 1;
-				long long ci = 0;
-				auto children = ((*(((*(forest)[ident])).alternatives)[ai])).children;
-				while (((ci) < (children.size()))) {
-					product = python::ispa_std::lr_conflicts::min2(2, ((product) * ((ways)[(children)[ci]])));
-					ci = ((ci) + (1));
-				}
-				n = python::ispa_std::lr_conflicts::min2(2, ((n) + (product)));
-				ai = ((ai) + (1));
-			}
-			(ways)[ident] = n;
-			if (((((n) > (1))) && (((ambiguous) == (python::ispa_std::lr::ABSENT))))) {
-				ambiguous = ident;
-			}
-		}
-		ri = 0;
-		while (((ri) < ((roots).items.size()))) {
-			total = python::ispa_std::lr_conflicts::min2(2, ((total) + ((ways)[((roots).items)[ri]])));
-			ri = ((ri) + (1));
-		}
-	}
-	if (((total) != (1))) {
-		std::string message = "Ambiguous LR input: multiple complete parses";
-		if (((ambiguous) != (python::ispa_std::lr::ABSENT))) {
-			auto node = (forest)[ambiguous];
-			message = ((((((((message) + (" at tokens "))) + (python::ispa_std::format::int_to_string(((*((*node)).span)).begin)))) + (".."))) + (python::ispa_std::format::int_to_string(((*((*node)).span)).end)));
-			long long ai = 0;
-			while (((ai) < (((*node)).alternatives.size()))) {
-				long long rule = ((*(((*node)).alternatives)[ai])).rule;
-				if (((*g)).has_rule_label()) {
-					message = ((((message) + ("\n  "))) + (((*g)).lr_rule_label(rule)));
-				} else {
-					message = ((((message) + ("\n  production "))) + (python::ispa_std::format::int_to_string(rule)));
-				}
-				ai = ((ai) + (1));
-			}
-		}
-		python::ispa_std::failures::runtime_error(message);
-	}
-	std::vector<std::shared_ptr<python::ispa_std::lr_conflicts::_Eval>> evaluating = std::vector<std::shared_ptr<python::ispa_std::lr_conflicts::_Eval>>{ISPA_STD::construct<python::ispa_std::lr_conflicts::_Eval>((roots).smallest())};
-	std::any result = 0;
-	while (((evaluating.size()) > (0))) {
-		((*this))._tick(forest, stacks);
-		auto frame = (evaluating)[((evaluating.size()) - (1))];
-		auto node = (forest)[((*frame)).node];
-		if ((((!(((*node)).has_token))) && (((((*frame)).child) < (((*(((*node)).alternatives)[0])).children.size()))))) {
-			long long child = (((*(((*node)).alternatives)[0])).children)[((*frame)).child];
-			((*frame)).child = ((((*frame)).child) + (1));
-			(evaluating).push_back(ISPA_STD::construct<python::ispa_std::lr_conflicts::_Eval>(child));
-		} else {
-			std::any produced = 0;
-			if (((*node)).has_token) {
-				produced = ((*g)).lr_shift(((*((*node)).token)).current());
-			} else {
-				produced = ((*g)).lr_reduce(((*(((*node)).alternatives)[0])).rule, ((*frame)).rhs);
-			}
-			ISPA_STD::python_pop((evaluating));
-			if (((evaluating.size()) == (0))) {
-				result = produced;
-			} else {
-				(((*(evaluating)[((evaluating.size()) - (1))])).rhs).push_back(produced);
-			}
-		}
-	}
-	return ISPA_STD::construct<python::ispa_std::match_result::MatchResult>(true, python::ispa_std::lr::lr_node(result), pos);
 }
 auto python::ispa_std::lr_conflicts::LRGeneralizedParser::_key(const std::vector<std::string>& parts) -> std::string {
 	std::vector<std::string> out = std::vector<std::string>{};

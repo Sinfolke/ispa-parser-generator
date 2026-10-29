@@ -271,6 +271,7 @@ namespace LangAPI {
             case StdlibExports::LRPack: os << "LRPack"; break;
             case StdlibExports::LRCaptureAssign: os << "LRCaptureAssign"; break;
             case StdlibExports::LRNode: os << "LRNode"; break;
+            case StdlibExports::LRValue: os << "LRValue"; break;
             case StdlibExports::LRParse: os << "LRParse"; break;
             case StdlibExports::Parser: os << "Parser"; break;
             case StdlibExports::LexerMakeTokenParameter: os << "LexerMakeTokenParameter"; break;

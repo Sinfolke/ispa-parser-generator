@@ -10,6 +10,9 @@
 #include <sstream>
 
 namespace ISPA_STD {
+// The LR value stack's element type, named by generated parsers as LRValueOf<Token, Node<Types::...>...>.
+// ispastdlib keeps one dynamic type; a stdlib with closed tagged storage maps the same name onto it.
+template<class... Alternatives> using LRValueOf = std::any;
 // A region owns its recognition stack and the values produced inside it. A
 // continuation identifies where an enclosing semantic program can resume.
 // The deterministic parser currently uses one root region; nested region

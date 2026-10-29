@@ -78,10 +78,16 @@ def is_token_end(token: RawToken) -> bool:
     return token.empty() and not token.isAmbiguous()
 
 
+class Checkpoint:
+    """Lexer state captured by Lexer_base.checkpoint(); subclass it to carry state."""
+    def __init__(self):
+        return
+
+
 class _SharedState:
     pos: int
     eof_processed: bool
-    checkpoints: list[object]
+    checkpoints: list[Checkpoint]
 
     def __init__(self, pos: int):
         self.pos = pos
@@ -130,10 +136,10 @@ class Lexer_base:
         logic_error("External parser handoff requires a cloneable lexer")
         return self
 
-    def checkpoint(self) -> object:
-        return 0
+    def checkpoint(self) -> Checkpoint:
+        return Checkpoint()
 
-    def restoreCheckpoint(self, state: object) -> None:
+    def restoreCheckpoint(self, state: Checkpoint) -> None:
         return
 
     def externalAdvance(self, begin: int, end: int) -> None:

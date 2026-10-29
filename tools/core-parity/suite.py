@@ -1,6 +1,6 @@
 """Build one grammar twice (the C++ ispastdlib, and `--stdlib core`) for parity checks.
 
-build_cpp(NAME, ENTRY, SRCDIR, stdlib=False) returns the path of a binary that parses argv[1] (LAZY=1: lazily) and
+build_cpp(NAME, ENTRY, SRCDIR, stdlib=False, algorithm='LL') returns the path of a binary that parses argv[1] (LAZY=1: lazily) and
 prints the AST dump / diagnostics. Binaries and generated sources go under ./build/. REBUILD=1 forces a rebuild;
 ISPA=<executable> selects the generator, CXX the compiler."""
 import json, os, subprocess, sys
@@ -13,12 +13,12 @@ FACADE = CORE + '-core'
 CXX = os.environ.get('CXX') or 'clang++'
 ENV = {k: v for k, v in os.environ.items() if k != 'LD_LIBRARY_PATH'}
 
-def build_cpp(name, entry, srcdir, stdlib=False):
+def build_cpp(name, entry, srcdir, stdlib=False, algorithm='LL'):
     d = os.path.join(BUILD, ('cppcore_' if stdlib else 'cpp_') + name); os.makedirs(d, exist_ok=True)
     binary = os.path.join(d, 'ref')
     if os.path.exists(binary) and not os.environ.get('REBUILD'):
         return binary
-    r = subprocess.run([ISPA, '-l', 'cpp', '-a', 'LL', '--no-incremental', '--no-ai-recovery',
+    r = subprocess.run([ISPA, '-l', 'cpp', '-a', algorithm, '--no-incremental', '--no-ai-recovery',
                         *(['--stdlib', 'core'] if stdlib else []), *os.environ.get('SUITE_GEN', '').split(), '--dir', *srcdir.split(':'), entry, '-o', os.path.join(d, name)], env=ENV, capture_output=True, text=True)
     if r.returncode: sys.exit('cpp generation failed:\n' + r.stdout[-1500:] + r.stderr[-500:])
     main = open(HERE + '/cppref/main.cpp').read().replace('"json.h"', f'"{name}.h"').replace('json::', name + '::')

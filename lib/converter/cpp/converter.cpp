@@ -871,7 +871,8 @@ namespace Cpp {
             if (visibility == LangAPI::Visibility::Public) {
                 if (declaration->isVariable()) {
                     fields.push_back(declaration->getVariable().name);
-                } else if (declaration->isFunction()) {
+                } else if (declaration->isFunction() && declaration->getFunction().template_parameters.empty()) {
+                    // A member template has no single address to list.
                     methods.push_back(declaration->getFunction().name);
                 }
             }
