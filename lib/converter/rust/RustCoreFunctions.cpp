@@ -288,6 +288,8 @@ auto RustCore::convertType(const LangAPI::Type &type) -> std::string {
                 const auto result = parts.back() == "()" ? std::string() : " -> " + parts.back();
                 return "impl FnMut(" + joinStrings(arguments, ", ") + ")" + result;
             }
+            case LangAPI::ValueType::Any:
+                return "::std::boxed::Box<dyn ::std::any::Any>";
             case LangAPI::ValueType::Undef:
                 return "_";
             default:

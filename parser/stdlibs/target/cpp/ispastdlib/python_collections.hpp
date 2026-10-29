@@ -14,6 +14,16 @@
 #include <vector>
 
 namespace ISPA_STD {
+// `needle in container`: vectors, strings and associative containers (C++17 overloads).
+template<class T, class A, class V>
+bool python_contains(const std::vector<T, A>& values, const V& needle) {
+    return std::find(values.begin(), values.end(), needle) != values.end();
+}
+template<class K, class T, class H, class E, class A, class V>
+bool python_contains(const std::unordered_map<K, T, H, E, A>& values, const V& key) { return values.find(key) != values.end(); }
+template<class K, class T, class C, class A, class V>
+bool python_contains(const std::map<K, T, C, A>& values, const V& key) { return values.find(key) != values.end(); }
+inline bool python_contains(std::string_view text, std::string_view needle) { return text.find(needle) != std::string_view::npos; }
 inline std::ptrdiff_t python_bound(std::ptrdiff_t index, std::ptrdiff_t size) {
     if (index < 0) index += size;
     return std::clamp(index, std::ptrdiff_t{0}, size);

@@ -180,13 +180,13 @@ def run(src: str, cur: Cursor, start_pos: int, tables: DfaTables, semantic: Call
             elif op == Action.COPY:
                 regs[row[1]] = regs[row[2]]
             elif op == Action.APPEND or op == Action.APPEND_NEXT:
-                value = here
+                mark = here
                 if op == Action.APPEND_NEXT:
-                    value = here + 1
+                    mark = here + 1
                 prev = UNSET
                 if row[2] != NULL_STATE:
                     prev = regs[row[2]]
-                history.append(HistoryNode(value, prev))
+                history.append(HistoryNode(mark, prev))
                 regs[row[1]] = len(history) - 1
             else:
                 scope.close()

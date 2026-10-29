@@ -132,12 +132,26 @@ struct PythonConverter {
             for (const auto& item : value) count_name(item, name, total);
         }
     }
+    // Occurrences of `name` in the statements of `list` itself, not in the blocks they contain.
+    static void count_shallow(const py::StmtList& list, const std::string& name, std::size_t& total) {
+        for (const auto& statement : list) {
+            if (!statement) continue;
+            if (auto s = statement->template get<py::If>()) count_name(s->test, name, total);
+            else if (auto s = statement->template get<py::While>()) count_name(s->test, name, total);
+            else if (auto s = statement->template get<py::For>()) { count_name(s->target, name, total); count_name(s->iter, name, total); }
+            else if (auto s = statement->template get<py::With>()) count_name(s->items, name, total);
+            else if (statement->template get<py::Try>()) continue;
+            else count_name(*statement, name, total);
+        }
+    }
+    // A name escapes its block when a statement of an enclosing block (outside any sibling block) uses it.
+    // Sibling blocks that assign the same name are independent variables, as they are in the targets.
     bool escapes_block(const std::string& name) const {
         if (!function_body || block_lists.empty()) return false;
-        std::size_t everywhere = 0, inside = 0;
-        count_name(*function_body, name, everywhere);
-        count_name(*block_lists.back(), name, inside);
-        return everywhere > inside;
+        std::size_t outside = 0;
+        count_shallow(*function_body, name, outside);
+        for (std::size_t i = 0; i + 1 < block_lists.size(); ++i) count_shallow(*block_lists[i], name, outside);
+        return outside > 0;
     }
     la::Statements nested(const py::StmtList& list, bool loop = false) {
         ++block_depth;
@@ -193,8 +207,6 @@ struct PythonConverter {
             if (n->id == "float") return la::Type{la::ValueType::Float};
             if (n->id == "bool") return la::Type{la::ValueType::Bool};
             if (n->id == "str") return la::Type{la::ValueType::String};
-            if (n->id == "list" || n->id == "dict")
-                unsupported(p->pos, n->id + " requires element types, e.g. " + (n->id == "list" ? "list[T]" : "dict[K, V]"));
             if (n->id == "object") return la::Type{la::ValueType::Any};
             if (typevars.contains(n->id)) return la::Type{la::Symbol{n->id}};
             return la::Type{pythonSymbol(n->id)};
@@ -500,10 +512,11 @@ struct PythonConverter {
                         {"items", {la::ArrayMethods::PythonItems, 0, 0}},
                         {"fromkeys", {la::ArrayMethods::PythonFromKeys, 2, 2}},
                     };
-                    if (auto found = methods.find(method->attr); found != methods.end()) {
+                    // A name that also belongs to a user class (`get(key)`) is a plain method call when the
+                    // arguments do not fit the collection method.
+                    if (auto found = methods.find(method->attr); found != methods.end() &&
+                        x.args.size() >= std::get<1>(found->second) && x.args.size() <= std::get<2>(found->second)) {
                         const auto& [kind, minimum, maximum] = found->second;
-                        if (x.args.size() < minimum || x.args.size() > maximum)
-                            unsupported(e.pos, "wrong argument count for collection method " + method->attr);
                         la::ArrayMethodCall call;
                         call.method = kind;
                         for (const auto& arg : x.args) call.args.push_back(expr(arg));
@@ -677,7 +690,22 @@ struct PythonConverter {
                     case py::CmpOp::LtE: op = la::ExpressionElement::LowerOrEqual; break;
                     case py::CmpOp::Gt: op = la::ExpressionElement::Higher; break;
                     case py::CmpOp::GtE: op = la::ExpressionElement::HigherOrEqual; break;
-                    default: unsupported(e.pos, "identity and membership comparisons are unsupported");
+                    case py::CmpOp::In: case py::CmpOp::NotIn: {
+                        // `needle in container`: a collection method call on the container.
+                        la::ArrayMethodCall call;
+                        call.method = la::ArrayMethods::PythonContains;
+                        call.args.push_back(expr(x.left));
+                        la::StorageSymbol storage;
+                        storage.what = group(expr(x.comparators[0]));
+                        storage.path.emplace_back(call);
+                        auto member = la::StorageSymbol::createExpression(storage);
+                        if (x.ops[0] == py::CmpOp::In) return member;
+                        la::Expression negated{la::ExpressionElement::Not};
+                        auto operand = group(member);
+                        negated.insert(negated.end(), operand.begin(), operand.end());
+                        return group(negated);
+                    }
+                    default: unsupported(e.pos, "identity comparisons are unsupported");
                 }
                 if (action_context && (x.ops[0] == py::CmpOp::Eq || x.ops[0] == py::CmpOp::NotEq)) {
                     auto tokenCompare = [&](const py::ExprPtr& property, const py::ExprPtr& other) -> std::optional<la::Expression> {
@@ -1023,6 +1051,8 @@ struct PythonConverter {
                             default: break;
                         }
                     }
+                    // A subclass may assign fields its base class declares.
+                    if (field_type == la::ValueType::Undef && !c->bases.empty()) continue;
                     if (field_type == la::ValueType::Undef) unsupported(line->pos, "instance field requires an annotation or a typed parameter initializer");
                     fields.insert(attr->attr);
                     out.data.emplace_back(std::make_shared<la::Declaration>(la::Variable{.name = attr->attr, .type = field_type}), la::Visibility::Public);

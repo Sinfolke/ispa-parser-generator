@@ -336,10 +336,15 @@ std::string Core::storage(const LangAPI::StorageSymbol& s) {
                 case M::PythonValues: name = "values"; break;
                 case M::PythonItems: name = "items"; break;
                 case M::PythonFromKeys: name = "fromkeys"; break;
+                case M::PythonContains: name = "contains"; break;
                 default: unsupported("ArrayMethodCall");
             }
             if (method->method == M::Push && method->args.empty()) {
                 result += ".append(None)";
+                continue;
+            }
+            if (method->method == M::PythonContains) {
+                result = "(" + expression(method->args.front()) + " in " + result + ")";
                 continue;
             }
             result += "." + name + "(" + join(method->args, ", ", [this](const auto& a) { return expression(a); }) + ")";

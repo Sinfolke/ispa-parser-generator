@@ -7,6 +7,8 @@ Sentinels are small signed Ints so the same table literal works in every target
   action_table  rows {op, a, b, next_state}
 A state number < len(table) is a table state; the next len(action_table) are
 action rows; everything above is a semantic dispatch index."""
+from typing import ClassVar
+
 from ispa_std.chars import at, code_of
 from ispa_std.failures import runtime_error
 from ispa_std.raw_token import RawToken
@@ -23,16 +25,16 @@ UNSET = -1
 
 class Action:
     # Same numbering as NFA::TNFA::Action.
-    UNDEF = 0
+    UNDEF: ClassVar[int] = 0
     # reg[a] = position
-    SET = 1
+    SET: ClassVar[int] = 1
     # reg[a] = position + 1 (one past the character being consumed)
-    SET_NEXT = 2
+    SET_NEXT: ClassVar[int] = 2
     # reg[a] = reg[b]
-    COPY = 3
+    COPY: ClassVar[int] = 3
     # reg[a] = append(reg[b], position)   (b == NULL_STATE: empty list)
-    APPEND = 4
-    APPEND_NEXT = 5
+    APPEND: ClassVar[int] = 4
+    APPEND_NEXT: ClassVar[int] = 5
 
 
 class TdfaLayout:

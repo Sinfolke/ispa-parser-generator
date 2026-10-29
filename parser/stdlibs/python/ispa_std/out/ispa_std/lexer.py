@@ -12,9 +12,9 @@ Differences forced by the language-neutral model:
     (cpp_residue/ispastdlib/file_io.hpp);
   * cursors are mutable objects: use copy() where C++ copies an iterator and
     assign() where it assigns one."""
-from typing import Callable
+from typing import Callable, ClassVar
 
-from ispa_std.chars import at, is_space
+from ispa_std.chars import at as char_at, is_space
 from ispa_std.dfa_api import Captures, LEXER_DELETE_STATE, NULL_STATE
 from ispa_std.utility import Pair
 from ispa_std.dfa_run import DfaTables, run
@@ -26,10 +26,10 @@ from ispa_std.string import substr
 
 
 class LexerDecision:
-    NONE = 0
-    DELETE = 1
-    INSERT = 2
-    ABORT = 3
+    NONE: ClassVar[int] = 0
+    DELETE: ClassVar[int] = 1
+    INSERT: ClassVar[int] = 2
+    ABORT: ClassVar[int] = 3
 
 
 class LexerFailureContext:
@@ -55,7 +55,7 @@ class LexerFailureContext:
         while left > 0 and p < len(self.src):
             p = p + 1
             left = left - 1
-        return value == at(self.src, p)
+        return value == char_at(self.src, p)
 
     def error(self, message: str) -> None:
         self.diagnostics.append(message)
@@ -233,7 +233,7 @@ class Lexer_base:
 
     def skip_spaces(self, cur: Cursor) -> int:
         prev = cur.pos
-        while is_space(at(self._in, cur.pos)):
+        while is_space(char_at(self._in, cur.pos)):
             cur.pos = cur.pos + 1
         return cur.pos - prev
 
@@ -472,9 +472,8 @@ class LazyIterator(TokenCursor):
                     before = state.pos
                     checkpoint = owner.checkpoint()
                     cur = Cursor(state.pos, owner.line)
-                    if owner.bound >= 0 and state.pos >= owner.bound:
-                        raw = owner.empty_token()
-                    else:
+                    raw: RawToken = owner.empty_token()
+                    if owner.bound < 0 or state.pos < owner.bound:
                         raw = owner.makeToken(cur)
                     state.pos = cur.pos
                     if raw.empty() and owner.external_boundary:

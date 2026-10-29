@@ -13,6 +13,8 @@ marks a missing cell, LR_CONFLICT a cell with several candidate actions
 The type-directed capture conversion (lr_convert & co) is expressed with an
 explicit `Shape` instead of the target's static type; the typed C++ version
 stays in cpp_residue."""
+from typing import ClassVar
+
 from ispa_std.failures import runtime_error
 from ispa_std.format import int_to_string
 from ispa_std.lexer import TokenCursor
@@ -27,12 +29,12 @@ ABSENT = -1
 
 
 class LRControlPhase:
-    Decide = 0
-    Shift = 1
-    Reduce = 2
-    Semantic = 3
-    Recover = 4
-    Accept = 5
+    Decide: ClassVar[int] = 0
+    Shift: ClassVar[int] = 1
+    Reduce: ClassVar[int] = 2
+    Semantic: ClassVar[int] = 3
+    Recover: ClassVar[int] = 4
+    Accept: ClassVar[int] = 5
 
 
 class LRControlState:
@@ -395,6 +397,7 @@ class LRParser:
                     rhs.append(values[i])
                     i = i + 1
                 span = self._reduce_span(g, rule, count, begin, spans, region.cursor)
+                value: object = 0
                 if g.has_semantic_reduce():
                     # Semantic reductions run at the ACTION table's exact reduce
                     # point. The callback may update the cursor and span, and

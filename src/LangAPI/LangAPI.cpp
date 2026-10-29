@@ -229,6 +229,7 @@ namespace LangAPI {
             case ArrayMethods::PythonValues: os << "PythonValues"; break;
             case ArrayMethods::PythonItems: os << "PythonItems"; break;
             case ArrayMethods::PythonFromKeys: os << "PythonFromKeys"; break;
+            case ArrayMethods::PythonContains: os << "PythonContains"; break;
 
         }
         return os;

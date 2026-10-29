@@ -6,7 +6,7 @@ optional/probing/backtracking alternatives. Token ids are Ints; EOF_TOKEN
 isEnd(), current(), next(), copy()."""
 from ispa_std.failures import invalid_argument, logic_error
 from ispa_std.format import int_to_string, join
-from typing import Callable
+from typing import Callable, ClassVar
 
 from ispa_std.lexer import TokenCursor
 from ispa_std.node import Node
@@ -18,14 +18,14 @@ NO_OFFSET = -1
 
 
 class Mode:
-    PanicUntil = 0
-    Insert = 1
-    Delete = 2
-    Replace = 3
-    Retry = 4
-    Synchronize = 5
-    Propagate = 6
-    Abort = 7
+    PanicUntil: ClassVar[int] = 0
+    Insert: ClassVar[int] = 1
+    Delete: ClassVar[int] = 2
+    Replace: ClassVar[int] = 3
+    Retry: ClassVar[int] = 4
+    Synchronize: ClassVar[int] = 5
+    Propagate: ClassVar[int] = 6
+    Abort: ClassVar[int] = 7
 
 
 class Decision:
@@ -164,7 +164,7 @@ def _kind(pos: TokenCursor) -> int:
     return token_id(pos.current())
 
 
-def recover(pos: TokenCursor, state: State, plan: Plan, token_kind: int) -> Decision:
+def recover(pos: TokenCursor, state: State, plan: Plan, token_kind: Callable[[RawToken], int]) -> Decision:
     """Pick and perform a repair at `pos`. `token_kind(token) -> id`; pos is
     advanced in place when tokens are skipped."""
     at = EOF_TOKEN
@@ -406,10 +406,10 @@ class LegacyFail(FailHandler):
 
 
 class RequiredStatus:
-    Matched = 0
-    Missing = 1
-    Boundary = 2
-    Aborted = 3
+    Matched: ClassVar[int] = 0
+    Missing: ClassVar[int] = 1
+    Boundary: ClassVar[int] = 2
+    Aborted: ClassVar[int] = 3
 
 
 class RequiredResult:
@@ -434,11 +434,11 @@ class RequiredResult:
 # --- context recovery ---------------------------------------------------------
 class ContextKind:
     # required member missing; skipped to a resume point
-    Mismatch = 0
+    Mismatch: ClassVar[int] = 0
     # token starts a construct owned by an outer frame
-    Misplaced = 1
+    Misplaced: ClassVar[int] = 1
     # token after a loop that no active frame can accept
-    Stray = 2
+    Stray: ClassVar[int] = 2
 
 
 class ContextClaim:

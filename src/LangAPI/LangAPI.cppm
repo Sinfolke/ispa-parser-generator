@@ -99,7 +99,7 @@ export namespace LangAPI {
     enum class ArrayMethods {
         Push, Pop, Size, Extend, Clear, PythonAppend, PythonExtend, PythonInsert, PythonRemove, PythonPop,
         PythonClear, PythonCopy, PythonCount, PythonIndex, PythonReverse, PythonSort,
-        PythonGet, PythonSetDefault, PythonUpdate, PythonKeys, PythonValues, PythonItems, PythonFromKeys
+        PythonGet, PythonSetDefault, PythonUpdate, PythonKeys, PythonValues, PythonItems, PythonFromKeys, PythonContains
     };
     enum class Visibility {
         Private, Public, Protected

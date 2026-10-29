@@ -106,6 +106,8 @@ auto Core::convertType(const LangAPI::Type &type) -> std::string {
                 }
                 return "std::function<" + convertTemplates(decltype(type.template_parameters){type.template_parameters.back()}) + "(" + args + ")>";
             }
+            case LangAPI::ValueType::Any:
+                return "std::any";
             case LangAPI::ValueType::Undef:
                 return "auto";
             default:
@@ -200,6 +202,7 @@ auto Core::convertStorageSymbol(const LangAPI::StorageSymbol &symbol) -> std::st
                 case LangAPI::ArrayMethods::PythonValues: name = "values"; break;
                 case LangAPI::ArrayMethods::PythonItems: name = "items"; break;
                 case LangAPI::ArrayMethods::PythonFromKeys: name = "fromkeys"; break;
+                case LangAPI::ArrayMethods::PythonContains: name = "contains"; break;
                 default: throw Error("Unknown Python collection method");
             }
             if (method->method == LangAPI::ArrayMethods::PythonAppend) {

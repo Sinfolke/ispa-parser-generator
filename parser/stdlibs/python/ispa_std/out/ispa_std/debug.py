@@ -12,6 +12,8 @@ every call is a no-op, like the C++ build without ISPA_DEBUG_FD.
 Where C++ used RAII (RuleScope, ProductionScope, MatchScope) call `close()` on
 every exit path. A scope abandoned by an exception is closed by
 `unwind_to(depth)`, which the parser calls where it catches NoMatch."""
+from typing import ClassVar
+
 from ispa_std.chars import char_of, code_of
 from ispa_std.format import int_to_string, join
 from ispa_std.string import substr
@@ -19,20 +21,20 @@ from ispa_std.utility import Pair
 
 
 class Kind:
-    trace = 1
-    value = 2
-    enter_rule = 3
-    exit_rule = 4
-    diagnostic = 5
-    breakpoint = 6
-    lexer_enter = 7
-    lexer_leave = 8
-    lexer_capture = 9
-    source_line = 10
-    production_enter = 11
-    production_leave = 12
-    snapshot = 13
-    session_end = 14
+    trace: ClassVar[int] = 1
+    value: ClassVar[int] = 2
+    enter_rule: ClassVar[int] = 3
+    exit_rule: ClassVar[int] = 4
+    diagnostic: ClassVar[int] = 5
+    breakpoint: ClassVar[int] = 6
+    lexer_enter: ClassVar[int] = 7
+    lexer_leave: ClassVar[int] = 8
+    lexer_capture: ClassVar[int] = 9
+    source_line: ClassVar[int] = 10
+    production_enter: ClassVar[int] = 11
+    production_leave: ClassVar[int] = 12
+    snapshot: ClassVar[int] = 13
+    session_end: ClassVar[int] = 14
 
 
 MAX_PAYLOAD = 1048576

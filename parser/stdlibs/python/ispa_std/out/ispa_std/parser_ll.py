@@ -1129,6 +1129,7 @@ class LLParser(Parser_base):
             # Recursive alternatives may advance their input argument before
             # failing. Never let a failed probe mutate pos.
             attempt = pos.copy()
+            match: MatchResult = MatchResult.failed(attempt)
             if fail.is_custom():
                 match = self._attempt_rule(rec, attempt)
             else:
