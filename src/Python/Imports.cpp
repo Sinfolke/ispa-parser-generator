@@ -340,8 +340,8 @@ std::string Imports::module(const Modules::Path& source_path, const std::string&
         for (const auto& statement : syntax.body) {
             if (statement->get<py::ImportFrom>() || statement->get<py::Import>()) continue;
             if (auto spec = native(*statement)) {
-                if (canonical.filename() != "internals.py" && canonical.filename() != "langapi.py")
-                    fail(statement->pos, "native declarations belong in internals.py");
+                if (canonical.filename() != "internals.py" && canonical.filename() != "langapi.py" && canonical.filename() != "prim.py")
+                    fail(statement->pos, "native declarations belong in internals.py, langapi.py or prim.py");
                 auto assignment = statement->get<py::Assign>();
                 if (assignment->targets.size() != 1 || !assignment->targets[0] ||
                     !assignment->targets[0]->get<py::Name>())
@@ -396,6 +396,16 @@ std::string Imports::module(const Modules::Path& source_path, const std::string&
                 f->decorators.size() == 1 && f->decorators[0]->get<py::Name>() && f->decorators[0]->get<py::Name>()->id == "staticmethod") {
                 const auto key = c->name + "." + f->name;
                 symbols.emplace(key, Export{"python." + name + "." + key, f->params.size()});
+            }
+            // `NAME: ClassVar[T] = value` constants are addressed as Class.NAME.
+            for (const auto& member : c->body) if (auto a = member->get<py::AnnAssign>(); a && a->target && a->annotation) {
+                auto marker = a->annotation->get<py::Subscript>();
+                auto marker_name = marker && marker->value ? marker->value->get<py::Name>() : nullptr;
+                auto field = a->target->get<py::Name>();
+                if (marker_name && marker_name->id == "ClassVar" && field) {
+                    const auto key = c->name + "." + field->id;
+                    symbols.emplace(key, Export{"python." + name + "." + key, std::nullopt});
+                }
             }
         }
         LangAPI::Declarations lowered;

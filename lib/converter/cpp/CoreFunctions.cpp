@@ -579,6 +579,10 @@ auto Core::convertIspaLibFunctionCall(const LangAPI::IspaLibFunctionCall &call) 
         return scopePrefix() + "Lexer::" + (call.symbol.exports == S::TokenCursor ? "iterator(" : "lazy_iterator(") +
             lexer + (expected == 2 ? ", " + convertExpression(call.args[1]) : "") + ")";
     }
+    if (call.symbol.exports == S::Fail || call.symbol.exports == S::Attempt || call.symbol.exports == S::FailureMessage) {
+        const auto name = call.symbol.exports == S::Fail ? "fail" : call.symbol.exports == S::Attempt ? "attempt" : "failure_message";
+        return std::string("::ISPA_STD::") + name + "(" + convertFunctionParams(call.args) + ")";
+    }
     if (call.symbol.exports == LangAPI::StdlibExports::CloneSelfBox)
         return "std::make_shared<" + convertTemplates(call.template_parameters) + ">(*this)";
     std::ostringstream out;

@@ -539,6 +539,12 @@ std::string Core::lib_call(const LangAPI::IspaLibFunctionCall& c) {
         if (c.symbol.exports == S::TokenCursor) return lexer + ".iterator()";
         return "(" + lexer + ".set_input(" + expression(c.args[1]) + "), " + lexer + ".lazy_iterator())[1]";
     }
+    if (c.symbol.exports == S::Fail || c.symbol.exports == S::Attempt || c.symbol.exports == S::FailureMessage) {
+        const auto name = c.symbol.exports == S::Fail ? "fail" : c.symbol.exports == S::Attempt ? "attempt" : "failure_message";
+        std::string arguments;
+        for (const auto& argument : c.args) arguments += (arguments.empty() ? "" : ", ") + expression(argument);
+        return std::string("ispa_std.") + name + "(" + arguments + ")";
+    }
     if (c.symbol.exports == LangAPI::StdlibExports::CloneSelfBox) return "__import__('copy').copy(self)";
     std::string fn = lib(c.symbol);
     const auto kind = c.symbol.exports;

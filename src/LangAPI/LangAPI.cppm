@@ -120,7 +120,11 @@ export namespace LangAPI {
         ParserRequired, ParserOptional, ParserRange, ParserRangeOptional,
         RecoveryDecision, RecoveryState, RecoverEncoded, ParserCounted,
         RecoveryTokenSet, RecoveryEndOfInput, RecoveryPolicy, CloneSelfBox, LookaheadKind,
-        TextOutput, RecoveryHandler, TokenCursor, LazyTokenCursor, ResetTokenStream
+        TextOutput, RecoveryHandler, TokenCursor, LazyTokenCursor, ResetTokenStream,
+        // Error primitives, implemented by each target's native runtime:
+        // Fail(kind, message) never returns; Attempt(fn) -> 0 on success, else the error kind;
+        // FailureMessage() -> message of the failure Attempt last caught.
+        Fail, Attempt, FailureMessage
     };
 
 

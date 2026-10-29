@@ -474,6 +474,7 @@ namespace {
                 if constexpr (std::is_same_v<T,py::Name>) {
                     if (v.ctx != py::ExprContext::Load) return type(TK::Unknown);
                     if (auto* sym = look(s, v.id)) { sym->used = true; return sym->ty; }
+                    if (v.id == "__ispa_internal__") return type(TK::Unknown); // compiler-intrinsic declaration marker
                     report(options_.strictPythonNames ? diag::Severity::Error : diag::Severity::Warning,
                         "PY001", "unresolved Python name '" + v.id + "'", p,
                         "Declare it in the action, a capture, or an imported Python sidecar module.");

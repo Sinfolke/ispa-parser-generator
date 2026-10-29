@@ -409,7 +409,9 @@ struct PythonConverter {
                     const std::map<std::string, std::pair<la::StdlibExports, std::size_t>> streams{
                         {"token_cursor", {la::StdlibExports::TokenCursor, 1}},
                         {"lazy_token_cursor", {la::StdlibExports::LazyTokenCursor, 2}},
-                        {"reset_token_stream", {la::StdlibExports::ResetTokenStream, 1}}};
+                        {"reset_token_stream", {la::StdlibExports::ResetTokenStream, 1}},
+                        {"fail", {la::StdlibExports::Fail, 2}}, {"attempt", {la::StdlibExports::Attempt, 1}},
+                        {"failure_message", {la::StdlibExports::FailureMessage, 0}}};
                     if (const auto found = streams.find(name); found != streams.end()) {
                         if (x.args.size() != found->second.second) unsupported(e.pos, "wrong IR operation arity");
                         la::IspaLibFunctionCall call{.symbol = la::IspaLibSymbol{.exports = found->second.first}};
@@ -1001,6 +1003,20 @@ struct PythonConverter {
                     out.data.emplace_back(std::make_shared<la::Declaration>(std::move(lowered)), la::Visibility::Public);
                     scope.self_name.clear();
                 } else {
+                    // `NAME: ClassVar[T] = value` is a class-level constant, not an instance field.
+                    if (auto a = member->template get<py::AnnAssign>(); a && a->target && a->annotation) {
+                        auto marker = a->annotation->template get<py::Subscript>();
+                        auto marker_name = marker && marker->value ? marker->value->template get<py::Name>() : nullptr;
+                        auto field = a->target->template get<py::Name>();
+                        if (marker_name && (marker_name->id == "ClassVar" || marker_name->id == "typing.ClassVar") && field) {
+                            if (!a->value) unsupported(member->pos, "ClassVar requires an initializer");
+                            const auto field_type = scope.type(marker->slice);
+                            la::Variable constant{.name = field->id, .type = field_type,
+                                                  .value = scope.initializer(a->value, field_type), .is_static = true};
+                            out.data.emplace_back(std::make_shared<la::Declaration>(la::Declaration{constant}), la::Visibility::Public);
+                            continue;
+                        }
+                    }
                     auto lowered = scope.declaration(*member);
                     if (lowered.isVariable() && lowered.getVariable().type == la::ValueType::Undef)
                         unsupported(member->pos, "class fields require type annotations");

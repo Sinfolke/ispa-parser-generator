@@ -256,6 +256,9 @@ namespace LangAPI {
             case StdlibExports::TokenCursor: os << "TokenCursor"; break;
             case StdlibExports::LazyTokenCursor: os << "LazyTokenCursor"; break;
             case StdlibExports::ResetTokenStream: os << "ResetTokenStream"; break;
+            case StdlibExports::Fail: os << "Fail"; break;
+            case StdlibExports::Attempt: os << "Attempt"; break;
+            case StdlibExports::FailureMessage: os << "FailureMessage"; break;
             case StdlibExports::Node: os << "Node"; break;
             case StdlibExports::MatchResult: os << "MatchResult"; break;
             case StdlibExports::Lexer: os << "Lexer"; break;

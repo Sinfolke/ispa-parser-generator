@@ -736,6 +736,14 @@ auto RustCore::convertIspaLibFunctionCall(const LangAPI::IspaLibFunctionCall &ca
         return std::string("ispa_std::TokenStream::") + method + "(&mut " + convertExpression(call.args[0]) +
             (expected == 2 ? ", " + convertExpression(call.args[1]) : "") + ")";
     }
+    if (kind == LangAPI::StdlibExports::Fail || kind == LangAPI::StdlibExports::Attempt ||
+        kind == LangAPI::StdlibExports::FailureMessage) {
+        const auto name = kind == LangAPI::StdlibExports::Fail ? "fail" :
+            kind == LangAPI::StdlibExports::Attempt ? "attempt" : "failure_message";
+        std::vector<std::string> arguments;
+        for (const auto &argument : call.args) arguments.push_back(convertExpression(argument));
+        return std::string("::ispa_std::") + name + "(" + joinStrings(arguments, ", ") + ")";
+    }
     if (kind == LangAPI::StdlibExports::CloneSelfBox)
         return "::std::rc::Rc::new(::std::clone::Clone::clone(&self.base_0))";
     const bool parser_match = kind == LangAPI::StdlibExports::ParserRequired ||
