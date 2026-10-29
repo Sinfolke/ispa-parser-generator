@@ -1079,6 +1079,23 @@ auto RustCore::convertLambda(const LangAPI::Lambda &lambda) -> std::string {
     return "|" + joinStrings(params, ", ") + "| {\n" + entry + body + "}";
 }
 
+// An argument for a runtime helper (which takes values): a copy of a place, except a reference parameter or the cursor of
+// a semantic action, which are lent.
+auto RustCore::runtimeArgument(const LangAPI::Expression &expression, const std::string &rendered) -> std::string {
+    if (expression.size() == 1 && expression[0].isRvalue()) {
+        const auto &rvalue = expression[0].getRValue();
+        if (rvalue.isSymbol() && rvalue.getSymbol().path.size() == 1 && std::holds_alternative<std::string>(rvalue.getSymbol().path[0])) {
+            const auto &name = std::get<std::string>(rvalue.getSymbol().path[0]);
+            if (reference_parameters.contains(name) || (borrowed_parameters.contains(name) && !const_borrowed_parameters.contains(name)))
+                return "&mut *" + ident(name);
+        }
+        if (rvalue.type() == LangAPI::RValueType::Pos && !rvalue.getPos().dereference && rendered.find("(*") != std::string::npos &&
+            rendered.find(".offset(") == std::string::npos)
+            return "&mut " + rendered;
+    }
+    return convertInitializerValue(LangAPI::Type{LangAPI::ValueType::Undef}, expression);
+}
+
 auto RustCore::convertFunctionCall(const LangAPI::FunctionCall &call, bool member) -> std::string {
     auto* const sink = hoist_sink;
     const bool hoist_self_call = hoist_self;
@@ -1235,7 +1252,9 @@ auto RustCore::convertFunctionCall(const LangAPI::FunctionCall &call, bool membe
                 if (call.args[i].size() == 1 && call.args[i][0].isRvalue() && call.args[i][0].getRValue().isSymbol() &&
                     call.args[i][0].getRValue().getSymbol().path.size() == 1 &&
                     std::holds_alternative<std::string>(call.args[i][0].getRValue().getSymbol().path[0]) &&
-                    reference_parameters.contains(std::get<std::string>(call.args[i][0].getRValue().getSymbol().path[0]))) {
+                    (reference_parameters.contains(std::get<std::string>(call.args[i][0].getRValue().getSymbol().path[0])) ||
+             (borrowed_parameters.contains(std::get<std::string>(call.args[i][0].getRValue().getSymbol().path[0])) &&
+              !const_borrowed_parameters.contains(std::get<std::string>(call.args[i][0].getRValue().getSymbol().path[0]))))) {
                     args[i] = "&mut *" + ident(std::get<std::string>(call.args[i][0].getRValue().getSymbol().path[0]));
                     continue;
                 }
@@ -1301,7 +1320,7 @@ auto RustCore::convertFunctionCall(const LangAPI::FunctionCall &call, bool membe
     std::string callee = convertIspaLibSymbol(lib, true);
     if (lib.exports == LangAPI::StdlibExports::Error) callee += "::new";           // std::runtime_error(msg) -> Error::new(msg)
     for (std::size_t i = 0; i < args.size(); ++i)   // runtime helpers take their arguments by value
-        if (args[i] == raw_args[i]) args[i] = convertInitializerValue(LangAPI::Type{LangAPI::ValueType::Undef}, call.args[i]);
+        if (args[i] == raw_args[i]) args[i] = runtimeArgument(call.args[i], args[i]);
     return callee + generic(convertTemplates(call.template_parameters), true) + "(" + joinStrings(args, ", ") + ")";
 }
 
@@ -1392,7 +1411,7 @@ auto RustCore::convertIspaLibFunctionCall(const LangAPI::IspaLibFunctionCall &ca
                convertInitializerValue(LangAPI::Type{LangAPI::ValueType::Undef}, call.args[1]) + ")";
     }
     for (std::size_t i = 0; i < args.size() && i < call.args.size(); ++i)   // runtime helpers take their arguments by value
-        args[i] = convertInitializerValue(LangAPI::Type{LangAPI::ValueType::Undef}, call.args[i]);
+        args[i] = runtimeArgument(call.args[i], args[i]);
     return callee + turbofish + "(" + joinStrings(args, ", ") + ")";
 }
 

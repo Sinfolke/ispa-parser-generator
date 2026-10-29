@@ -99,3 +99,31 @@ impl<T: ToText> Node<T> { pub fn to_string(&self) -> String { self.value.to_text
 
 /// Join the text of every argument (`ISPA_STD::concat`).
 pub fn concat(parts: &[&dyn ToText]) -> String { parts.iter().map(|part| part.to_text()).collect() }
+
+// tuples (a group of a rule: `(COMMA item)`): printed as their items, concatenated as text
+macro_rules! tuple_support {
+    ($($name:ident $index:tt),+) => {
+        impl<$($name: PrintValue),+> PrintValue for ($($name,)+) {
+            fn structured(&self) -> bool { true }
+            fn print_subtree(&self, printer: &mut ASTPrinter) {
+                let count = [$($index),+].len();
+                $( printer.node_with_value("item", &self.$index, $index + 1 == count); )+
+            }
+        }
+        impl<$($name: ToText),+> ToText for ($($name,)+) {
+            fn to_text(&self) -> String { let mut text = String::new(); $( text += &self.$index.to_text(); )+ text }
+        }
+    };
+}
+tuple_support!(A 0);
+tuple_support!(A 0, B 1);
+tuple_support!(A 0, B 1, C 2);
+tuple_support!(A 0, B 1, C 2, D 3);
+tuple_support!(A 0, B 1, C 2, D 3, E 4);
+tuple_support!(A 0, B 1, C 2, D 3, E 4, F 5);
+impl<T: PrintValue> PrintValue for &T {
+    fn structured(&self) -> bool { (**self).structured() }
+    fn scalar(&self) -> String { (**self).scalar() }
+    fn print_subtree(&self, printer: &mut ASTPrinter) { (**self).print_subtree(printer) }
+    fn print_data(&self, printer: &mut ASTPrinter) { (**self).print_data(printer) }
+}

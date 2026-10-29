@@ -101,3 +101,6 @@ impl<Token: Clone + Default + 'static> LexerBase<Token> {
 /// A token that can say it is the empty end marker.
 pub trait TokenEnd { fn is_end(&self) -> bool; }
 impl<V: crate::TokenVariant> TokenEnd for crate::RawToken<V> { fn is_end(&self) -> bool { self.empty() } }
+
+/// The text a pointer points into, as the core's string.
+pub(crate) fn source_text(text: &'static str) -> Shared<dfa_api::SourceText> { core_source(text) }

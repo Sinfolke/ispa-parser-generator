@@ -13,11 +13,18 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 RUNTIME = REPO / 'parser' / 'stdlibs' / 'target' / 'rust'
 CPP_STDLIB = REPO / 'parser' / 'stdlibs' / 'target' / 'cpp'
-GRAMMAR = HERE / 'grammars' / 'json'
 
-CORPUS = ['[1, "a", true]', '{"a": [1, 2, {"b": false}], "c": "x"}', '[]', '{}', '  [ 1.5 , 2 ]  ', '"s"', 'true', '[[[[1]]]]',
+# grammar name -> (entry file, fixed corpus, fuzz alphabet)
+GRAMMARS = {
+    'json': ('json.isc', ['[1, "a", true]', '{"a": [1, 2, {"b": false}], "c": "x"}', '[]', '{}', '  [ 1.5 , 2 ]  ', '"s"', 'true', '[[[[1]]]]',
           '[1,', '[1, 2', '{"a": [1,', '{"a": 1, ', '[1 2]', '{"a" 1}', '{"a": }', '[,]', '[1,,2]', '{,}', 'x', '-3',
-          '{"a":1,"b":2,"c":[],"d":{}}', '{"k": {"n": [true, false, "s", 1.25]}}']
+          '{"a":1,"b":2,"c":[],"d":{}}', '{"k": {"n": [true, false, "s", 1.25]}}'],
+             ['[', ']', '{', '}', ',', ':', '"k"', '"v"', '1', '2.5', 'true', 'false', ' ', '  ']),
+    # dynamic values: a quote character or heredoc tag captured earlier decides where the match ends
+    'dyn': ('dyn.isc', ['"abc", \'d\\\'e\', <<EOT\nline one\nEOT, "x\\"y"', "'a' , \"b\"", '<<A\nxx\nA,<<BB\nA\nBB', '"unterminated', '<<T\nbody T',
+                        "'it\"s", '<<X\n\nX', '"a""b"', '', ',', '"a",'],
+            ['"', "'", '<<', ',', '\\', '\n', ' ', 'EOT', 'A\n', 'a', 'b', 'T\n']),
+}
 
 
 def run(command, **kwargs):
@@ -27,13 +34,13 @@ def run(command, **kwargs):
     return result
 
 
-def build(ispa, work):
+def build(ispa, work, grammar):
     env = {key: value for key, value in os.environ.items() if key != 'LD_LIBRARY_PATH'}
     env['ISPA_RUST_EXPERIMENTAL'] = '1'
     gen, gen_cpp = work / 'gen_rust', work / 'gen_cpp'
     gen.mkdir(parents=True, exist_ok=True)
     gen_cpp.mkdir(parents=True, exist_ok=True)
-    common = ['-a', 'LL', '--no-incremental', '--no-ai-recovery', '--no-debug-instrumentation', '--dir', str(GRAMMAR), str(GRAMMAR / 'json.isc')]
+    common = ['-a', 'LL', '--no-incremental', '--no-ai-recovery', '--no-debug-instrumentation', '--dir', str(HERE / 'grammars' / grammar), str(HERE / 'grammars' / grammar / GRAMMARS[grammar][0])]
     run([ispa, '-l', 'rust', *common, '-o', str(gen / 'generated')], env=env)
     run([ispa, '-l', 'cpp', *common, '-o', str(gen_cpp / 'generated')], env=env)
     # the generated Rust file is a module root: its crate-level attributes move to the including crate
@@ -52,9 +59,8 @@ def build(ispa, work):
     return crate / 'target' / 'debug' / 'run', reference
 
 
-def fuzz_inputs(count, seed):
+def fuzz_inputs(count, seed, pieces):
     rng = random.Random(seed)
-    pieces = ['[', ']', '{', '}', ',', ':', '"k"', '"v"', '1', '2.5', 'true', 'false', ' ', '  ']
     for _ in range(count):
         yield ''.join(rng.choice(pieces) for _ in range(rng.randint(1, 14)))
 
@@ -62,13 +68,14 @@ def fuzz_inputs(count, seed):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--ispa', default=os.environ.get('ISPA') or str(REPO / 'cmake-build-release' / 'ispa'))
+    parser.add_argument('--grammar', choices=sorted(GRAMMARS), default='json')
     parser.add_argument('--fuzz', type=int, default=150)
     parser.add_argument('--seed', type=int, default=1)
     args = parser.parse_args()
-    work = HERE / 'build' / 'rust'
-    rust, cpp = build(args.ispa, work)
+    work = HERE / 'build' / 'rust' / args.grammar
+    rust, cpp = build(args.ispa, work, args.grammar)
     different = 0
-    inputs = CORPUS + list(fuzz_inputs(args.fuzz, args.seed))
+    inputs = GRAMMARS[args.grammar][1] + list(fuzz_inputs(args.fuzz, args.seed, GRAMMARS[args.grammar][2]))
     for text in inputs:
         want = subprocess.run([str(cpp), text], capture_output=True, text=True).stdout
         got = subprocess.run([str(rust), text], capture_output=True, text=True).stdout

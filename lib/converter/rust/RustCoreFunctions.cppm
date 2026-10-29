@@ -59,6 +59,7 @@ export namespace RustCore {
     std::vector<std::string>* hoist_sink = nullptr;        // call arguments that re-borrow `self` are bound before the receiver is borrowed
     bool hoist_self = false;                               // ... and the receiver is rooted at `self`, so arguments touching `self` are hoisted too
     int hoist_counter = 0;
+    auto runtimeArgument(const LangAPI::Expression &expression, const std::string &rendered) -> std::string;
     auto currentClass() -> std::string;
     auto isSharedObjectInitializer(const LangAPI::Expression &value) -> bool;
     auto typeOfExpression(const LangAPI::Expression &e) -> const LangAPI::Type *;

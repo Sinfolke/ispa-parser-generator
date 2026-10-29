@@ -208,21 +208,14 @@ pub mod dfa {
         impl<T,U> SpanCharTable<T,U> { pub fn from_slice(_: &[U]) -> Self { Self(std::marker::PhantomData) } }
         #[derive(Clone, Copy, Debug, Default)] pub struct SpanMultiTable<'a, T>(pub Span<'a,T>);
         impl<'a,T> SpanMultiTable<'a,T> { pub fn new(v: Span<'a,T>) -> Self { Self(v) } }
-        pub fn dynamic_match(cursor: &mut crate::Ptr, alternatives: &[&str], negative: bool, repeat: bool) -> bool {
-            let excluded = |pos: crate::Ptr| alternatives.iter().any(|value| !value.is_empty() && pos.starts_with(value));
-            if negative {
-                if repeat {
-                    while !cursor.is_eof() && !excluded(*cursor) { cursor.inc(); }
-                    return true;
-                }
-                if cursor.is_eof() || excluded(*cursor) { return false; }
-                cursor.inc();
-                return true;
-            }
-            if let Some(value) = alternatives.iter().find(|value| !value.is_empty() && cursor.starts_with(value)) {
-                *cursor = cursor.advance(value.chars().count());
-                true
-            } else { false }
+        /// Match one of `alternatives` (or, negated, anything but them: one character, or a run for `*`) at the cursor.
+        pub fn dynamic_match(cursor: &mut crate::Ptr, alternatives: impl AsRef<[String]>, negative: bool, quantifier: impl AsRef<str>) -> bool {
+            let source = crate::lexer::source_text(cursor.text());
+            let found = crate::python::ispa_std::dfa_api::dynamic_match(&source.borrow().text, cursor.offset() as i64, &alternatives.as_ref().to_vec(), negative,
+                                                                         &quantifier.as_ref().to_string());
+            if found < 0 { return false; }
+            *cursor = crate::Ptr::at(cursor.text(), found as usize);
+            true
         }
     }
 }

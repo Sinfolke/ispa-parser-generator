@@ -48,6 +48,8 @@ pub struct RawToken<V> {
     pub id: usize,
 }
 impl<V: TokenVariant> RawToken<V> {
+    /// The empty token.
+    pub fn new() -> Self { Self::default() }
     pub fn create(start_pos: i64, source: Ptr, length: i64, line: i64, id: usize, value: impl Into<V>) -> Self {
         Self { value: value.into(), start_pos, source, length, line, id }
     }
