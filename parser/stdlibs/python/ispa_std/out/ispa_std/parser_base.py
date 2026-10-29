@@ -55,12 +55,17 @@ class Parser_base:
 
     # Parse NON-LAZILY input (C++ protected virtual parse()).
     def parse_tokens(self) -> object:
+        self.before_parse()
         if not self.has_lexer:
             api_error("Can't parse because no input lexer is provided", [])
         if not self.lexer.hasInput():
             self.lexer.makeTokens()
         self.parseFromTokens()
         return self.tree
+
+    # Hook run first by parse_tokens (LLParser resets its recovery state here).
+    def before_parse(self) -> None:
+        return
 
     # Parse LAZILY input.
     def parseLazy(self) -> object:

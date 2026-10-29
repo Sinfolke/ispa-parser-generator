@@ -204,7 +204,7 @@ class LRCaptures:
 
 
 def lr_pack(values: list[object], indices: list[int], offsets: list[int], splice: list[int], count: int, repeated: bool) -> LRCaptures:
-    columns = []
+    columns: list[list[object]] = []
     i = 0
     while i < count:
         columns.append([])
@@ -373,7 +373,7 @@ class LRParser:
                 if (last.begin != 0 and not last.leading and not region.recovered_prefix) \
                         or (region.cursor > last.end and not last.trailing):
                     runtime_error("Whitespace is not allowed at the input boundary")
-                return MatchResult(True, values[len(values) - 1], position)
+                return MatchResult(True, lr_node(values[len(values) - 1]), position)
             elif action > 0:
                 control.phase = LRControlPhase.Shift
                 if position.isEnd():

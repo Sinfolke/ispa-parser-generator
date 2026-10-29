@@ -48,7 +48,7 @@ class Sum(LRGrammar):
 def test_lr_sums():
     # tokens n + n + n at positions 0,1,2,3,4 -> shift values are pos+1
     r = LRParser().lr_parse(Sum(), ListIt(toks([N, PLUS, N, PLUS, N])))
-    assert r.status and r.node == 1 + 3 + 5
+    assert r.status and r.node.data() == 1 + 3 + 5
 
 
 def test_lr_error():
@@ -80,7 +80,7 @@ class Ambig(Sum):
 
 def test_glr_unambiguous():
     r = LRGeneralizedParser().lr_parse_generalized(Ambig(), ListIt(toks([N, PLUS, N])))
-    assert r.status and r.node == 1 + 3
+    assert r.status and r.node.data() == 1 + 3
 
 
 def test_glr_ambiguous_reports():

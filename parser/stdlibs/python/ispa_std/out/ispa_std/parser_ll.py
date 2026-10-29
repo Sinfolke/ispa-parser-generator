@@ -693,9 +693,8 @@ class LLParser(Parser_base):
         self.recovering_ = False
         self.context_errors_.clear()
 
-    def parse_tokens(self) -> object:
+    def before_parse(self) -> None:
         self.reset_recovery()
-        return Parser_base.parse_tokens(self)
 
     def parseLazy(self) -> object:
         self.reset_recovery()
@@ -776,8 +775,9 @@ class LLParser(Parser_base):
             return "<end of input>"
         actual = "token #" + int_to_string(recovery.token_id(pos.current()))
         meta = pos.current().meta()
+        shown: int = 80
         if meta.has_source() and meta.length() > 0:
-            actual = actual + " '" + substr(meta.source(), meta.startpos(), minimum(meta.length(), 80)) + "'"
+            actual = actual + " '" + substr(meta.source(), meta.startpos(), minimum(meta.length(), shown)) + "'"
         return actual
 
     def debug_recovery_mode(self, mode: int) -> str:

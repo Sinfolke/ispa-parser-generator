@@ -75,6 +75,9 @@ class DebugControl:
 class ScopeBase:
     serial: int
 
+    def close(self) -> None:
+        return
+
 
 class DebugState:
     sink: DebugSink

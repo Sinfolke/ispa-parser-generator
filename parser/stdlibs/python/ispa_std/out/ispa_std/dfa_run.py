@@ -123,7 +123,7 @@ def run(src: str, cur: Cursor, start_pos: int, tables: DfaTables, semantic: Call
     nactions = len(action_table)
     trace_on = len(tables.debug_array) > 1 or (len(tables.debug_array) == 1 and tables.debug_array[0].member != "<Undefined>")
 
-    regs = []
+    regs: list[int] = []
     i = 0
     width = registers
     if width < 1:

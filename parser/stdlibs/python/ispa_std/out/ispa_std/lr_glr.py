@@ -5,7 +5,7 @@ prefixes and reductions share a packed forest. No semantic callbacks run until
 the complete input has exactly one surviving derivation."""
 from ispa_std.failures import runtime_error
 from ispa_std.format import int_to_string, join
-from ispa_std.lr import ABSENT, LR_CONFLICT, LR_INVALID, LRGrammar, LRParser
+from ispa_std.lr import ABSENT, lr_node, LR_CONFLICT, LR_INVALID, LRGrammar, LRParser
 from ispa_std.lexer import TokenCursor
 from ispa_std.match_result import MatchResult
 from ispa_std.sortedmap import IntSet, StrIntMap
@@ -48,13 +48,25 @@ class _Alternative:
         return True
 
 
+class _Eval:
+    """One frame of the iterative tree evaluation."""
+    node: int
+    child: int
+    rhs: list[object]
+
+    def __init__(self, node: int):
+        self.node = node
+        self.child = 0
+        self.rhs = []
+
+
 class _Forest:
     span: _Span
     has_token: bool
-    token: object
+    token: TokenCursor
     alternatives: list[_Alternative]
 
-    def __init__(self, span: _Span, has_token: bool, token: object):
+    def __init__(self, span: _Span, has_token: bool, token: TokenCursor):
         self.span = span
         self.has_token = has_token
         self.token = token
@@ -92,7 +104,7 @@ class LRGeneralizedParser(LRParser):
 
     def lr_parse_generalized(self, g: LRGrammar, pos: TokenCursor) -> MatchResult:
         self.work = 0
-        forest = []
+        forest: list[_Forest] = []
         stacks = [_Stack(ABSENT, 0, ABSENT)]
         forest_index = StrIntMap()
         stack_index = StrIntMap()
@@ -107,7 +119,7 @@ class LRGeneralizedParser(LRParser):
             self._skip(g, pos, offset)
             cursor = offset[0]
             window = self._window(g, pos)
-            pending = []
+            pending: list[int] = []
             pending.extend(active.items)
             closure = active.copy()
             shifted = IntSet()
@@ -207,7 +219,7 @@ class LRGeneralizedParser(LRParser):
             ways.append(0)
             i = i + 1
         ambiguous = ABSENT
-        order = []
+        order: list[int] = []
         ri = 0
         while ri < len(roots.items) and ambiguous == ABSENT:
             root = roots.items[ri]
@@ -284,28 +296,28 @@ class LRGeneralizedParser(LRParser):
         # Evaluate the chosen tree after recognition. Semantic results are not
         # memoized: two occurrences of a shared epsilon subtree still need two
         # action invocations. The traversal is iterative so deep trees work.
-        # frames: [node, child, rhs]
-        evaluating = [[roots.smallest(), 0, []]]
-        result = 0
+        evaluating: list[_Eval] = [_Eval(roots.smallest())]
+        result: object = 0
         while len(evaluating) > 0:
             self._tick(forest, stacks)
             frame = evaluating[len(evaluating) - 1]
-            node = forest[frame[0]]
-            if (not node.has_token) and frame[1] < len(node.alternatives[0].children):
-                child = node.alternatives[0].children[frame[1]]
-                frame[1] = frame[1] + 1
-                evaluating.append([child, 0, []])
+            node = forest[frame.node]
+            if (not node.has_token) and frame.child < len(node.alternatives[0].children):
+                child = node.alternatives[0].children[frame.child]
+                frame.child = frame.child + 1
+                evaluating.append(_Eval(child))
             else:
+                produced: object = 0
                 if node.has_token:
                     produced = g.lr_shift(node.token.current())
                 else:
-                    produced = g.lr_reduce(node.alternatives[0].rule, frame[2])
+                    produced = g.lr_reduce(node.alternatives[0].rule, frame.rhs)
                 evaluating.pop()
                 if len(evaluating) == 0:
                     result = produced
                 else:
-                    evaluating[len(evaluating) - 1][2].append(produced)
-        return MatchResult(True, result, pos)
+                    evaluating[len(evaluating) - 1].rhs.append(produced)
+        return MatchResult(True, lr_node(result), pos)
 
     def _key(self, parts: list[str]) -> str:
         out = []
@@ -316,7 +328,7 @@ class LRGeneralizedParser(LRParser):
         return join(out, ",")
 
     def _intern(self, forest: list[_Forest], index: StrIntMap, terminal: bool, symbol: int, span: _Span,
-                has_token: bool, token: object) -> int:
+                has_token: bool, token: TokenCursor) -> int:
         self._tick(forest, [])
         key = self._key([_b(terminal), int_to_string(symbol), int_to_string(span.begin), int_to_string(span.end),
                          _b(span.leading), _b(span.trailing), _b(span.empty)])
