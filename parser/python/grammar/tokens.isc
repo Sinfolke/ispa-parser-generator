@@ -29,6 +29,8 @@ IS: 'is';
 INDENT: '';
 DEDENT: '';
 CR { match '\r'; ctx.skip() }
+// Explicit line joining: a backslash directly before the line end continues the logical line.
+LINE_JOIN { match '\\' '\r'? '\n' [ \t]*; ctx.skip() }
 
 // Python indentation
 NEWLINE {

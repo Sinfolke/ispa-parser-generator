@@ -636,6 +636,20 @@ namespace PyRawParser {
 } // namespace PyRawParser
 namespace PyRawParser {
 	namespace Tokens {
+		namespace LINE_JOIN {
+			inline const std::size_t id = 8919494918713929597;
+		} // namespace LINE_JOIN
+	} // namespace Tokens
+} // namespace PyRawParser
+namespace PyRawParser {
+	namespace Tokens {
+		namespace LINE_JOIN {
+			inline const bool shared = true;
+		} // namespace LINE_JOIN
+	} // namespace Tokens
+} // namespace PyRawParser
+namespace PyRawParser {
+	namespace Tokens {
 		namespace LPAREN {
 			inline const std::size_t id = 4186228276183359238;
 		} // namespace LPAREN
@@ -1549,6 +1563,13 @@ namespace PyRawParser {
 		namespace LE {
 			inline const char* const id = "LE";
 		} // namespace LE
+	} // namespace TokensStr
+} // namespace PyRawParser
+namespace PyRawParser {
+	namespace TokensStr {
+		namespace LINE_JOIN {
+			inline const char* const id = "LINE_JOIN";
+		} // namespace LINE_JOIN
 	} // namespace TokensStr
 } // namespace PyRawParser
 namespace PyRawParser {
@@ -3513,6 +3534,7 @@ namespace PyRawParser::FlatTypes { struct FLOOR_DIV_ASSIGN; }
 namespace PyRawParser::FlatTypes { struct TRUE_BOOL; }
 namespace PyRawParser::FlatTypes { struct SLASH_ASSIGN; }
 namespace PyRawParser::FlatTypes { struct TRY; }
+namespace PyRawParser::FlatTypes { struct LINE_JOIN; }
 namespace PyRawParser::FlatTypes { struct POWER_ASSIGN; }
 namespace PyRawParser::FlatTypes { struct POWER; }
 namespace PyRawParser::FlatTypes { struct PIPE; }
@@ -5245,6 +5267,41 @@ namespace PyRawParser {
 		};
 		inline std::string_view ispa_debug_type(const TRY&) { return "PyRawParser.FlatTypes.TRY"; }
 		template<class F> void ispa_debug_fields(const TRY& value, F&& field) {
+		}
+	} // namespace FlatTypes
+} // namespace PyRawParser
+namespace PyRawParser {
+	namespace FlatTypes {
+		auto operator<<(std::ostream & os, LINE_JOIN value) -> std::ostream &;
+	} // namespace FlatTypes
+} // namespace PyRawParser
+namespace PyRawParser {
+	namespace FlatTypes {
+		struct LINE_JOIN {
+			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
+			auto print(std::ostream& os) const -> void;
+			auto to_string() const -> std::string;
+			constexpr auto members() {
+				return std::tie();
+			}
+			constexpr auto members() const {
+				return std::tie();
+			}
+			static constexpr auto members_str() {
+				return std::array<std::string_view, 0>{{}};
+			}
+			constexpr auto methods() {
+				return std::make_tuple(&LINE_JOIN::write_to_output, &LINE_JOIN::print);
+			}
+			constexpr auto methods() const {
+				return std::make_tuple(&LINE_JOIN::write_to_output, &LINE_JOIN::print);
+			}
+			static constexpr auto methods_str() {
+				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
+			}
+		};
+		inline std::string_view ispa_debug_type(const LINE_JOIN&) { return "PyRawParser.FlatTypes.LINE_JOIN"; }
+		template<class F> void ispa_debug_fields(const LINE_JOIN& value, F&& field) {
 		}
 	} // namespace FlatTypes
 } // namespace PyRawParser
@@ -11383,6 +11440,11 @@ namespace PyRawParser {
 } // namespace PyRawParser
 namespace PyRawParser {
 	namespace Types {
+		using LINE_JOIN = ::PyRawParser::FlatTypes::LINE_JOIN;
+	} // namespace Types
+} // namespace PyRawParser
+namespace PyRawParser {
+	namespace Types {
 		using POWER_ASSIGN = ::PyRawParser::FlatTypes::POWER_ASSIGN;
 	} // namespace Types
 } // namespace PyRawParser
@@ -12172,7 +12234,7 @@ namespace PyRawParser {
 	} // namespace Types
 } // namespace PyRawParser
 namespace PyRawParser {
-	using Token = ::ISPA_STD::RawToken<Types::END_INPUT, Types::NEWLINE, Types::CR, Types::DEDENT, Types::INDENT, Types::DEL, Types::IS, Types::IN, Types::ELSE, Types::NOT, Types::ASSIGN, Types::COMMA, Types::RPAREN, Types::SEMICOLON, Types::TILDE, Types::LSHIFT_ASSIGN, Types::BREAK, Types::NONLOCAL, Types::GLOBAL, Types::ELIF, Types::ASSERT, Types::COMMENT, Types::PASS, Types::DEF, Types::FINALLY, Types::WHILE, Types::WITH, Types::MATMUL_ASSIGN, Types::ASYNC, Types::COLON, Types::__WS, Types::FOR, Types::CONTINUE, Types::RAISE, Types::IF, Types::MATMUL, Types::PERCENT_ASSIGN, Types::PLUS_ASSIGN, Types::STAR_ASSIGN, Types::RBRACE, Types::STRING, Types::FLOOR_DIV_ASSIGN, Types::TRUE_BOOL, Types::SLASH_ASSIGN, Types::TRY, Types::POWER_ASSIGN, Types::POWER, Types::PIPE, Types::EXCEPT, Types::NONE_V, Types::NE, Types::LT, Types::LE, Types::STAR, Types::SLASH, Types::LBRACKET, Types::GT, Types::PLUS, Types::LSHIFT, Types::GE, Types::FALSE_BOOL, Types::EQ, Types::CARET, Types::AND, Types::ISPA_MATCH, Types::NUMBER, Types::AS, Types::MINUS_ASSIGN, Types::LPAREN, Types::ID, Types::AMP, Types::AMP_ASSIGN, Types::CLASS, Types::MINUS, Types::DOT, Types::CARET_ASSIGN, Types::RSHIFT_ASSIGN, Types::PERCENT, Types::IMPORT, Types::FLOOR_DIV, Types::ARROW, Types::OR, Types::PIPE_ASSIGN, Types::RSHIFT, Types::RETURN, Types::FROM, Types::LBRACE, Types::RBRACKET>;
+	using Token = ::ISPA_STD::RawToken<Types::END_INPUT, Types::NEWLINE, Types::CR, Types::DEDENT, Types::INDENT, Types::DEL, Types::IS, Types::IN, Types::ELSE, Types::NOT, Types::ASSIGN, Types::COMMA, Types::RPAREN, Types::SEMICOLON, Types::TILDE, Types::LSHIFT_ASSIGN, Types::BREAK, Types::NONLOCAL, Types::GLOBAL, Types::ELIF, Types::ASSERT, Types::COMMENT, Types::PASS, Types::DEF, Types::FINALLY, Types::WHILE, Types::WITH, Types::MATMUL_ASSIGN, Types::ASYNC, Types::COLON, Types::__WS, Types::FOR, Types::CONTINUE, Types::RAISE, Types::IF, Types::MATMUL, Types::PERCENT_ASSIGN, Types::PLUS_ASSIGN, Types::STAR_ASSIGN, Types::RBRACE, Types::STRING, Types::FLOOR_DIV_ASSIGN, Types::TRUE_BOOL, Types::SLASH_ASSIGN, Types::TRY, Types::LINE_JOIN, Types::POWER_ASSIGN, Types::POWER, Types::PIPE, Types::EXCEPT, Types::NONE_V, Types::NE, Types::LT, Types::LE, Types::STAR, Types::SLASH, Types::LBRACKET, Types::GT, Types::PLUS, Types::LSHIFT, Types::GE, Types::FALSE_BOOL, Types::EQ, Types::CARET, Types::AND, Types::ISPA_MATCH, Types::NUMBER, Types::AS, Types::MINUS_ASSIGN, Types::LPAREN, Types::ID, Types::AMP, Types::AMP_ASSIGN, Types::CLASS, Types::MINUS, Types::DOT, Types::CARET_ASSIGN, Types::RSHIFT_ASSIGN, Types::PERCENT, Types::IMPORT, Types::FLOOR_DIV, Types::ARROW, Types::OR, Types::PIPE_ASSIGN, Types::RSHIFT, Types::RETURN, Types::FROM, Types::LBRACE, Types::RBRACKET>;
 } // namespace PyRawParser
 namespace PyRawParser {
 	class Lexer : public ::ISPA_STD::Lexer_base<Token> {
@@ -12191,7 +12253,7 @@ namespace PyRawParser {
 		auto on_eof() -> void override;
 	private:
 		static ::ISPA_STD::DFA::API::CharToClass char_class_table;
-		static ::ISPA_STD::DFA::API::Table<206, 60> dfa_table;
+		static ::ISPA_STD::DFA::API::Table<210, 61> dfa_table;
 		static ::ISPA_STD::DFA::API::Table<249, 4> action_table;
 		auto semantic_action_exec(long long state, const ::ISPA_STD::DFA::API::Captures& captures, long long start_pos, const char* start, long long length, long long line, const char*& cursor) -> std::pair<long long, Token>;
 		bool init_done = false;
@@ -12344,7 +12406,7 @@ namespace PyRawParser {
 	private:
 		Lexer lazy_lexer_;
 	public:
-		auto lazyParse() -> ::ISPA_STD::MatchResult<Types::main, Lexer::lazy_iterator> override;
+		auto lazyParse() -> ::ISPA_STD::MatchResult<Types::main, ::PyRawParser::Lexer::lazy_iterator> override;
 		constexpr auto members() {
 			return std::tie();
 		}
@@ -12594,786 +12656,791 @@ static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_45 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::LPAREN;
+using node_type = ::PyRawParser::Types::LINE_JOIN;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_46 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::LSHIFT;
+using node_type = ::PyRawParser::Types::LPAREN;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_47 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::LSHIFT_ASSIGN;
+using node_type = ::PyRawParser::Types::LSHIFT;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_48 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::LT;
+using node_type = ::PyRawParser::Types::LSHIFT_ASSIGN;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_49 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::MATMUL;
+using node_type = ::PyRawParser::Types::LT;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_50 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::MATMUL_ASSIGN;
+using node_type = ::PyRawParser::Types::MATMUL;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_51 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::MINUS;
+using node_type = ::PyRawParser::Types::MATMUL_ASSIGN;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_52 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::MINUS_ASSIGN;
+using node_type = ::PyRawParser::Types::MINUS;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_53 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::NE;
+using node_type = ::PyRawParser::Types::MINUS_ASSIGN;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_54 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::NEWLINE;
+using node_type = ::PyRawParser::Types::NE;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_55 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::NONE_V;
+using node_type = ::PyRawParser::Types::NEWLINE;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_56 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::NONLOCAL;
+using node_type = ::PyRawParser::Types::NONE_V;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_57 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::NOT;
+using node_type = ::PyRawParser::Types::NONLOCAL;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_58 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::NUMBER;
+using node_type = ::PyRawParser::Types::NOT;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_59 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::OR;
+using node_type = ::PyRawParser::Types::NUMBER;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_60 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::PASS;
+using node_type = ::PyRawParser::Types::OR;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_61 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::PERCENT;
+using node_type = ::PyRawParser::Types::PASS;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_62 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::PERCENT_ASSIGN;
+using node_type = ::PyRawParser::Types::PERCENT;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_63 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::PIPE;
+using node_type = ::PyRawParser::Types::PERCENT_ASSIGN;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_64 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::PIPE_ASSIGN;
+using node_type = ::PyRawParser::Types::PIPE;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_65 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::PLUS;
+using node_type = ::PyRawParser::Types::PIPE_ASSIGN;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_66 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::PLUS_ASSIGN;
+using node_type = ::PyRawParser::Types::PLUS;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_67 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::POWER;
+using node_type = ::PyRawParser::Types::PLUS_ASSIGN;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_68 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::POWER_ASSIGN;
+using node_type = ::PyRawParser::Types::POWER;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_69 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::RAISE;
+using node_type = ::PyRawParser::Types::POWER_ASSIGN;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_70 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::RBRACE;
+using node_type = ::PyRawParser::Types::RAISE;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_71 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::RBRACKET;
+using node_type = ::PyRawParser::Types::RBRACE;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_72 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::RETURN;
+using node_type = ::PyRawParser::Types::RBRACKET;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_73 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::RPAREN;
+using node_type = ::PyRawParser::Types::RETURN;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_74 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::RSHIFT;
+using node_type = ::PyRawParser::Types::RPAREN;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_75 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::RSHIFT_ASSIGN;
+using node_type = ::PyRawParser::Types::RSHIFT;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_76 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::SEMICOLON;
+using node_type = ::PyRawParser::Types::RSHIFT_ASSIGN;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_77 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::SLASH;
+using node_type = ::PyRawParser::Types::SEMICOLON;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_78 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::SLASH_ASSIGN;
+using node_type = ::PyRawParser::Types::SLASH;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_79 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::STAR;
+using node_type = ::PyRawParser::Types::SLASH_ASSIGN;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_80 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::STAR_ASSIGN;
+using node_type = ::PyRawParser::Types::STAR;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_81 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::STRING;
+using node_type = ::PyRawParser::Types::STAR_ASSIGN;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_82 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::TILDE;
+using node_type = ::PyRawParser::Types::STRING;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_83 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::TRUE_BOOL;
+using node_type = ::PyRawParser::Types::TILDE;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_84 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::TRY;
+using node_type = ::PyRawParser::Types::TRUE_BOOL;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_85 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::WHILE;
+using node_type = ::PyRawParser::Types::TRY;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_86 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::WITH;
+using node_type = ::PyRawParser::Types::WHILE;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_87 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::annotated_assignment;
+using node_type = ::PyRawParser::Types::WITH;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_88 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::assert_stmt;
+using node_type = ::PyRawParser::Types::annotated_assignment;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_89 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::assignment_op;
+using node_type = ::PyRawParser::Types::assert_stmt;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_90 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::assignment_suffix;
+using node_type = ::PyRawParser::Types::assignment_op;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_91 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::assignment_tail;
+using node_type = ::PyRawParser::Types::assignment_suffix;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_92 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::assignment_target;
+using node_type = ::PyRawParser::Types::assignment_tail;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_93 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::assignment_value;
+using node_type = ::PyRawParser::Types::assignment_target;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_94 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::atom;
+using node_type = ::PyRawParser::Types::assignment_value;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_95 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::attribute_suffix;
+using node_type = ::PyRawParser::Types::atom;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_96 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::bitand_tail;
+using node_type = ::PyRawParser::Types::attribute_suffix;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_97 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::bitor_tail;
+using node_type = ::PyRawParser::Types::bitand_tail;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_98 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::bitwise_and;
+using node_type = ::PyRawParser::Types::bitor_tail;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_99 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::bitwise_or;
+using node_type = ::PyRawParser::Types::bitwise_and;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_100 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::bitwise_xor;
+using node_type = ::PyRawParser::Types::bitwise_or;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_101 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::bitxor_tail;
+using node_type = ::PyRawParser::Types::bitwise_xor;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_102 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::block;
+using node_type = ::PyRawParser::Types::bitxor_tail;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_103 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::break_stmt;
+using node_type = ::PyRawParser::Types::block;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_104 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::call_arg;
+using node_type = ::PyRawParser::Types::break_stmt;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_105 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::call_arg_tail;
+using node_type = ::PyRawParser::Types::call_arg;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_106 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::call_args;
+using node_type = ::PyRawParser::Types::call_arg_tail;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_107 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::call_suffix;
+using node_type = ::PyRawParser::Types::call_args;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_108 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::class_bases;
+using node_type = ::PyRawParser::Types::call_suffix;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_109 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::class_def;
+using node_type = ::PyRawParser::Types::class_bases;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_110 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::class_header;
+using node_type = ::PyRawParser::Types::class_def;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_111 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::compare_op;
+using node_type = ::PyRawParser::Types::class_header;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_112 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::compare_tail;
+using node_type = ::PyRawParser::Types::compare_op;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_113 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::comparison;
+using node_type = ::PyRawParser::Types::compare_tail;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_114 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::compound_stmt;
+using node_type = ::PyRawParser::Types::comparison;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_115 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::conditional_tail;
+using node_type = ::PyRawParser::Types::compound_stmt;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_116 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::conjunction;
+using node_type = ::PyRawParser::Types::conditional_tail;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_117 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::continue_stmt;
+using node_type = ::PyRawParser::Types::conjunction;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_118 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::decorated_def;
+using node_type = ::PyRawParser::Types::continue_stmt;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_119 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::decorator;
+using node_type = ::PyRawParser::Types::decorated_def;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_120 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::decorators;
+using node_type = ::PyRawParser::Types::decorator;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_121 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::def_header;
+using node_type = ::PyRawParser::Types::decorators;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_122 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::del_stmt;
+using node_type = ::PyRawParser::Types::def_header;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_123 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::dict_expr;
+using node_type = ::PyRawParser::Types::del_stmt;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_124 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::dict_item;
+using node_type = ::PyRawParser::Types::dict_expr;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_125 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::dict_item_tail;
+using node_type = ::PyRawParser::Types::dict_item;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_126 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::dict_items;
+using node_type = ::PyRawParser::Types::dict_item_tail;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_127 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::disjunction;
+using node_type = ::PyRawParser::Types::dict_items;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_128 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::dotted_as_name;
+using node_type = ::PyRawParser::Types::disjunction;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_129 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::dotted_as_names;
+using node_type = ::PyRawParser::Types::dotted_as_name;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_130 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::dotted_name;
+using node_type = ::PyRawParser::Types::dotted_as_names;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_131 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::elif_clause;
+using node_type = ::PyRawParser::Types::dotted_name;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_132 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::else_clause;
+using node_type = ::PyRawParser::Types::elif_clause;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_133 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::except_alias;
+using node_type = ::PyRawParser::Types::else_clause;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_134 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::except_clause;
+using node_type = ::PyRawParser::Types::except_alias;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_135 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::except_handlers;
+using node_type = ::PyRawParser::Types::except_clause;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_136 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::expr;
+using node_type = ::PyRawParser::Types::except_handlers;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_137 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::expr_list;
+using node_type = ::PyRawParser::Types::expr;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_138 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::expr_stmt;
+using node_type = ::PyRawParser::Types::expr_list;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_139 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::factor;
+using node_type = ::PyRawParser::Types::expr_stmt;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_140 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::finally_clause;
+using node_type = ::PyRawParser::Types::factor;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_141 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::for_stmt;
+using node_type = ::PyRawParser::Types::finally_clause;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_142 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::for_targets;
+using node_type = ::PyRawParser::Types::for_stmt;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_143 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::function_def;
+using node_type = ::PyRawParser::Types::for_targets;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_144 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::function_header;
+using node_type = ::PyRawParser::Types::function_def;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_145 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::global_stmt;
+using node_type = ::PyRawParser::Types::function_header;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_146 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::if_stmt;
+using node_type = ::PyRawParser::Types::global_stmt;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_147 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::import_alias;
+using node_type = ::PyRawParser::Types::if_stmt;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_148 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::import_from;
+using node_type = ::PyRawParser::Types::import_alias;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_149 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::import_name;
+using node_type = ::PyRawParser::Types::import_from;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_150 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::import_name_item;
+using node_type = ::PyRawParser::Types::import_name;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_151 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::import_names;
+using node_type = ::PyRawParser::Types::import_name_item;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_152 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::import_stmt;
+using node_type = ::PyRawParser::Types::import_names;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_153 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::import_targets;
+using node_type = ::PyRawParser::Types::import_stmt;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_154 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::indented_block;
+using node_type = ::PyRawParser::Types::import_targets;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_155 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::index_suffix;
+using node_type = ::PyRawParser::Types::indented_block;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_156 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::inversion;
+using node_type = ::PyRawParser::Types::index_suffix;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_157 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::is_op;
+using node_type = ::PyRawParser::Types::inversion;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_158 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::ispa_match_stmt;
+using node_type = ::PyRawParser::Types::is_op;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_159 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::keyword_arg;
+using node_type = ::PyRawParser::Types::ispa_match_stmt;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_160 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::list_expr;
+using node_type = ::PyRawParser::Types::keyword_arg;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_161 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::main;
+using node_type = ::PyRawParser::Types::list_expr;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_162 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::nonlocal_stmt;
+using node_type = ::PyRawParser::Types::main;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_163 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::not_in;
+using node_type = ::PyRawParser::Types::nonlocal_stmt;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_164 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::not_inversion;
+using node_type = ::PyRawParser::Types::not_in;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_165 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::or_tail;
+using node_type = ::PyRawParser::Types::not_inversion;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_166 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::parameter;
+using node_type = ::PyRawParser::Types::or_tail;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_167 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::parameter_annotation;
+using node_type = ::PyRawParser::Types::parameter;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_168 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::parameter_default;
+using node_type = ::PyRawParser::Types::parameter_annotation;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_169 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::parameters;
+using node_type = ::PyRawParser::Types::parameter_default;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_170 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::parenthesized_content;
+using node_type = ::PyRawParser::Types::parameters;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_171 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::parenthesized_expr;
+using node_type = ::PyRawParser::Types::parenthesized_content;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_172 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::parenthesized_imports;
+using node_type = ::PyRawParser::Types::parenthesized_expr;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_173 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::pass_stmt;
+using node_type = ::PyRawParser::Types::parenthesized_imports;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_174 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::postfix;
+using node_type = ::PyRawParser::Types::pass_stmt;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_175 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::power;
+using node_type = ::PyRawParser::Types::postfix;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_176 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::power_tail;
+using node_type = ::PyRawParser::Types::power;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_177 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::primary;
+using node_type = ::PyRawParser::Types::power_tail;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_178 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::raise_from;
+using node_type = ::PyRawParser::Types::primary;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_179 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::raise_stmt;
+using node_type = ::PyRawParser::Types::raise_from;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_180 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::relative_module;
+using node_type = ::PyRawParser::Types::raise_stmt;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_181 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::return_annotation;
+using node_type = ::PyRawParser::Types::relative_module;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_182 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::return_stmt;
+using node_type = ::PyRawParser::Types::return_annotation;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_183 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::shift_expr;
+using node_type = ::PyRawParser::Types::return_stmt;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_184 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::shift_tail;
+using node_type = ::PyRawParser::Types::shift_expr;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_185 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::simple_stmt;
+using node_type = ::PyRawParser::Types::shift_tail;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_186 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::simple_stmts;
+using node_type = ::PyRawParser::Types::simple_stmt;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_187 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::statement;
+using node_type = ::PyRawParser::Types::simple_stmts;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_188 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::sum;
+using node_type = ::PyRawParser::Types::statement;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_189 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::sum_tail;
+using node_type = ::PyRawParser::Types::sum;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_190 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::term;
+using node_type = ::PyRawParser::Types::sum_tail;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_191 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::term_tail;
+using node_type = ::PyRawParser::Types::term;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_192 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::try_stmt;
+using node_type = ::PyRawParser::Types::term_tail;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_193 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::try_tail;
+using node_type = ::PyRawParser::Types::try_stmt;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_194 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::tuple_elements;
+using node_type = ::PyRawParser::Types::try_tail;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_195 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::tuple_suffix;
+using node_type = ::PyRawParser::Types::tuple_elements;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_196 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::unary_expr;
+using node_type = ::PyRawParser::Types::tuple_suffix;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_197 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::while_stmt;
+using node_type = ::PyRawParser::Types::unary_expr;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_198 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::with_as;
+using node_type = ::PyRawParser::Types::while_stmt;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_199 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::with_item;
+using node_type = ::PyRawParser::Types::with_as;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_200 : ::PyRawParser::Parser {
-using node_type = ::PyRawParser::Types::with_items;
+using node_type = ::PyRawParser::Types::with_item;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
 };
 struct symbol_201 : ::PyRawParser::Parser {
+using node_type = ::PyRawParser::Types::with_items;
+static bool starts(const char* origin, const char* start);
+static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
+};
+struct symbol_202 : ::PyRawParser::Parser {
 using node_type = ::PyRawParser::Types::with_stmt;
 static bool starts(const char* origin, const char* start);
 static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
