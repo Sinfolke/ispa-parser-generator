@@ -20,13 +20,13 @@ class Optional(Generic[T]):
 
     @staticmethod
     def some(value: T) -> "Optional[T]":
-        result = Optional()
+        result = Optional[T]()
         result._items.append(value)
         return result
 
     @staticmethod
     def none() -> "Optional[T]":
-        return Optional()
+        return Optional[T]()
 
     def has_value(self) -> bool:
         return len(self._items) == 1
@@ -50,13 +50,15 @@ class Optional(Generic[T]):
 
     def transform(self, fn: Callable[[T], U]) -> "Optional[U]":
         if len(self._items) == 1:
-            return Optional.some(fn(self._items[0]))
-        return Optional.none()
+            result = Optional[U]()
+            result._items.append(fn(self._items[0]))
+            return result
+        return Optional[U]()
 
     def and_then(self, fn: Callable[[T], "Optional[U]"]) -> "Optional[U]":
         if len(self._items) == 1:
             return fn(self._items[0])
-        return Optional.none()
+        return Optional[U]()
 
     def or_else(self, fn: Callable[[], "Optional[T]"]) -> "Optional[T]":
         if len(self._items) == 1:

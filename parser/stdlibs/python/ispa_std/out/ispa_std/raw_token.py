@@ -12,7 +12,6 @@ from ispa_std.chars import at
 from ispa_std.failures import api_error, logic_error
 from ispa_std.node import Node
 from ispa_std.string import substr
-from ispa_std.to_string import to_string
 
 NO_POS = -1
 NO_NAME = -1
@@ -152,29 +151,9 @@ class RawToken:
         return Node.with_data(m.startpos(), m.source(), m.has_source(), m.length(),
                               m.line(), m.column(), m.name(), self._payload)
 
-    def to_string(self) -> str:
-        if self.empty():
-            api_error("Can't retrieve string representation of an empty node", [])
-        return to_string(self._payload)
-
-    def write_to_output(self, printer) -> None:
-        if self.empty():
-            printer.node("<empty>", False)
-            return
-        printer.print_value_tree(self._payload)
-
     def text(self) -> str:
         """The source text this token covers ("" when it has no source)."""
         return self._meta.text()
-
-    def debug_type(self) -> str:
-        return "ISPA.RawToken"
-
-    def debug_fields(self) -> list:
-        from ispa_std.utility import Pair
-        return [Pair("kind", self.kind()), Pair("index", self.index()),
-                Pair("startpos", self._meta.startpos()), Pair("length", self._meta.length())]
-
 
 def char_at_source(meta: RawTokenMeta, offset: int) -> str:
     return at(meta.source(), meta.startpos() + offset)

@@ -8,8 +8,8 @@ from ispa_std.algorithm import lower_bound
 
 class StrIntMap:
     """std::map<std::string, std::size_t>."""
-    keys: list
-    values: list
+    keys: list[str]
+    values: list[int]
 
     def __init__(self):
         self.keys = []
@@ -61,7 +61,7 @@ class StrIntMap:
 
 class IntSet:
     """std::set<std::size_t>: ascending, unique."""
-    items: list
+    items: list[int]
 
     def __init__(self):
         self.items = []

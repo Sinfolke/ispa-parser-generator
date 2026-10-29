@@ -25,7 +25,7 @@ def _boundary_at(src: str, p: int, boundary: str) -> bool:
     return True
 
 
-def scan_balanced(src: str, begin: int, boundaries: list, budget: int) -> ScanResult:
+def scan_balanced(src: str, begin: int, boundaries: list[str], budget: int) -> ScanResult:
     """Scan forward from `begin`. The budget is in source units, including
     strings and comments. Stops at the first boundary outside brackets (a ";"
     boundary also stops inside brackets), or at an unmatched closer."""

@@ -9,23 +9,24 @@ K = TypeVar("K")
 V = TypeVar("V")
 
 
-def contains(m: dict, key: K) -> bool:
+def contains(m: dict[K, V], key: K) -> bool:
     return key in m
 
 
-def at(m: dict, key: K) -> V:
+def at(m: dict[K, V], key: K) -> V:
     if key not in m:
         prim.fail(ErrorKind.KeyNotFound, "map.at: key not found")
     return m[key]
 
 
-def get(m: dict, key: K) -> Optional[V]:
+def get(m: dict[K, V], key: K) -> Optional[V]:
+    result = Optional[V]()
     if key in m:
-        return Optional.some(m[key])
-    return Optional.none()
+        result.emplace(m[key])
+    return result
 
 
-def insert(m: dict, key: K, value: V) -> bool:
+def insert(m: dict[K, V], key: K, value: V) -> bool:
     # Like unordered_map::insert: never overwrites. Returns whether it inserted.
     if key in m:
         return False
@@ -33,13 +34,13 @@ def insert(m: dict, key: K, value: V) -> bool:
     return True
 
 
-def insert_or_assign(m: dict, key: K, value: V) -> bool:
+def insert_or_assign(m: dict[K, V], key: K, value: V) -> bool:
     inserted = key not in m
     m[key] = value
     return inserted
 
 
-def erase(m: dict, key: K) -> bool:
+def erase(m: dict[K, V], key: K) -> bool:
     if key not in m:
         return False
     m.pop(key)

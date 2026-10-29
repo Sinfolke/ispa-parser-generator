@@ -47,7 +47,7 @@ class TdfaLayout:
             runtime_error("output registers are registers 0 .. outputs-1")
 
 
-def dynamic_match(src: str, cursor: int, alternatives: list, negative: bool, quantifier: str) -> int:
+def dynamic_match(src: str, cursor: int, alternatives: list[str], negative: bool, quantifier: str) -> int:
     """A semantic transition tests the whole runtime string. Returns the new
     cursor, or -1 when the match failed. Negation consumes one character, or a
     run when the quantifier is "*"."""
@@ -81,7 +81,7 @@ def _starts_at(src: str, p: int, value: str) -> bool:
     return True
 
 
-def _excluded(src: str, p: int, alternatives: list) -> bool:
+def _excluded(src: str, p: int, alternatives: list[str]) -> bool:
     i = 0
     while i < len(alternatives):
         if _starts_at(src, p, alternatives[i]):
@@ -118,8 +118,8 @@ class DFADebug:
 class DebugIndex:
     """(state, class) -> index into the DFADebug table. Keys are packed
     state * 256 + class and kept sorted."""
-    _keys: list
-    _values: list
+    _keys: list[int]
+    _values: list[int]
 
     def __init__(self):
         self._keys = []
@@ -171,11 +171,11 @@ class Captures:
     2k (begin, or the head of a list capture's history) and 2k + 1 (end)."""
     _src: str
     _base: int
-    _regs: list
-    _history: list
+    _regs: list[int]
+    _history: list[HistoryNode]
     _first_line: int
 
-    def __init__(self, src: str, base: int, regs: list, history: list, first_line: int):
+    def __init__(self, src: str, base: int, regs: list[int], history: list[HistoryNode], first_line: int):
         self._src = src
         self._base = base
         self._regs = regs
@@ -210,7 +210,7 @@ class Captures:
     def character(self, k: int) -> str:
         return at(self._src, self.begin(k))
 
-    def list_positions(self, k: int) -> list:
+    def list_positions(self, k: int) -> list[int]:
         positions = []
         h = self.begin_off(k)
         while h != UNSET:
@@ -219,7 +219,7 @@ class Captures:
         positions.reverse()
         return positions
 
-    def list_texts(self, k: int) -> list:
+    def list_texts(self, k: int) -> list[str]:
         """One entry per iteration of a list capture, in input order."""
         positions = self.list_positions(k)
         out = []
@@ -229,7 +229,7 @@ class Captures:
             i = i + 2
         return out
 
-    def list_chars(self, k: int) -> list:
+    def list_chars(self, k: int) -> list[str]:
         texts = self.list_texts(k)
         out = []
         i = 0
@@ -264,5 +264,5 @@ def semantic_result(state: int, token: RawToken) -> Pair:
     return Pair(state, token)
 
 
-def class_of(class_table: list, ch: str) -> int:
+def class_of(class_table: list[int], ch: str) -> int:
     return class_table[code_of(ch)]

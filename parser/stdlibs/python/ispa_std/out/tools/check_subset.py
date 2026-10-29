@@ -20,7 +20,7 @@ BASE = {
 EXTENSIONS = {
     "ClassBases": "classes that inherit from another library class (Lexer_base, LLParser, FailHandler ...)",
 }
-EXEMPT = {"reflect.py", "prim_cpython.py", "cpython.py", "prim.py", "__init__.py"}
+EXEMPT = {"reflect.py", "prim_cpython.py", "cpython.py", "prim.py", "__init__.py", "printing.py", "debug_encode.py", "lr_shape.py"}
 SKIP_ANNOTATION_NAMES = True
 
 

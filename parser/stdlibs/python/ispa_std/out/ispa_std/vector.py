@@ -9,49 +9,49 @@ from ispa_std.errors import ErrorKind
 T = TypeVar("T")
 
 
-def filled(count: int, value: T) -> list:
+def filled(count: int, value: T) -> list[T]:
     result = []
     resize(result, count, value)
     return result
 
 
-def at(arr: list, index: int) -> T:
+def at(arr: list[T], index: int) -> T:
     if index < 0 or index >= len(arr):
         prim.fail(ErrorKind.OutOfRange, "vector.at: index out of range")
     return arr[index]
 
 
-def front(arr: list) -> T:
+def front(arr: list[T]) -> T:
     if len(arr) == 0:
         prim.fail(ErrorKind.OutOfRange, "vector.front: empty")
     return arr[0]
 
 
-def back(arr: list) -> T:
+def back(arr: list[T]) -> T:
     if len(arr) == 0:
         prim.fail(ErrorKind.OutOfRange, "vector.back: empty")
     return arr[len(arr) - 1]
 
 
-def pop_back(arr: list) -> None:
+def pop_back(arr: list[T]) -> None:
     if len(arr) == 0:
         prim.fail(ErrorKind.OutOfRange, "vector.pop_back: empty")
     arr.pop()
 
 
-def insert_at(arr: list, index: int, value: T) -> None:
+def insert_at(arr: list[T], index: int, value: T) -> None:
     if index < 0 or index > len(arr):
         prim.fail(ErrorKind.OutOfRange, "vector.insert_at: index out of range")
     arr.insert(index, value)
 
 
-def erase_at(arr: list, index: int) -> None:
+def erase_at(arr: list[T], index: int) -> None:
     if index < 0 or index >= len(arr):
         prim.fail(ErrorKind.OutOfRange, "vector.erase_at: index out of range")
     arr.pop(index)
 
 
-def erase_range(arr: list, first: int, last: int) -> None:
+def erase_range(arr: list[T], first: int, last: int) -> None:
     # Removes [first, last). Rebuilds once, so it is O(n) rather than O(n * count).
     n = len(arr)
     if first < 0 or last < first or last > n:
@@ -65,7 +65,7 @@ def erase_range(arr: list, first: int, last: int) -> None:
         i = i + 1
 
 
-def resize(arr: list, count: int, fill: T) -> None:
+def resize(arr: list[T], count: int, fill: T) -> None:
     if count < 0:
         prim.fail(ErrorKind.LengthError, "vector.resize: negative size")
     while len(arr) > count:
@@ -74,12 +74,12 @@ def resize(arr: list, count: int, fill: T) -> None:
         arr.append(fill)
 
 
-def assign(arr: list, count: int, value: T) -> None:
+def assign(arr: list[T], count: int, value: T) -> None:
     arr.clear()
     resize(arr, count, value)
 
 
-def swap(a: list, b: list) -> None:
+def swap(a: list[T], b: list[T]) -> None:
     tmp = a.copy()
     a.clear()
     a.extend(b)
@@ -87,7 +87,7 @@ def swap(a: list, b: list) -> None:
     b.extend(tmp)
 
 
-def lexicographical_less(a: list, b: list) -> bool:
+def lexicographical_less(a: list[T], b: list[T]) -> bool:
     i = 0
     while i < len(a) and i < len(b):
         if a[i] < b[i]:

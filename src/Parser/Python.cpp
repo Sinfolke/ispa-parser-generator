@@ -88,6 +88,8 @@ struct PythonConverter {
     std::string self_name;
     std::string token_rule;
     std::set<std::string> class_names, objects;
+    // TypeVar names in scope (module-level `T = TypeVar("T")`) and the subset owned by the enclosing generic class.
+    std::set<std::string> typevars, class_typevars;
     std::map<std::string, la::Type> local_types;
     std::set<std::string> debug_ready;
     bool debug_ready_initialized = false;
@@ -191,6 +193,10 @@ struct PythonConverter {
             if (n->id == "float") return la::Type{la::ValueType::Float};
             if (n->id == "bool") return la::Type{la::ValueType::Bool};
             if (n->id == "str") return la::Type{la::ValueType::String};
+            if (n->id == "list" || n->id == "dict")
+                unsupported(p->pos, n->id + " requires element types, e.g. " + (n->id == "list" ? "list[T]" : "dict[K, V]"));
+            if (n->id == "object") return la::Type{la::ValueType::Any};
+            if (typevars.contains(n->id)) return la::Type{la::Symbol{n->id}};
             return la::Type{pythonSymbol(n->id)};
         }
         if (auto sub = p->template get<py::Subscript>(); sub && sub->value) {
@@ -210,7 +216,8 @@ struct PythonConverter {
                 result.template_parameters.emplace_back(type(args->elts[1]));
                 return result;
             }
-            if (name && (name->id.starts_with("ISPA_STD.") || name->id.starts_with("__ispa_parser__."))) {
+            if (name) {
+                // A generic class used with type arguments: Pair[int, RawToken].
                 la::Type result{pythonSymbol(name->id)};
                 if (auto args = sub->slice ? sub->slice->template get<py::Tuple>() : nullptr) {
                     for (const auto& arg : args->elts) result.template_parameters.emplace_back(type(arg));
@@ -620,6 +627,15 @@ struct PythonConverter {
                     call.name = std::make_shared<la::Symbol>(pythonSymbol(localName(n->id)));
                     return la::FunctionCall::createExpression(call);
                 }
+                if (auto sub = x.func ? x.func->template get<py::Subscript>() : nullptr;
+                    sub && sub->value && sub->value->template get<py::Name>()) {
+                    // Explicit type arguments: Optional[T]() constructs Optional<T>.
+                    call.name = std::make_shared<la::Symbol>(pythonSymbol(sub->value->template get<py::Name>()->id));
+                    if (auto args = sub->slice ? sub->slice->template get<py::Tuple>() : nullptr) {
+                        for (const auto& arg : args->elts) call.template_parameters.emplace_back(std::make_shared<la::Type>(type(arg)));
+                    } else call.template_parameters.emplace_back(std::make_shared<la::Type>(type(sub->slice)));
+                    return la::FunctionCall::createExpression(call);
+                }
                 if (auto a = x.func ? x.func->template get<py::Attribute>() : nullptr) {
                     if (auto owner = a->value ? a->value->template get<py::Name>() : nullptr; owner && class_names.contains(owner->id)) {
                         call.name = std::make_shared<la::Symbol>(pythonSymbol(owner->id + "." + a->attr));
@@ -898,6 +914,28 @@ struct PythonConverter {
             out.type = type(f->returns);
             scope.self_name = self_name;
             scope.class_names = class_names;
+            scope.typevars = typevars;
+            scope.class_typevars = class_typevars;
+            {
+                // Type variables the class does not already own become template parameters of the function.
+                std::vector<std::string> used;
+                const auto collect = [&](const auto& self, const py::ExprPtr& annotation) -> void {
+                    if (!annotation) return;
+                    if (auto n = annotation->template get<py::Name>()) {
+                        if (typevars.contains(n->id) && !class_typevars.contains(n->id) &&
+                            std::ranges::find(used, n->id) == used.end()) used.push_back(n->id);
+                    } else if (auto sub = annotation->template get<py::Subscript>()) {
+                        self(self, sub->slice);
+                    } else if (auto tuple = annotation->template get<py::Tuple>()) {
+                        for (const auto& item : tuple->elts) self(self, item);
+                    } else if (auto list = annotation->template get<py::List>()) {
+                        for (const auto& item : list->elts) self(self, item);
+                    }
+                };
+                for (const auto& p : f->params) collect(collect, p.annotation);
+                collect(collect, f->returns);
+                for (const auto& name : used) out.template_parameters.emplace_back(name, decltype(out.template_parameters)::value_type::second_type{});
+            }
             if (s.pos.file.ends_with(".py")) {
                 std::ifstream source(s.pos.file);
                 std::string line;
@@ -931,13 +969,30 @@ struct PythonConverter {
             if (!c->decorators.empty() || !c->keywords.empty()) unsupported(s.pos, "class decorators and keywords are unsupported");
             la::Class out;
             out.name = la::Symbol{c->name};
+            std::set<std::string> own_typevars;
             for (auto& b : c->bases) {
+                if (auto generic = b ? b->template get<py::Subscript>() : nullptr;
+                    generic && generic->value && generic->value->template get<py::Name>() &&
+                    (generic->value->template get<py::Name>()->id == "Generic" || generic->value->template get<py::Name>()->id == "typing.Generic")) {
+                    std::vector<py::ExprPtr> names;
+                    if (auto tuple = generic->slice ? generic->slice->template get<py::Tuple>() : nullptr) names = tuple->elts;
+                    else names.push_back(generic->slice);
+                    for (const auto& item : names) {
+                        auto var = item ? item->template get<py::Name>() : nullptr;
+                        if (!var || !typevars.contains(var->id)) unsupported(s.pos, "Generic[...] arguments must be TypeVars");
+                        out.template_parameters.push_back(var->id);
+                        own_typevars.insert(var->id);
+                    }
+                    continue;
+                }
                 auto n = b ? b->template get<py::Name>() : nullptr;
                 if (!n) unsupported(s.pos, "base class must be a name");
                 out.inherit_members.emplace_back(la::Visibility::Public, pythonSymbol(n->id));
             }
             PythonConverter scope;
             scope.class_names = class_names;
+            scope.typevars = typevars;
+            scope.class_typevars = own_typevars;
             std::set<std::string> fields;
             for (const auto& member : c->body) if (auto a = member->template get<py::AnnAssign>(); a && a->target)
                 if (auto n = a->target->template get<py::Name>()) fields.insert(n->id);
@@ -1034,9 +1089,11 @@ struct PythonConverter {
 auto ParserBase::convertPython(const UAST::py::Expr& e) -> LangAPI::Expression { return PythonConverter{}.expr(e); }
 auto ParserBase::convertPython(const UAST::py::Stmt& s, const std::set<std::string>& variables) -> LangAPI::Statements { return PythonConverter{variables}.stmt(s); }
 auto ParserBase::convertPython(const UAST::py::Module& m, const std::set<std::string>& variables) -> LangAPI::Statements { return PythonConverter{variables}.body(m.body); }
-auto ParserBase::convertPythonDeclaration(const UAST::py::Stmt& s, const std::set<std::string>& classes) -> LangAPI::Declaration {
+auto ParserBase::convertPythonDeclaration(const UAST::py::Stmt& s, const std::set<std::string>& classes,
+                                          const std::set<std::string>& typevars) -> LangAPI::Declaration {
     PythonConverter converter;
     converter.class_names = classes;
+    converter.typevars = typevars;
     return converter.declaration(s);
 }
 auto ParserBase::convertPythonDeclarations(const UAST::py::Module& m) -> LangAPI::Declarations {

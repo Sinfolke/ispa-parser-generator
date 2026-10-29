@@ -31,9 +31,9 @@ class _Span:
 
 class _Alternative:
     rule: int
-    children: list
+    children: list[int]
 
-    def __init__(self, rule: int, children: list):
+    def __init__(self, rule: int, children: list[int]):
         self.rule = rule
         self.children = children
 
@@ -52,7 +52,7 @@ class _Forest:
     span: _Span
     has_token: bool
     token: object
-    alternatives: list
+    alternatives: list[_Alternative]
 
     def __init__(self, span: _Span, has_token: bool, token: object):
         self.span = span
@@ -85,7 +85,7 @@ class LRGeneralizedParser(LRParser):
         LRParser.__init__(self)
         self.work = 0
 
-    def _tick(self, forest: list, stacks: list) -> None:
+    def _tick(self, forest: list[_Forest], stacks: list[_Stack]) -> None:
         self.work = self.work + 1
         if self.work > WORK_LIMIT or len(forest) + len(stacks) > NODE_LIMIT:
             runtime_error("LR automatic conflict resolution resource limit exceeded")
@@ -307,7 +307,7 @@ class LRGeneralizedParser(LRParser):
                     evaluating[len(evaluating) - 1][2].append(produced)
         return MatchResult(True, result, pos)
 
-    def _key(self, parts: list) -> str:
+    def _key(self, parts: list[str]) -> str:
         out = []
         i = 0
         while i < len(parts):
@@ -315,7 +315,7 @@ class LRGeneralizedParser(LRParser):
             i = i + 1
         return join(out, ",")
 
-    def _intern(self, forest: list, index: StrIntMap, terminal: bool, symbol: int, span: _Span,
+    def _intern(self, forest: list[_Forest], index: StrIntMap, terminal: bool, symbol: int, span: _Span,
                 has_token: bool, token: object) -> int:
         self._tick(forest, [])
         key = self._key([_b(terminal), int_to_string(symbol), int_to_string(span.begin), int_to_string(span.end),
@@ -324,7 +324,7 @@ class LRGeneralizedParser(LRParser):
             forest.append(_Forest(span, has_token, token))
         return index.get(key)
 
-    def _push(self, stacks: list, index: StrIntMap, previous: int, state: int, value: int) -> int:
+    def _push(self, stacks: list[_Stack], index: StrIntMap, previous: int, state: int, value: int) -> int:
         self._tick([], stacks)
         key = self._key([int_to_string(previous), int_to_string(state), int_to_string(value)])
         if index.try_emplace(key, len(stacks)):

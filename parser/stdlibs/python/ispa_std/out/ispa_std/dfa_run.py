@@ -20,15 +20,15 @@ from ispa_std.refs import Cursor
 
 
 class DfaTables:
-    table: list
-    class_table: list
-    action_table: list
+    table: list[list[int]]
+    class_table: list[int]
+    action_table: list[list[int]]
     layout: TdfaLayout
-    debug_array: list
+    debug_array: list[DFADebug]
     debug_index: DebugIndex
 
-    def __init__(self, table: list, class_table: list, action_table: list, layout: TdfaLayout,
-                 debug_array: list, debug_index: DebugIndex):
+    def __init__(self, table: list[list[int]], class_table: list[int], action_table: list[list[int]], layout: TdfaLayout,
+                 debug_array: list[DFADebug], debug_index: DebugIndex):
         self.table = table
         self.class_table = class_table
         self.action_table = action_table

@@ -11,18 +11,18 @@ T = TypeVar("T")
 
 
 class Span(Generic[T]):
-    _arr: list
+    _arr: list[T]
     _begin: int
     _end: int
 
-    def __init__(self, arr: list, begin: int, end: int):
+    def __init__(self, arr: list[T], begin: int, end: int):
         if begin < 0 or end < begin or end > len(arr):
             prim.fail(ErrorKind.OutOfRange, "Span: window outside array")
         self._arr = arr
         self._begin = begin
         self._end = end
 
-    def data(self) -> list:
+    def data(self) -> list[T]:
         return self._arr
 
     def begin(self) -> int:

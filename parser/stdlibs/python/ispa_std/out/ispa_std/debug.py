@@ -12,7 +12,6 @@ every call is a no-op, like the C++ build without ISPA_DEBUG_FD.
 Where C++ used RAII (RuleScope, ProductionScope, MatchScope) call `close()` on
 every exit path. A scope abandoned by an exception is closed by
 `unwind_to(depth)`, which the parser calls where it catches NoMatch."""
-from ispa_std import reflect
 from ispa_std.chars import char_of, code_of
 from ispa_std.format import int_to_string, join
 from ispa_std.string import substr
@@ -83,8 +82,8 @@ class DebugState:
     stepping: bool
     target_depth: int
     frame_depth: int
-    break_files: list
-    break_lines: list
+    break_files: list[str]
+    break_lines: list[int]
     failure_seen: bool
     location: Location
     scopes: list[ScopeBase]
@@ -198,45 +197,6 @@ def obj(type_name: str, data: str) -> str:
     return '{"type":' + quote(type_name) + ',"value":' + data + "}"
 
 
-def encode(value: object, depth: int) -> str:
-    """Typed JSON for a value; objects expose debug_type()/debug_fields()."""
-    kind = reflect.kind_of(value)
-    if kind == reflect.NONE:
-        return obj("null", "null")
-    if kind == reflect.BOOL:
-        if value:
-            return obj("bool", "true")
-        return obj("bool", "false")
-    if kind == reflect.INT:
-        return obj("int", int_to_string(value))
-    if kind == reflect.FLOAT:
-        return obj("double", reflect.float_to_string(value))
-    if kind == reflect.STR:
-        return obj("string", quote(value))
-    if kind == reflect.LIST or kind == reflect.TUPLE:
-        if depth >= 16:
-            return obj("list", '"<depth limit>"')
-        parts = []
-        i = 0
-        while i < len(value) and i < 256:
-            parts.append(encode(value[i], depth + 1))
-            i = i + 1
-        return obj("list", "[" + join(parts, ",") + "]")
-    if reflect.has_method(value, "debug_fields"):
-        name = value.debug_type()
-        if depth >= 16:
-            return obj(name, '"<depth limit>"')
-        fields = value.debug_fields()
-        parts = []
-        i = 0
-        while i < len(fields):
-            pair = fields[i]
-            parts.append(quote(pair.first) + ":" + encode(pair.second, depth + 1))
-            i = i + 1
-        return obj(name, "{" + join(parts, ",") + "}")
-    return obj("opaque", '"<unavailable: expose debug_fields>"')
-
-
 def location_json(loc: Location) -> str:
     return '"file":' + quote(loc.file) + ',"line":' + int_to_string(loc.line) + ',"column":' + int_to_string(loc.column)
 
@@ -284,22 +244,22 @@ def lexer_result(token: str, success: bool, actual: str, reason: str, loc: Locat
                  '"success":' + flag + ',"actual":' + quote(actual) + ',"reason":' + quote(reason))
 
 
-def value(name: str, data: object, loc: Location) -> bool:
-    return event(Kind.value, loc, name, '"data":' + encode(data, 0))
+def value(name: str, encoded: str, loc: Location) -> bool:
+    return event(Kind.value, loc, name, '"data":' + encoded)
 
 
-def lexer_capture(name: str, data: object, loc: Location) -> bool:
-    return event(Kind.lexer_capture, loc, name, '"data":' + encode(data, 0))
+def lexer_capture(name: str, encoded: str, loc: Location) -> bool:
+    return event(Kind.lexer_capture, loc, name, '"data":' + encoded)
 
 
 class Snapshot:
-    _values: list
+    _values: list[str]
 
     def __init__(self):
         self._values = []
 
-    def add(self, name: str, data: object) -> "Snapshot":
-        self._values.append(quote(name) + ":" + encode(data, 0))
+    def add(self, name: str, encoded: str) -> "Snapshot":
+        self._values.append(quote(name) + ":" + encoded)
         return self
 
     def json(self) -> str:

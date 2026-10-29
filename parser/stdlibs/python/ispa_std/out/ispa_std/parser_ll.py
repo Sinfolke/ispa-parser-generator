@@ -23,10 +23,11 @@ including the NoMatch path, which is why probing goes through prim.attempt."""
 from ispa_std import debug, prim, recovery
 from ispa_std.counter import CountSpec
 from ispa_std.errors import ErrorKind
-from ispa_std.failures import invalid_argument, length_error, logic_error, no_match, out_of_range, rethrow
+from ispa_std.failures import api_error, invalid_argument, length_error, logic_error, no_match, out_of_range, rethrow, runtime_error
 from ispa_std.format import fmt, int_to_string, replace_all
 from typing import Callable
-from ispa_std.lexer import Lexer_base, TokenCursor, TokenIterator, is_token_end
+from ispa_std.chars import at, is_space
+from ispa_std.lexer import LazyIterator, Lexer_base, TokenCursor, TokenIterator, is_token_end
 from ispa_std.raw_token import RawToken
 from ispa_std.match_result import MatchResult
 from ispa_std.node import Node
@@ -71,7 +72,6 @@ def parse_source_span(lexer: Lexer_base, tokens: list[RawToken], rule: Callable[
     """External rules need the original source bytes. Tokens collected from a
     contiguous source region provide its bounds while retaining the source
     positions in the returned AST."""
-    from ispa_std.lexer import LazyIterator
     if len(tokens) == 0:
         return Node.blank()
     first = tokens[0].meta()
@@ -144,9 +144,9 @@ def token_boundary(name: str) -> TokenBoundary:
 class TokenNames:
     """`const char* (*token_name)(std::size_t)`: id -> dotted token name.
     `lookup(id)` returns "" when the id has no spelling."""
-    names: list
+    names: list[str]
 
-    def __init__(self, names: list):
+    def __init__(self, names: list[str]):
         self.names = names
 
     def lookup(self, id: int) -> str:
@@ -229,8 +229,8 @@ class ActionCheckpoint:
     """Named cursor checkpoints a rule or fail action can mark and restore.
     Contexts hold the live cursor, so restoring writes through to it."""
     pos: object
-    names: list
-    saved: list
+    names: list[str]
+    saved: list[TokenCursor]
 
     def __init__(self, pos: TokenCursor):
         self.pos = pos
@@ -306,7 +306,7 @@ class RuleContext(ActionCheckpoint):
     def prev(self) -> ActionToken:
         return context_prev(self.pos, self.start_pos, self.token_names, self.ambiguous_id)
 
-    def collect_braced(self) -> list:
+    def collect_braced(self) -> list[RawToken]:
         """Collect a braced region's contents after its opening token has been
         consumed. The closing token is consumed but not included; nested braces
         are preserved."""
@@ -316,13 +316,11 @@ class RuleContext(ActionCheckpoint):
             origin = self.pos.sourceOrigin()
             scanned = scan_balanced(origin, begin, ["}"], len(origin) - begin)
             if scanned.exhausted or scanned.end >= len(origin) or origin[scanned.end] != "}":
-                from ispa_std.failures import runtime_error
                 runtime_error("unterminated braced region in parser action")
             while (not self.pos.isEnd()) and self.pos.sourcePosition() < scanned.end:
                 collected.append(self.pos.current())
                 self.pos.next()
             if self.pos.isEnd() or self.pos.sourcePosition() != scanned.end or not self.at("}", 0):
-                from ispa_std.failures import runtime_error
                 runtime_error("braced region boundary is not a token")
             self.pos.next()
             return collected
@@ -337,7 +335,6 @@ class RuleContext(ActionCheckpoint):
                     return collected
             collected.append(self.pos.current())
             self.pos.next()
-        from ispa_std.failures import runtime_error
         runtime_error("unterminated braced region in parser action")
         return collected
 
@@ -436,7 +433,7 @@ class FailContext(ActionCheckpoint):
             logic_error("ctx.note requires a preceding ctx.error in this fail block")
         self.recovery_state.diagnostics[len(self.recovery_state.diagnostics) - 1].notes.append(message)
 
-    def sync(self, boundaries: list) -> None:
+    def sync(self, boundaries: list[str]) -> None:
         """Skip source text to one of `boundaries` (Strings). Lazy cursors only."""
         if len(boundaries) == 0:
             logic_error("ctx.sync requires at least one boundary")
@@ -462,7 +459,7 @@ class FailContext(ActionCheckpoint):
         if scanned.exhausted or self.recovery_state.exhausted():
             self.abort()
 
-    def sync_tokens(self, boundaries: list) -> None:
+    def sync_tokens(self, boundaries: list[str]) -> None:
         """Skip whole tokens to one of `boundaries` (TokenBoundary), preserving
         token-stream structure (including synthetic indentation)."""
         if len(boundaries) == 0:
@@ -550,7 +547,7 @@ class Frame:
     """One rule invocation's recovery frame."""
     rule: str
     expecting: str
-    claims: list
+    claims: list[recovery.ContextClaim]
 
     def __init__(self, rule: str):
         self.rule = rule
@@ -642,12 +639,12 @@ class Resume:
 class LLParser(Parser_base):
     recovery_state_: recovery.State
     counters_: StrIntMap
-    frames_: list
+    frames_: list[Frame]
     unwind_: int
     last_resume_pos_: int
     recovering_: bool
     context_max_skip_: int
-    context_errors_: list
+    context_errors_: list[recovery.ContextDiagnostic]
     probe_: object
     has_probe_: bool
     token_names_: TokenNames
@@ -685,11 +682,11 @@ class LLParser(Parser_base):
 
     # Diagnostics from the current/last parse, including one that failed.
     # A new parse clears them; callers control how they are displayed.
-    def getErrors(self) -> list:
+    def getErrors(self) -> list[recovery.Diagnostic]:
         return self.recovery_state_.diagnostics
 
     # Diagnostics produced by hierarchical (context) recovery.
-    def getContextErrors(self) -> list:
+    def getContextErrors(self) -> list[recovery.ContextDiagnostic]:
         return self.context_errors_
 
     def reset_recovery(self) -> None:
@@ -710,7 +707,6 @@ class LLParser(Parser_base):
     def parseLazy(self) -> object:
         self.reset_recovery()
         if not self.has_text:
-            from ispa_std.failures import api_error
             api_error("Can't parse because no input text is provided", [])
         result = self.lazyParse()
         at_end = result.it.isEnd()
@@ -749,7 +745,7 @@ class LLParser(Parser_base):
             if self.counters_.get(name) != count:
                 logic_error("Shared counter '" + name + "' has a different count")
 
-    def bind_counter_list(self, name: str, values: list) -> None:
+    def bind_counter_list(self, name: str, values: list[Node]) -> None:
         self.bind_counter_count(name, len(values))
 
     def bind_counter_node(self, name: str, node: Node) -> None:
@@ -815,7 +811,7 @@ class LLParser(Parser_base):
     def recovery_frame(self, rule: str) -> FrameGuard:
         return FrameGuard(self, rule)
 
-    def recovery_at(self, expecting: str, claims: list) -> None:
+    def recovery_at(self, expecting: str, claims: list[recovery.ContextClaim]) -> None:
         """Emitted before each child member: the claims of this frame here (the
         member itself if repeated, plus the suffix up to the first required
         member). `claims` is a list of recovery.ContextClaim."""
@@ -983,7 +979,7 @@ class LLParser(Parser_base):
         pos.assign(candidate)
         self.recover_at_context(pos, recovery.ContextKind.Stray)
 
-    def recover_choice(self, pos: TokenCursor, rule: str, expected: str, first_sets: list, inner_sets: list) -> int:
+    def recover_choice(self, pos: TokenCursor, rule: str, expected: str, first_sets: list[recovery.TokenSet], inner_sets: list[recovery.TokenSet]) -> int:
         """Called only after normal LL(k) selection failed. Prefer an
         unambiguous FIRST token, then an unambiguous terminal inside an
         alternative (shared interior terminals do not identify a branch).
@@ -1282,7 +1278,6 @@ class LLParser(Parser_base):
             pos.next()
 
     def skip_external_spaces(self, pos: TokenCursor) -> None:
-        from ispa_std.chars import at, is_space
         if pos.has_source():
             origin = pos.sourceOrigin()
             begin = pos.sourcePosition()
@@ -1294,7 +1289,7 @@ class LLParser(Parser_base):
         else:
             self.skip_spaces(pos)
 
-    def counted_impl(self, pos: TokenCursor, spec: CountSpec, match: Callable[[TokenCursor], Node]) -> list:
+    def counted_impl(self, pos: TokenCursor, spec: CountSpec, match: Callable[[TokenCursor], Node]) -> list[Node]:
         has_limit = spec.has_count
         limit = spec.count
         if len(spec.name) > 0:
@@ -1344,10 +1339,10 @@ class LLParser(Parser_base):
         self.commit_rule(pos)
         return nodes
 
-    def counted_token(self, pos: TokenCursor, type_id: int, spec: CountSpec) -> list:
+    def counted_token(self, pos: TokenCursor, type_id: int, spec: CountSpec) -> list[Node]:
         return self.counted_impl(pos, spec, lambda attempt: self.optional_token(attempt, type_id))
 
-    def counted_rule(self, pos: TokenCursor, rec: Callable[[TokenCursor], MatchResult], spec: CountSpec) -> list:
+    def counted_rule(self, pos: TokenCursor, rec: Callable[[TokenCursor], MatchResult], spec: CountSpec) -> list[Node]:
         return self.counted_impl(pos, spec, lambda attempt: self.optional_rule(attempt, rec))
 
     def repeat_optional(self, pos: TokenCursor, match: Callable[[TokenCursor], Node], separated: bool) -> Node:
@@ -1363,7 +1358,7 @@ class LLParser(Parser_base):
         pos.assign(attempt)
         return node
 
-    def range_token(self, pos: TokenCursor, type_id: int, fail: recovery.FailHandler) -> list:
+    def range_token(self, pos: TokenCursor, type_id: int, fail: recovery.FailHandler) -> list[Node]:
         result = []
         if fail.is_recovering():
             first = self.required_recovering(pos, type_id, fail)
@@ -1385,7 +1380,7 @@ class LLParser(Parser_base):
         self.sync_loop(pos)
         return result
 
-    def range_rule(self, pos: TokenCursor, rule_name: str, rec: Callable[[TokenCursor], MatchResult], fail: recovery.FailHandler) -> list:
+    def range_rule(self, pos: TokenCursor, rule_name: str, rec: Callable[[TokenCursor], MatchResult], fail: recovery.FailHandler) -> list[Node]:
         start = cursor_position(pos)
         result = []
         if fail.is_recovering():
@@ -1407,7 +1402,7 @@ class LLParser(Parser_base):
         self.sync_loop(pos)
         return result
 
-    def range_optional_token(self, pos: TokenCursor, type_id: int) -> list:
+    def range_optional_token(self, pos: TokenCursor, type_id: int) -> list[Node]:
         result = []
         repeating = True
         while repeating and (not pos.isEnd()) and not self.unwinding():
@@ -1420,7 +1415,7 @@ class LLParser(Parser_base):
         self.sync_loop(pos)
         return result
 
-    def range_optional_rule(self, pos: TokenCursor, rec: Callable[[TokenCursor], MatchResult]) -> list:
+    def range_optional_rule(self, pos: TokenCursor, rec: Callable[[TokenCursor], MatchResult]) -> list[Node]:
         result = []
         repeating = True
         while repeating and (not pos.isEnd()) and not self.unwinding():

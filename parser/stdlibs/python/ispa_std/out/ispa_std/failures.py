@@ -28,12 +28,12 @@ def length_error(message: str) -> None:
     prim.fail(ErrorKind.LengthError, message)
 
 
-def api_error(message: str, args: list) -> None:
+def api_error(message: str, args: list[str]) -> None:
     # IspaAPIExcept: `message` uses sequential {} placeholders.
     prim.fail(ErrorKind.ApiError, fmt(message, args))
 
 
-def internal_error(message: str, issue: str, ispa_side: bool, args: list) -> None:
+def internal_error(message: str, issue: str, ispa_side: bool, args: list[str]) -> None:
     # IspaInternalExcept carried (issue, ispa_side) next to the text; the
     # primitive carries one string, so the classification is a bracketed prefix.
     origin = "Generated parser"

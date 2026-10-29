@@ -27,7 +27,7 @@ def bool_to_string(value: bool) -> str:
     return "false"
 
 
-def fmt(format_text: str, args: list) -> str:
+def fmt(format_text: str, args: list[str]) -> str:
     # ISPA_STD::fmt: replaces the next "{}" for each argument. Arguments are
     # already Strings; extra arguments are ignored, missing ones leave "{}".
     res = format_text
@@ -68,7 +68,7 @@ def repeat(s: str, count: int) -> str:
     return out
 
 
-def join(items: list, separator: str) -> str:
+def join(items: list[str], separator: str) -> str:
     out = ""
     i = 0
     while i < len(items):
@@ -79,5 +79,5 @@ def join(items: list, separator: str) -> str:
     return out
 
 
-def concat_all(items: list) -> str:
+def concat_all(items: list[str]) -> str:
     return join(items, "")

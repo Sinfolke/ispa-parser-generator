@@ -23,7 +23,7 @@ def node_char(node: Node) -> str:
     return node.text()
 
 
-def assign_list(source: list, convert: Callable[[Node], T]) -> list:
+def assign_list(source: list[Node], convert: Callable[[Node], T]) -> list[T]:
     """The vector -> vector case: convert each element; empty source nodes
     leave their destination default (callers skip them with node.empty())."""
     out = []

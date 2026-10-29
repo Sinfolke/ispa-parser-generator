@@ -17,10 +17,3 @@ class MatchResult:
     @staticmethod
     def failed(it: TokenCursor) -> "MatchResult":
         return MatchResult(False, Node.blank(), it)
-
-    def debug_type(self) -> str:
-        return "ISPA.MatchResult"
-
-    def debug_fields(self) -> list:
-        from ispa_std.utility import Pair
-        return [Pair("status", self.status), Pair("node", self.node)]

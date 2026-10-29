@@ -15,7 +15,7 @@ Differences forced by the language-neutral model:
 from typing import Callable
 
 from ispa_std.chars import at, is_space
-from ispa_std.dfa_api import Captures
+from ispa_std.dfa_api import Captures, LEXER_DELETE_STATE, NULL_STATE
 from ispa_std.utility import Pair
 from ispa_std.dfa_run import DfaTables, run
 from ispa_std.failures import api_error, internal_error, logic_error, out_of_range, runtime_error
@@ -35,12 +35,12 @@ class LexerDecision:
 class LexerFailureContext:
     src: str
     cursor: int
-    diagnostics: list
+    diagnostics: list[str]
     rule: str
     failed_rule: str
     decision: int
 
-    def __init__(self, src: str, cursor: int, diagnostics: list, rule: str, failed_rule: str):
+    def __init__(self, src: str, cursor: int, diagnostics: list[str], rule: str, failed_rule: str):
         self.src = src
         self.cursor = cursor
         self.diagnostics = diagnostics
@@ -81,7 +81,7 @@ def is_token_end(token: RawToken) -> bool:
 class _SharedState:
     pos: int
     eof_processed: bool
-    checkpoints: list
+    checkpoints: list[object]
 
     def __init__(self, pos: int):
         self.pos = pos
@@ -92,8 +92,8 @@ class _SharedState:
 class Lexer_base:
     _in: str
     _has_input: bool
-    tokens: list
-    errors: list
+    tokens: list[RawToken]
+    errors: list[str]
     line: int
     external_boundary: bool
     # End of the source this lexer may read (-1: whole input). Replaces C++'s
@@ -187,13 +187,13 @@ class Lexer_base:
         self._has_input = True
         return self
 
-    def getTokens(self) -> list:
+    def getTokens(self) -> list[RawToken]:
         return self.tokens
 
     def clearTokens(self) -> None:
         self.tokens.clear()
 
-    def getErrors(self) -> list:
+    def getErrors(self) -> list[str]:
         return self.errors
 
     def copy_base_into(self, other: "Lexer_base") -> None:
@@ -287,8 +287,6 @@ class Lexer_base:
 
     def lexer_failure_result(self, ctx: LexerFailureContext, inserted: RawToken) -> Pair[int, RawToken]:
         """(state, token) for a lexer fail handler; see DFA run()."""
-        from ispa_std.dfa_api import LEXER_DELETE_STATE, NULL_STATE
-        from ispa_std.utility import Pair
         if ctx.decision == LexerDecision.DELETE:
             return Pair(LEXER_DELETE_STATE, self.empty_token())
         if ctx.decision == LexerDecision.INSERT:
@@ -312,7 +310,7 @@ class Lexer_base:
         return token
 
     # --- eager tokenization ----------------------------------------------------
-    def makeTokens(self) -> list:
+    def makeTokens(self) -> list[RawToken]:
         if self.hasExternalRules():
             logic_error("AMBIGUOUS eager token stream: use lazy tokenization with external parsers")
         if not self._has_input:
@@ -331,7 +329,7 @@ class Lexer_base:
         self.push_eof()
         return self.tokens
 
-    def makeTokensFromText(self, text: str) -> list:
+    def makeTokensFromText(self, text: str) -> list[RawToken]:
         self.setInput(text)
         return self.makeTokens()
 
@@ -374,7 +372,7 @@ class TokenCursor:
     def sourceOrigin(self) -> str:
         return ""
 
-    def getErrors(self) -> list:
+    def getErrors(self) -> list[str]:
         return self.owner.getErrors()
 
     def sourcePosition(self) -> int:
@@ -498,7 +496,7 @@ class LazyIterator(TokenCursor):
     def sourceOrigin(self) -> str:
         return self.owner.source()
 
-    def getErrors(self) -> list:
+    def getErrors(self) -> list[str]:
         return self.owner.getErrors()
 
     def sourcePosition(self) -> int:

@@ -13,7 +13,6 @@ marks a missing cell, LR_CONFLICT a cell with several candidate actions
 The type-directed capture conversion (lr_convert & co) is expressed with an
 explicit `Shape` instead of the target's static type; the typed C++ version
 stays in cpp_residue."""
-from ispa_std import reflect
 from ispa_std.failures import runtime_error
 from ispa_std.format import int_to_string
 from ispa_std.lexer import TokenCursor
@@ -70,10 +69,10 @@ class LRRegionFrame:
     """A region owns its recognition stack and the values produced inside it.
     The deterministic parser currently uses one root region."""
     pos: object
-    states: list
-    values: list
-    spans: list
-    capture_destinations: list
+    states: list[int]
+    values: list[object]
+    spans: list[LRRuleSpan]
+    capture_destinations: list[int]
     cursor: int
     recovered_prefix: bool
     control: LRControlState
@@ -96,10 +95,10 @@ class LRGrammar:
     def lr_k(self) -> int:
         return 1
 
-    def lr_action(self, state: int, window: list) -> int:
+    def lr_action(self, state: int, window: list[int]) -> int:
         return LR_INVALID
 
-    def lr_conflict(self, state: int, window: list) -> list:
+    def lr_conflict(self, state: int, window: list[int]) -> list[int]:
         return []
 
     def lr_shift(self, token: RawToken) -> object:
@@ -108,7 +107,7 @@ class LRGrammar:
     def lr_length(self, rule: int) -> int:
         return 0
 
-    def lr_reduce(self, rule: int, rhs: list) -> object:
+    def lr_reduce(self, rule: int, rhs: list[object]) -> object:
         return 0
 
     def lr_lhs(self, rule: int) -> int:
@@ -132,7 +131,7 @@ class LRGrammar:
     def has_expected(self) -> bool:
         return False
 
-    def lr_expected(self, state: int) -> list:
+    def lr_expected(self, state: int) -> list[int]:
         return []
 
     def has_context(self) -> bool:
@@ -162,7 +161,7 @@ class LRGrammar:
     def has_semantic_reduce(self) -> bool:
         return False
 
-    def lr_semantic_reduce(self, rule: int, region: LRRegionFrame, span: LRRuleSpan, rhs: list) -> object:
+    def lr_semantic_reduce(self, rule: int, region: LRRegionFrame, span: LRRuleSpan, rhs: list[object]) -> object:
         return 0
 
 
@@ -186,10 +185,10 @@ def lr_token(node: Node) -> LRTokenValue:
 
 class LRCaptures:
     """Captured values per destination column; `repeated` marks a repetition."""
-    columns: list
+    columns: list[list[object]]
     repeated: bool
 
-    def __init__(self, columns: list, repeated: bool):
+    def __init__(self, columns: list[list[object]], repeated: bool):
         self.columns = columns
         self.repeated = repeated
 
@@ -202,7 +201,7 @@ class LRCaptures:
         return True
 
 
-def lr_pack(values: list, indices: list, offsets: list, splice: list, count: int, repeated: bool) -> LRCaptures:
+def lr_pack(values: list[object], indices: list[int], offsets: list[int], splice: list[int], count: int, repeated: bool) -> LRCaptures:
     columns = []
     i = 0
     while i < count:
@@ -222,7 +221,7 @@ def lr_pack(values: list, indices: list, offsets: list, splice: list, count: int
     return LRCaptures(columns, repeated)
 
 
-def lr_get(values: list, index: int) -> object:
+def lr_get(values: list[object], index: int) -> object:
     return values[index]
 
 
@@ -232,203 +231,18 @@ def lr_node(value: object) -> Node:
     return node
 
 
-# --- shape-directed capture conversion ---------------------------------------
-class ShapeKind:
-    ANY = 0
-    TEXT = 1
-    CHAR = 2
-    LIST = 3
-    TUPLE = 4
-    VARIANT = 5
-
-
-class Shape:
-    """What the AST field expects (stands in for the C++ target type)."""
-    kind: int
-    parts: list
-
-    def __init__(self, kind: int, parts: list):
-        self.kind = kind
-        self.parts = parts
-
-    @staticmethod
-    def any() -> "Shape":
-        return Shape(ShapeKind.ANY, [])
-
-    @staticmethod
-    def text() -> "Shape":
-        return Shape(ShapeKind.TEXT, [])
-
-    @staticmethod
-    def char() -> "Shape":
-        return Shape(ShapeKind.CHAR, [])
-
-    @staticmethod
-    def list_of(element: "Shape") -> "Shape":
-        return Shape(ShapeKind.LIST, [element])
-
-    @staticmethod
-    def tuple_of(elements: list) -> "Shape":
-        return Shape(ShapeKind.TUPLE, elements)
-
-    @staticmethod
-    def variant_of(alternatives: list) -> "Shape":
-        return Shape(ShapeKind.VARIANT, alternatives)
-
-
-class Converted:
-    ok: bool
-    value: object
-
-    def __init__(self, ok: bool, value: object):
-        self.ok = ok
-        self.value = value
-
-
-def _is_token_value(v: object) -> bool:
-    return reflect.has_attr(v, "text") and reflect.has_attr(v, "node") and not reflect.has_attr(v, "columns")
-
-
-def _is_captures(v: object) -> bool:
-    return reflect.has_attr(v, "columns") and reflect.has_attr(v, "repeated")
-
-
-def _empty_for(shape: Shape) -> object:
-    if shape.kind == ShapeKind.TEXT:
-        return ""
-    if shape.kind == ShapeKind.CHAR:
-        return ""
-    if shape.kind == ShapeKind.LIST:
-        return []
-    return Node.blank()
-
-
-def lr_convert(shape: Shape, value: object) -> Converted:
-    if _is_token_value(value):
-        if shape.kind == ShapeKind.CHAR:
-            if len(value.text) != 1:
-                return Converted(False, 0)
-            return Converted(True, value.text)
-        if shape.kind == ShapeKind.TEXT:
-            return Converted(True, value.text)
-        if shape.kind != ShapeKind.VARIANT:
-            return lr_convert(shape, value.node)
-        # A variant may contain a literal char/string alternative as well as
-        # typed nodes: keep the token text until alternatives are tried.
-    if _is_captures(value):
-        if value.is_empty():
-            return Converted(True, _empty_for(shape))
-        if shape.kind == ShapeKind.LIST:
-            element = shape.parts[0]
-            out = []
-            if value.repeated and len(value.columns) > 1:
-                rows = len(value.columns[0])
-                c = 0
-                while c < len(value.columns):
-                    if len(value.columns[c]) != rows:
-                        return Converted(False, 0)
-                    c = c + 1
-                row = 0
-                while row < rows:
-                    columns = []
-                    c = 0
-                    while c < len(value.columns):
-                        columns.append([value.columns[c][row]])
-                        c = c + 1
-                    item = lr_convert(element, LRCaptures(columns, False))
-                    if not item.ok:
-                        return Converted(False, 0)
-                    out.append(item.value)
-                    row = row + 1
-                return Converted(True, out)
-            c = 0
-            while c < len(value.columns):
-                j = 0
-                while j < len(value.columns[c]):
-                    item = lr_convert(element, value.columns[c][j])
-                    if item.ok:
-                        out.append(item.value)
-                    else:
-                        nested = lr_convert(shape, value.columns[c][j])
-                        if not nested.ok:
-                            return Converted(False, 0)
-                        out.extend(nested.value)
-                    j = j + 1
-                c = c + 1
-            return Converted(True, out)
-        if shape.kind == ShapeKind.TUPLE:
-            if len(value.columns) != len(shape.parts):
-                return Converted(False, 0)
-            out = []
-            c = 0
-            while c < len(shape.parts):
-                item = lr_convert(shape.parts[c], LRCaptures([value.columns[c]], False))
-                if not item.ok:
-                    return Converted(False, 0)
-                out.append(item.value)
-                c = c + 1
-            return Converted(True, out)
-        selected = []
-        c = 0
-        while c < len(value.columns):
-            j = 0
-            while j < len(value.columns[c]):
-                selected.append(value.columns[c][j])
-                j = j + 1
-            c = c + 1
-        if len(selected) > 1:
-            return Converted(False, 0)
-        if len(selected) == 0:
-            return Converted(True, _empty_for(shape))
-        return lr_convert(shape, selected[0])
-    if shape.kind == ShapeKind.VARIANT:
-        i = 0
-        while i < len(shape.parts):
-            attempt = lr_convert(shape.parts[i], value)
-            if attempt.ok:
-                return Converted(True, Variant(i, attempt.value))
-            i = i + 1
-        return Converted(False, 0)
-    if shape.kind == ShapeKind.ANY or shape.kind == ShapeKind.TUPLE or shape.kind == ShapeKind.LIST:
-        if shape.kind == ShapeKind.ANY:
-            return Converted(True, value)
-    return Converted(False, 0)
-
-
-class Variant:
-    """Which alternative of a variant shape matched, and its value."""
-    index: int
-    value: object
-
-    def __init__(self, index: int, value: object):
-        self.index = index
-        self.value = value
-
-
-def lr_capture_assign(shape: Shape, values: list, index: int, column: int) -> object:
-    """Convert values[index] (or one of its columns; column < 0 = whole value)
-    to `shape`, or fail when the payload does not match its declared field."""
-    value = values[index]
-    if column >= 0:
-        value = LRCaptures([value.columns[column]], value.repeated)
-    result = lr_convert(shape, value)
-    if not result.ok:
-        runtime_error("LR capture payload does not match its declared AST field type")
-    return result.value
-
-
 # --- the driver ------------------------------------------------------------
 class LRParser:
     """Holds the diagnostics of the last lr_parse."""
-    errors_: list
+    errors_: list[Diagnostic]
 
     def __init__(self):
         self.errors_ = []
 
-    def getErrors(self) -> list:
+    def getErrors(self) -> list[Diagnostic]:
         return self.errors_
 
-    def _skip(self, g: LRGrammar, it: TokenCursor, offset: list) -> None:
+    def _skip(self, g: LRGrammar, it: TokenCursor, offset: list[int]) -> None:
         if g.has_is_space():
             while (not it.isEnd()) and g.lr_is_space(it.current()):
                 it.next()
@@ -440,7 +254,7 @@ class LRParser:
             return g.lr_space(rule, index)
         return False
 
-    def _window(self, g: LRGrammar, position: TokenCursor) -> list:
+    def _window(self, g: LRGrammar, position: TokenCursor) -> list[int]:
         peek = position.copy()
         window = []
         i = 0
@@ -455,7 +269,7 @@ class LRParser:
             i = i + 1
         return window
 
-    def _unexpected(self, g: LRGrammar, states: list, window: list, position: TokenCursor) -> Diagnostic:
+    def _unexpected(self, g: LRGrammar, states: list[int], window: list[int], position: TokenCursor) -> Diagnostic:
         d = Diagnostic()
         d.unexpected = window[0]
         if g.has_expected():
@@ -490,7 +304,7 @@ class LRParser:
         d.code = "lr-unexpected-token"
         return d
 
-    def _reduce_span(self, g: LRGrammar, rule: int, count: int, begin: int, spans: list, cursor: int) -> LRRuleSpan:
+    def _reduce_span(self, g: LRGrammar, rule: int, count: int, begin: int, spans: list[LRRuleSpan], cursor: int) -> LRRuleSpan:
         span = LRRuleSpan(cursor, cursor, False, False, True)
         allowed = self._gap(g, rule, 0)
         i = 0

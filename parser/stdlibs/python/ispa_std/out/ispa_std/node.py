@@ -9,6 +9,7 @@ Positions are Int offsets into `source`, a native String shared by reference
 (C++: `const char* start/end`). `copy()` replaces C++ value semantics: a Node
 is never mutated through an alias unless the caller wants that."""
 from ispa_std.failures import api_error
+from ispa_std.string import substr
 
 NO_POS = -1
 NO_NAME = -1
@@ -124,32 +125,4 @@ class Node:
     def text(self) -> str:
         if not self._has_source or self._startpos < 0:
             return ""
-        from ispa_std.string import substr
         return substr(self._source, self._startpos, self._length)
-
-    def write_to_output(self, printer) -> None:
-        if self._empty:
-            printer.node("<empty>", False)
-            return
-        printer.print_value_tree(self._data)
-
-    def to_string(self) -> str:
-        if self._empty:
-            api_error("Can't retrieve string representation of an empty node", [])
-        from ispa_std.to_string import to_string
-        return to_string(self._data)
-
-    def debug_type(self) -> str:
-        return "ISPA.Node"
-
-    def debug_fields(self) -> list:
-        from ispa_std.utility import Pair
-        out = [Pair("empty", self._empty)]
-        if not self._empty:
-            out.append(Pair("name", self._name))
-            out.append(Pair("startpos", self._startpos))
-            out.append(Pair("length", self._length))
-            out.append(Pair("line", self._line))
-            out.append(Pair("column", self._column))
-            out.append(Pair("data", self._data))
-        return out

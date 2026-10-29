@@ -51,14 +51,14 @@ class Decision:
 class Diagnostic:
     rule: str
     unexpected: int
-    expected: list
+    expected: list[int]
     decision: Decision
     expected_text: str
     offset: int
     length: int
     message: str
     code: str
-    notes: list
+    notes: list[str]
 
     def __init__(self):
         self.rule = ""
@@ -77,9 +77,9 @@ class State:
     max_errors: int
     max_total_skipped: int
     total_skipped: int
-    diagnostics: list
+    diagnostics: list[Diagnostic]
     # Active call-site suffixes, including terminals inside nested productions.
-    anchors: list
+    anchors: list[list[int]]
 
     def __init__(self):
         self.max_errors = 32
@@ -94,16 +94,16 @@ class State:
 
 class Plan:
     rule: str
-    expected: list
-    continuation: list
-    follow: list
-    explicit_sync: list
+    expected: list[int]
+    continuation: list[int]
+    follow: list[int]
+    explicit_sync: list[int]
     allow_insertion: bool
     allow_deletion: bool
     allow_replacement: bool
     max_skip: int
 
-    def __init__(self, rule: str, expected: list, continuation: list, follow: list, explicit_sync: list,
+    def __init__(self, rule: str, expected: list[int], continuation: list[int], follow: list[int], explicit_sync: list[int],
                  allow_insertion: bool, allow_deletion: bool, allow_replacement: bool, max_skip: int):
         self.rule = rule
         self.expected = expected
@@ -116,7 +116,7 @@ class Plan:
         self.max_skip = max_skip
 
 
-def contains(tokens: list, id: int) -> bool:
+def contains(tokens: list[int], id: int) -> bool:
     i = 0
     while i < len(tokens):
         if tokens[i] == id:
@@ -125,7 +125,7 @@ def contains(tokens: list, id: int) -> bool:
     return False
 
 
-def decode(encoded: str) -> list:
+def decode(encoded: str) -> list[int]:
     """Comma/space separated unsigned decimal token ids (LangAPI fail wrappers)."""
     result = []
     i = 0
@@ -283,12 +283,12 @@ def recover_encoded(pos: TokenCursor, state: State, rule: str, expected: str, co
 
 class TokenSet:
     """Recovery::Tokens<...>: a fixed set of token ids."""
-    _values: list
+    _values: list[int]
 
-    def __init__(self, values: list):
+    def __init__(self, values: list[int]):
         self._values = values
 
-    def values(self) -> list:
+    def values(self) -> list[int]:
         return self._values
 
     def matches(self, token: RawToken) -> bool:
@@ -475,7 +475,7 @@ class ContextDiagnostic:
         self.claim = ""
 
 
-def describe_ids(ids: list) -> str:
+def describe_ids(ids: list[int]) -> str:
     parts = []
     i = 0
     while i < len(ids):

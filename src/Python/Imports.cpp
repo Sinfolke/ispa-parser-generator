@@ -116,6 +116,54 @@ template<class Bindings> struct Bind {
         walk(s.kind, *this);
     }
 };
+// "Node" and list["Node"] annotations are forward references: parse the text into the expression it spells.
+void forwardReference(py::ExprPtr& e) {
+    if (!e) return;
+    if (auto c = e->get<py::Constant>(); c && c->kind == py::ConstantKind::Str) {
+        auto text = c->value;
+        text += "\n";
+        auto origin = e->pos;
+        origin.offset = 0;
+        origin.length = text.size();
+        auto parsed = UAST::parsePythonModule(text, origin);
+        if (parsed.body.size() != 1 || !parsed.body[0]->get<py::ExprStmt>() || !parsed.body[0]->get<py::ExprStmt>()->value)
+            fail(e->pos, "unsupported type annotation (forward reference \"" + text + "\" parsed as " +
+                std::to_string(parsed.body.size()) + " statements)");
+        auto resolved = parsed.body[0]->get<py::ExprStmt>()->value;
+        forwardReference(resolved);
+        resolved->pos = e->pos;
+        e = resolved;
+    } else if (auto sub = e->get<py::Subscript>()) {
+        forwardReference(sub->slice);
+    } else if (auto tuple = e->get<py::Tuple>()) {
+        for (auto& item : tuple->elts) forwardReference(item);
+    } else if (auto list = e->get<py::List>()) {
+        for (auto& item : list->elts) forwardReference(item);
+    }
+}
+void forwardReferences(py::StmtList& body) {
+    for (auto& statement : body) {
+        if (auto f = statement->get<py::FunctionDef>()) {
+            forwardReference(f->returns);
+            for (auto& p : f->params) forwardReference(p.annotation);
+        } else if (auto a = statement->get<py::AnnAssign>()) {
+            forwardReference(a->annotation);
+        } else if (auto c = statement->get<py::ClassDef>()) {
+            forwardReferences(c->body);
+        }
+    }
+}
+// `T = TypeVar("T")`: a type variable, not a module variable.
+bool typeVariable(const py::Stmt& statement, std::string& name) {
+    auto a = statement.get<py::Assign>();
+    if (!a || a->targets.size() != 1 || !a->targets[0] || !a->targets[0]->get<py::Name>() || !a->value) return false;
+    auto call = a->value->get<py::Call>();
+    if (!call || !call->func) return false;
+    const auto callee = path(*call->func);
+    if (callee != "TypeVar" && callee != "typing.TypeVar") return false;
+    name = a->targets[0]->get<py::Name>()->id;
+    return true;
+}
 void annotation(const py::ExprPtr& e, const UAST::SourcePosition& at, bool returns = false) {
     if (!e) fail(at, "function parameters and returns require type annotations");
     if (e->get<py::Name>() || e->get<py::Attribute>() || e->get<py::Subscript>()) return;
@@ -207,6 +255,14 @@ std::string Imports::module(const Modules::Path& source_path, const std::string&
         const std::string text(std::istreambuf_iterator<char>{input}, {});
         auto syntax = UAST::parsePythonModule(text, {canonical.string(), 0, text.size(), 1, 1});
         if (!loading.insert(name).second) fail(at, "circular Python import: " + name);
+        forwardReferences(syntax.body);
+        std::set<std::string> typevars;
+        std::erase_if(syntax.body, [&](const py::StmtPtr& statement) {
+            std::string variable;
+            if (!typeVariable(*statement, variable)) return false;
+            typevars.insert(variable);
+            return true;
+        });
         Validate validate;
         for (auto& statement : syntax.body)
             if (!statement->get<py::Import>() && !statement->get<py::ImportFrom>()) walk(statement->kind, validate);
@@ -449,7 +505,7 @@ std::string Imports::module(const Modules::Path& source_path, const std::string&
                 Bind bind{bindings};
                 walk(a->value, bind);
             } else continue;
-            auto declaration = Parser::ParserBase::convertPythonDeclaration(*statement, classes);
+            auto declaration = Parser::ParserBase::convertPythonDeclaration(*statement, classes, typevars);
             if (declaration.isFunction() && declaration.getFunction().statements.empty()) {
                 auto& function = declaration.getFunction();
                 if (function.type != LangAPI::ValueType::Void)
