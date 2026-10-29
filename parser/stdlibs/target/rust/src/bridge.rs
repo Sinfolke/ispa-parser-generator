@@ -36,6 +36,8 @@ pub trait BridgeCursor: Clone + 'static {
     fn retreat(&mut self);
     fn distance(&self) -> i64;
     fn current(&self) -> Option<Self::Token>;
+    /// The source text this cursor lexes from, when it knows it (lazy cursors do).
+    fn source_origin(&self) -> Option<&'static str> { None }
 }
 impl<V: TokenVariant> BridgeCursor for TokenIterator<RawToken<V>> {
     type Token = RawToken<V>;
@@ -53,6 +55,7 @@ impl<V: TokenVariant> BridgeCursor for LazyIterator<RawToken<V>> {
     fn retreat(&mut self) { LazyIterator::retreat(self) }
     fn distance(&self) -> i64 { LazyIterator::distance(self) as i64 }
     fn current(&self) -> Option<RawToken<V>> { self.token() }
+    fn source_origin(&self) -> Option<&'static str> { self.origin() }
 }
 
 /// A typed node as the core's `Node`: the core carries it, only the facade looks inside.
@@ -160,8 +163,8 @@ impl<IT: BridgeCursor> TypedCursor<IT> {
     fn install(&mut self) {
         let base = &mut self.base_0;
         base.__vt_isEnd = |base| Self::this(base).it.is_end();
-        base.__vt_has_source = |_| false;
-        base.__vt_sourceOrigin = |_| String::new();
+        base.__vt_has_source = |base| Self::this(base).it.source_origin().is_some();
+        base.__vt_sourceOrigin = |base| Self::this(base).it.source_origin().unwrap_or_default().to_string();
         base.__vt_getErrors = |_| Vec::new();
         base.__vt_sourcePosition = |_| -1;
         base.__vt_consumeExternal = |_, _| {};

@@ -16,13 +16,16 @@ fn main() {
         parser.lexer = Shared::new(lexer).upcast();
     }
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        if lazy { parser.parse_text(&text); } else { parser.parseFromTokens(); }
+        if lazy { parser.parse_text(&text); } else { parser.parse_tokens(); }
         let mut out = String::new();
         parser.tree.print(&mut out);
         out
     }));
     match outcome {
-        Ok(out) => print!("{out}"),
+        Ok(out) => {
+            print!("{out}");
+            for (rule, message) in parser.diagnostics() { println!("ERR {rule} | {message}"); }
+        }
         Err(payload) => {
             let message = payload.downcast_ref::<ispa_std::StdError>().map(|e| e.message.clone()).unwrap_or_else(|| "panic".into());
             println!("exception: {message}");

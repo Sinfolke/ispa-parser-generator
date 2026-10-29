@@ -2,7 +2,7 @@
 //! core (`python::ispa_std::parser_ll`); typed iterators, tokens and nodes stay typed (see bridge.rs).
 use crate::python::ispa_std::{lexer::TokenCursor, match_result::MatchResult as CoreMatch, node::Node as CoreNode, parser_ll,
                               recovery as core_recovery, counter as core_counter};
-use crate::{core_node, typed_node, BridgeCursor, BridgeToken, LazyIterator, LexerBase, MatchResult, Node, Ptr, Shared, TypedCursor};
+use crate::{core_node, typed_node, TokenEnd, BridgeCursor, BridgeToken, LazyIterator, LexerBase, MatchResult, Node, Ptr, Shared, TypedCursor};
 use crate::{Error, Upcast};
 use std::collections::HashMap;
 use std::ops::DerefMut;
@@ -178,18 +178,19 @@ pub struct LLParser<Main, Token> {
     pub tree: Main,
     pub errors: Vec<Error>,
     core: Option<Shared<parser_ll::LLParser>>,
+    trailing: Vec<(String, String)>,
     pub __vt_parseFromTokens: fn(&mut LLParser<Main, Token>),
     pub __vt_lazyParse: fn(&mut LLParser<Main, Token>) -> MatchResult<Main, LazyIterator<Token>>,
 }
 impl<Main: Clone, Token> Clone for LLParser<Main, Token> {
     fn clone(&self) -> Self {
-        Self { lexer: self.lexer.clone(), text: self.text, tree: self.tree.clone(), errors: self.errors.clone(), core: self.core.clone(),
+        Self { lexer: self.lexer.clone(), text: self.text, tree: self.tree.clone(), errors: self.errors.clone(), core: self.core.clone(), trailing: self.trailing.clone(),
                __vt_parseFromTokens: self.__vt_parseFromTokens, __vt_lazyParse: self.__vt_lazyParse }
     }
 }
 impl<Main: Default, Token: Clone + Default + 'static> Default for LLParser<Main, Token> {
     fn default() -> Self {
-        Self { lexer: Shared::default(), text: Ptr::new(""), tree: Main::default(), errors: Vec::new(), core: None,
+        Self { lexer: Shared::default(), text: Ptr::new(""), tree: Main::default(), errors: Vec::new(), core: None, trailing: Vec::new(),
                __vt_parseFromTokens: |_| {}, __vt_lazyParse: |_| MatchResult { status: false, node: Node::default(), it: LazyIterator::default() } }
     }
 }
@@ -205,11 +206,24 @@ impl<Main, Token> LLParser<Main, Token> {
     }
     pub fn parseFromTokens(&mut self) where Main: 'static, Token: 'static { (self.__vt_parseFromTokens)(self) }
     pub fn lazyParse(&mut self) -> MatchResult<Main, LazyIterator<Token>> { (self.__vt_lazyParse)(self) }
+    /// Parse the tokens of `self.lexer`; the tree is `self.tree`.
+    pub fn parse_tokens(&mut self) -> &Main where Main: 'static, Token: 'static {
+        self.core().borrow_mut().reset_recovery();
+        self.trailing.clear();
+        self.parseFromTokens();
+        &self.tree
+    }
     /// Parse `text`, lexing it on demand; the tree is `self.tree`. The text is kept for the life of the program.
-    pub fn parse_text(&mut self, text: &str) -> &Main where Main: Clone {
+    pub fn parse_text(&mut self, text: &str) -> &Main where Main: Clone, Token: Clone + Default + 'static + TokenEnd {
+        self.core().borrow_mut().reset_recovery();
+        self.trailing.clear();
         self.text = Ptr::new(Box::leak(text.to_string().into_boxed_str()));
         let result = self.lazyParse();
-        self.tree = result.node.data().clone();
+        let at_end = result.it.is_end_lazy();
+        if !result.status || !at_end {
+            self.trailing.push(("main".into(), if result.status { "unexpected trailing input" } else { "could not match main rule" }.into()));
+        }
+        if result.status { self.tree = result.node.data().clone(); }
         &self.tree
     }
 
@@ -245,6 +259,13 @@ impl<Main, Token> LLParser<Main, Token> {
     /// Bind `name` to how many elements `value` captured; a name bound twice has to agree.
     pub fn bind_counter(&mut self, name: impl AsRef<str>, value: impl CountOf) {
         self.core().borrow_mut().bind_counter_count(&name.as_ref().to_string(), value.count_of());
+    }
+    /// What recovery reported for the parse so far: (rule, message) of each local repair, then of each context repair.
+    pub fn diagnostics(&mut self) -> Vec<(String, String)> {
+        let core = self.core();
+        let local: Vec<_> = core.borrow_mut().getErrors().iter().map(|d| (d.borrow().rule.clone(), d.borrow().message.clone())).collect();
+        let context: Vec<_> = core.borrow_mut().getContextErrors().iter().map(|d| (d.borrow().rule.clone(), d.borrow().message.clone())).collect();
+        local.into_iter().chain(self.trailing.iter().cloned()).chain(context).collect()
     }
     /// A matched result made from an action's value (the rule short-circuits on an unwinding recovery).
     pub fn action_result<R, IT>(&mut self, value: R, pos: IT) -> MatchResult<R, IT> {

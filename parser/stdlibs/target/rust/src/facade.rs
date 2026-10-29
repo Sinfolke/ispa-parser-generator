@@ -145,8 +145,16 @@ impl<Token: Clone + Default + 'static + TokenEnd> LazyIterator<Token> {
         }
         Some(&*lexer)
     }
+    /// The text being lexed.
+    pub fn origin(&self) -> Option<&'static str> {
+        let state = self.state.as_ref()?;
+        let lexer = unsafe { &*state.borrow().lexer };
+        lexer.input
+    }
     pub fn token(&self) -> Option<Token> { self.ensure()?.tokens.get(self.index).cloned() }
     pub fn at_end(&self) -> bool { self.token().map_or(true, |token| token.is_end()) }
+    /// Past the last token (the end marker included).
+    pub fn is_end_lazy(&self) -> bool { self.at_end() }
     pub fn distance(&self) -> usize { self.index }
     // stepping onto a position makes its token (so a lexical error shows up when the parser gets there)
     pub fn advance(&mut self) { if !self.at_end() { self.index += 1; self.ensure(); } }

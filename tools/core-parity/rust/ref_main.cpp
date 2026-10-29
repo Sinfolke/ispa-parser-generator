@@ -10,5 +10,7 @@ int main(int argc, char** argv) {
         if (!lazy) lexer.makeTokens();
         auto& tree = lazy ? parser.parse(argv[1]) : parser.parse(lexer);
         tree.print(std::cout);
+        for (const auto& d : parser.getErrors()) std::cout << "ERR " << d.rule << " | " << d.message << "\n";
+        for (const auto& d : parser.getContextErrors()) std::cout << "ERR " << d.rule << " | " << d.message << "\n";
     } catch (const std::exception& e) { std::cout << "exception: " << e.what() << "\n"; }
 }
