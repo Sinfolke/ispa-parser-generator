@@ -1286,6 +1286,8 @@ export namespace LangAPI {
         Statements statements;
         stdu::vector<std::pair<std::string, stdu::vector<Type>>> template_parameters;
         bool override = false;
+        // Dispatched dynamically (every method of a Python class).
+        bool is_virtual = false;
         bool is_static = false;
         bool is_const = false;
         bool is_wrap_function = false;

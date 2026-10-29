@@ -1247,6 +1247,7 @@ struct PythonConverter {
                     auto lowered = scope.declaration(syntax);
                     auto& function = lowered.getFunction();
                     function.is_static = is_static;
+                    function.is_virtual = !is_static && f->name != "__init__";
                     if (f->name == "__init__") {
                         if (is_static || (f->returns && function.type != la::ValueType::Void))
                             unsupported(member->pos, "__init__ must be an instance method returning None");

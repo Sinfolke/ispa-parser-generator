@@ -199,6 +199,8 @@ namespace Cpp {
             // `static` is only valid on the in-class / in-header declaration, `override` likewise.
             if (kind == SigKind::Declaration && keep_static && func.is_static)
                 out += "static ";
+            if (kind == SigKind::Declaration && keep_static && func.is_virtual && tps.empty() && !constructor)
+                out += "virtual ";
 
             out += (constructor ? "" : "auto ") + qualifier + func.name;
             if (kind == SigKind::Instantiation)
