@@ -492,6 +492,10 @@ std::string Imports::module(const Modules::Path& source_path, const std::string&
                         walk(f->body, bind);
                         walk(f->returns, type_bind);
                         for (auto& p : f->params) walk(p.annotation, type_bind);
+                    } else if (auto field = member->get<py::AnnAssign>()) {
+                        // The field name is not a reference: only its annotation and value are bound.
+                        walk(field->annotation, type_bind);
+                        walk(field->value, type_bind);
                     } else walk(*member, type_bind);
                 }
             } else if (auto a = statement->get<py::AnnAssign>()) {

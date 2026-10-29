@@ -89,7 +89,7 @@ def parse_source_span(lexer: Lexer_base, tokens: list[RawToken], rule: Callable[
 
 class ActionToken:
     """A token as a parser action sees it (LLParser::ActionToken)."""
-    raw: object
+    raw: RawToken
     text: str
     name: str
     kind: int
@@ -100,7 +100,7 @@ class ActionToken:
     present: bool
 
     def __init__(self):
-        self.raw = 0
+        self.raw = RawToken.empty_token()
         self.text = ""
         self.name = ""
         self.kind = NPOS
@@ -228,7 +228,7 @@ def context_at(pos: TokenCursor, text: str, lookahead: int, token_names: TokenNa
 class ActionCheckpoint:
     """Named cursor checkpoints a rule or fail action can mark and restore.
     Contexts hold the live cursor, so restoring writes through to it."""
-    pos: object
+    pos: TokenCursor
     names: list[str]
     saved: list[TokenCursor]
 
@@ -275,7 +275,7 @@ class RuleContext(ActionCheckpoint):
     """`ctx` inside a rule action. Cursor and AST changes are immediately
     visible to subsequent matches and to the rule's caller."""
     ast: object
-    start_pos: object
+    start_pos: TokenCursor
     rule: str
     token_names: TokenNames
     ambiguous_id: int
@@ -342,7 +342,7 @@ class RuleContext(ActionCheckpoint):
 class FailContext(ActionCheckpoint):
     """`ctx` inside a `fail` block: the same queries plus the repair requests."""
     ast: object
-    start_pos: object
+    start_pos: TokenCursor
     rule: str
     failed_rule: str
     recovery_state: recovery.State
@@ -522,7 +522,7 @@ class FailContext(ActionCheckpoint):
         # Also account for handlers that change ctx.pos directly.
         if moved > self.skipped:
             self.recovery_state.total_skipped = self.recovery_state.total_skipped + (moved - self.skipped)
-        decision = recovery.Decision.default()
+        decision = recovery.Decision.initial()
         if self.recovery_state.exhausted():
             decision.mode = recovery.Mode.Abort
         elif self.has_request:
@@ -1083,7 +1083,7 @@ class LLParser(Parser_base):
                 self.commit_rule(pos)
                 self.note_match()
                 return recovery.RequiredResult(recovery.RequiredStatus.Matched, True, node,
-                                               recovery.Decision.default())
+                                               recovery.Decision.initial())
             self.reject_absent_rule()
             decision = fail.run(pos, self.recovery_state_)
             retry = False
@@ -1139,13 +1139,13 @@ class LLParser(Parser_base):
                 self.commit_rule(pos)
                 self.note_match()
                 return recovery.RequiredResult(recovery.RequiredStatus.Matched, True, match.node,
-                                               recovery.Decision.default())
+                                               recovery.Decision.initial())
             if self.unwinding():
                 pos.assign(match.it)
                 # The child abandoned itself for an outer frame; do not repair
                 # here, just propagate.
                 return recovery.RequiredResult(recovery.RequiredStatus.Boundary, False, Node.blank(),
-                                               recovery.Decision.default())
+                                               recovery.Decision.initial())
             self.reject_absent_rule()
             decision = fail.run(pos, self.recovery_state_)
             # We cannot synthesize an arbitrary nonterminal from one token.
@@ -1439,7 +1439,7 @@ class LLParser(Parser_base):
                            self.ambiguous_id_)
 
     def custom_failure_decision(self, before: TokenCursor, after: TokenCursor) -> recovery.Decision:
-        decision = recovery.Decision.default()
+        decision = recovery.Decision.initial()
         if cursor_position(before) == cursor_position(after):
             decision.mode = recovery.Mode.Insert
         else:

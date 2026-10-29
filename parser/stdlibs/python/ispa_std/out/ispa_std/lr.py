@@ -70,7 +70,7 @@ class LRRuleSpan:
 class LRRegionFrame:
     """A region owns its recognition stack and the values produced inside it.
     The deterministic parser currently uses one root region."""
-    pos: object
+    pos: TokenCursor
     states: list[int]
     values: list[object]
     spans: list[LRRuleSpan]
@@ -170,7 +170,7 @@ class LRGrammar:
 class LRTokenValue:
     """A shifted terminal: the token and its text. Synthetic grammar symbols
     carry captures, never user-visible AST nodes."""
-    node: object
+    node: Node
     text: str
 
     def __init__(self, node: Node, text: str):

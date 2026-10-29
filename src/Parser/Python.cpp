@@ -409,6 +409,13 @@ struct PythonConverter {
                 else s.path.emplace_back(la::StorageOffset{.offset = expr(x.slice)});
                 return la::StorageSymbol::createExpression(s);
             } else if constexpr (std::is_same_v<T, py::Call>) {
+                if (const auto* builtin = x.func ? x.func->template get<py::Name>() : nullptr;
+                    builtin && builtin->id == "len" && !locals.contains("len") && x.args.size() == 1 && x.keywords.empty()) {
+                    la::StorageSymbol access;
+                    access.what = expr(x.args[0]);
+                    access.path.emplace_back(la::ArrayMethodCall{.method = la::ArrayMethods::Size});
+                    return la::StorageSymbol::createExpression(access);
+                }
                 if (const auto* intrinsic = x.func ? x.func->template get<py::Name>() : nullptr;
                     intrinsic && intrinsic->id.starts_with("__ispa_ir__.")) {
                     const auto name = intrinsic->id.substr(12);

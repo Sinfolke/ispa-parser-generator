@@ -20,7 +20,7 @@ def stream(types):
 def handler(rule, expected, cont=(), follow=(), sync=()):
     return recovery.Handler(rule, "expected", recovery.TokenSet(list(expected)), recovery.TokenSet(list(cont)),
                             recovery.TokenSet(list(follow)), recovery.TokenSet(list(sync)),
-                            recovery.Policy.default())
+                            recovery.Policy.initial())
 
 
 def test_optional_and_required_token():

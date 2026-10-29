@@ -41,7 +41,7 @@ class Decision:
         self.skipped = skipped
 
     @staticmethod
-    def default() -> "Decision":
+    def initial() -> "Decision":
         return Decision(Mode.Propagate, EOF_TOKEN, EOF_TOKEN, 0)
 
     def copy(self) -> "Decision":
@@ -64,7 +64,7 @@ class Diagnostic:
         self.rule = ""
         self.unexpected = EOF_TOKEN
         self.expected = []
-        self.decision = Decision.default()
+        self.decision = Decision.initial()
         self.expected_text = ""
         self.offset = NO_OFFSET
         self.length = 0
@@ -314,7 +314,7 @@ class Policy:
         self.max_skip = max_skip
 
     @staticmethod
-    def default() -> "Policy":
+    def initial() -> "Policy":
         return Policy(True, True, True, 64)
 
 
@@ -326,7 +326,7 @@ class FailHandler:
 
     def run(self, pos: TokenCursor, state: State) -> Decision:
         logic_error("FailHandler.run is abstract")
-        return Decision.default()
+        return Decision.initial()
 
     def is_custom(self) -> bool:
         return False
@@ -399,7 +399,7 @@ class LegacyFail(FailHandler):
 
     def run(self, pos: TokenCursor, state: State) -> Decision:
         self.action(pos)
-        return Decision.default()
+        return Decision.initial()
 
     def is_recovering(self) -> bool:
         return False
@@ -428,7 +428,7 @@ class RequiredResult:
     @staticmethod
     def boundary_only() -> "RequiredResult":
         """The C++ default-constructed result (status Boundary, no node)."""
-        return RequiredResult(RequiredStatus.Boundary, False, Node.blank(), Decision.default())
+        return RequiredResult(RequiredStatus.Boundary, False, Node.blank(), Decision.initial())
 
 
 # --- context recovery ---------------------------------------------------------
