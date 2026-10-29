@@ -15,7 +15,7 @@ generator can lower it to any target. What cannot be language-agnostic is in `cp
 | recovery_scan.hpp / external.hpp / counter.hpp | scan.py / external.py / counter.py |
 | node.hpp / raw_token.hpp / assign.hpp / to_string.hpp | node.py / raw_token.py / assign.py / to_string.py |
 | ast_printer.hpp / ispa_debug.hpp | ast_printer.py / debug.py |
-| lr_machine.hpp / lr_conflicts.hpp | lr.py / lr_glr.py |
+| lr_machine.hpp / lr_conflicts.hpp | lr.py / lr_conflicts.py |
 | core.hpp errors | failures.py, errors.py |
 | helpers (new) | format.py, chars.py, refs.py, sortedmap.py, reflect.py |
 

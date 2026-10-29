@@ -8,7 +8,7 @@ C++ detection idioms:
              lr_rule_label, lr_recover, lr_semantic_reduce
 Actions are signed: shift = state+1, reduce = -rule-1, accept = 0; LR_INVALID
 marks a missing cell, LR_CONFLICT a cell with several candidate actions
-(see lr_glr.py). Semantic values are plain values (C++: std::any).
+(see lr_conflicts.py). Semantic values are plain values (C++: std::any).
 
 The type-directed capture conversion (lr_convert & co) is expressed with an
 explicit `Shape` instead of the target's static type; the typed C++ version

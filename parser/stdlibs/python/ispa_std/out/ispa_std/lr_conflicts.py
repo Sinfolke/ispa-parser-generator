@@ -1,4 +1,4 @@
-"""lr_conflicts.hpp: LR parsing with automatic conflict resolution (GLR-style).
+"""lr_conflicts.hpp: LR parsing with runtime conflict resolution.
 
 Used only for grammars with unresolved conflict cells. Stacks share immutable
 prefixes and reductions share a packed forest. No semantic callbacks run until

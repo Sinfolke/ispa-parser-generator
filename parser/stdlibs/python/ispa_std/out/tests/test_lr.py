@@ -1,7 +1,7 @@
 import pytest
 
 from ispa_std.lr import LRGrammar, LRParser, LR_INVALID, LR_CONFLICT, ABSENT
-from ispa_std.lr_glr import LRGeneralizedParser
+from ispa_std.lr_conflicts import LRGeneralizedParser
 from helpers import ListIt, toks
 
 N, PLUS = 1, 2
