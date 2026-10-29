@@ -208,13 +208,13 @@ TEST(RustEmitter, RejectsLanguageSpecificTypesAndUnresolvedOverloads) {
 }
 
 TEST(RustEmitter, ReportsMissingParserRuntimeContract) {
-    Class lexer{.name = "Lexer",
-        .inherit_members = {{Visibility::Public, IspaLibSymbol{.exports = StdlibExports::Lexer}}}};
+    Class lexer{.name = "Parser",
+        .inherit_members = {{Visibility::Public, IspaLibSymbol{.exports = StdlibExports::LRParser}}}};
     try {
         generate({Class::createDeclaration(lexer)});
         FAIL() << "incomplete parser generation must be diagnosed";
     } catch (const std::exception& error) {
-        EXPECT_NE(std::string(error.what()).find("semantic token-stream operations"), std::string::npos);
+        EXPECT_NE(std::string(error.what()).find("LR parsers are not implemented"), std::string::npos);
     }
 }
 

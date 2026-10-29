@@ -456,13 +456,12 @@ namespace Rust {
     //   nested types / statics were hoisted by Rust.Rewriter; anything that still shows up is emitted as a sibling
     auto Construct::emitClass(const LangAPI::Class &cls, Converter::Writer &w) -> void {
         for (const auto& [visibility, base] : cls.inherit_members) {
+            // LL parsers and lexers run on the lowered runtime; the LR drivers are not ported yet
             if (const auto* library = std::get_if<LangAPI::IspaLibSymbol>(&base);
-                library && (library->exports == LangAPI::StdlibExports::Lexer ||
-                            library->exports == LangAPI::StdlibExports::Parser ||
-                            library->exports == LangAPI::StdlibExports::LRParser ||
+                library && (library->exports == LangAPI::StdlibExports::LRParser ||
                             library->exports == LangAPI::StdlibExports::LRGeneralizedParser)) {
-                if (!std::getenv("ISPA_RUST_EXPERIMENTAL"))   // set to develop the Rust parser backend
-                    throw Error("Rust target: parser generation is incomplete: shared lowering still uses C++ container/iterator operations and implicit inherited runtime calls. IR needs semantic token-stream operations and explicit runtime interface contracts; refusing to emit an invalid Rust parser");
+                if (!std::getenv("ISPA_RUST_EXPERIMENTAL"))   // set to develop the Rust LR backend
+                    throw Error("Rust target: LR parsers are not implemented yet (use -a LL); the LR driver of the lowered runtime has no typed Rust facade");
             }
         }
         const std::string name = RustCore::convertSymbol(cls.name, false);

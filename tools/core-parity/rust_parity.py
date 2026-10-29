@@ -2,10 +2,10 @@
 Rust, parser/stdlibs/target/rust) must print the same tree and report the same failure as the C++ parser, including
 error recovery on malformed input.
 
-    python3 rust_parity.py [--ispa PATH] [--fuzz N] [--seed S]
+    python3 rust_parity.py [--grammar json|dyn|sql|pyexpr|counted|failblock] [--ispa PATH] [--fuzz N] [--seed S]
 
-Needs cargo and clang++ (C++23). Builds into ./build/rust (ignored). `ISPA_RUST_EXPERIMENTAL=1` is set for the generator
-(the Rust parser backend is still behind that switch)."""
+Needs cargo and clang++ (C++23); builds into ./build/rust (ignored). The trees, failure texts and diagnostics are compared
+with the tokens made up front and with them made on demand."""
 import argparse, os, random, re, shutil, subprocess, sys
 from pathlib import Path
 
@@ -57,7 +57,6 @@ def run(command, **kwargs):
 
 def build(ispa, work, grammar):
     env = {key: value for key, value in os.environ.items() if key != 'LD_LIBRARY_PATH'}
-    env['ISPA_RUST_EXPERIMENTAL'] = '1'
     gen, gen_cpp = work / 'gen_rust', work / 'gen_cpp'
     gen.mkdir(parents=True, exist_ok=True)
     gen_cpp.mkdir(parents=True, exist_ok=True)

@@ -38,4 +38,4 @@ demand. Tests are single-threaded (`.cargo/config.toml`): namespace variables ar
 ## Not yet
 
 LR parsers (`-a LALR|SLR|...`), `--static`, grammars whose actions embed C++ (examples/yaml), and the
-`ISPA_RUST_EXPERIMENTAL=1` guard in the converter is still required for parsers.
+(`ISPA_RUST_EXPERIMENTAL=1` lifts the converter's refusal of LR parsers, for development.)
