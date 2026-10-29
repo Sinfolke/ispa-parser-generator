@@ -541,6 +541,8 @@ auto RustCore::convertSymbol(const LangAPI::Symbol &symbol, bool value_context) 
         if (std::holds_alternative<std::string>(part)) {
             piece = std::get<std::string>(part);
             if (first && piece == "__ispa_parser__") piece = crateRoot();
+            else if (first && piece == "ISPA_STD" && symbol.path.size() > 1 && std::holds_alternative<std::string>(symbol.path[1]) &&
+                     std::get<std::string>(symbol.path[1]) == "CountSpec") piece = "::ispa_std";   // the repetition count of the typed stdlib
             else piece = ident(piece);
         } else if (std::holds_alternative<LangAPI::IspaLibSymbol>(part)) {
             piece = convertIspaLibSymbol(std::get<LangAPI::IspaLibSymbol>(part), true);

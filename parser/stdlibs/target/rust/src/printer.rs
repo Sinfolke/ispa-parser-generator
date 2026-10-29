@@ -49,7 +49,9 @@ impl PrintValue for ScalarText { fn scalar(&self) -> String { self.0.clone() } }
 macro_rules! scalar_print {
     ($($t:ty),*) => { $(impl PrintValue for $t { fn scalar(&self) -> String { self.to_text() } })* };
 }
-scalar_print!(String, &str, i64, i32, u64, usize, u8, bool, f64, char);
+scalar_print!(String, &str, i64, i32, u64, usize, bool, f64, char);
+// `u8` is the IR's character
+impl PrintValue for u8 { fn scalar(&self) -> String { (*self as char).to_string() } }
 impl<T: PrintValue> PrintValue for Vec<T> {
     fn structured(&self) -> bool { true }
     fn print_subtree(&self, printer: &mut ASTPrinter) {
@@ -89,7 +91,8 @@ pub trait ToText { fn to_text(&self) -> String; }
 macro_rules! display_text {
     ($($t:ty),*) => { $(impl ToText for $t { fn to_text(&self) -> String { self.to_string() } })* };
 }
-display_text!(String, &str, i64, i32, u64, usize, u8, bool, f64, char);
+display_text!(String, &str, i64, i32, u64, usize, bool, f64, char);
+impl ToText for u8 { fn to_text(&self) -> String { (*self as char).to_string() } }
 impl<T: ToText> ToText for Vec<T> { fn to_text(&self) -> String { self.iter().map(ToText::to_text).collect() } }
 impl<T: ToText> ToText for Node<T> { fn to_text(&self) -> String { self.value.to_text() } }
 impl<T: ToText + 'static> ToText for Shared<T> {

@@ -30,6 +30,10 @@ GRAMMARS = {
                 'a < b <= c', 'a is not b', 'a not in b', 'a | b ^ c & d', 'a << 2 >> 1', '-a ** 2', '~a', 'a // b % c', '1 +', '(1', '[1,', 'f(', '+', ''],
                ['a', 'b', '1', '2', '+', '-', '*', '/', '(', ')', '[', ']', '{', '}', ':', ',', '.', ' ', 'if ', 'else ', 'not ', 'and ', 'or ', 'in ', 'is ',
                 '==', '<', '>', '**', 'None', 'True']),
+    # counted repetitions: the number of `b` is the number of `a` before it (a shared counter), then exactly two `c`
+    'counted': (HERE / 'grammars' / 'counted', 'counted.isc',
+                ['abcc', 'aabbcc', 'aaabbbcc', 'aaabbcc', 'aabbbcc', 'abc', 'abccc', 'bcc', 'cc', 'a', '', 'aaaaabbbbbcc', 'abbcc', 'aabcc'],
+                ['a', 'b', 'c', 'aa', 'bb', 'cc']),
     # SQL select statements: nested rules, groups, optional parts
     'sql': (REPO / 'examples' / 'sql', 'grammar.isc',
             ['SELECT a FROM t', 'SELECT a, b as c FROM t WHERE a = 1', "SELECT x FROM t WHERE name = 'bob' AND (age > 3 OR age < 1) ORDER BY x DESC;",

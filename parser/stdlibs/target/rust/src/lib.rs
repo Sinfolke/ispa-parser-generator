@@ -189,7 +189,7 @@ pub mod dfa {
             pub fn is_set(&self, capture: i64) -> bool { self.inner.borrow_mut().is_set(capture) }
             pub fn begin(&self, capture: i64) -> i64 { self.inner.borrow_mut().begin(capture) }
             pub fn end(&self, capture: i64) -> i64 { self.inner.borrow_mut().end(capture) }
-            pub fn character(&self, capture: i64) -> String { self.inner.borrow_mut().character(capture) }
+            pub fn character(&self, capture: i64) -> u8 { self.inner.borrow_mut().character(capture).bytes().next().unwrap_or(0) }
             pub fn list_texts(&self, capture: i64) -> Vec<String> { self.inner.borrow_mut().list_texts(capture) }
             pub fn list_positions(&self, capture: i64) -> Vec<i64> { self.inner.borrow_mut().list_positions(capture) }
             pub fn line(&self, capture: i64) -> i64 { self.inner.borrow_mut().line(capture) }

@@ -1,7 +1,7 @@
 //! `LLParser<Main, Token>`: the base of generated parsers. Combinators, error recovery and frames run in the lowered
 //! core (`python::ispa_std::parser_ll`); typed iterators, tokens and nodes stay typed (see bridge.rs).
 use crate::python::ispa_std::{lexer::TokenCursor, match_result::MatchResult as CoreMatch, node::Node as CoreNode, parser_ll,
-                              recovery as core_recovery};
+                              recovery as core_recovery, counter as core_counter};
 use crate::{core_node, typed_node, BridgeCursor, BridgeToken, LazyIterator, LexerBase, MatchResult, Node, Ptr, Shared, TypedCursor};
 use crate::{Error, Upcast};
 use std::collections::HashMap;
@@ -118,11 +118,41 @@ impl<Main, Token> LLParser<Main, Token> {
         *pos = cursor.borrow().it.clone();
         chosen
     }
+    /// Counters bound in the rule being parsed disappear when the guard does.
+    pub fn counter_scope(&mut self) -> CounterScopeGuard { CounterScopeGuard { scope: self.core().borrow_mut().counter_scope() } }
+    /// Bind `name` to how many elements `value` captured; a name bound twice has to agree.
+    pub fn bind_counter(&mut self, name: impl AsRef<str>, value: impl CountOf) {
+        self.core().borrow_mut().bind_counter_count(&name.as_ref().to_string(), value.count_of());
+    }
     /// A matched result made from an action's value (the rule short-circuits on an unwinding recovery).
     pub fn action_result<R, IT>(&mut self, value: R, pos: IT) -> MatchResult<R, IT> {
         MatchResult { status: true, node: Node::create(value), it: pos }
     }
 }
+
+/// A repetition count: fixed, or the one bound to a name earlier (`A+ => n`, then `B+=n`).
+pub struct CountSpec;
+impl CountSpec {
+    pub fn named(name: impl AsRef<str>, minimum: i64) -> Shared<core_counter::CountSpec> {
+        let spec = core_counter::CountSpec::shared_default();
+        spec.borrow_mut().__init__(&name.as_ref().to_string(), false, 0, minimum);
+        spec
+    }
+    pub fn fixed(value: impl Into<i64>, minimum: i64) -> Shared<core_counter::CountSpec> {
+        let value = value.into();
+        if value < 0 { crate::fail(2, "a repetition count cannot be negative"); }
+        let spec = core_counter::CountSpec::shared_default();
+        spec.borrow_mut().__init__(&String::new(), true, value, if value < minimum { minimum } else { value });
+        spec
+    }
+}
+/// How many elements a captured value holds, for `bind_counter`.
+pub trait CountOf { fn count_of(&self) -> i64; }
+impl<T> CountOf for Vec<T> { fn count_of(&self) -> i64 { self.len() as i64 } }
+impl<T> CountOf for Node<T> { fn count_of(&self) -> i64 { i64::from(!self.empty()) } }
+/// The counters bound inside a rule are dropped with it.
+pub struct CounterScopeGuard { scope: Shared<parser_ll::CounterScope> }
+impl Drop for CounterScopeGuard { fn drop(&mut self) { self.scope.borrow_mut().restore(); } }
 
 /// The combinators generated rules call. `Self` is the generated parser; its `LLParser` base holds the core.
 pub trait LLParserApi<IT: BridgeCursor> {
@@ -137,6 +167,9 @@ pub trait LLParserApi<IT: BridgeCursor> {
     fn range_optional<T: Clone + Default + 'static>(&mut self, pos: &mut IT) -> Vec<Node<T>>;
     fn range_optional_rule<T: Clone + Default + 'static>(&mut self, pos: &mut IT, rec: impl FnMut(&mut Self, IT) -> MatchResult<T, IT>)
         -> Vec<Node<T>>;
+    fn counted<T: Clone + Default + 'static>(&mut self, pos: &mut IT, spec: Shared<core_counter::CountSpec>) -> Vec<Node<T>>;
+    fn counted_rule<T: Clone + Default + 'static>(&mut self, pos: &mut IT, spec: Shared<core_counter::CountSpec>,
+                                                  rec: impl FnMut(&mut Self, IT) -> MatchResult<T, IT>) -> Vec<Node<T>>;
 }
 
 /// The same combinators for repetitions that skip a space token between their elements (`range::<T, Space>`).
@@ -147,6 +180,9 @@ pub trait LLParserSpaced<IT: BridgeCursor>: LLParserApi<IT> {
     fn range_optional_spaced<T: Clone + Default + 'static, S: 'static>(&mut self, pos: &mut IT) -> Vec<Node<T>>;
     fn range_optional_rule_spaced<T: Clone + Default + 'static, S: 'static>(&mut self, pos: &mut IT,
                                                                            rec: impl FnMut(&mut Self, IT) -> MatchResult<T, IT>) -> Vec<Node<T>>;
+    fn counted_spaced<T: Clone + Default + 'static, S: 'static>(&mut self, pos: &mut IT, spec: Shared<core_counter::CountSpec>) -> Vec<Node<T>>;
+    fn counted_rule_spaced<T: Clone + Default + 'static, S: 'static>(&mut self, pos: &mut IT, spec: Shared<core_counter::CountSpec>,
+                                                                     rec: impl FnMut(&mut Self, IT) -> MatchResult<T, IT>) -> Vec<Node<T>>;
 }
 
 fn bridge<IT: BridgeCursor, T: Clone + Default + 'static>(it: IT, token: bool) -> Shared<TypedCursor<IT>> {
@@ -242,6 +278,22 @@ where
         take(&cursor, pos);
         typed_nodes::<T>(nodes)
     }
+    fn counted<T: Clone + Default + 'static>(&mut self, pos: &mut IT, spec: Shared<core_counter::CountSpec>) -> Vec<Node<T>> {
+        let core = self.core();
+        let cursor = bridge::<IT, T>(pos.clone(), true);
+        let nodes = core.borrow_mut().counted_token(cursor.clone().upcast(), token_id::<IT, T>(), spec);
+        take(&cursor, pos);
+        typed_nodes::<T>(nodes)
+    }
+    fn counted_rule<T: Clone + Default + 'static>(&mut self, pos: &mut IT, spec: Shared<core_counter::CountSpec>,
+                                                  rec: impl FnMut(&mut Self, IT) -> MatchResult<T, IT>) -> Vec<Node<T>> {
+        let core = self.core();
+        let cursor = bridge::<IT, T>(pos.clone(), false);
+        let callback = rule_callback::<Self, IT, T>(self as *mut Self, rec);
+        let nodes = core.borrow_mut().counted_rule(cursor.clone().upcast(), callback, spec);
+        take(&cursor, pos);
+        typed_nodes::<T>(nodes)
+    }
 }
 
 impl<P, IT, Main, Token> LLParserSpaced<IT> for P
@@ -266,6 +318,15 @@ where
                                                                            rec: impl FnMut(&mut Self, IT) -> MatchResult<T, IT>) -> Vec<Node<T>> {
         self.use_space_token::<IT, S>();
         LLParserApi::range_optional_rule::<T>(self, pos, rec)
+    }
+    fn counted_spaced<T: Clone + Default + 'static, S: 'static>(&mut self, pos: &mut IT, spec: Shared<core_counter::CountSpec>) -> Vec<Node<T>> {
+        self.use_space_token::<IT, S>();
+        LLParserApi::counted::<T>(self, pos, spec)
+    }
+    fn counted_rule_spaced<T: Clone + Default + 'static, S: 'static>(&mut self, pos: &mut IT, spec: Shared<core_counter::CountSpec>,
+                                                                     rec: impl FnMut(&mut Self, IT) -> MatchResult<T, IT>) -> Vec<Node<T>> {
+        self.use_space_token::<IT, S>();
+        LLParserApi::counted_rule::<T>(self, pos, spec, rec)
     }
 }
 impl<Main, Token> LLParser<Main, Token> {
