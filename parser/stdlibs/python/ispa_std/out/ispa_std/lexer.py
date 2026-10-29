@@ -354,6 +354,14 @@ class TokenCursor:
     owned_owner: Lexer_base
     has_owned: bool
 
+    def __init__(self):
+        self.owner = Lexer_base()
+        self.state = _SharedState(0)
+        self.token_index = 0
+        self.distance_base = 0
+        self.owned_owner = self.owner
+        self.has_owned = False
+
     def copy(self) -> "TokenCursor":
         logic_error("TokenCursor.copy is abstract")
         return self

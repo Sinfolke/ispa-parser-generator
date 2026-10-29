@@ -284,6 +284,7 @@ struct PythonConverter {
         }
         if (auto sub = value->template get<py::Subscript>()) {
             const auto base = inferred(sub->value);
+            if (is(base, la::ValueType::String)) return base;
             if (is(base, la::ValueType::Array) && !base.template_parameters.empty())
                 if (const auto* element = std::get_if<la::Type>(&base.template_parameters.front())) return *element;
         }
@@ -406,7 +407,12 @@ struct PythonConverter {
                 la::StorageSymbol s;
                 s.what = group(expr(x.value));
                 if constexpr (std::is_same_v<T, py::Attribute>) s.path.emplace_back(x.attr);
-                else s.path.emplace_back(la::StorageOffset{.offset = expr(x.slice)});
+                else {
+                    s.path.emplace_back(la::StorageOffset{.offset = expr(x.slice)});
+                    // Indexing a str gives a one-character str, not the target's character type.
+                    if (const auto base = inferred(x.value); base.isValueType() && base.getValueType() == la::ValueType::String)
+                        return la::CharToStringConstructor::createExpression(la::CharToStringConstructor{.what = la::StorageSymbol::createExpression(s)});
+                }
                 return la::StorageSymbol::createExpression(s);
             } else if constexpr (std::is_same_v<T, py::Call>) {
                 if (const auto* builtin = x.func ? x.func->template get<py::Name>() : nullptr;
@@ -895,7 +901,11 @@ struct PythonConverter {
                         return la::VariableAssignment::createStatements(la::VariableAssignment{.name = target(x.targets[0]), .value = value});
                     }
                     if (block_depth) block_declared.back().push_back(n->id);
-                    return la::Statements{la::Variable{.name = localName(n->id), .type = la::Type{la::ValueType::Undef}, .value = value}};
+                    // A literal's own C++ type (`const char*` for "") is not the Python type, so scalars are declared.
+                    const bool scalar = value_type.isValueType() && (value_type.getValueType() == la::ValueType::String ||
+                        value_type.getValueType() == la::ValueType::Int || value_type.getValueType() == la::ValueType::Bool ||
+                        value_type.getValueType() == la::ValueType::Float);
+                    return la::Statements{la::Variable{.name = localName(n->id), .type = scalar ? value_type : la::Type{la::ValueType::Undef}, .value = value}};
                 }
                 return la::VariableAssignment::createStatements(la::VariableAssignment{.name = target(x.targets[0]), .value = value});
             } else if constexpr (std::is_same_v<T, py::AnnAssign>) {
