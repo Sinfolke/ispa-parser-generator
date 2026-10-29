@@ -878,6 +878,21 @@ int generate(Args args) {
             else target->second += code;
         }
     }
+    if (!args.stdlib.empty()) {
+        // --stdlib: link to a library with the ispastdlib interface under another namespace and include directory.
+        std::string library_namespace = args.stdlib_name.empty() ? "ISPA_CORE" : args.stdlib_name;
+        std::string include_dir = library_namespace;
+        std::ranges::transform(include_dir, include_dir.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        const auto replace_all = [](std::string& text, const std::string& from, const std::string& to) {
+            for (std::size_t at = text.find(from); at != std::string::npos; at = text.find(from, at + to.size()))
+                text.replace(at, from.size(), to);
+        };
+        for (auto& [file, code] : generated) {
+            replace_all(code, "ispastdlib.hpp", include_dir + ".hpp");
+            replace_all(code, "ispastdlib/", include_dir + "/");
+            replace_all(code, "ISPA_STD", library_namespace);
+        }
+    }
     const auto result = writeGeneratedFiles(dir_path, generated, previous_hashes);
 
     saveKeyHashMap(manifest_path, result.hashes);

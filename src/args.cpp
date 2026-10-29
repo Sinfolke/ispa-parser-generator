@@ -69,8 +69,8 @@ Args parse_args(int argc, char** argv) {
         throw Error("--stdlib-name requires --stdlib");
     if ((!args.stdlib.empty() || args.static_stdlib) && args.language_str != "cpp")
         throw Error("--stdlib and --static are only available for -l cpp so far");
-    if (!args.stdlib.empty() || args.static_stdlib)
-        throw Error("--stdlib/--static: emitting parsers against the lowered standard library is not implemented yet");
+    if (args.static_stdlib)
+        throw Error("--static: lowering the standard library into the output is not implemented yet");
     if (args.no_ai_recovery && !args.ai_recovery_file.empty())
         throw Error("--ai-recovery and --no-ai-recovery cannot be used together");
 
