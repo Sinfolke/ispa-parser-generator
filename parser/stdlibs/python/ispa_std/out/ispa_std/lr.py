@@ -259,10 +259,11 @@ class LRParser:
 
     def _window(self, g: LRGrammar, position: TokenCursor) -> list[int]:
         peek = position.copy()
-        window = []
+        window: list[int] = []
+        scratch: list[int] = []
         i = 0
         while i < g.lr_k():
-            self._skip(g, peek, [])
+            self._skip(g, peek, scratch)
             end = peek.isEnd()
             if end:
                 window.append(ABSENT)

@@ -161,6 +161,47 @@ struct PythonConverter {
         walk(body, visit);
         return found;
     }
+    // How a list/dict parameter is passed. Python passes the object itself, so a callee that mutates it (or
+    // keeps it) must see the caller's container: by reference. A parameter that is only read is const&.
+    enum class ContainerPass { Value, ConstRef, Ref };
+    static ContainerPass container_pass(const py::StmtList& body, const std::string& name) {
+        if (rebinds(body, name)) return ContainerPass::Value;
+        bool mutated = false;
+        const auto is_name = [&](const py::ExprPtr& e) {
+            auto n = e ? e->template get<py::Name>() : nullptr;
+            return n && n->id == name;
+        };
+        auto visit = [&](const auto& node) {
+            if constexpr (std::is_same_v<std::decay_t<decltype(node)>, py::Expr>) {
+                // A direct mutation: a mutating method, or a store through a subscript. Passing the list on is
+                // not one; a callee that mutates what it is handed makes the C++ compiler refuse the const&.
+                if (auto c = node.template get<py::Call>(); c && c->func)
+                    if (auto m = c->func->template get<py::Attribute>(); m && is_name(m->value)) {
+                        static const std::set<std::string> writes{"append", "extend", "insert", "remove", "pop", "clear",
+                            "sort", "reverse", "update", "setdefault", "popitem"};
+                        if (writes.contains(m->attr)) mutated = true;
+                    }
+                if (auto s = node.template get<py::Subscript>(); s && is_name(s->value) && s->ctx != py::ExprContext::Load)
+                    mutated = true;
+            } else if constexpr (std::is_same_v<std::decay_t<decltype(node)>, py::Stmt>) {
+                if (auto a = node.template get<py::AugAssign>(); a && a->target)
+                    if (auto sub = a->target->template get<py::Subscript>(); sub && is_name(sub->value)) mutated = true;
+            }
+        };
+        walk(body, visit);
+        return mutated ? ContainerPass::Ref : ContainerPass::ConstRef;
+    }
+    static std::size_t store_count(const py::StmtList& body, const std::string& name) {
+        std::size_t count = 0;
+        auto visit = [&](const auto& node) {
+            if constexpr (std::is_same_v<std::decay_t<decltype(node)>, py::Stmt>) {
+                if (auto a = node.template get<py::AugAssign>(); a && a->target)
+                    if (auto n = a->target->template get<py::Name>(); n && n->id == name) ++count;
+            } else if (auto n = node.template get<py::Name>(); n && n->id == name && n->ctx != py::ExprContext::Load) ++count;
+        };
+        walk(body, visit);
+        return count;
+    }
     la::Type return_type{la::ValueType::Undef};
     // `x = []` carries no element type. Python code states it later: `return x` (the declared return type)
     // or `x.append(value)` (the value's type).
@@ -1070,7 +1111,14 @@ struct PythonConverter {
                     const bool scalar = value_type.isValueType() && (value_type.getValueType() == la::ValueType::String ||
                         value_type.getValueType() == la::ValueType::Int || value_type.getValueType() == la::ValueType::Bool ||
                         value_type.getValueType() == la::ValueType::Float);
-                    return la::Statements{la::Variable{.name = localName(n->id), .type = scalar || collection ? value_type : la::Type{la::ValueType::Undef}, .value = value}};
+                    // `x = self.items` binds the same list: a reference, unless x is rebound later.
+                    auto declared_type = scalar || collection ? value_type : la::Type{la::ValueType::Undef};
+                    if (!hoist && !collection && function_body && value_type.isValueType() &&
+                        (value_type.getValueType() == la::ValueType::Array || value_type.getValueType() == la::ValueType::Map) &&
+                        x.value && (x.value->template get<py::Attribute>() || x.value->template get<py::Subscript>() ||
+                                    x.value->template get<py::Name>()) && store_count(*function_body, n->id) == 1)
+                        declared_type = la::Type{la::ValueType::BorrowSemantic, value_type};
+                    return la::Statements{la::Variable{.name = localName(n->id), .type = declared_type, .value = value}};
                 }
                 return la::VariableAssignment::createStatements(la::VariableAssignment{.name = target(x.targets[0]), .value = value});
             } else if constexpr (std::is_same_v<T, py::AnnAssign>) {
@@ -1169,6 +1217,14 @@ struct PythonConverter {
                 // A str is immutable: a parameter the body never rebinds is passed by const reference.
                 if (parameter_type.isValueType() && parameter_type.getValueType() == la::ValueType::String && !rebinds(f->body, p.name))
                     parameter_type = la::Type{la::ValueType::BorrowSemantic, la::Type{la::ValueType::ImmutableSemantic, parameter_type}};
+                if (parameter_type.isValueType() && (parameter_type.getValueType() == la::ValueType::Array ||
+                                                     parameter_type.getValueType() == la::ValueType::Map)) {
+                    const auto pass = container_pass(f->body, p.name);
+                    if (pass == ContainerPass::ConstRef)
+                        parameter_type = la::Type{la::ValueType::BorrowSemantic, la::Type{la::ValueType::ImmutableSemantic, parameter_type}};
+                    else if (pass == ContainerPass::Ref)
+                        parameter_type = la::Type{la::ValueType::BorrowSemantic, parameter_type};
+                }
                 out.parameters.emplace_back(std::move(parameter_type), p.name);
                 scope.locals.insert(p.name);
                 scope.local_types.insert_or_assign(p.name, type(p.annotation));
