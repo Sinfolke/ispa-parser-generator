@@ -605,9 +605,11 @@ namespace Rust {
         if (!cls.inherit_members.empty() && !templated)
             if (const auto* library = std::get_if<LangAPI::IspaLibSymbol>(&cls.inherit_members.front().second);
                 library && library->exports == LangAPI::StdlibExports::Lexer) {
-                const auto base = "<" + bases[0] + " as ::ispa_std::LexerTypes>";
-                emitLine(w, "impl ::ispa_std::LexerTypes for " + name + " { type Token = " + base + "::Token; type Iterator = " + base +
-                            "::Iterator; type LazyIterator = " + base + "::LazyIterator; }");
+                // spelled out: projections through the base would leave the marker-trait impls looking overlapping
+                const auto open = bases[0].find('<');
+                const auto token = open == std::string::npos ? std::string("()") : bases[0].substr(open + 1, bases[0].size() - open - 2);
+                emitLine(w, "impl ::ispa_std::LexerTypes for " + name + " { type Token = " + token + "; type Iterator = ::ispa_std::TokenIterator<" +
+                            token + ">; type LazyIterator = ::ispa_std::LazyIterator<" + token + ">; }");
             }
 
         // --- impl ---
@@ -812,6 +814,20 @@ namespace Rust {
                 w.decreaseIndentation();
                 emitLine(w, "}");
             }
+            // which alternative a type is (a rule type is none of them): how the core addresses tokens by type
+            emitLine(w, "impl ::ispa_std::TokenVariant for " + def.name + " {");
+            w.increaseIndentation();
+            emitLine(w, "fn variant_index(&self) -> usize { self.index() }");
+            emitLine(w, "fn index_of<__T: 'static>() -> Option<usize> {");
+            w.increaseIndentation();
+            emitLine(w, "let id = ::std::any::TypeId::of::<__T>();");
+            for (std::size_t i = 0; i < def.alternatives.size(); ++i)
+                emitLine(w, "if id == ::std::any::TypeId::of::<" + def.alternatives[i] + ">() { return Some(" + std::to_string(i + 1) + "); }");
+            emitLine(w, "None");
+            w.decreaseIndentation();
+            emitLine(w, "}");
+            w.decreaseIndentation();
+            emitLine(w, "}");
             emitLine(w, "impl " + def.name + " {");
             w.increaseIndentation();
             emitLine(w, "pub fn index(&self) -> usize {");

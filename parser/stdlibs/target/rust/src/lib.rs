@@ -18,6 +18,8 @@ mod shared;
 pub use shared::{Shared, WeakShared, Upcast, Ref, RefMut};
 pub mod pycoll;
 pub use pycoll::{PyAny, PyVal, PyKey};
+mod facade;
+pub use facade::*;
 mod primitives;
 pub use primitives::{StdError, fail, attempt, failure_message};
 
@@ -98,31 +100,6 @@ impl<'a, T> IntoIterator for Span<'a, T> {
     fn into_iter(self) -> Self::IntoIter { self.values.iter() }
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct Node<T> { pub value: T, pub start: usize, pub end: usize }
-impl<T: Default> Node<T> {
-    pub fn create(value: T) -> Self { Self { value, start: 0, end: 0 } }
-    pub fn set_data(&mut self, value: T) { self.value = value; }
-    pub fn data(&self) -> &T { &self.value }
-}
-
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct RawToken<T = ()> { pub value: Option<T>, pub start: usize, pub end: usize, pub kind: usize }
-impl<T> RawToken<T> {
-    pub fn new(value: T, start: usize, end: usize) -> Self { Self { value: Some(value), start, end, kind: 0 } }
-    pub fn create<V: Into<T>>(start: i64, _source: Ptr, length: i64, _line: i64, kind: usize, value: V) -> Self {
-        let start = start.max(0) as usize;
-        Self { value: Some(value.into()), start, end: start.saturating_add(length.max(0) as usize), kind }
-    }
-    pub fn empty(&self) -> bool { self.value.is_none() }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct MatchResult<T, I = usize> { pub status: bool, pub node: Node<T>, pub it: I }
-impl<T: Default, I: Default> Default for MatchResult<T, I> {
-    fn default() -> Self { Self { status: false, node: Node::create(T::default()), it: I::default() } }
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Error { message: String }
 impl Error { pub fn new(message: impl Into<String>) -> Self { Self { message: message.into() } } }
@@ -142,114 +119,6 @@ pub fn bad_variant_access() -> ! { panic!("ISPA variant access failed") }
 /// Conversion hook used where the language neutral IR permits compatible values.
 pub fn assign_compatible<T: Clone>(target: &mut T, source: &T) { *target = source.clone(); }
 
-/// A lazy lexer. The callback must advance the cursor for every token it returns.
-#[derive(Clone)]
-pub struct LexerBase<T> {
-    cursor: Ptr,
-    finished: bool,
-    scan: Rc<RefCell<dyn FnMut(&mut Ptr) -> Result<Option<T>, Error>>>,
-}
-impl<T> Default for LexerBase<T> {
-    fn default() -> Self { Self::new("", |_| Ok(None)) }
-}
-impl<T> LexerBase<T> {
-    pub fn new(input: &'static str, scan: impl FnMut(&mut Ptr) -> Result<Option<T>, Error> + 'static) -> Self {
-        Self { cursor: Ptr::new(input), finished: false, scan: Rc::new(RefCell::new(scan)) }
-    }
-    pub fn cursor(&self) -> Ptr { self.cursor }
-    pub fn next_token(&mut self) -> Result<Option<T>, Error> {
-        if self.finished { return Ok(None); }
-        if self.cursor.is_eof() { self.finished = true; return Ok(None); }
-        let before = self.cursor;
-        let token = (self.scan.borrow_mut())(&mut self.cursor)?;
-        if token.is_some() && self.cursor.offset() == before.offset() {
-            return Err(Error::new(format!("lexer did not advance at line {}, column {}", before.line(), before.column())));
-        }
-        if token.is_none() { self.finished = true; }
-        Ok(token)
-    }
-    pub fn collect_tokens(mut self) -> Result<Vec<T>, Error> {
-        let mut tokens = Vec::new();
-        while let Some(token) = self.next_token()? { tokens.push(token); }
-        Ok(tokens)
-    }
-}
-impl<T> Iterator for LexerBase<T> {
-    type Item = Result<T, Error>;
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.next_token() { Ok(Some(token)) => Some(Ok(token)), Ok(None) => None, Err(error) => { self.finished = true; Some(Err(error)) } }
-    }
-}
-pub trait LexerTypes { type Token; type Iterator; }
-/// Cursor operations required by generated parser entry points.
-pub trait TokenStream {
-    type Cursor;
-    type LazyCursor;
-
-    fn token_cursor(&mut self) -> Self::Cursor;
-    fn lazy_token_cursor(&mut self, input: Ptr) -> Self::LazyCursor;
-    fn reset_token_stream(&mut self);
-}
-/// Token stream with transactional rule calls and useful failure positions.
-#[derive(Clone)]
-pub struct LLParser<AST, T> { tokens: Vec<T>, position: usize, errors: Vec<Error>, ast: PhantomData<AST> }
-impl<AST, T> Default for LLParser<AST, T> {
-    fn default() -> Self { Self { tokens: Vec::new(), position: 0, errors: Vec::new(), ast: PhantomData } }
-}
-impl<AST, T> LLParser<AST, T> {
-    pub fn new(tokens: Vec<T>) -> Self { Self { tokens, position: 0, errors: Vec::new(), ast: PhantomData } }
-    pub fn errors(&self) -> &[Error] { &self.errors }
-    pub fn position(&self) -> usize { self.position }
-    pub fn is_eof(&self) -> bool { self.position == self.tokens.len() }
-    pub fn peek(&self) -> Option<&T> { self.tokens.get(self.position) }
-    pub fn checkpoint(&self) -> usize { self.position }
-    pub fn restore(&mut self, checkpoint: usize) { assert!(checkpoint <= self.tokens.len()); self.position = checkpoint; }
-    pub fn take_if(&mut self, predicate: impl FnOnce(&T) -> bool) -> Option<&T> {
-        if self.peek().is_some_and(predicate) { self.position += 1; self.tokens.get(self.position - 1) } else { None }
-    }
-    pub fn required<R>(&mut self, expected: &str, rule: impl FnOnce(&mut Self) -> Result<Option<R>, Error>) -> Result<R, Error> {
-        let start = self.checkpoint();
-        match rule(self) {
-            Ok(Some(value)) => Ok(value),
-            Ok(None) => { self.restore(start); Err(Error::new(format!("expected {expected} at token {start}"))) },
-            Err(error) => { self.restore(start); Err(error) },
-        }
-    }
-    pub fn optional<R>(&mut self, rule: impl FnOnce(&mut Self) -> Result<Option<R>, Error>) -> Result<Option<R>, Error> {
-        let start = self.checkpoint();
-        match rule(self) { Ok(Some(value)) => Ok(Some(value)), Ok(None) => { self.restore(start); Ok(None) }, Err(error) => { self.restore(start); Err(error) } }
-    }
-    pub fn repeated<R>(&mut self, minimum: usize, maximum: Option<usize>, mut rule: impl FnMut(&mut Self) -> Result<Option<R>, Error>) -> Result<Vec<R>, Error> {
-        let origin = self.checkpoint();
-        let mut values = Vec::new();
-        while maximum.map_or(true, |limit| values.len() < limit) {
-            let before = self.checkpoint();
-            match rule(self) {
-                Ok(Some(value)) => {
-                    if self.position == before { self.restore(origin); return Err(Error::new("repeated rule did not advance")); }
-                    values.push(value);
-                }
-                Ok(None) => { self.restore(before); break; }
-                Err(error) => { self.restore(origin); return Err(error); }
-            }
-        }
-        if values.len() < minimum { self.restore(origin); Err(Error::new(format!("expected at least {minimum} repetitions at token {origin}"))) } else { Ok(values) }
-    }
-    /// Record a diagnostic, then skip tokens until a synchronization token or EOF.
-    /// The synchronization token remains available to the caller.
-    pub fn recover_until(&mut self, error: Error, synchronize: impl Fn(&T) -> bool) -> usize {
-        self.errors.push(error);
-        let start = self.position;
-        while let Some(token) = self.peek() {
-            if synchronize(token) { break; }
-            self.position += 1;
-        }
-        self.position - start
-    }
-}
-pub trait LLParserApi { type Iterator; }
-pub struct LRParser<T>(PhantomData<T>);
-pub struct LRGeneralizedParser<T>(PhantomData<T>);
 pub struct ASTPrinter<'a> { out: &'a mut dyn fmt::Write, branches: Vec<bool> }
 impl<'a> ASTPrinter<'a> {
     pub fn new(out: &'a mut dyn fmt::Write) -> Self { Self { out, branches: Vec::new() } }
@@ -462,38 +331,6 @@ mod execution_tests {
     use super::*;
 
     #[test]
-    fn token_stream_interface_resets_and_creates_cursors() {
-        #[derive(Default)]
-        struct Stream { tokens: Vec<u8> }
-        impl TokenStream for Stream {
-            type Cursor = usize;
-            type LazyCursor = Ptr;
-            fn token_cursor(&mut self) -> usize { self.tokens.len() }
-            fn lazy_token_cursor(&mut self, input: Ptr) -> Ptr { input }
-            fn reset_token_stream(&mut self) { self.tokens.clear(); }
-        }
-        let mut stream = Stream { tokens: vec![1, 2] };
-        assert_eq!(stream.token_cursor(), 2);
-        stream.reset_token_stream();
-        assert_eq!(stream.token_cursor(), 0);
-        assert_eq!(stream.lazy_token_cursor(Ptr::new("é")).get(), Some(0xc3));
-    }
-
-    #[test]
-    fn lexer_and_parser_execute_and_backtrack() {
-        let lexer = LexerBase::new("a b", |pos| {
-            while pos.get() == Some(b' ') { pos.inc(); }
-            if let Some(ch) = pos.get() { pos.inc(); Ok(Some(ch)) } else { Ok(None) }
-        });
-        let mut parser = LLParser::<(), u8>::new(lexer.collect_tokens().unwrap());
-        assert_eq!(parser.optional(|p| Ok(p.take_if(|ch| *ch == b'z').copied())).unwrap(), None);
-        assert_eq!(parser.position(), 0);
-        assert_eq!(parser.required("a", |p| Ok(p.take_if(|ch| *ch == b'a').copied())).unwrap(), b'a');
-        assert_eq!(parser.repeated(1, None, |p| Ok(p.take_if(|ch| *ch == b'b').copied())).unwrap(), vec![b'b']);
-        assert!(parser.is_eof());
-    }
-
-    #[test]
     fn cursor_classifies_each_utf8_byte() {
         let mut cursor = Ptr::new("é\n!");
         let start = cursor;
@@ -506,12 +343,6 @@ mod execution_tests {
         assert_eq!(string_range(start, cursor), "é");
         cursor.inc();
         assert_eq!((cursor.line(), cursor.column(), cursor.get()), (2, 1, Some(b'!')));
-    }
-
-    #[test]
-    fn lexer_rejects_non_advancing_callbacks() {
-        let mut lexer = LexerBase::new("x", |_| Ok(Some('x')));
-        assert!(lexer.next_token().unwrap_err().to_string().contains("did not advance"));
     }
 
     #[test]
@@ -533,13 +364,6 @@ mod execution_tests {
         assert_eq!(cursor.remaining(), "!");
     }
 
-    #[test]
-    fn recovery_keeps_synchronization_token() {
-        let mut parser = LLParser::<(), char>::new(vec!['x', 'y', ';', 'z']);
-        assert_eq!(parser.recover_until(Error::new("unexpected token"), |token| *token == ';'), 2);
-        assert_eq!(parser.peek(), Some(&';'));
-        assert_eq!(parser.errors().len(), 1);
-    }
 }
 
 // The Python runtime (parser/stdlibs/python/ispa_std) lowered to Rust by ispa itself: `python::ispa_std::*`.

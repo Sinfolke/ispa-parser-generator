@@ -1178,7 +1178,11 @@ auto RustCore::convertFunctionCall(const LangAPI::FunctionCall &call, bool membe
         }
         // arguments passed by value out of a place are copies
         for (std::size_t i = 0; i < args.size(); ++i)
-            if (args[i] == raw_args[i]) args[i] = convertInitializerValue(LangAPI::Type{LangAPI::ValueType::Undef}, call.args[i]);
+            if (args[i] == raw_args[i]) {
+                // a namespace-level table handed to a runtime method is lent, not copied
+                if (args[i].starts_with("(*") && args[i].ends_with(".get())")) { args[i] = "&" + args[i]; continue; }
+                args[i] = convertInitializerValue(LangAPI::Type{LangAPI::ValueType::Undef}, call.args[i]);
+            }
         // arguments are evaluated before the call borrows its receiver / `&mut` operands: bind the ones that would clash
         std::vector<std::string> pending;
         const auto bind_arg = [&](std::string& a) {
