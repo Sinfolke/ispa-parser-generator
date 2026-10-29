@@ -15,7 +15,7 @@ Differences forced by the language-neutral model:
 from typing import Callable, ClassVar
 
 from ispa_std.chars import at as char_at, is_space
-from ispa_std.dfa_api import Captures, LEXER_DELETE_STATE, NULL_STATE
+from ispa_std.dfa_api import Captures, LEXER_DELETE_STATE, NULL_STATE, SourceText
 from ispa_std.utility import Pair
 from ispa_std.dfa_run import DfaTables, run
 from ispa_std.failures import api_error, internal_error, logic_error, out_of_range, runtime_error
@@ -90,7 +90,7 @@ class _SharedState:
 
 
 class Lexer_base:
-    _in: str
+    _src: SourceText
     _has_input: bool
     tokens: list[RawToken]
     errors: list[str]
@@ -101,7 +101,7 @@ class Lexer_base:
     bound: int
 
     def __init__(self):
-        self._in = ""
+        self._src = SourceText("")
         self._has_input = False
         self.tokens = []
         self.errors = []
@@ -123,7 +123,7 @@ class Lexer_base:
 
     def ambiguous_token(self, before: int, after: int) -> RawToken:
         """Marker for one source unit an external rule may still claim."""
-        meta = RawTokenMeta(before, self._in, True, 1, self.line_at(before), self.column_at(before), AMBIGUOUS_ID)
+        meta = RawTokenMeta(before, self._src.text, True, 1, self.line_at(before), self.column_at(before), AMBIGUOUS_ID)
         return RawToken.ambiguous(meta)
 
     def clone(self) -> "Lexer_base":
@@ -179,11 +179,11 @@ class Lexer_base:
         return len(self.tokens) > 0
 
     def source(self) -> str:
-        return self._in
+        return self._src.text
 
     def setInput(self, text: str) -> "Lexer_base":
         self.errors.clear()
-        self._in = text
+        self._src = SourceText(text)
         self._has_input = True
         return self
 
@@ -198,7 +198,7 @@ class Lexer_base:
 
     def copy_base_into(self, other: "Lexer_base") -> None:
         """For clone() implementations: copy the base-class state."""
-        other._in = self._in
+        other._src = self._src
         other._has_input = self._has_input
         other.tokens = []
         other.tokens.extend(self.tokens)
@@ -214,7 +214,7 @@ class Lexer_base:
         self.tokens.extend(other.tokens)
         self.errors = []
         self.errors.extend(other.errors)
-        self._in = other._in
+        self._src = other._src
         self._has_input = other._has_input
 
     def equals(self, other: "Lexer_base") -> bool:
@@ -233,19 +233,19 @@ class Lexer_base:
 
     def skip_spaces(self, cur: Cursor) -> int:
         prev = cur.pos
-        while is_space(char_at(self._in, cur.pos)):
+        while is_space(char_at(self._src.text, cur.pos)):
             cur.pos = cur.pos + 1
         return cur.pos - prev
 
     def line_at(self, pos: int) -> int:
         if not self._has_input or pos < 0:
             logic_error("Lexer line lookup has no source position")
-        if pos > len(self._in):
+        if pos > len(self._src.text):
             out_of_range("Lexer line lookup exceeds source input")
         count = 1
         i = 0
         while i < pos:
-            if self._in[i] == "\n":
+            if self._src.text[i] == "\n":
                 count = count + 1
             i = i + 1
         return count
@@ -253,12 +253,12 @@ class Lexer_base:
     def column_at(self, pos: int) -> int:
         if not self._has_input or pos < 0:
             logic_error("Lexer column lookup has no source position")
-        if pos > len(self._in):
+        if pos > len(self._src.text):
             out_of_range("Lexer column lookup exceeds source input")
         count = 1
         i = 0
         while i < pos:
-            if self._in[i] == "\n":
+            if self._src.text[i] == "\n":
                 count = 0
             else:
                 count = count + 1
@@ -269,21 +269,21 @@ class Lexer_base:
         if not self._has_input or pos < 0:
             logic_error("Lexer line prefix has no source position")
         begin = pos
-        while begin > 0 and char_at(self._in, begin - 1) != "\n" and char_at(self._in, begin - 1) != "\r":
+        while begin > 0 and char_at(self._src.text, begin - 1) != "\n" and char_at(self._src.text, begin - 1) != "\r":
             begin = begin - 1
-        return substr(self._in, begin, pos - begin)
+        return substr(self._src.text, begin, pos - begin)
 
     def next_char(self, pos: int) -> str:
         if pos < 0:
             logic_error("Lexer next character has no source position")
-        return char_at(self._in, pos)
+        return char_at(self._src.text, pos)
 
     def panic_mode(self, cur: Cursor) -> None:
-        if cur.pos < len(self._in):
+        if cur.pos < len(self._src.text):
             cur.pos = cur.pos + 1
 
     def lexer_failure_context(self, cursor: int, rule: str, failed_rule: str) -> LexerFailureContext:
-        return LexerFailureContext(self._in, cursor, self.errors, rule, failed_rule)
+        return LexerFailureContext(self._src.text, cursor, self.errors, rule, failed_rule)
 
     def lexer_failure_result(self, ctx: LexerFailureContext, inserted: RawToken) -> Pair[int, RawToken]:
         """(state, token) for a lexer fail handler; see DFA run()."""
@@ -299,11 +299,11 @@ class Lexer_base:
 
     def lookup(self, tables: DfaTables, semantic: Callable[[int, Captures, int, int, int, Cursor], Pair[int, RawToken]], cur: Cursor) -> RawToken:
         """Run the DFA for one token at cur (empty token at end of input)."""
-        if cur.pos >= len(self._in):
+        if cur.pos >= len(self._src.text):
             return self.empty_token()
         # `line` is shared with the scan: copy in, copy out.
         scan = Cursor(cur.pos, self.line)
-        token = run(self._in, scan, self.getCurrentPos(cur.pos), tables, semantic, self.empty_token())
+        token = run(self._src, scan, self.getCurrentPos(cur.pos), tables, semantic, self.empty_token())
         cur.pos = scan.pos
         cur.line = scan.line
         self.line = scan.line  # the lexer's own `line` is the one that persists
@@ -316,14 +316,14 @@ class Lexer_base:
         if not self._has_input:
             api_error("can't lex because no input provided. ", [])
         cur = Cursor(0, self.line)
-        n = len(self._in)
+        n = len(self._src.text)
         while cur.pos < n:
             before = cur.pos
             token = self.makeToken(cur)
             if cur.pos == before:
                 internal_error("no matches at position {}, on character {}, and no exception can handle it",
                                "Lexer TDFA generation", True,
-                               [int_to_string(cur.pos), char_at(self._in, cur.pos)])
+                               [int_to_string(cur.pos), char_at(self._src.text, cur.pos)])
             if not is_token_end(token):
                 self.push(token)
         self.push_eof()
@@ -522,7 +522,7 @@ class LazyIterator(TokenCursor):
         if self.token_index < len(self.state.checkpoints):
             branch.restoreCheckpoint(self.state.checkpoints[self.token_index])
         branch.tokens.clear()
-        branch._in = origin
+        branch._src = SourceText(origin)
         branch._has_input = True
         branch.line = branch.line_at(end)
         branch.externalAdvance(begin, end)

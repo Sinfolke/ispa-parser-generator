@@ -12,7 +12,7 @@ from ispa_std import debug
 from ispa_std.raw_token import RawToken
 from ispa_std.utility import Pair
 from ispa_std.chars import at, code_of
-from ispa_std.dfa_api import (Action, Captures, DebugIndex, DFADebug, DYNAMIC_FAIL_STATE, HistoryNode,
+from ispa_std.dfa_api import (Action, Captures, SourceText, DebugIndex, DFADebug, DYNAMIC_FAIL_STATE, HistoryNode,
                               LEXER_DELETE_STATE, NULL_STATE, TdfaLayout, UNSET)
 from ispa_std.failures import internal_error, runtime_error
 from ispa_std.format import int_to_string, repeat
@@ -103,16 +103,16 @@ def _trace_step(tables: DfaTables, state: int, cls: int, current_ch: str, pos_ch
         sink.write("State " + int_to_string(state) + " char '" + pos_ch + "'\n")
 
 
-def run(src: str, cur: Cursor, start_pos: int, tables: DfaTables, semantic: Callable[[int, Captures, int, int, int, Cursor], Pair[int, RawToken]], empty_token: RawToken) -> RawToken:
+def run(source: SourceText, cur: Cursor, start_pos: int, tables: DfaTables, semantic: Callable[[int, Captures, int, int, int, Cursor], Pair[int, RawToken]], empty_token: RawToken) -> RawToken:
     """Scan one token starting at cur.pos. Returns the accepted token, or
     `empty_token` when nothing matched (cur is then left where the walk died,
     which the caller treats as no progress)."""
-    n = len(src)
+    n = len(source.text)
     start = cur.pos
     start_line = cur.line
     first = "<end of input>"
     if start < n:
-        first = src[start]
+        first = source.text[start]
     scope = debug.MatchScope("lexer scan", first)
 
     table = tables.table
@@ -140,10 +140,10 @@ def run(src: str, cur: Cursor, start_pos: int, tables: DfaTables, semantic: Call
     dead = False
 
     while state != NULL_STATE and not dead:
-        pos_ch = at(src, cur.pos)
+        pos_ch = at(source.text, cur.pos)
         current_ch = pos_ch
         if immediate_action:
-            current_ch = at(src, cur.pos + 1)
+            current_ch = at(source.text, cur.pos + 1)
         if trace_on:
             _trace_step(tables, state, class_table[code_of(current_ch)], current_ch, current_ch)
         if state < nstates:
@@ -153,7 +153,7 @@ def run(src: str, cur: Cursor, start_pos: int, tables: DfaTables, semantic: Call
                     cur.line = cur.line + 1
                 if cur.pos < n:
                     cur.pos = cur.pos + 1
-            here_ch = at(src, cur.pos)
+            here_ch = at(source.text, cur.pos)
             nxt = table[state][class_table[code_of(here_ch)]]
             if nxt == NULL_STATE:
                 dead = True
@@ -193,7 +193,7 @@ def run(src: str, cur: Cursor, start_pos: int, tables: DfaTables, semantic: Call
                 runtime_error("DFA: unknown action; Report this error to github")
             state = row[3]
         else:
-            captures = Captures(src, start, regs, history, start_line)
+            captures = Captures(source, start, regs, history, start_line)
             semantic_pos = cur.pos
             result = semantic(state - nstates - nactions, captures, start_pos, cur.pos - start, start_line, cur)
             if cur.pos != semantic_pos:
@@ -202,7 +202,7 @@ def run(src: str, cur: Cursor, start_pos: int, tables: DfaTables, semantic: Call
                     runtime_error("DFA: semantic matcher moved the cursor backwards")
                 k = semantic_pos
                 while k < cur.pos and k < n:
-                    if src[k] == "\n":
+                    if source.text[k] == "\n":
                         cur.line = cur.line + 1
                     k = k + 1
                 immediate_action = False

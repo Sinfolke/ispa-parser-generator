@@ -167,17 +167,26 @@ class HistoryNode:
         self.prev = prev
 
 
+class SourceText:
+    """The text being scanned, shared by reference: every Captures of a token run points at it instead of
+    copying the whole input."""
+    text: str
+
+    def __init__(self, text: str):
+        self.text = text
+
+
 class Captures:
     """Read access to the registers a token's DFA run recorded. Offsets are
     relative to the token start `base` inside `src`. Capture k owns registers
     2k (begin, or the head of a list capture's history) and 2k + 1 (end)."""
-    _src: str
+    _src: SourceText
     _base: int
     _regs: list[int]
     _history: list[HistoryNode]
     _first_line: int
 
-    def __init__(self, src: str, base: int, regs: list[int], history: list[HistoryNode], first_line: int):
+    def __init__(self, src: SourceText, base: int, regs: list[int], history: list[HistoryNode], first_line: int):
         self._src = src
         self._base = base
         self._regs = regs
@@ -204,13 +213,13 @@ class Captures:
     def text(self, k: int) -> str:
         if not self.is_set(k):
             return ""
-        return substr(self._src, self.begin(k), self.end_off(k) - self.begin_off(k))
+        return substr(self._src.text, self.begin(k), self.end_off(k) - self.begin_off(k))
 
     def view(self, k: int) -> str:
         return self.text(k)
 
     def character(self, k: int) -> str:
-        return at(self._src, self.begin(k))
+        return at(self._src.text, self.begin(k))
 
     def list_positions(self, k: int) -> list[int]:
         positions = []
@@ -227,7 +236,7 @@ class Captures:
         out = []
         i = 0
         while i + 1 < len(positions):
-            out.append(substr(self._src, self._base + positions[i], positions[i + 1] - positions[i]))
+            out.append(substr(self._src.text, self._base + positions[i], positions[i + 1] - positions[i]))
             i = i + 2
         return out
 
@@ -247,8 +256,8 @@ class Captures:
         count = 0
         i = self._base
         stop = self.begin(k)
-        while i < stop and i < len(self._src):
-            if self._src[i] == "\n":
+        while i < stop and i < len(self._src.text):
+            if self._src.text[i] == "\n":
                 count = count + 1
             i = i + 1
         return self._first_line + count
@@ -256,7 +265,7 @@ class Captures:
     def column(self, k: int) -> int:
         b = self.begin(k)
         line_start = b
-        while line_start > self._base and at(self._src, line_start - 1) != "\n":
+        while line_start > self._base and at(self._src.text, line_start - 1) != "\n":
             line_start = line_start - 1
         return (b - line_start) + 1
 
