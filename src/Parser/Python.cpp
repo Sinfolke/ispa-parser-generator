@@ -149,6 +149,18 @@ struct PythonConverter {
             for (const auto& item : value) walk(item, visit);
         }
     }
+    // Whether `name` is assigned (or augmented) anywhere in `body`.
+    static bool rebinds(const py::StmtList& body, const std::string& name) {
+        bool found = false;
+        auto visit = [&](const auto& node) {
+            if constexpr (std::is_same_v<std::decay_t<decltype(node)>, py::Stmt>) {
+                if (auto a = node.template get<py::AugAssign>(); a && a->target)
+                    if (auto n = a->target->template get<py::Name>(); n && n->id == name) found = true;
+            } else if (auto n = node.template get<py::Name>(); n && n->id == name && n->ctx != py::ExprContext::Load) found = true;
+        };
+        walk(body, visit);
+        return found;
+    }
     la::Type return_type{la::ValueType::Undef};
     // `x = []` carries no element type. Python code states it later: `return x` (the declared return type)
     // or `x.append(value)` (the value's type).
@@ -1146,7 +1158,11 @@ struct PythonConverter {
             for (auto& p : f->params) {
                 if (!self_name.empty() && p.name == self_name && &p == &f->params.front()) continue;
                 if (p.default_value) unsupported(p.pos, "default parameters are unsupported");
-                out.parameters.emplace_back(type(p.annotation), p.name);
+                auto parameter_type = type(p.annotation);
+                // A str is immutable: a parameter the body never rebinds is passed by const reference.
+                if (parameter_type.isValueType() && parameter_type.getValueType() == la::ValueType::String && !rebinds(f->body, p.name))
+                    parameter_type = la::Type{la::ValueType::BorrowSemantic, la::Type{la::ValueType::ImmutableSemantic, parameter_type}};
+                out.parameters.emplace_back(std::move(parameter_type), p.name);
                 scope.locals.insert(p.name);
                 scope.local_types.insert_or_assign(p.name, type(p.annotation));
                 if (auto annotation = p.annotation ? p.annotation->template get<py::Name>() : nullptr;
