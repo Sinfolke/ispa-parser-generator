@@ -456,6 +456,11 @@ std::string Core::call(const LangAPI::FunctionCall& c) {
         [this](const std::shared_ptr<LangAPI::IspaLibSymbol>& name) { return lib(*name); }
     }, c.name);
     if (fn.starts_with("ISPA_STD.CountSpec.")) fn.replace(0, 8, "ispa_std");
+    if (c.args.size() == 1 && (fn == "ISPA_STD.python_char_code" || fn == "ISPA_STD.python_char_from_code")) {
+        const auto value = expression(c.args.front());
+        return fn == "ISPA_STD.python_char_code" ? "(ord(" + value + ") if " + value + " else 0)" :
+            "(chr(" + value + ") if 0 <= " + value + " <= 255 else \"\")";
+    }
     // construct<Class>(args): Python constructs by calling the class.
     if (fn == "ISPA_STD.construct" && c.template_parameters.size() == 1) {
         if (const auto* built = std::get_if<std::shared_ptr<LangAPI::Type>>(&c.template_parameters.front()); built && *built) {

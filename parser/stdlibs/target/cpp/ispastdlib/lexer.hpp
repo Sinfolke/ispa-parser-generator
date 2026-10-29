@@ -165,10 +165,18 @@ namespace ISPA_STD {
             if (*pos == '\0') {
                 return Token {};
             }
+#ifdef ISPA_STDLIB_DFA_RUN
+            // Customization point: another standard library (--stdlib) supplies the DFA interpreter.
+            return ISPA_STDLIB_DFA_RUN<Token>(
+                pos, getCurrentPos(pos), line, table, class_table, action_table,
+                semantic, debug_array, debug_index, layout
+            );
+#else
             return DFA::run<Token>(
                 pos, getCurrentPos(pos), line, table, class_table, action_table,
                 semantic, debug_array, debug_index, layout
             );
+#endif
         }
 
     public:

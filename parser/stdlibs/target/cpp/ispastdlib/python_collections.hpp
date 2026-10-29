@@ -15,6 +15,9 @@
 #include <vector>
 
 namespace ISPA_STD {
+// Character primitives of the 8-bit-unit string model (prim.char_code / prim.char_from_code).
+inline long long python_char_code(const std::string& ch) { return ch.empty() ? 0 : static_cast<unsigned char>(ch.front()); }
+inline std::string python_char_from_code(long long code) { return code < 0 || code > 255 ? std::string() : std::string(1, static_cast<char>(code)); }
 // Cast with Python meaning: an object held as std::any comes back as its dynamic type; other values convert.
 template<typename T> T python_cast(const std::any& value) { return std::any_cast<T>(value); }
 template<typename T, typename V, typename = std::enable_if_t<!std::is_same_v<std::decay_t<V>, std::any>>>

@@ -86,3 +86,11 @@ def attempt(fn):
 
 def failure_message():
     return _last_message[0]
+
+
+def char_code(ch):
+    return ord(ch) if ch else 0
+
+
+def char_from_code(code):
+    return chr(code) if 0 <= code <= 255 else ""

@@ -583,6 +583,13 @@ struct PythonConverter {
                         for (const auto& argument : x.args) call.args.push_back(expr(argument));
                         return la::IspaLibFunctionCall::createExpression(call);
                     }
+                    // Character primitives: native per target (ord/chr over 8-bit units).
+                    if ((name == "char_code" || name == "char_from_code") && x.args.size() == 1) {
+                        la::FunctionCall call;
+                        call.name = std::make_shared<la::Symbol>(pythonSymbol("ISPA_STD.python_" + name));
+                        call.args.push_back(expr(x.args[0]));
+                        return la::FunctionCall::createExpression(call);
+                    }
                     unsupported(e.pos, "unknown IR operation " + name);
                 }
                 if (!token_rule.empty() && !failure_context) if (auto method = x.func ? x.func->template get<py::Attribute>() : nullptr)
