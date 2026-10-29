@@ -38,6 +38,13 @@ export struct Args {
     bool incremental = false;
     bool auto_conflicts = true;
     std::size_t conflict_lookahead = 3;
+    // Generate against the standard library lowered from Python (target-core) instead of the built-in
+    // C++ runtime. `stdlib` is a directory, or the name of an installed module; empty keeps the default path.
+    std::string stdlib;
+    // Namespace the generated parser links the standard library through (a module's config may set it).
+    std::string stdlib_name;
+    // Emit the lowered library next to the parser instead of expecting it to be installed.
+    bool static_stdlib = false;
 };
 export Args parse_args(int argc, char** argv);
 export auto to_string(Args::Algorithm algorithm) -> std::string;

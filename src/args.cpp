@@ -36,6 +36,12 @@ Args parse_args(int argc, char** argv) {
         "Resolve LR conflicts with extra lookahead and deferred runtime branching");
     app.add_option("--lr-conflict-lookahead", args.conflict_lookahead,
         "Maximum automatic compile-time LR lookahead before runtime fallback (1..8)");
+    app.add_option("--stdlib", args.stdlib,
+        "Standard library to generate against: a directory or an installed module name (target-core)");
+    app.add_option("--stdlib-name", args.stdlib_name,
+        "Namespace the generated parser links the standard library through");
+    app.add_flag("--static", args.static_stdlib,
+        "Lower the standard library into the output instead of expecting it to be installed");
     try {
         app.parse(argc, argv);
     } catch (CLI::CallForAllHelp&) {
@@ -59,6 +65,12 @@ Args parse_args(int argc, char** argv) {
 
     if (args.conflict_lookahead < 1 || args.conflict_lookahead > 8)
         throw Error("--lr-conflict-lookahead must be between 1 and 8");
+    if (!args.stdlib_name.empty() && args.stdlib.empty())
+        throw Error("--stdlib-name requires --stdlib");
+    if ((!args.stdlib.empty() || args.static_stdlib) && args.language_str != "cpp")
+        throw Error("--stdlib and --static are only available for -l cpp so far");
+    if (!args.stdlib.empty() || args.static_stdlib)
+        throw Error("--stdlib/--static: emitting parsers against the lowered standard library is not implemented yet");
     if (args.no_ai_recovery && !args.ai_recovery_file.empty())
         throw Error("--ai-recovery and --no-ai-recovery cannot be used together");
 
