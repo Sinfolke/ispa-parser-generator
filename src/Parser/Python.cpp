@@ -642,6 +642,9 @@ struct PythonConverter {
                 for (const auto& item : inferred(std::make_shared<py::Expr>(e)).template_parameters)
                     if (auto t = std::get_if<la::Type>(&item)) out.template_parameters.push_back(std::make_shared<la::Type>(*t));
                 return la::Map::createExpression(out);
+            } else if constexpr (std::is_same_v<T, py::Lambda>) {
+                // LangAPI::Lambda needs typed parameters and the language has no callable type yet.
+                unsupported(e.pos, "lambda cannot be lowered: LangAPI has no callable type; use a class with a method");
             } else unsupported(e.pos, "conditional expression is unsupported");
         }, e.kind);
     }

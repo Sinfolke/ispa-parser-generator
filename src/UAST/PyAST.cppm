@@ -146,6 +146,16 @@ struct IfExpr {
     bool operator==(const IfExpr& other) const { return members() == other.members(); }
     bool operator<(const IfExpr& other) const { return members() < other.members(); }
 };
+// `lambda a, b: body`: parameters are unannotated names.
+struct Lambda {
+    std::vector<std::string> params;
+    ExprPtr body;
+
+    auto members() { return std::tie(params, body); }
+    auto members() const { return std::tie(params, body); }
+    bool operator==(const Lambda& other) const { return members() == other.members(); }
+    bool operator<(const Lambda& other) const { return members() < other.members(); }
+};
 struct Tuple {
     ExprList elts;
     ExprContext ctx = ExprContext::Load;
@@ -176,7 +186,7 @@ struct Dict {
 
 using ExprKind = std::variant<
     Name, Constant, Attribute, Subscript, Call, UnaryExpr, BinaryExpr,
-    BoolExpr, Compare, IfExpr, Tuple, List, Dict
+    BoolExpr, Compare, IfExpr, Lambda, Tuple, List, Dict
 >;
 struct Expr {
     SourcePosition pos;

@@ -342,6 +342,12 @@ namespace {
             else if constexpr (std::is_same_v<T,py::BoolExpr>) many(v.values);
             else if constexpr (std::is_same_v<T,py::Compare>) { one(v.left); many(v.comparators); }
             else if constexpr (std::is_same_v<T,py::IfExpr>) { one(v.test); one(v.body); one(v.orelse); }
+            else if constexpr (std::is_same_v<T,py::Lambda>) {
+                std::set<std::string> inner;
+                names(v.body.get(), inner);
+                for (const auto& parameter : v.params) inner.erase(parameter);
+                out.insert(inner.begin(), inner.end());
+            }
             else if constexpr (std::is_same_v<T,py::Tuple> || std::is_same_v<T,py::List>) many(v.elts);
             else if constexpr (std::is_same_v<T,py::Dict>) { many(v.keys); many(v.values); }
         }, e->kind);
@@ -607,6 +613,8 @@ namespace {
                     return type(TK::Bool);
                 } else if constexpr (std::is_same_v<T,py::IfExpr>) {
                     eval(v.test,s); return unify(eval(v.body,s), eval(v.orelse,s));
+                } else if constexpr (std::is_same_v<T,py::Lambda>) {
+                    return type(TK::Unknown); // parameters are untyped; the body is checked at lowering
                 } else if constexpr (std::is_same_v<T,py::Tuple>) {
                     Ty t = type(TK::Tuple);
                     for (const auto& x : v.elts) t.args.push_back(eval(x,s));

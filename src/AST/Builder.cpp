@@ -165,6 +165,10 @@ namespace {
                 return make("Compare", std::move(f), p, {}, {expr(x.left, "left", p), make("sequence", "ops", p, {}, std::move(ops)), exprs(x.comparators, "comparators", p)});
             }
             PN node(const py::IfExpr& x, std::string f, const Pos& p) const { return make("IfExpr", std::move(f), p, {}, {expr(x.test, "test", p), expr(x.body, "body", p), expr(x.orelse, "orelse", p)}); }
+            PN node(const py::Lambda& x, std::string f, const Pos& p) const {
+                std::string params; for (const auto& n : x.params) params += (params.empty() ? "" : ",") + n;
+                return make("Lambda", std::move(f), p, params, {expr(x.body, "body", p)});
+            }
             PN node(const py::Tuple& x, std::string f, const Pos& p) const { return make("Tuple", std::move(f), p, {}, {exprs(x.elts, "elts", p), make("ctx", "ctx", p, name(kCtx, x.ctx))}); }
             PN node(const py::List& x, std::string f, const Pos& p) const { return make("List", std::move(f), p, {}, {exprs(x.elts, "elts", p), make("ctx", "ctx", p, name(kCtx, x.ctx))}); }
             PN node(const py::Dict& x, std::string f, const Pos& p) const { return make("Dict", std::move(f), p, {}, {exprs(x.keys, "keys", p), exprs(x.values, "values", p)}); }

@@ -456,6 +456,14 @@ private:
             for (auto e : find_all(value_of(suffix), "expr")) t.elts.push_back(expr(e));
             return mk(n->position, std::move(t));
         }
+        if (k == "lambda_expr") {
+            pyast::Lambda l;
+            auto params = field(n, "params");
+            if (!absent(params))
+                for (auto id : find_all(params, "ID")) l.params.push_back(value_of(id)->scalar);
+            l.body = expr(field(n, "body"));
+            return mk(n->position, std::move(l));
+        }
         if (k == "list_expr") {
             pyast::List l;
             for (auto e : find_all(value_of(n), "expr")) l.elts.push_back(expr(e));
@@ -821,6 +829,11 @@ private:
         out += "(Compare "; expr(x.left); out += " [";
         for (std::size_t i = 0; i < x.ops.size(); ++i) { if (i) out += ' '; out += name(x.ops[i]); }
         out += "] "; list(x.comparators); out += ')';
+    }
+    void node(const pyast::Lambda& x) {
+        out += "(Lambda";
+        for (const auto& name : x.params) out += " " + name;
+        sp(); expr(x.body); out += ')';
     }
     void node(const pyast::IfExpr& x) { out += "(IfExpr "; expr(x.test); sp(); expr(x.body); sp(); expr(x.orelse); out += ')'; }
     void node(const pyast::Tuple& x) { out += "(Tuple "; list(x.elts); sp(); out += name(x.ctx); out += ')'; }

@@ -21,6 +21,7 @@ LBRACKET {
     ctx.shared.bracket_depth: int
     ctx.shared.bracket_depth += 1
 }
+LAMBDA: 'lambda';
 LE: '<=';
 LSHIFT: '<<';
 LSHIFT_ASSIGN: '<<=';

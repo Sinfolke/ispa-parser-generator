@@ -171,7 +171,24 @@ index_suffix:
 
 atom:
     @ ID | NUMBER | STRING | TRUE_BOOL | FALSE_BOOL | NONE_V
- | parenthesized_expr | list_expr | dict_expr
+ | parenthesized_expr | list_expr | dict_expr | lambda_expr
+    {@}
+;
+
+// `lambda a, b: body` binds as far right as a conditional expression; the
+// body is parsed here so it also works as a call argument.
+lambda_expr:
+    LAMBDA @ lambda_params? %missing_lambda_colon COLON @ %missing_operand expr
+    @{params, body}
+;
+
+lambda_params:
+    @ ID @ lambda_param_tail*
+    @{first, rest}
+;
+
+lambda_param_tail:
+    COMMA @ ID
     {@}
 ;
 
@@ -268,6 +285,10 @@ fail missing_rbrace {
 }
 fail missing_colon {
     ctx.error("Expected ':' between dictionary key and value")
+    ctx.insert()
+}
+fail missing_lambda_colon {
+    ctx.error("Expected ':' after lambda parameters")
     ctx.insert()
 }
 fail missing_else {
