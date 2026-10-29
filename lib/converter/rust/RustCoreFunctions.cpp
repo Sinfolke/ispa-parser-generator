@@ -280,6 +280,14 @@ auto RustCore::convertType(const LangAPI::Type &type) -> std::string {
                 return "::ispa_std::Span<" + joined + ">";
             case LangAPI::ValueType::TypeTag:
                 return "::std::marker::PhantomData<" + joined + ">";
+            // Argument-position `impl FnMut`: callers pass plain closures (as lambdas lower), and
+            // FnMut also admits Fn closures. Forwarding a callable parameter needs `&mut name`.
+            case LangAPI::ValueType::Callable: {
+                if (parts.empty()) throw Error("Rust Converter: Callable needs a return type");
+                std::vector<std::string> arguments(parts.begin(), parts.end() - 1);
+                const auto result = parts.back() == "()" ? std::string() : " -> " + parts.back();
+                return "impl FnMut(" + joinStrings(arguments, ", ") + ")" + result;
+            }
             case LangAPI::ValueType::Undef:
                 return "_";
             default:

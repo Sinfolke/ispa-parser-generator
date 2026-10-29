@@ -254,6 +254,14 @@ std::string Core::type(const LangAPI::Type& t) {
         case V::Box: return args.empty() ? "typing.Any" : args;
         case V::Span: return "list[" + (args.empty() ? "typing.Any" : args) + "]";
         case V::TypeTag: return "ispa_std.TypeTag.specialize(" + args + ")";
+        case V::Callable: {
+            if (t.template_parameters.empty()) unsupported("Callable without return type");
+            std::string parameters;
+            for (std::size_t i = 0; i + 1 < t.template_parameters.size(); ++i)
+                parameters += (i ? ", " : "") + templates(decltype(t.template_parameters){t.template_parameters[i]});
+            return "typing.Callable[[" + parameters + "], " +
+                   templates(decltype(t.template_parameters){t.template_parameters.back()}) + "]";
+        }
         case V::Undef: return "typing.Any";
     }
     unsupported("ValueType");

@@ -160,6 +160,15 @@ struct PythonConverter {
                 if (!args || args->elts.size() != 2) unsupported(p->pos, "dict requires key and value types");
                 return la::Type{la::ValueType::Map, type(args->elts[0]), type(args->elts[1])};
             }
+            if (name && (name->id == "Callable" || name->id == "typing.Callable")) {
+                auto args = sub->slice ? sub->slice->template get<py::Tuple>() : nullptr;
+                auto params = args && args->elts.size() == 2 && args->elts[0] ? args->elts[0]->template get<py::List>() : nullptr;
+                if (!params) unsupported(p->pos, "Callable requires [[parameter types], return type]");
+                la::Type result{la::ValueType::Callable};
+                for (const auto& parameter : params->elts) result.template_parameters.emplace_back(type(parameter));
+                result.template_parameters.emplace_back(type(args->elts[1]));
+                return result;
+            }
             if (name && (name->id.starts_with("ISPA_STD.") || name->id.starts_with("__ispa_parser__."))) {
                 la::Type result{pythonSymbol(name->id)};
                 if (auto args = sub->slice ? sub->slice->template get<py::Tuple>() : nullptr) {
@@ -643,8 +652,19 @@ struct PythonConverter {
                     if (auto t = std::get_if<la::Type>(&item)) out.template_parameters.push_back(std::make_shared<la::Type>(*t));
                 return la::Map::createExpression(out);
             } else if constexpr (std::is_same_v<T, py::Lambda>) {
-                // LangAPI::Lambda needs typed parameters and the language has no callable type yet.
-                unsupported(e.pos, "lambda cannot be lowered: LangAPI has no callable type; use a class with a method");
+                // Parameter types stay Undef: C++ (auto), Rust (closure inference) and Python infer them
+                // from the expected Callable. The body sees the enclosing locals; its parameters shadow them.
+                PythonConverter scope = *this;
+                scope.block_depth = scope.loop_depth = 0;
+                la::Lambda out;
+                for (const auto& name : x.params) {
+                    out.parameters.emplace_back(la::Type{la::ValueType::Undef}, name);
+                    scope.locals.insert(name);
+                    scope.local_types.insert_or_assign(name, la::Type{la::ValueType::Undef});
+                    scope.objects.erase(name);
+                }
+                out.statements = la::Return::createStatements(la::Return{.value = scope.expr(x.body)});
+                return la::Lambda::createExpression(std::move(out));
             } else unsupported(e.pos, "conditional expression is unsupported");
         }, e.kind);
     }

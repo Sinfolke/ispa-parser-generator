@@ -97,6 +97,15 @@ auto Core::convertType(const LangAPI::Type &type) -> std::string {
                 return "::ISPA_STD::Span<" + convertTemplates(type.template_parameters) + ">";
             case LangAPI::ValueType::TypeTag:
                 return "std::type_identity<" + convertTemplates(type.template_parameters) + ">";
+            case LangAPI::ValueType::Callable: {
+                if (type.template_parameters.empty()) throw Error("Callable type requires a return type");
+                std::string args;
+                for (std::size_t i = 0; i + 1 < type.template_parameters.size(); ++i) {
+                    if (i) args += ", ";
+                    args += convertTemplates(decltype(type.template_parameters){type.template_parameters[i]});
+                }
+                return "std::function<" + convertTemplates(decltype(type.template_parameters){type.template_parameters.back()}) + "(" + args + ")>";
+            }
             case LangAPI::ValueType::Undef:
                 return "auto";
             default:

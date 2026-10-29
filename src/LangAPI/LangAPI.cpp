@@ -147,6 +147,7 @@ namespace LangAPI {
             case ValueType::BorrowSemantic: os << "BorrowSemantic"; break;
             case ValueType::MoveSemantic: os << "MoveSemantic"; break;
             case ValueType::TypeTag: os << "TypeTag"; break;
+            case ValueType::Callable: os << "Callable"; break;
         }
         return os;
     }
