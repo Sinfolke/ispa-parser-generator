@@ -515,6 +515,11 @@ std::string Imports::module(const Modules::Path& source_path, const std::string&
             }
         }
         LangAPI::Declarations lowered;
+        // Python resolves names late: a class may mention one defined further down.
+        for (const auto& statement : syntax.body) if (auto c = statement->get<py::ClassDef>()) {
+            const bool generic = std::ranges::any_of(c->bases, [](const py::ExprPtr& base) { return base && base->get<py::Subscript>(); });
+            if (!generic) lowered.push_back(LangAPI::Declaration{LangAPI::ForwardDeclaredClass{.name = c->name}});
+        }
         for (auto& statement : syntax.body) {
             if (statement->get<py::ImportFrom>() || statement->get<py::Import>() || native(*statement)) continue;
             if (auto f = statement->get<py::FunctionDef>()) {
