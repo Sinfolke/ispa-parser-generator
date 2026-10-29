@@ -1267,7 +1267,7 @@ auto RustCore::convertIspaLibFunctionCall(const LangAPI::IspaLibFunctionCall &ca
         return std::string("::ispa_std::") + name + "(" + joinStrings(arguments, ", ") + ")";
     }
     if (kind == LangAPI::StdlibExports::CloneSelfBox)
-        return "::std::rc::Rc::new(::std::clone::Clone::clone(&self.base_0))";
+        return "::ispa_std::Shared::new(::std::clone::Clone::clone(self))";   // a handle to a copy of the whole object
     const bool parser_match = kind == LangAPI::StdlibExports::ParserRequired ||
         kind == LangAPI::StdlibExports::ParserOptional ||
         kind == LangAPI::StdlibExports::ParserRange ||
@@ -1275,6 +1275,7 @@ auto RustCore::convertIspaLibFunctionCall(const LangAPI::IspaLibFunctionCall &ca
     const bool parser_call = parser_match || kind == LangAPI::StdlibExports::ParserCounted;
 
     std::vector<std::string> args;
+    bool has_callback = false;
     for (std::size_t i = 0; i < call.args.size(); ++i) {
         const auto &param = call.args[i];
         const bool counted_callback = kind == LangAPI::StdlibExports::ParserCounted && i == 2;
@@ -1292,6 +1293,7 @@ auto RustCore::convertIspaLibFunctionCall(const LangAPI::IspaLibFunctionCall &ca
                 else simple = false;
             }
             if (simple && !comps.empty() && (comps.front() == "self" || comps.front() == "this")) comps.erase(comps.begin());
+            has_callback = true;
             if (simple && comps.size() == 1)
                 args.push_back("|__p, cursor| __p." + ident(comps.front()) + "(cursor)");
             else
@@ -1304,7 +1306,8 @@ auto RustCore::convertIspaLibFunctionCall(const LangAPI::IspaLibFunctionCall &ca
     if (parser_call) {
         // inherited LLParser members: reached through the LLParserApi trait implemented by the generated parser
         std::string joined = args.empty() ? "" : ", " + joinStrings(args, ", ");
-        return "::ispa_std::LLParserApi::" + convertIspaLibSymbol(call.symbol, true) + turbofish + "(self" + joined + ")";
+        return "::ispa_std::LLParserApi::" + convertIspaLibSymbol(call.symbol, true) + (has_callback ? "_rule" : "") + turbofish +
+               "(self" + joined + ")";
     }
     std::string callee = convertIspaLibSymbol(call.symbol, true);
     if (kind == LangAPI::StdlibExports::Error) callee += "::new";

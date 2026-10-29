@@ -592,7 +592,7 @@ namespace Rust {
             if (bases.size() > 1) throw Error("Rust target: multiple inheritance on `{}` needs resolved base-member identities in IR", name);
             emitLine(w, "impl" + impl_generics + " ::std::ops::Deref for " + name + generics + " { type Target = " + bases[0] + "; fn deref(&self) -> &Self::Target { &self.base_0 } }");
             emitLine(w, "impl" + impl_generics + " ::std::ops::DerefMut for " + name + generics + " { fn deref_mut(&mut self) -> &mut Self::Target { &mut self.base_0 } }");
-            if (cls.shared_object) {
+            {
                 // Shared<Self> converts to Shared<Base> and to everything Base converts to
                 std::string generic_list = impl_generics.empty() ? "<__X: 'static>" : impl_generics.substr(0, impl_generics.size() - 1) + ", __X: 'static>";
                 emitLine(w, "impl" + generic_list + " ::ispa_std::Upcast<__X> for " + name + generics + " where " + bases[0] +

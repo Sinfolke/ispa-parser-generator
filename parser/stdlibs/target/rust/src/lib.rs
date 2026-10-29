@@ -20,6 +20,8 @@ pub mod pycoll;
 pub use pycoll::{PyAny, PyVal, PyKey};
 mod facade;
 pub use facade::*;
+mod bridge;
+pub use bridge::*;
 mod primitives;
 pub use primitives::{StdError, fail, attempt, failure_message};
 

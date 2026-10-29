@@ -93,6 +93,7 @@ impl<Token> TokenIterator<Token> {
     pub fn distance(&self) -> usize { self.index }
     pub fn get(&self) -> Option<&Token> { self.tokens.get(self.index) }
     pub fn advance(&mut self) { if !self.is_end() { self.index += 1; } }
+    pub fn retreat(&mut self) { self.index = self.index.saturating_sub(1); }
 }
 
 /// Cursor that lexes on demand from source text.
