@@ -14,16 +14,23 @@ REPO = HERE.parents[1]
 RUNTIME = REPO / 'parser' / 'stdlibs' / 'target' / 'rust'
 CPP_STDLIB = REPO / 'parser' / 'stdlibs' / 'target' / 'cpp'
 
-# grammar name -> (entry file, fixed corpus, fuzz alphabet)
+# grammar name -> (directory, entry file, fixed corpus, fuzz alphabet)
 GRAMMARS = {
-    'json': ('json.isc', ['[1, "a", true]', '{"a": [1, 2, {"b": false}], "c": "x"}', '[]', '{}', '  [ 1.5 , 2 ]  ', '"s"', 'true', '[[[[1]]]]',
+    'json': (HERE / 'grammars' / 'json', 'json.isc', ['[1, "a", true]', '{"a": [1, 2, {"b": false}], "c": "x"}', '[]', '{}', '  [ 1.5 , 2 ]  ', '"s"', 'true', '[[[[1]]]]',
           '[1,', '[1, 2', '{"a": [1,', '{"a": 1, ', '[1 2]', '{"a" 1}', '{"a": }', '[,]', '[1,,2]', '{,}', 'x', '-3',
           '{"a":1,"b":2,"c":[],"d":{}}', '{"k": {"n": [true, false, "s", 1.25]}}'],
              ['[', ']', '{', '}', ',', ':', '"k"', '"v"', '1', '2.5', 'true', 'false', ' ', '  ']),
     # dynamic values: a quote character or heredoc tag captured earlier decides where the match ends
-    'dyn': ('dyn.isc', ['"abc", \'d\\\'e\', <<EOT\nline one\nEOT, "x\\"y"', "'a' , \"b\"", '<<A\nxx\nA,<<BB\nA\nBB', '"unterminated', '<<T\nbody T',
+    'dyn': (HERE / 'grammars' / 'dyn', 'dyn.isc', ['"abc", \'d\\\'e\', <<EOT\nline one\nEOT, "x\\"y"', "'a' , \"b\"", '<<A\nxx\nA,<<BB\nA\nBB', '"unterminated', '<<T\nbody T',
                         "'it\"s", '<<X\n\nX', '"a""b"', '', ',', '"a",'],
             ['"', "'", '<<', ',', '\\', '\n', ' ', 'EOT', 'A\n', 'a', 'b', 'T\n']),
+    # SQL select statements: nested rules, groups, optional parts
+    'sql': (REPO / 'examples' / 'sql', 'grammar.isc',
+            ['SELECT a FROM t', 'SELECT a, b as c FROM t WHERE a = 1', "SELECT x FROM t WHERE name = 'bob' AND (age > 3 OR age < 1) ORDER BY x DESC;",
+             'SELECT 1 + 2 * 3 FROM t', 'SELECT (a) FROM t ORDER BY a', 'SELECT', 'SELECT a', 'SELECT a FROM', 'SELECT a FROM t WHERE', 'FROM t',
+             'SELECT a, FROM t', 'SELECT a FROM t ORDER x', 'select a from t', 'SELECT a FROM t;;', ''],
+            ['SELECT ', 'FROM ', 'WHERE ', 'ORDER ', 'BY ', 'AND ', 'OR ', 'ASC ', 'DESC ', 'as ', 'a', 'b', 't', '1', '2.5', "'s'", ',', ';', '(', ')',
+             '+', '-', '*', '/', '=', '!=', '<', '>', ' ']),
 }
 
 
@@ -40,7 +47,7 @@ def build(ispa, work, grammar):
     gen, gen_cpp = work / 'gen_rust', work / 'gen_cpp'
     gen.mkdir(parents=True, exist_ok=True)
     gen_cpp.mkdir(parents=True, exist_ok=True)
-    common = ['-a', 'LL', '--no-incremental', '--no-ai-recovery', '--no-debug-instrumentation', '--dir', str(HERE / 'grammars' / grammar), str(HERE / 'grammars' / grammar / GRAMMARS[grammar][0])]
+    common = ['-a', 'LL', '--no-incremental', '--no-ai-recovery', '--no-debug-instrumentation', '--dir', str(GRAMMARS[grammar][0]), str(GRAMMARS[grammar][0] / GRAMMARS[grammar][1])]
     run([ispa, '-l', 'rust', *common, '-o', str(gen / 'generated')], env=env)
     run([ispa, '-l', 'cpp', *common, '-o', str(gen_cpp / 'generated')], env=env)
     # the generated Rust file is a module root: its crate-level attributes move to the including crate
@@ -75,7 +82,7 @@ def main():
     work = HERE / 'build' / 'rust' / args.grammar
     rust, cpp = build(args.ispa, work, args.grammar)
     different = 0
-    inputs = GRAMMARS[args.grammar][1] + list(fuzz_inputs(args.fuzz, args.seed, GRAMMARS[args.grammar][2]))
+    inputs = GRAMMARS[args.grammar][2] + list(fuzz_inputs(args.fuzz, args.seed, GRAMMARS[args.grammar][3]))
     for text in inputs:
         want = subprocess.run([str(cpp), text], capture_output=True, text=True).stdout
         got = subprocess.run([str(rust), text], capture_output=True, text=True).stdout

@@ -381,10 +381,12 @@ namespace {
         const Registry &reg;
         std::vector<std::string> ns;                 // current namespace
         std::vector<std::string> class_chain;        // original chain of the class being walked
+        std::unordered_set<std::string> members;     // data members of the class being walked: they shadow types of that name
 
         auto resolve(Symbol &s) const -> void {
             if (s.path.empty() || !allStrings(s)) return;
             const auto path = stringParts(s);
+            if (path.size() == 1 && members.contains(path[0])) return;
             // Nested grammar declarations are hoisted into FlatTypes. Types
             // only carries aliases for top-level names.
             if (path.size() > 2 && path.front() == "Types") {
@@ -439,7 +441,10 @@ namespace {
             if (enter) resolver.ns.push_back(n.name); else resolver.ns.pop_back();
         };
         w.on_class = [&](Class &c, bool enter) {
-            if (!enter) { resolver.class_chain.clear(); return; }
+            if (!enter) { resolver.class_chain.clear(); resolver.members.clear(); return; }
+            resolver.members.clear();
+            for (const auto &entry : c.data)
+                if (entry.first->isVariable() && !entry.first->getVariable().is_static) resolver.members.insert(entry.first->getVariable().name);
             const auto parts = stringParts(c.name);
             resolver.class_chain = parts.empty() ? std::vector<std::string>{} : reg.chainOfFlat(parts.back(), resolver.ns);
         };

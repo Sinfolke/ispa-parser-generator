@@ -828,12 +828,71 @@ namespace Rust {
 
     // generated enums standing in for std::variant<std::monostate, ...>
     auto Construct::emitVariants(Converter::Writer &w) -> void {
+        // `Shared<..>` and the `Types::`/`FlatTypes::` namespaces do not tell types apart for assignment
+        const auto unboxed = [](std::string text) {
+            const std::string open = "::ispa_std::Shared<";
+            for (auto at = text.find(open); at != std::string::npos; at = text.find(open)) {
+                int depth = 1;
+                std::size_t close = at + open.size();
+                for (; close < text.size() && depth > 0; ++close) depth += text[close] == '<' ? 1 : text[close] == '>' ? -1 : 0;
+                text.erase(close - 1, 1);
+                text.erase(at, open.size());
+            }
+            for (const std::string prefix : {RustCore::crateRoot() + "::FlatTypes::", RustCore::crateRoot() + "::Types::", std::string("FlatTypes::"), std::string("Types::")})
+                for (auto at = text.find(prefix); at != std::string::npos; at = text.find(prefix)) text.erase(at, prefix.size());
+            return text;
+        };
+        // the elements of a tuple type `(A, B<C, D>, E)`
+        const auto tuple_elements = [](const std::string &text) {
+            std::vector<std::string> elements;
+            if (text.size() < 2 || text.front() != '(' || text.back() != ')') return elements;
+            int depth = 0;
+            std::string current;
+            for (std::size_t i = 1; i + 1 < text.size(); ++i) {
+                const char c = text[i];
+                if (c == '<' || c == '(' || c == '[') ++depth;
+                else if (c == '>' || c == ')' || c == ']') --depth;
+                if (c == ',' && depth == 0) { elements.push_back(current); current.clear(); continue; }
+                current += c;
+            }
+            if (!current.empty() && current.find_first_not_of(" ") != std::string::npos) elements.push_back(current);
+            for (auto &element : elements) element.erase(0, element.find_first_not_of(" "));
+            return elements;
+        };
+        // how a tuple `from` fills a tuple `to` that has extra `String` elements (omitted captures): the target index of each source element
+        const auto tuple_mapping = [&](const std::string &from, const std::string &to) -> std::optional<std::vector<std::size_t>> {
+            const auto source = tuple_elements(from), target = tuple_elements(to);
+            if (source.empty() || target.size() < source.size()) return std::nullopt;
+            std::vector<std::size_t> mapping;
+            std::size_t next = 0;
+            for (std::size_t d = 0; d < target.size(); ++d) {
+                if (next < source.size() && unboxed(source[next]) == unboxed(target[d])) { mapping.push_back(d); ++next; }
+                else if (target[d] != "String") return std::nullopt;
+            }
+            return next == source.size() ? std::optional(mapping) : std::nullopt;
+        };
         // assign_compatible into a variant: an alternative sets it; another variant sets it when it only holds alternatives
         // this one holds as well
         for (const auto &def : RustCore::variants) {
             for (const auto &alternative : def.alternatives)
                 emitLine(w, "impl ::ispa_std::AssignFrom<" + alternative + "> for " + def.name + " { fn assign_from(&mut self, source: " +
                             alternative + ") { *self = source.into(); } }");
+            // a tuple (a group) is accepted from another tuple that leaves out some of the target's `String` elements
+            for (const auto &other : RustCore::variants)
+                for (const auto &source : other.alternatives) {
+                    if (tuple_elements(source).empty()) continue;
+                    for (const auto &target : def.alternatives) {
+                        if (source == target) continue;
+                        const auto mapping = tuple_mapping(source, target);
+                        if (!mapping) continue;
+                        std::string assigns;
+                        for (std::size_t i = 0; i < mapping->size(); ++i)
+                            assigns += "::ispa_std::AssignFrom::assign_from(&mut filled." + std::to_string((*mapping)[i]) + ", source." + std::to_string(i) + "); ";
+                        emitLine(w, "impl ::ispa_std::AssignFrom<" + source + "> for " + def.name + " { fn assign_from(&mut self, source: " + source +
+                                    ") { let mut filled: " + target + " = Default::default(); " + assigns + "*self = filled.into(); } }");
+                        break;
+                    }
+                }
             // a node of a rule is accepted boxed or unboxed, whichever form the variant holds
             for (const auto &alternative : def.alternatives) {
                 const std::string node = "::ispa_std::Node<", shared = "::ispa_std::Shared<";
@@ -856,24 +915,9 @@ namespace Rust {
             }
             for (const auto &other : RustCore::variants) {
                 if (other.name == def.name) continue;
-                // boxing of a rule is invisible to assignment: compare the alternatives without their `Shared<..>`
-                const auto unboxed = [](std::string text) {
-                    const std::string open = "::ispa_std::Shared<";
-                    for (auto at = text.find(open); at != std::string::npos; at = text.find(open)) {
-                        int depth = 1;
-                        std::size_t close = at + open.size();
-                        for (; close < text.size() && depth > 0; ++close) depth += text[close] == '<' ? 1 : text[close] == '>' ? -1 : 0;
-                        text.erase(close - 1, 1);
-                        text.erase(at, open.size());
-                    }
-                    // `Types::x` is an alias of `FlatTypes::x`: the namespace does not tell types apart here
-                    for (const std::string prefix : {RustCore::crateRoot() + "::FlatTypes::", RustCore::crateRoot() + "::Types::", std::string("FlatTypes::"), std::string("Types::")})
-                        for (auto at = text.find(prefix); at != std::string::npos; at = text.find(prefix)) text.erase(at, prefix.size());
-                    return text;
-                };
                 const bool covered = std::all_of(other.alternatives.begin(), other.alternatives.end(), [&](const auto &alternative) {
-                    return std::any_of(def.alternatives.begin(), def.alternatives.end(),
-                                       [&](const auto &candidate) { return unboxed(candidate) == unboxed(alternative); }); });
+                    return std::any_of(def.alternatives.begin(), def.alternatives.end(), [&](const auto &candidate) {
+                        return unboxed(candidate) == unboxed(alternative) || tuple_mapping(alternative, candidate).has_value(); }); });
                 if (!covered) continue;
                 emitLine(w, "impl ::ispa_std::AssignFrom<" + other.name + "> for " + def.name + " { fn assign_from(&mut self, source: " +
                             other.name + ") { match source { " + other.name + "::Monostate => {}");
