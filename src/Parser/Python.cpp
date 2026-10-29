@@ -91,6 +91,9 @@ struct PythonConverter {
     // TypeVar names in scope (module-level `T = TypeVar("T")`) and the subset owned by the enclosing generic class.
     std::set<std::string> typevars, class_typevars;
     std::map<std::string, la::Type> local_types;
+    // Declared signatures of the loaded modules, and the qualified class the current method belongs to.
+    const py::Signatures* signatures = nullptr;
+    std::string module_prefix, self_class;
     std::set<std::string> debug_ready;
     bool debug_ready_initialized = false;
     std::size_t debug_line_cursor = 0;
@@ -131,6 +134,43 @@ struct PythonConverter {
         } else if constexpr (std::ranges::range<T> && !std::is_same_v<T, std::string>) {
             for (const auto& item : value) count_name(item, name, total);
         }
+    }
+    template<class T, class F> static void walk(const T& value, F& visit) {
+        if constexpr (std::is_same_v<T, py::Expr> || std::is_same_v<T, py::Stmt>) {
+            visit(value);
+            walk(value.kind, visit);
+        } else if constexpr (requires { std::visit([](const auto&) {}, value); }) {
+            std::visit([&](const auto& item) { walk(item, visit); }, value);
+        } else if constexpr (requires { value.get(); *value; }) {
+            if (value) walk(*value, visit);
+        } else if constexpr (requires { value.members(); }) {
+            std::apply([&](const auto&... items) { (walk(items, visit), ...); }, value.members());
+        } else if constexpr (std::ranges::range<T> && !std::is_same_v<T, std::string>) {
+            for (const auto& item : value) walk(item, visit);
+        }
+    }
+    la::Type return_type{la::ValueType::Undef};
+    // `x = []` carries no element type. Python code states it later: `return x` (the declared return type)
+    // or `x.append(value)` (the value's type).
+    la::Type usage_type(const std::string& name) {
+        if (!function_body) return la::Type{la::ValueType::Undef};
+        la::Type found{la::ValueType::Undef};
+        const auto undefined = [](const la::Type& t) { return t.isValueType() && t.getValueType() == la::ValueType::Undef; };
+        auto visit = [&](const auto& node) {
+            if (!undefined(found)) return;
+            if constexpr (std::is_same_v<std::decay_t<decltype(node)>, py::Stmt>) {
+                if (auto r = node.template get<py::Return>(); r && r->value)
+                    if (auto n = r->value->template get<py::Name>(); n && n->id == name &&
+                        return_type.isValueType() && return_type.getValueType() == la::ValueType::Array) found = return_type;
+            } else if (auto c = node.template get<py::Call>(); c && c->func && c->args.size() == 1)
+                if (auto m = c->func->template get<py::Attribute>(); m && m->attr == "append" && m->value)
+                    if (auto n = m->value->template get<py::Name>(); n && n->id == name) {
+                        const auto element = inferred(c->args.front());
+                        if (!undefined(element)) found = la::Type{la::ValueType::Array, element};
+                    }
+        };
+        walk(*function_body, visit);
+        return found;
     }
     // Occurrences of `name` in the statements of `list` itself, not in the blocks they contain.
     static void count_shallow(const py::StmtList& list, const std::string& name, std::size_t& total) {
@@ -248,11 +288,70 @@ struct PythonConverter {
             if (auto n = c->func->template get<py::Name>()) return class_names.contains(n->id);
         return false;
     }
+    static std::string symbol_id(const la::Type& t) {
+        if (!t.isSymbol()) return {};
+        std::string id;
+        for (const auto& part : t.getSymbol().path) {
+            const auto* text = std::get_if<std::string>(&part);
+            if (!text) return {};
+            id += (id.empty() ? "" : ".") + *text;
+        }
+        return id;
+    }
+    // A field's (method == false) or method's return annotation, searching base classes.
+    py::ExprPtr member_annotation(const std::string& cls, const std::string& member, bool method, std::size_t depth = 0) const {
+        if (!signatures || depth > 16) return nullptr;
+        const auto found = signatures->classes.find(cls);
+        if (found == signatures->classes.end()) return nullptr;
+        const auto& table = method ? found->second.methods : found->second.fields;
+        if (const auto it = table.find(member); it != table.end()) return it->second;
+        for (const auto& base : found->second.bases)
+            if (auto inherited = member_annotation(base, member, method, depth + 1)) return inherited;
+        return nullptr;
+    }
+    la::Type declared(const py::ExprPtr& annotation) {
+        if (!annotation) return la::Type{la::ValueType::Undef};
+        try { return type(annotation); } catch (const std::invalid_argument&) { return la::Type{la::ValueType::Undef}; }
+    }
+    la::Type inferred_call(const py::Call& call) {
+        const la::Type unknown{la::ValueType::Undef};
+        if (!call.func) return unknown;
+        if (auto n = call.func->template get<py::Name>()) {
+            if (auto local = local_types.find(n->id); local != local_types.end()) {
+                // A Callable local returns the last template parameter.
+                if (local->second.isValueType() && local->second.getValueType() == la::ValueType::Callable &&
+                    !local->second.template_parameters.empty())
+                    if (const auto* result = std::get_if<la::Type>(&local->second.template_parameters.back())) return *result;
+                return unknown;
+            }
+            if (locals.contains(n->id)) return unknown;
+            if (n->id == "len" || n->id == "int") return la::Type{la::ValueType::Int};
+            if (n->id == "str") return la::Type{la::ValueType::String};
+            if (n->id == "float") return la::Type{la::ValueType::Float};
+            if (n->id == "bool") return la::Type{la::ValueType::Bool};
+            if (signatures) {
+                if (const auto it = signatures->functions.find(n->id); it != signatures->functions.end()) return declared(it->second);
+                if (signatures->classes.contains(n->id)) return la::Type{pythonSymbol(n->id)};
+            }
+            return unknown;
+        }
+        if (auto attribute = call.func->template get<py::Attribute>(); attribute && attribute->value) {
+            const auto owner = symbol_id(inferred(attribute->value));
+            if (!owner.empty()) return declared(member_annotation(owner, attribute->attr, true));
+        }
+        return unknown;
+    }
     la::Type inferred(const py::ExprPtr& value) {
         if (!value) return la::Type{la::ValueType::Undef};
         if (auto n = value->template get<py::Name>()) {
             if (auto found = local_types.find(n->id); found != local_types.end()) return found->second;
+            if (!self_name.empty() && n->id == self_name && !self_class.empty()) return la::Type{pythonSymbol(self_class)};
         }
+        if (auto a = value->template get<py::Attribute>(); a && a->value) {
+            const auto owner = symbol_id(inferred(a->value));
+            if (!owner.empty()) return declared(member_annotation(owner, a->attr, false));
+        }
+        if (auto c = value->template get<py::Call>()) return inferred_call(*c);
         if (auto c = value->template get<py::Constant>()) {
             switch (c->kind) {
                 case py::ConstantKind::Int: return la::Type{la::ValueType::Int};
@@ -889,7 +988,16 @@ struct PythonConverter {
                 if (auto n = x.targets[0] ? x.targets[0]->template get<py::Name>() : nullptr; n && !locals.contains(n->id)) {
                     if (action_context && n->id == "ctx") unsupported(s.pos, "ctx cannot be rebound");
                     const bool hoist = block_depth && escapes_block(n->id);
-                    const auto value_type = inferred(x.value);
+                    auto value_type = inferred(x.value);
+                    bool collection = false;
+                    if (value_type.isValueType() && value_type.getValueType() == la::ValueType::Undef)
+                        if (auto list = x.value ? x.value->template get<py::List>() : nullptr; list && list->elts.empty()) {
+                            if (const auto used = usage_type(n->id); !(used.isValueType() && used.getValueType() == la::ValueType::Undef)) {
+                                value_type = used;
+                                collection = true;
+                                value = initializer(x.value, used);
+                            }
+                        }
                     if (hoist && value_type.isValueType() && value_type.getValueType() == la::ValueType::Undef)
                         unsupported(s.pos, "cannot infer the type of '" + n->id + "', which is used outside this block; declare it with an annotation first");
                     locals.insert(n->id);
@@ -905,7 +1013,7 @@ struct PythonConverter {
                     const bool scalar = value_type.isValueType() && (value_type.getValueType() == la::ValueType::String ||
                         value_type.getValueType() == la::ValueType::Int || value_type.getValueType() == la::ValueType::Bool ||
                         value_type.getValueType() == la::ValueType::Float);
-                    return la::Statements{la::Variable{.name = localName(n->id), .type = scalar ? value_type : la::Type{la::ValueType::Undef}, .value = value}};
+                    return la::Statements{la::Variable{.name = localName(n->id), .type = scalar || collection ? value_type : la::Type{la::ValueType::Undef}, .value = value}};
                 }
                 return la::VariableAssignment::createStatements(la::VariableAssignment{.name = target(x.targets[0]), .value = value});
             } else if constexpr (std::is_same_v<T, py::AnnAssign>) {
@@ -961,6 +1069,9 @@ struct PythonConverter {
             scope.class_names = class_names;
             scope.typevars = typevars;
             scope.class_typevars = class_typevars;
+            scope.signatures = signatures;
+            scope.module_prefix = module_prefix;
+            scope.self_class = self_class;
             {
                 // Type variables the class does not already own become template parameters of the function.
                 std::vector<std::string> used;
@@ -1004,6 +1115,7 @@ struct PythonConverter {
                     annotation && class_names.contains(annotation->id)) scope.objects.insert(p.name);
             }
             scope.function_body = &f->body;
+            scope.return_type = out.type;
             out.statements = scope.body(f->body);
             for (auto it = scope.hoisted.rbegin(); it != scope.hoisted.rend(); ++it)
                 out.statements.insert(out.statements.begin(), la::Statement{la::Variable{.name = it->first, .type = it->second}});
@@ -1038,6 +1150,9 @@ struct PythonConverter {
             scope.class_names = class_names;
             scope.typevars = typevars;
             scope.class_typevars = own_typevars;
+            scope.signatures = signatures;
+            scope.module_prefix = module_prefix;
+            scope.self_class = module_prefix + c->name;
             std::set<std::string> fields;
             for (const auto& member : c->body) if (auto a = member->template get<py::AnnAssign>(); a && a->target)
                 if (auto n = a->target->template get<py::Name>()) fields.insert(n->id);
@@ -1137,10 +1252,13 @@ auto ParserBase::convertPython(const UAST::py::Expr& e) -> LangAPI::Expression {
 auto ParserBase::convertPython(const UAST::py::Stmt& s, const std::set<std::string>& variables) -> LangAPI::Statements { return PythonConverter{variables}.stmt(s); }
 auto ParserBase::convertPython(const UAST::py::Module& m, const std::set<std::string>& variables) -> LangAPI::Statements { return PythonConverter{variables}.body(m.body); }
 auto ParserBase::convertPythonDeclaration(const UAST::py::Stmt& s, const std::set<std::string>& classes,
-                                          const std::set<std::string>& typevars) -> LangAPI::Declaration {
+                                          const std::set<std::string>& typevars, const UAST::py::Signatures* signatures,
+                                          const std::string& module_prefix) -> LangAPI::Declaration {
     PythonConverter converter;
     converter.class_names = classes;
     converter.typevars = typevars;
+    converter.signatures = signatures;
+    converter.module_prefix = module_prefix;
     return converter.declaration(s);
 }
 auto ParserBase::convertPythonDeclarations(const UAST::py::Module& m) -> LangAPI::Declarations {

@@ -67,6 +67,16 @@ std::string path(const py::Expr& e) {
 bool nativeName(const std::string& name) {
     return name.starts_with("__ispa_parser__.") || name.starts_with("ISPA_STD.") || name.starts_with("__ispa_ir__.");
 }
+// Whether an annotation names one of `names` (a TypeVar): such a type is not concrete outside its generic.
+struct Mentions {
+    const std::set<std::string>& names;
+    bool found = false;
+    void expression(py::Expr& e) {
+        if (auto n = e.get<py::Name>(); n && names.contains(n->id)) found = true;
+        walk(e.kind, *this);
+    }
+    void statement(py::Stmt& s) { walk(s.kind, *this); }
+};
 struct Locals {
     std::set<std::string> names;
     void expression(py::Expr& e) {
@@ -464,6 +474,46 @@ std::string Imports::module(const Modules::Path& source_path, const std::string&
                 }
             }
         }
+        {
+            auto bindings = symbols;
+            bindings.insert(dependencies.begin(), dependencies.end());
+            Bind type_bind{bindings};
+            const auto prefix = "python." + name + ".";
+            const auto record = [&](py::ExprPtr annotation) -> py::ExprPtr {
+                if (!annotation) return nullptr;
+                walk(annotation, type_bind);
+                Mentions mentions{typevars};
+                walk(annotation, mentions);
+                return mentions.found ? nullptr : annotation;
+            };
+            for (const auto& statement : syntax.body) {
+                if (auto f = statement->get<py::FunctionDef>()) signatures.functions[prefix + f->name] = record(f->returns);
+                else if (auto c = statement->get<py::ClassDef>()) {
+                    auto& entry = signatures.classes[prefix + c->name];
+                    for (auto& base : c->bases) {
+                        walk(base, type_bind);
+                        if (auto n = base ? base->get<py::Name>() : nullptr) entry.bases.push_back(n->id);
+                    }
+                    for (const auto& member : c->body) {
+                        if (auto f = member->get<py::FunctionDef>()) {
+                            const auto returns = record(f->returns);
+                            entry.methods[f->name] = returns;
+                            if (f->decorators.size() == 1 && f->decorators[0]->get<py::Name>() &&
+                                f->decorators[0]->get<py::Name>()->id == "staticmethod")
+                                signatures.functions[prefix + c->name + "." + f->name] = returns;
+                        } else if (auto a = member->get<py::AnnAssign>(); a && a->target && a->annotation)
+                            if (auto field = a->target->get<py::Name>()) {
+                                // ClassVar[T] constants read as T.
+                                auto annotation = a->annotation;
+                                if (auto marker = annotation->get<py::Subscript>(); marker && marker->value)
+                                    if (auto marker_name = marker->value->get<py::Name>(); marker_name && marker_name->id == "ClassVar")
+                                        annotation = marker->slice;
+                                entry.fields[field->id] = record(annotation);
+                            }
+                    }
+                }
+            }
+        }
         LangAPI::Declarations lowered;
         for (auto& statement : syntax.body) {
             if (statement->get<py::ImportFrom>() || statement->get<py::Import>() || native(*statement)) continue;
@@ -509,7 +559,7 @@ std::string Imports::module(const Modules::Path& source_path, const std::string&
                 Bind bind{bindings};
                 walk(a->value, bind);
             } else continue;
-            auto declaration = Parser::ParserBase::convertPythonDeclaration(*statement, classes, typevars);
+            auto declaration = Parser::ParserBase::convertPythonDeclaration(*statement, classes, typevars, &signatures, "python." + name + ".");
             if (declaration.isFunction() && declaration.getFunction().statements.empty()) {
                 auto& function = declaration.getFunction();
                 if (function.type != LangAPI::ValueType::Void)

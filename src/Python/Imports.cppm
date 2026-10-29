@@ -17,6 +17,7 @@ class Imports {
     std::map<std::string, std::filesystem::path> paths;
     std::map<std::string, Bindings> exports;
     LangAPI::Declarations declarations;
+    UAST::py::Signatures signatures;
     std::set<std::string> class_names, loading;
     // Resolves, compiles (once) and returns the dotted name of a Python module.
     std::string module(const Modules::Path& source_path, const std::string& from_file,

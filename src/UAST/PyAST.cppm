@@ -485,5 +485,15 @@ struct Module {
     bool operator==(const Module& other) const { return members() == other.members(); }
     bool operator<(const Module& other) const { return members() < other.members(); }
 };
+// Declared signatures of already-loaded Python modules, keyed by qualified name. The converter uses the
+// annotations to type expressions (call results, fields) that the source leaves implicit.
+struct Signatures {
+    struct Class {
+        std::vector<std::string> bases;
+        std::map<std::string, ExprPtr> fields, methods;
+    };
+    std::map<std::string, ExprPtr> functions;
+    std::map<std::string, Class> classes;
+};
 } // namespace py
 }
