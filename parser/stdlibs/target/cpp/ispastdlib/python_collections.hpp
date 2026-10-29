@@ -40,9 +40,15 @@ template<class T, class A, class V>
 void python_append(std::vector<T, A>& values, V&& value) { values.push_back(std::forward<V>(value)); }
 template<class T, class A, class Range>
 void python_extend(std::vector<T, A>& values, const Range& other) {
-    // Snapshot first: extending a list with itself is valid Python.
-    std::vector<T, A> copy(std::begin(other), std::end(other));
-    values.insert(values.end(), copy.begin(), copy.end());
+    // Extending a list with itself is valid Python: snapshot only in that case.
+    if constexpr (std::is_same_v<Range, std::vector<T, A>>) {
+        if (static_cast<const void*>(&other) == static_cast<const void*>(&values)) {
+            std::vector<T, A> copy(other);
+            values.insert(values.end(), copy.begin(), copy.end());
+            return;
+        }
+    }
+    values.insert(values.end(), std::begin(other), std::end(other));
 }
 template<class T, class A, class V>
 void python_insert(std::vector<T, A>& values, std::ptrdiff_t index, V&& value) {
