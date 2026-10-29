@@ -545,7 +545,7 @@ struct PythonConverter {
     static bool is_box(const la::Type& t) { return t.isValueType() && t.getValueType() == la::ValueType::Box; }
     la::Expression receiver(const py::ExprPtr& base) {
         if (auto n = base ? base->template get<py::Name>() : nullptr; n && !self_name.empty() && n->id == self_name)
-            return la::Symbol::createExpression(pythonSymbol("__ispa_python_self"));
+            return la::Instance::createExpression(la::Instance{});
         auto value = expr(base);
         if (is_box(inferred(base))) return la::GetFromBox::createExpression(la::GetFromBox{.what = std::move(value)});
         return value;
@@ -753,7 +753,9 @@ struct PythonConverter {
             using T = std::decay_t<decltype(x)>;
             if constexpr (std::is_same_v<T, py::Name>) {
                 if (!token_rule.empty() && !failure_context && x.id == "ctx") unsupported(e.pos, "token context needs a property");
-                return la::Symbol::createExpression(pythonSymbol(!self_name.empty() && x.id == self_name ? "__ispa_python_self_box" : localName(x.id)));
+                if (!self_name.empty() && x.id == self_name)
+                    return la::Instance::createExpression(la::Instance{.handle = true});
+                return la::Symbol::createExpression(pythonSymbol(localName(x.id)));
             }
             else if constexpr (std::is_same_v<T, py::Constant>) {
                 switch (x.kind) {
@@ -940,7 +942,7 @@ struct PythonConverter {
                         {"remove", {la::ArrayMethods::PythonRemove, 1, 1}},
                         {"pop", {la::ArrayMethods::PythonPop, 0, 2}},
                         {"clear", {la::ArrayMethods::PythonClear, 0, 0}},
-                        {"copy", {la::ArrayMethods::PythonCopy, 0, 0}},
+                        {"copy", {la::ArrayMethods::ShallowCopy, 0, 0}},
                         {"count", {la::ArrayMethods::PythonCount, 1, 1}},
                         {"index", {la::ArrayMethods::PythonIndex, 1, 3}},
                         {"reverse", {la::ArrayMethods::PythonReverse, 0, 0}},
@@ -962,6 +964,13 @@ struct PythonConverter {
                         const auto& [kind, minimum, maximum] = found->second;
                         la::ArrayMethodCall call;
                         call.method = kind;
+                        if (kind == la::ArrayMethods::PythonPop && x.args.empty())
+                            call.method = la::ArrayMethods::SequencePopBack;
+                        // These operations have the same container contract in
+                        // every target; source spelling must not reach emitters.
+                        if (kind == la::ArrayMethods::PythonClear) call.method = la::ArrayMethods::Clear;
+                        else if (kind == la::ArrayMethods::PythonAppend) call.method = la::ArrayMethods::Push;
+                        else if (kind == la::ArrayMethods::PythonExtend) call.method = la::ArrayMethods::Extend;
                         for (const auto& arg : x.args) call.args.push_back(expr(arg));
                         if (!x.keywords.empty()) {
                             if (method->attr == "update") {

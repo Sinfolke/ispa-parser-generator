@@ -854,6 +854,7 @@ int generate(Args args) {
         throw std::runtime_error("Algorithm returned no LangRepr converter: " + algorithm_name);
     Algorithm::ConversionRequest conversion_request{lexer_data, ast, args.language, name};
     auto holder = built.to_lang_repr(built.output.get(), conversion_request);
+    if (args.library_only) holder.get() = ast.getPythonDeclarations();
     if (!args.debug_instrumentation) {
         holder.removeInclude("ispastdlib/ispa_debug.hpp");
         removeDebugDeclarations(holder.get());
@@ -870,7 +871,7 @@ int generate(Args args) {
     const auto manifest_path = dir_path / (".codegen-manifest." + name);
     const auto previous_hashes = loadKeyHashMap(manifest_path);
     auto generated = converter.get();
-    if (args.algorithm == Args::Algorithm::LL) {
+    if (!args.library_only && args.algorithm == Args::Algorithm::LL) {
         auto exports = External::exports(ast, module_project, name, args.language == Args::Language::Python);
         for (auto& [file, code] : exports) {
             auto target = std::ranges::find_if(generated, [&](const auto& item) { return item.first == file; });
@@ -881,7 +882,7 @@ int generate(Args args) {
     if (!args.stdlib.empty()) {
         // --stdlib: link to a library with the ispastdlib interface under another namespace and include directory.
         const auto library = InstalledLibraries::stdlib(
-            InstalledLibraries::root(std::filesystem::path(args.executable_dir) / "ispa"), args.stdlib);
+            InstalledLibraries::root(std::filesystem::path(args.executable_dir) / "ispa"), args.stdlib, to_string(args.language));
         if (!library.found)
             std::cerr << "warning: --stdlib " << args.stdlib << " was not found (a directory, or a module installed with ispa-pkg);"
                          " generating against the default namespace\n";
@@ -894,9 +895,17 @@ int generate(Args args) {
                 text.replace(at, from.size(), to);
         };
         for (auto& [file, code] : generated) {
-            replace_all(code, "ispastdlib.hpp", include_dir + ".hpp");
-            replace_all(code, "ispastdlib/", include_dir + "/");
-            replace_all(code, "ISPA_STD", library_namespace);
+            if (!library.found) continue;
+            if (args.language == Args::Language::Python) {
+                replace_all(code, "\nimport ispa_std\n", "\nimport " + library_namespace + " as ispa_std\n");
+                replace_all(code, "\nfrom ispa_std import ", "\nfrom " + library_namespace + " import ");
+            } else if (args.language == Args::Language::Rust) {
+                replace_all(code, "::ispa_std::", "::" + library_namespace + "::");
+            } else {
+                replace_all(code, "ispastdlib.hpp", include_dir + ".hpp");
+                replace_all(code, "ispastdlib/", include_dir + "/");
+                replace_all(code, "ISPA_STD", library_namespace);
+            }
         }
     }
     const auto result = writeGeneratedFiles(dir_path, generated, previous_hashes);

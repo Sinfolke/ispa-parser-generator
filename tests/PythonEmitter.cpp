@@ -59,6 +59,17 @@ TEST(PythonEmitter, ArithmeticControlFlowAndDebugExecute) {
     declarations.push_back(Variable::createDeclaration(Variable{
         .name = "debug", .type = ValueType::Array, .value = Array::createExpression(debug)}));
 
+    Class base{.name = "Base"};
+    base.data.emplace_back(std::make_shared<Declaration>(Variable::createDeclaration(
+        Variable{.name = "value", .type = ValueType::Int, .value = integer(7)})), Visibility::Public);
+    Symbol base_path{"runtime"};
+    base_path.path.emplace_back(std::string("first"));
+    base_path.path.emplace_back(std::string("Base"));
+    Class derived{.name = "Derived", .inherit_members = {{Visibility::Public, base_path}}};
+    declarations.push_back(Namespace::createDeclaration(Namespace{.name = "runtime", .declarations = {
+        Namespace::createDeclaration(Namespace{.name = "first", .declarations = {Class::createDeclaration(base)}}),
+        Namespace::createDeclaration(Namespace{.name = "second", .declarations = {Class::createDeclaration(derived)}})}}));
+
     LangRepr::Holder holder{declarations};
     LangRepr::Converter converter(holder, "python", "Emitter", false, false);
     converter.init();
@@ -78,6 +89,8 @@ assert e.modulo(-5, 2) == -1
 assert e.reconstruct(-5, 2) == -5
 assert e.compound(-5, 2) == -2
 assert e.compound(5.0, 2.0) == 2.5
+assert e.runtime.second.Derived().value == 7
+assert issubclass(e.runtime.second.Derived, e.runtime.first.Base)
 assert e.loop() == 3
 assert e.select(0) == 9 and e.select(1) == 7
 d = e.debug[0]

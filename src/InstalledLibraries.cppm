@@ -75,12 +75,14 @@ Discovery discover(const fs::path& library_root) {
 
 // A standard-library module (`--stdlib`) announces itself with ispa-stdlib.yaml in its directory:
 //   module: core          the name `--stdlib core` selects
+//   language: cpp         cpp, python, or rust (omitted means cpp for older manifests)
 //   namespace: ISPA_CORE  namespace the generated parser links through (--stdlib-name overrides)
 //   include: ispa_core    include directory the generated sources use (default: the lowercased namespace)
 struct Stdlib {
     bool found = false;
     fs::path directory;
     std::string module;
+    std::string language;
     std::string ns = "ISPA_CORE";
     std::string include;
 };
@@ -103,6 +105,7 @@ Stdlib readStdlib(const fs::path& directory) {
         const auto key = trim(line.substr(0, colon));
         const auto value = trim(line.substr(colon + 1));
         if (key == "module") result.module = value;
+        else if (key == "language") result.language = value;
         else if (key == "namespace" && !value.empty()) result.ns = value;
         else if (key == "include") result.include = value;
     }
@@ -110,9 +113,17 @@ Stdlib readStdlib(const fs::path& directory) {
 }
 
 // `request` is a directory, or the name of an installed module.
-Stdlib stdlib(const fs::path& library_root, const std::string& request) {
+Stdlib stdlib(const fs::path& library_root, const std::string& request,
+              const std::string& language = "cpp") {
+    // Older manifests describe C++ libraries. Never select one for a different target.
+    const auto compatible = [&](const Stdlib& library) {
+        return (library.language.empty() ? "cpp" : library.language) == language;
+    };
     std::error_code error;
-    if (fs::is_directory(request, error)) return readStdlib(fs::absolute(request));
+    if (fs::is_directory(request, error)) {
+        auto library = readStdlib(fs::absolute(request));
+        return compatible(library) ? library : Stdlib{};
+    }
     if (!fs::is_directory(library_root, error)) return {};
     std::vector<fs::path> packages;
     for (const auto& entry : fs::directory_iterator(library_root))
@@ -127,7 +138,7 @@ Stdlib stdlib(const fs::path& library_root, const std::string& request) {
             if (entry.is_directory()) directories.push_back(entry.path());
         std::sort(directories.begin(), directories.end());
         for (const auto& directory : directories)
-            if (auto found = readStdlib(directory); found.found && found.module == request) return found;
+            if (auto found = readStdlib(directory); found.found && found.module == request && compatible(found)) return found;
     }
     return {};
 }

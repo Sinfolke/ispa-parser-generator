@@ -36,6 +36,8 @@ Args parse_args(int argc, char** argv) {
         "Resolve LR conflicts with extra lookahead and deferred runtime branching");
     app.add_option("--lr-conflict-lookahead", args.conflict_lookahead,
         "Maximum automatic compile-time LR lookahead before runtime fallback (1..8)");
+    app.add_flag("--library-only", args.library_only,
+        "Emit only imported helper declarations (for lowering shared runtime libraries)");
     app.add_option("--stdlib", args.stdlib,
         "Standard library to generate against: a directory or an installed module name (target-core)");
     app.add_option("--stdlib-name", args.stdlib_name,

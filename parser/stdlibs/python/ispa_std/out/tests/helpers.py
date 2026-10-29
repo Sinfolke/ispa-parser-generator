@@ -28,4 +28,4 @@ class ListIt:
 
 
 def toks(kinds):
-    return [RawToken.make(RawTokenMeta(i, "", False, 1, 1, i + 1, k), 0, 0) for i, k in enumerate(kinds)]
+    return [RawToken.make(RawTokenMeta(i, "", False, 1, 1, i + 1, k), 0) for i, k in enumerate(kinds)]

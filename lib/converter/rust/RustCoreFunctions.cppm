@@ -36,6 +36,7 @@ export namespace RustCore {
     std::vector<std::unordered_set<std::string>> locals;
     std::unordered_set<std::string> borrowed_parameters;
     std::string receiver;
+    bool shared_receiver = false;
     const LangAPI::Type* return_type = nullptr;
     auto indexFunctions(const LangAPI::Declarations& declarations) -> void;
     auto bind(const std::string& name) -> void;

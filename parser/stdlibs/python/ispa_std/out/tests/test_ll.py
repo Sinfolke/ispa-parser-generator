@@ -10,7 +10,7 @@ LP, RP, ID, SEMI = 1, 2, 3, 4
 
 
 def tok(i, t):
-    return RawToken.make(RawTokenMeta(i, "", False, 1, 1, i + 1, t), t, 0)
+    return RawToken.make(RawTokenMeta(i, "", False, 1, 1, i + 1, t), t)
 
 
 def stream(types):

@@ -322,9 +322,10 @@ std::string Core::storage(const LangAPI::StorageSymbol& s) {
                 case M::PythonExtend: name = "extend"; break;
                 case M::PythonInsert: name = "insert"; break;
                 case M::PythonRemove: name = "remove"; break;
+                case M::SequencePopBack:
                 case M::PythonPop: name = "pop"; break;
                 case M::PythonClear: name = "clear"; break;
-                case M::PythonCopy: name = "copy"; break;
+                case M::ShallowCopy: name = "copy"; break;
                 case M::PythonCount: name = "count"; break;
                 case M::PythonIndex: name = "index"; break;
                 case M::PythonReverse: name = "reverse"; break;
@@ -736,6 +737,7 @@ std::string Core::rvalue(const LangAPI::RValue& v) {
             if (cast.type && cast.type->isSymbol()) return expression(cast.what);
             return type(*cast.type) + "(" + expression(cast.what) + ")";
         }
+        case R::Instance: return "self";
         case R::GetFromBox: return expression(v.getGetFromBox().what);
     }
     unsupported("RValueType");

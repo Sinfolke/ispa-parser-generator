@@ -1554,14 +1554,13 @@ namespace python {
 		namespace raw_token {
 			struct RawToken : public ::ISPA_STD::Object {
 				long long _type_id;
-				std::any _payload;
 				std::shared_ptr<python::ispa_std::raw_token::RawTokenMeta> _meta;
-				auto __init__(std::shared_ptr<python::ispa_std::raw_token::RawTokenMeta> meta, long long type_id, std::any payload) -> void;
+				auto __init__(std::shared_ptr<python::ispa_std::raw_token::RawTokenMeta> meta, long long type_id) -> void;
 				static auto empty_token() -> std::shared_ptr<python::ispa_std::raw_token::RawToken>;
 				static auto ambiguous(std::shared_ptr<python::ispa_std::raw_token::RawTokenMeta> meta) -> std::shared_ptr<python::ispa_std::raw_token::RawToken>;
-				static auto make(std::shared_ptr<python::ispa_std::raw_token::RawTokenMeta> meta, long long type_id, std::any payload) -> std::shared_ptr<python::ispa_std::raw_token::RawToken>;
+				static auto make(std::shared_ptr<python::ispa_std::raw_token::RawTokenMeta> meta, long long type_id) -> std::shared_ptr<python::ispa_std::raw_token::RawToken>;
 				static auto from_node(std::shared_ptr<python::ispa_std::node::Node> node, long long type_id) -> std::shared_ptr<python::ispa_std::raw_token::RawToken>;
-				static auto create(long long startpos, const std::string& source, bool has_source, long long length, long long line, long long enumv, long long type_id, std::any value) -> std::shared_ptr<python::ispa_std::raw_token::RawToken>;
+				static auto create(long long startpos, const std::string& source, bool has_source, long long length, long long line, long long enumv, long long type_id) -> std::shared_ptr<python::ispa_std::raw_token::RawToken>;
 				virtual auto copy() -> std::shared_ptr<python::ispa_std::raw_token::RawToken>;
 				virtual auto empty() -> bool;
 				virtual auto isAmbiguous() -> bool;
@@ -1569,26 +1568,25 @@ namespace python {
 				virtual auto kind() -> long long;
 				virtual auto index() -> long long;
 				virtual auto holds(long long type_id) -> bool;
-				virtual auto get() -> std::any;
 				virtual auto to_node(long long type_id) -> std::shared_ptr<python::ispa_std::node::Node>;
 				virtual auto text() -> std::string;
 				constexpr auto members() {
-					return std::tie(_type_id, _payload, _meta);
+					return std::tie(_type_id, _meta);
 				}
 				constexpr auto members() const {
-					return std::tie(_type_id, _payload, _meta);
+					return std::tie(_type_id, _meta);
 				}
 				static constexpr auto members_str() {
-					return std::array<std::string_view, 3>{{"_type_id", "_payload", "_meta"}};
+					return std::array<std::string_view, 2>{{"_type_id", "_meta"}};
 				}
 				constexpr auto methods() {
-					return std::make_tuple(&RawToken::__init__, &RawToken::empty_token, &RawToken::ambiguous, &RawToken::make, &RawToken::from_node, &RawToken::create, &RawToken::copy, &RawToken::empty, &RawToken::isAmbiguous, &RawToken::meta, &RawToken::kind, &RawToken::index, &RawToken::holds, &RawToken::get, &RawToken::to_node, &RawToken::text);
+					return std::make_tuple(&RawToken::__init__, &RawToken::empty_token, &RawToken::ambiguous, &RawToken::make, &RawToken::from_node, &RawToken::create, &RawToken::copy, &RawToken::empty, &RawToken::isAmbiguous, &RawToken::meta, &RawToken::kind, &RawToken::index, &RawToken::holds, &RawToken::to_node, &RawToken::text);
 				}
 				constexpr auto methods() const {
-					return std::make_tuple(&RawToken::__init__, &RawToken::empty_token, &RawToken::ambiguous, &RawToken::make, &RawToken::from_node, &RawToken::create, &RawToken::copy, &RawToken::empty, &RawToken::isAmbiguous, &RawToken::meta, &RawToken::kind, &RawToken::index, &RawToken::holds, &RawToken::get, &RawToken::to_node, &RawToken::text);
+					return std::make_tuple(&RawToken::__init__, &RawToken::empty_token, &RawToken::ambiguous, &RawToken::make, &RawToken::from_node, &RawToken::create, &RawToken::copy, &RawToken::empty, &RawToken::isAmbiguous, &RawToken::meta, &RawToken::kind, &RawToken::index, &RawToken::holds, &RawToken::to_node, &RawToken::text);
 				}
 				static constexpr auto methods_str() {
-					return std::array<std::string_view, 16>{{"__init__", "empty_token", "ambiguous", "make", "from_node", "create", "copy", "empty", "isAmbiguous", "meta", "kind", "index", "holds", "get", "to_node", "text"}};
+					return std::array<std::string_view, 15>{{"__init__", "empty_token", "ambiguous", "make", "from_node", "create", "copy", "empty", "isAmbiguous", "meta", "kind", "index", "holds", "to_node", "text"}};
 				}
 			};
 		} // namespace raw_token

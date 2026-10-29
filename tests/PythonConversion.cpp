@@ -301,6 +301,10 @@ TEST(PythonConversion, ClassesLowerConstructorsAndInstanceMethods) {
     EXPECT_EQ(constructor.name, "Box");
     EXPECT_EQ(constructor.parameters.size(), 1u);
     EXPECT_TRUE(cls.data[2].first->getFunction().is_static);
+    std::ostringstream ir;
+    ir << declarations;
+    EXPECT_EQ(ir.str().find("__ispa_python_self"), std::string::npos);
+    EXPECT_NE(ir.str().find("instance"), std::string::npos);
     LangRepr::Holder holder{declarations};
     LangRepr::Converter converter(holder, "cpp", "ClassConversionTest", false);
     converter.init(); converter.construct();

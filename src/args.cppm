@@ -25,6 +25,8 @@ export struct Args {
     std::string ai_recovery_file;
     // Internal: keep every exported module when generating a dependency.
     bool dependency_build = false;
+    // Emit imported helper declarations without a generated grammar facade.
+    bool library_only = false;
     bool debug = false;
     bool debug_instrumentation = true;
     bool logs = false;
@@ -39,7 +41,7 @@ export struct Args {
     bool auto_conflicts = true;
     std::size_t conflict_lookahead = 3;
     // Generate against the standard library lowered from Python (target-core) instead of the built-in
-    // C++ runtime. `stdlib` is a directory, or the name of an installed module; empty keeps the default path.
+    // target runtime. `stdlib` is a directory, or the name of an installed module; empty keeps the default path.
     std::string stdlib;
     // Namespace the generated parser links the standard library through (a module's config may set it).
     std::string stdlib_name;

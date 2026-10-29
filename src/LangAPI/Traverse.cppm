@@ -253,6 +253,11 @@ template<> struct Children<LangAPI::GetFromBox> {
     }
 };
 
+template<> struct Children<LangAPI::Instance> {
+    static constexpr bool is_node = true;
+    template<class N, class F> static void each(N&, F&) {}
+};
+
 template<> struct Children<LangAPI::RValue> {
     static constexpr bool is_node = true;
     template<class N, class F> static void each(N& node, F& f) {

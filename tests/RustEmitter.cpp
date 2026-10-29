@@ -71,8 +71,15 @@ TEST(RustEmitter, NeutralValuesCallsBorrowingAndControlFlowExecute) {
         .value = Array::createExpression(second_values)});
     collections.statements.push_back(Expression::createStatement(collection("first", ArrayMethods::Extend, {symbol("second")})));
     collections.statements.push_back(Expression::createStatement(collection("second", ArrayMethods::Clear)));
-    collections.statements.push_back(Return::createStatement(Return{.value = collection("first", ArrayMethods::Size)}));
+    collections.statements.push_back(Variable{.name = "snapshot", .type = Type{ValueType::Array, Type{ValueType::Int}},
+        .value = collection("first", ArrayMethods::ShallowCopy)});
+    collections.statements.push_back(Expression::createStatement(collection("first", ArrayMethods::Clear)));
+    collections.statements.push_back(Return::createStatement(Return{.value = collection("snapshot", ArrayMethods::Size)}));
     declarations.push_back(collections);
+    declarations.push_back(Function{.type = ValueType::Int, .name = "pop_last",
+        .parameters = {{Type{ValueType::Array, Type{ValueType::Int}}, "values"}},
+        .statements = returned(collection("values", ArrayMethods::SequencePopBack))});
+
 
     Function loop{.type = ValueType::Int, .name = "loop"};
     loop.statements.push_back(Variable{.name = "n", .type = ValueType::Int, .value = integer(0)});
@@ -101,10 +108,31 @@ TEST(RustEmitter, NeutralValuesCallsBorrowingAndControlFlowExecute) {
         Variable{.name = "value", .type = ValueType::Int, .value = integer(4)})), Visibility::Public);
     Function read{.type = ValueType::Int, .name = "read", .statements = returned(symbol("value")), .is_const = true};
     counter.data.emplace_back(std::make_shared<Declaration>(Function::createDeclaration(read)), Visibility::Public);
+    StorageSymbol explicit_receiver;
+    explicit_receiver.what = Instance::createExpression(Instance{});
+    explicit_receiver.path.emplace_back(std::string("value"));
+    Function read_instance{.type = ValueType::Int, .name = "read_instance",
+        .statements = returned(StorageSymbol::createExpression(explicit_receiver)), .is_const = true};
+    counter.data.emplace_back(std::make_shared<Declaration>(Function::createDeclaration(read_instance)), Visibility::Public);
     Function shadow{.type = ValueType::Int, .name = "shadow", .parameters = {{ValueType::Int, "value"}},
         .statements = returned(symbol("value")), .is_const = true};
     counter.data.emplace_back(std::make_shared<Declaration>(Function::createDeclaration(shadow)), Visibility::Public);
     declarations.push_back(counter);
+    Class shared_counter{.name = "SharedCounter", .shared_object = true};
+    shared_counter.data.emplace_back(std::make_shared<Declaration>(Variable::createDeclaration(
+        Variable{.name = "value", .type = ValueType::Int, .value = integer(1)})), Visibility::Public);
+    shared_counter.data.emplace_back(std::make_shared<Declaration>(Function::createDeclaration(Function{
+        .type = Type{ValueType::Box, Type{Symbol{"SharedCounter"}}}, .name = "receiver_handle",
+        .statements = returned(Instance::createExpression(Instance{.handle = true})), .is_const = true})), Visibility::Public);
+    declarations.push_back(shared_counter);
+    StorageSymbol shared_field;
+    shared_field.what = GetFromBox::createExpression(GetFromBox{.what = symbol("owner")});
+    shared_field.path.emplace_back(std::string("value"));
+    declarations.push_back(Function{.type = ValueType::Int, .name = "read_shared",
+        .parameters = {{Type{ValueType::Box, Type{Symbol{"SharedCounter"}}}, "owner"}},
+        .statements = returned(StorageSymbol::createExpression(shared_field))});
+
+
 
     // Array-looking text is literal data, including when it appears inside a fixed array.
     Type array_type{ValueType::FixedSizeArray, Type{ValueType::String}};
@@ -129,18 +157,33 @@ TEST(RustEmitter, NeutralValuesCallsBorrowingAndControlFlowExecute) {
             std::filesystem::create_directories((directory / name).parent_path());
             std::ofstream(directory / name) << source;
         }
-        std::ofstream(directory / "main.rs") << R"rs(
+        std::ofstream(directory / "main.rs")
+            << "extern crate self as ispa_std;\n#[path = \"" << ROOT_DIR
+            << "/parser/stdlibs/target/rust/src/shared.rs\"] mod shared;\npub use shared::{Shared, WeakShared};\n"
+            << "#[path = \"" << ROOT_DIR << "/parser/stdlibs/target/rust/src/primitives.rs\"] mod primitives;\npub use primitives::{fail, attempt};\n"
+            << R"rs(
 #[path = "Emitter.rs"] mod generated;
 pub use generated::Emitter;
 fn main() {
     assert_eq!(Emitter::run(), 5);
     assert_eq!(Emitter::copies(), "value");
     assert_eq!(Emitter::collections(), 4);
+    assert_eq!(Emitter::pop_last(vec![2, 7]), 7);
+    assert_eq!(attempt(|| { Emitter::pop_last(Vec::new()); }), 1);
     assert_eq!(Emitter::literal(), "quote\" backslash\\n newline\n tab\t\0 café");
     assert_eq!(Emitter::r#loop(), 3);
     assert_eq!(Emitter::steps(), 4);
     let counter = Emitter::Counter::default();
+    let owner = Emitter::SharedCounter::shared_default();
+    let retained = owner.borrow().receiver_handle();
+    assert!(owner.ptr_eq(&retained));
+    retained.borrow_mut().value = 9;
+    assert_eq!(owner.borrow().value, 9);
+    drop(owner);
+    assert_eq!(retained.borrow().value, 9);
+    assert_eq!(Emitter::read_shared(retained.clone()), 9);
     assert_eq!(counter.read(), 4);
+    assert_eq!(counter.read_instance(), 4);
     assert_eq!(counter.shadow(9), 9);
     assert_eq!(Emitter::array(), [String::from("vec![literal]")]);
 }
@@ -189,4 +232,14 @@ TEST(RustEmitter, EmitsTokenStreamInterfaceCalls) {
     EXPECT_NE(output.find("TokenStream::token_cursor(&mut stream)"), std::string::npos);
     EXPECT_NE(output.find("TokenStream::lazy_token_cursor(&mut stream, text)"), std::string::npos);
     EXPECT_NE(output.find("TokenStream::reset_token_stream(&mut stream)"), std::string::npos);
+}
+
+TEST(RustEmitter, RejectsInstanceOutsideMethodAndUnownedHandle) {
+    Function invalid{.type = ValueType::Int, .name = "invalid",
+        .statements = returned(Instance::createExpression(Instance{}))};
+    EXPECT_THROW(generate({Function::createDeclaration(invalid)}), std::exception);
+    Class owner{.name = "Owner"};
+    invalid.statements = returned(Instance::createExpression(Instance{.handle = true}));
+    owner.data.emplace_back(std::make_shared<Declaration>(Function::createDeclaration(invalid)), Visibility::Public);
+    EXPECT_THROW(generate({Class::createDeclaration(owner)}), std::exception);
 }

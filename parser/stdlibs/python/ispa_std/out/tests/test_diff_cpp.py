@@ -77,7 +77,7 @@ def test_scan_balanced_matches_cpp():
 class PyTok:
     def __init__(self, kind, pos):
         from ispa_std.raw_token import RawToken, RawTokenMeta
-        self.t = RawToken.make(RawTokenMeta(pos, "", False, 1, 1, 1, kind), 0, 0)
+        self.t = RawToken.make(RawTokenMeta(pos, "", False, 1, 1, 1, kind), 0)
 
 
 class PyIt:
@@ -123,7 +123,7 @@ def test_recover_matches_cpp():
         cases.append((kinds, expected, cont, follow, sync, flags, anchors, errs, skipped))
     expected_out = run_exe("recover_diff", lines)
     for (kinds, expected, cont, follow, sync, flags, anchors, errs, skipped), exp in zip(cases, expected_out):
-        toks = [RawToken.make(RawTokenMeta(i * 2, "", False, 1, 1, 1, k), 0, 0) for i, k in enumerate(kinds)]
+        toks = [RawToken.make(RawTokenMeta(i * 2, "", False, 1, 1, 1, k), 0) for i, k in enumerate(kinds)]
         it = PyIt(toks)
         st = recovery.State()
         st.anchors = [list(a) for a in anchors]

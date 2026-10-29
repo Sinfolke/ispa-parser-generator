@@ -606,6 +606,8 @@ void Construct::cls(const LangAPI::Class& value) {
         line("return " + name);
         --indentation_;
     }
+    if (namespace_context_ && !class_context_ && !current_scope_.empty() && !qualified)
+        line(current_scope_ + "." + name + " = " + name);
     if (qualified) {
         std::string target;
         for (std::size_t i = 0; i < path.size(); ++i) {
@@ -622,10 +624,15 @@ void Construct::ns(const LangAPI::Namespace& value) {
         declarations(value.declarations);
         return;
     }
+    const auto saved_scope = current_scope_;
+    const auto path = saved_scope.empty() ? Core::identifier(value.name) : saved_scope + "." + Core::identifier(value.name);
+    // Base classes are evaluated immediately, before enclosing class bodies
+    // finish. Publish a namespace shell so imported modules can refer to one
+    // another while their definitions are being evaluated.
+    line(path + " = type('_ispa_namespace', (), {})");
     line("class " + Core::identifier(value.name) + ":");
     ++indentation_;
-    const auto saved_scope = current_scope_;
-    current_scope_ = saved_scope.empty() ? Core::identifier(value.name) : saved_scope + "." + Core::identifier(value.name);
+    current_scope_ = path;
     const bool saved_ns = namespace_context_;
     const bool saved_class = class_context_;
     namespace_context_ = true;
@@ -636,6 +643,7 @@ void Construct::ns(const LangAPI::Namespace& value) {
     class_context_ = saved_class;
     current_scope_ = saved_scope;
     --indentation_;
+    if (!saved_scope.empty()) line(path + " = " + Core::identifier(value.name));
     if (saved_scope.empty()) {
         for (const auto& [target, rhs] : deferred_aliases_) line(target + " = " + rhs);
         deferred_aliases_.clear();

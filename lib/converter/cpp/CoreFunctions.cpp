@@ -190,9 +190,10 @@ auto Core::convertStorageSymbol(const LangAPI::StorageSymbol &symbol) -> std::st
                 case LangAPI::ArrayMethods::PythonExtend: name = "extend"; break;
                 case LangAPI::ArrayMethods::PythonInsert: name = "insert"; break;
                 case LangAPI::ArrayMethods::PythonRemove: name = "remove"; break;
-                case LangAPI::ArrayMethods::PythonPop: name = "pop"; break;
+                case LangAPI::ArrayMethods::PythonPop:
+                case LangAPI::ArrayMethods::SequencePopBack: name = "pop"; break;
                 case LangAPI::ArrayMethods::PythonClear: name = "clear"; break;
-                case LangAPI::ArrayMethods::PythonCopy: name = "copy"; break;
+                case LangAPI::ArrayMethods::ShallowCopy: name = "copy"; break;
                 case LangAPI::ArrayMethods::PythonCount: name = "count"; break;
                 case LangAPI::ArrayMethods::PythonIndex: name = "index"; break;
                 case LangAPI::ArrayMethods::PythonReverse: name = "reverse"; break;
@@ -575,6 +576,7 @@ auto Core::convertFunctionCall(const LangAPI::FunctionCall &call, bool need_temp
     const auto selfFirst = [&] {
         if (call.args.empty() || call.args.front().size() != 1 || !call.args.front().front().isRvalue()) return false;
         const auto &rv = call.args.front().front().getRValue();
+        if (rv.isInstance()) return rv.getInstance().handle;
         if (!rv.isSymbol() || rv.getSymbol().path.size() != 1) return false;
         const auto *name = std::get_if<std::string>(&rv.getSymbol().path.front());
         return name && *name == "__ispa_python_self_box";
@@ -1006,6 +1008,8 @@ auto Core::convertRValue(const LangAPI::RValue &rvalue) -> std::string {
             return "std::string(1, " + convertExpression(rvalue.getCharToStringConstructor().what) + ")";
         case LangAPI::RValueType::Cast:
             return "::ISPA_STD::python_cast<" + convertType(*rvalue.getCast().type) + ">(" + convertExpression(rvalue.getCast().what) + ")";
+        case LangAPI::RValueType::Instance:
+            return rvalue.getInstance().handle ? "::ISPA_STD::self_ptr(this)" : "(*this)";
         case LangAPI::RValueType::GetFromBox:
             return "(*" + convertExpression(rvalue.getGetFromBox().what) + ")";
         default:

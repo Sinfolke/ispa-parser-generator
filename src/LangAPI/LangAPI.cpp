@@ -175,6 +175,7 @@ namespace LangAPI {
             case RValueType::IspaLibDfaSpan: os << "IspaLibDfaSpan"; break;
             case RValueType::Reference: os << "Reference"; break;
             case RValueType::Span: os << "Span"; break;
+            case RValueType::Instance: os << "Instance"; break;
         }
         return os;
     }
@@ -211,13 +212,14 @@ namespace LangAPI {
             case ArrayMethods::Size: os << "Size"; break;
             case ArrayMethods::Extend: os << "Extend"; break;
             case ArrayMethods::Clear: os << "Clear"; break;
+            case ArrayMethods::SequencePopBack: os << "SequencePopBack"; break;
             case ArrayMethods::PythonAppend: os << "PythonAppend"; break;
             case ArrayMethods::PythonExtend: os << "PythonExtend"; break;
             case ArrayMethods::PythonInsert: os << "PythonInsert"; break;
             case ArrayMethods::PythonRemove: os << "PythonRemove"; break;
             case ArrayMethods::PythonPop: os << "PythonPop"; break;
             case ArrayMethods::PythonClear: os << "PythonClear"; break;
-            case ArrayMethods::PythonCopy: os << "PythonCopy"; break;
+            case ArrayMethods::ShallowCopy: os << "ShallowCopy"; break;
             case ArrayMethods::PythonCount: os << "PythonCount"; break;
             case ArrayMethods::PythonIndex: os << "PythonIndex"; break;
             case ArrayMethods::PythonReverse: os << "PythonReverse"; break;
@@ -586,6 +588,9 @@ namespace LangAPI {
     auto operator<<(std::ostream &os, const Cast &obj) -> std::ostream& {
         os << "static_cast<" << *obj.type << ">(" << obj.what << ")";
         return os;
+    }
+    auto operator<<(std::ostream& os, const Instance& value) -> std::ostream& {
+        return os << (value.handle ? "instance_handle" : "instance");
     }
     auto operator<<(std::ostream &os, const GetFromBox &obj) -> std::ostream& {
         os << "(*" << obj.what << ")";

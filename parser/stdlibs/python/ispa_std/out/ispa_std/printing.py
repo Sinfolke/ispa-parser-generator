@@ -31,7 +31,8 @@ def to_string(value) -> str:
     if isinstance(value, RawToken):
         if value.empty():
             raise ValueError("Can't retrieve string representation of an empty node")
-        return to_string(value.get())
+        # RawToken carries no payload (see raw_token.py): its source text is the closest substitute.
+        return value.text()
     if reflect.has_method(value, "to_string"):
         return value.to_string()
     if reflect.has_attr(value, "first") and reflect.has_attr(value, "second"):
@@ -83,8 +84,11 @@ def print_value_tree(printer: ASTPrinter, value) -> None:
     elif isinstance(value, (Node, RawToken)):
         if value.empty():
             printer.node("<empty>", False)
+        elif isinstance(value, Node):
+            print_value_tree(printer, value.data())
         else:
-            print_value_tree(printer, value.data() if isinstance(value, Node) else value.get())
+            # RawToken carries no payload (see raw_token.py): its source text is the closest substitute.
+            printer.node(value.text(), True)
     elif kind == reflect.OBJECT and reflect.has_method(value, "write_to_output"):
         value.write_to_output(printer)
     elif kind == reflect.OBJECT and reflect.has_method(value, "print"):

@@ -90,7 +90,7 @@ export namespace LangAPI {
         Callable
     };
     enum class RValueType {
-        Undef, Char, Int, Bool, Float, String, Array, FixedSizeArray, Map, Pos, Symbol, IspaLibSymbol, StorageSymbol, Inheritance, IspaLibDfaTransition, IspaLibDfaSpanCharState, IspaLibDfaSpanMultiTableState, IspaLibDfaEmptyState, IspaLibDfaSpan, Reference, Span, MakeTuple, GetVariant, CheckVariant, ToString, CharToStringConstructor, Cast, GetFromBox
+        Undef, Char, Int, Bool, Float, String, Array, FixedSizeArray, Map, Pos, Symbol, IspaLibSymbol, StorageSymbol, Inheritance, IspaLibDfaTransition, IspaLibDfaSpanCharState, IspaLibDfaSpanMultiTableState, IspaLibDfaEmptyState, IspaLibDfaSpan, Reference, Span, MakeTuple, GetVariant, CheckVariant, ToString, CharToStringConstructor, Cast, GetFromBox, Instance
     };
     enum class ExpressionValueType {
         Empty, EmptyInitializer, RValue, ExpressionElement, FunctionCall, IspaLibFunctionCall, StringCompare, Return, Break, Continue, VariableAssignment, CounterIncreament, CounterAssignment,
@@ -98,8 +98,8 @@ export namespace LangAPI {
     };
     enum class ArrayMethods {
         Push, Pop, Size, Extend, Clear, PythonAppend, PythonExtend, PythonInsert, PythonRemove, PythonPop,
-        PythonClear, PythonCopy, PythonCount, PythonIndex, PythonReverse, PythonSort,
-        PythonGet, PythonSetDefault, PythonUpdate, PythonKeys, PythonValues, PythonItems, PythonFromKeys, PythonContains
+        PythonClear, ShallowCopy, PythonCount, PythonIndex, PythonReverse, PythonSort,
+        PythonGet, PythonSetDefault, PythonUpdate, PythonKeys, PythonValues, PythonItems, PythonFromKeys, PythonContains, SequencePopBack
     };
     enum class Visibility {
         Private, Public, Protected
@@ -1033,8 +1033,21 @@ export namespace LangAPI {
             return std::tie(what);
         }
     };
+    // The current method receiver. A handle preserves the identity of the
+    // instance when it is passed or stored; it is never a clone of its value.
+    struct Instance : RValueLevel {
+        bool handle = false;
+        friend bool operator==(const Instance& a, const Instance& b) { return a.handle == b.handle; }
+        friend bool operator<(const Instance& a, const Instance& b) { return a.handle < b.handle; }
+        friend auto operator<<(std::ostream& os, const Instance& value) -> std::ostream&;
+    private:
+        friend struct ::uhash;
+        friend struct ::LangAPI::MembersAccess;
+        auto members() const { return std::tie(handle); }
+        auto members() { return std::tie(handle); }
+    };
     class RValue : public ExpressionValueLevel {
-        std::variant<std::monostate, Char, Int, Bool, Float, String, Array, FixedSizeArray, Map, Pos, Symbol, IspaLibSymbol, StorageSymbol, Inheritance, IspaLibDfaTransition, IspaLibDfaSpanCharState, IspaLibDfaSpanMultiTableState, IspaLibDfaEmptyState, IspaLibDfaSpan, Reference, Span, MakeTuple, GetVariant, CheckVariant, ToString, CharToStringConstructor, Cast, GetFromBox> value;
+        std::variant<std::monostate, Char, Int, Bool, Float, String, Array, FixedSizeArray, Map, Pos, Symbol, IspaLibSymbol, StorageSymbol, Inheritance, IspaLibDfaTransition, IspaLibDfaSpanCharState, IspaLibDfaSpanMultiTableState, IspaLibDfaEmptyState, IspaLibDfaSpan, Reference, Span, MakeTuple, GetVariant, CheckVariant, ToString, CharToStringConstructor, Cast, GetFromBox, Instance> value;
         friend struct ::uhash;
         friend struct ::LangAPI::MembersAccess;
         auto members() const {
@@ -1088,6 +1101,8 @@ export namespace LangAPI {
         bool isGetVariant()  const { return std::holds_alternative<GetVariant>(value); }
         bool isCheckVariant()  const { return std::holds_alternative<CheckVariant>(value); }
         bool isCast()  const { return std::holds_alternative<Cast>(value); }
+        bool isInstance() const { return std::holds_alternative<Instance>(value); }
+        const Instance& getInstance() const { return std::get<Instance>(value); }
         bool isGetFromBox()  const { return std::holds_alternative<GetFromBox>(value); }
         bool isToString()  const { return std::holds_alternative<ToString>(value); }
         bool isCharToStringConstructor()  const { return std::holds_alternative<CharToStringConstructor>(value); }

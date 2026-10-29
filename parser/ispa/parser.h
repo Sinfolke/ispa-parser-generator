@@ -194,10 +194,11 @@ public:
     }
 };
 class IspaParser : public Parser::Parser {
+    IspaLexer grammar_lexer_;
     public:
         auto lazyParse() -> ISPA_STD::MatchResult<::Parser::Types::main, ::Parser::Lexer::lazy_iterator> override {
-            IspaLexer lexer;
-            auto begin = IspaLexer::lazy_iterator(lexer, text);
+            grammar_lexer_.clearTokens();
+            auto begin = IspaLexer::lazy_iterator(grammar_lexer_, text);
             skip_spaces<::Parser::Types::__WS>(begin);
             auto res = main(begin);
             auto end = res.it;

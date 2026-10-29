@@ -9,6 +9,11 @@ use std::sync::OnceLock;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+mod shared;
+pub use shared::{Shared, WeakShared};
+mod primitives;
+pub use primitives::{StdError, fail, attempt, failure_message};
+
 /// Lazy static initialization compatible with the Rust toolchain used by ISPA.
 pub struct Lazy<T> { value: OnceLock<T>, init: fn() -> T }
 impl<T> Lazy<T> {

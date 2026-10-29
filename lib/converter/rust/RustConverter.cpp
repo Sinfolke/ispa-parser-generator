@@ -389,6 +389,8 @@ namespace Rust {
         const std::string name = RustCore::convertSymbol(cls.name, false);
         const std::string generics = genericParams(cls.template_parameters);
         const bool templated = !cls.template_parameters.empty();
+        const auto saved_shared_receiver = RustCore::shared_receiver;
+        RustCore::shared_receiver = cls.shared_object;
         const auto saved_members = RustCore::members;
         const auto saved_static_members = RustCore::static_members;
         RustCore::members.clear();
@@ -432,6 +434,7 @@ namespace Rust {
         emitLine(w, std::string("#[derive(Clone") + (has_defaults ? "" : ", Default") + ")]");
         emitLine(w, "pub struct " + name + generics + " {");
         w.increaseIndentation();
+        if (cls.shared_object) emitLine(w, "pub __ispa_owner: ::ispa_std::WeakShared<Self>,");
         for (std::size_t i = 0; i < bases.size(); ++i) emitLine(w, "pub base_" + std::to_string(i) + ": " + bases[i] + ",");
         for (const auto &f : fields) emitLine(w, "pub " + f.name + ": " + f.type + ",");
         if (templated) {
@@ -449,6 +452,7 @@ namespace Rust {
             w.increaseIndentation();
             emitLine(w, "Self {");
             w.increaseIndentation();
+            if (cls.shared_object) emitLine(w, "__ispa_owner: Default::default(),");
             for (std::size_t i = 0; i < bases.size(); ++i) emitLine(w, "base_" + std::to_string(i) + ": Default::default(),");
             for (const auto &f : fields) {
                 emitLine(w, f.name + ": " + (f.init->empty() ? std::string("Default::default()") : initializer(*f.ir_type, *f.init)) + ",");
@@ -475,6 +479,13 @@ namespace Rust {
         const auto scope = joinStrings(scope_parts, "::");
         emitLine(w, "impl" + generics + " " + name + generics + " {");
         w.increaseIndentation();
+        if (cls.shared_object) {
+            emitLine(w, "pub fn shared_default() -> ::ispa_std::Shared<Self> {");
+            w.increaseIndentation();
+            emitLine(w, "::ispa_std::Shared::new_with(|owner| { let mut value = Self::default(); value.__ispa_owner = owner.downgrade(); value })");
+            w.decreaseIndentation();
+            emitLine(w, "}");
+        }
         if (cls.constructor) emitFunction(*cls.constructor, w, aux, FnKind::Constructor, scope, bases);
         for (const auto &[declaration, visibility] : cls.data)
             if (declaration->isFunction()) emitFunction(declaration->getFunction(), w, aux, FnKind::Method, scope, bases);
@@ -529,6 +540,7 @@ namespace Rust {
         }
         context.module_path = saved_modules;
         RustCore::scope.pop_back();
+        RustCore::shared_receiver = saved_shared_receiver;
         RustCore::members = saved_members;
         RustCore::static_members = saved_static_members;
     }
@@ -701,6 +713,7 @@ namespace Rust {
         RustCore::members.clear();
         RustCore::static_members.clear();
         RustCore::receiver.clear();
+        RustCore::shared_receiver = false;
         RustCore::return_type = nullptr;
         program = Rust::Rewriter::rewrite(*source);
         RustCore::indexFunctions(program);

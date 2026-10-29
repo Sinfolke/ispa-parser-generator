@@ -275,7 +275,7 @@ auto RustCore::convertType(const LangAPI::Type &type) -> std::string {
             case LangAPI::ValueType::LargeVariant:
                 return variantEnum(parts);
             case LangAPI::ValueType::Box:
-                return "::std::rc::Rc<" + joined + ">";
+                return "::ispa_std::Shared<" + joined + ">";
             case LangAPI::ValueType::Span:
                 return "::ispa_std::Span<" + joined + ">";
             case LangAPI::ValueType::TypeTag:
@@ -354,7 +354,9 @@ auto RustCore::convertStorageSymbol(const LangAPI::StorageSymbol &symbol) -> std
     std::string res = convertExpression(symbol.what);
     for (const auto &part : symbol.path) {
         if (auto method = std::get_if<LangAPI::ArrayMethodCall>(&part);
-            method && method->method >= LangAPI::ArrayMethods::PythonAppend) {
+            method && method->method >= LangAPI::ArrayMethods::PythonAppend &&
+            method->method != LangAPI::ArrayMethods::ShallowCopy &&
+            method->method != LangAPI::ArrayMethods::SequencePopBack) {
             throw Error("Rust target: source-language collection operation {}; lower it to language-neutral collection IR", static_cast<int>(method->method));
         }
         if (std::holds_alternative<LangAPI::StorageOffset>(part)) {
@@ -369,10 +371,12 @@ auto RustCore::convertStorageSymbol(const LangAPI::StorageSymbol &symbol) -> std
             const auto &method_call = std::get<LangAPI::ArrayMethodCall>(part);
             switch (method_call.method) {
                 case LangAPI::ArrayMethods::Push: res += "push"; break;
-                case LangAPI::ArrayMethods::Pop: res += "pop"; break;
+                case LangAPI::ArrayMethods::Pop:
+                case LangAPI::ArrayMethods::SequencePopBack: res += "pop"; break;
                 case LangAPI::ArrayMethods::Size: res += "len"; break;
                 case LangAPI::ArrayMethods::Extend: res += "extend"; break;
                 case LangAPI::ArrayMethods::Clear: res += "clear"; break;
+                case LangAPI::ArrayMethods::ShallowCopy: res += "clone"; break;
                 default: throw Error("Unknown array method");
             }
             std::vector<std::string> args;
@@ -382,6 +386,8 @@ auto RustCore::convertStorageSymbol(const LangAPI::StorageSymbol &symbol) -> std
             if (method_call.method == LangAPI::ArrayMethods::Extend && args.size() == 1)
                 args[0] += ".iter().cloned()";
             res += "(" + joinStrings(args, ", ") + ")";
+            if (method_call.method == LangAPI::ArrayMethods::SequencePopBack)
+                res += ".unwrap_or_else(|| ::ispa_std::fail(1, \"pop from empty sequence\"))";
         } else if (std::holds_alternative<LangAPI::Property>(part)) {
             res += ident(std::get<LangAPI::Property>(part).name) + "()";
         } else if (std::holds_alternative<LangAPI::IspaLibSymbol>(part)) {
@@ -996,8 +1002,16 @@ auto RustCore::convertRValue(const LangAPI::RValue &rvalue) -> std::string {
             return "String::from((" + convertExpression(rvalue.getCharToStringConstructor().what) + ") as char)";
         case LangAPI::RValueType::Cast:
             return "((" + convertExpression(rvalue.getCast().what) + ") as " + convertType(*rvalue.getCast().type) + ")";
+        case LangAPI::RValueType::Instance:
+            if (receiver.empty()) throw Error("Rust target: instance access outside an instance method");
+            if (rvalue.getInstance().handle) {
+                if (!shared_receiver)
+                    throw Error("Rust target: instance handle requires a shared-object class");
+                return receiver + ".__ispa_owner.upgrade().expect(\"instance has no shared owner\")";
+            }
+            return receiver;
         case LangAPI::RValueType::GetFromBox:
-            return "(*" + asExpr(convertExpression(rvalue.getGetFromBox().what)) + ")";
+            return "(*" + asExpr(convertExpression(rvalue.getGetFromBox().what)) + ".borrow_mut())";
         default:
             throw Error("Unknown RValue type: {}", (int) rvalue.type());
     }

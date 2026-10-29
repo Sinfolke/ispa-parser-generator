@@ -11,7 +11,7 @@ from ispa_std.dfa_api import NULL_STATE
 def sem(idx, cap, start_pos, length, start_line, cur):
     if idx == 2:
         return Pair(NULL_STATE, RawToken.empty_token())
-    return Pair(NULL_STATE, RawToken.make(RawTokenMeta(start_pos, "", False, length, start_line, 1, idx), idx, 0))
+    return Pair(NULL_STATE, RawToken.make(RawTokenMeta(start_pos, "", False, length, start_line, 1, idx), idx))
 
 
 class L(Lexer_base):

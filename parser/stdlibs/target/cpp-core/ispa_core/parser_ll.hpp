@@ -139,7 +139,7 @@ struct TypedCursor : lo::lexer::TokenCursor {
                             static_cast<long long>(meta.length()), static_cast<long long>(meta.line()),
                             static_cast<long long>(meta.column()), static_cast<long long>(meta.name()));
         std::shared_ptr<lo::raw_token::RawTokenMeta> core_meta(std::shared_ptr<void>(), &core_meta_value);
-        raw->__init__(core_meta, static_cast<long long>(token.index()), std::any{});
+        raw->__init__(core_meta, static_cast<long long>(token.index()));
         raw->token = token;
         cached_token = raw;
         cached_distance = static_cast<long long>(it.distance());

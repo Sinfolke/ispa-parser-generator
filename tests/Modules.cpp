@@ -752,3 +752,9 @@ main: module_rule import_rule detach_rule;
     EXPECT_TRUE(source.detach.front().feature);
     EXPECT_TRUE(source.detached_symbols.contains({"lib", "feature_rule"}));
 }
+
+TEST(Modules, GrammarParserRetainsLazyLexerAcrossResultInspection) {
+    IspaParser parser;
+    EXPECT_NO_THROW(parser.parse("main: 'x';\n"));
+    EXPECT_NO_THROW(parser.parse("main: 'y';\n"));
+}

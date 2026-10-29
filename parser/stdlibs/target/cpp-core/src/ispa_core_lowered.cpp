@@ -989,37 +989,36 @@ auto python::ispa_std::raw_token::RawTokenMeta::text() -> std::string {
 	}
 	return python::ispa_std::string::substr(((*this))._source, ((*this))._startpos, ((*this))._length);
 }
-auto python::ispa_std::raw_token::RawToken::__init__(std::shared_ptr<python::ispa_std::raw_token::RawTokenMeta> meta, long long type_id, std::any payload) -> void {
+auto python::ispa_std::raw_token::RawToken::__init__(std::shared_ptr<python::ispa_std::raw_token::RawTokenMeta> meta, long long type_id) -> void {
 	((*this))._meta = meta;
 	((*this))._type_id = type_id;
-	((*this))._payload = payload;
 }
 auto python::ispa_std::raw_token::RawToken::empty_token() -> std::shared_ptr<python::ispa_std::raw_token::RawToken> {
 	"The default-constructed (end-of-stream) token.";
-	return ISPA_STD::construct<python::ispa_std::raw_token::RawToken>(python::ispa_std::raw_token::RawTokenMeta::blank(), python::ispa_std::raw_token::NO_TYPE, 0);
+	return ISPA_STD::construct<python::ispa_std::raw_token::RawToken>(python::ispa_std::raw_token::RawTokenMeta::blank(), python::ispa_std::raw_token::NO_TYPE);
 }
 auto python::ispa_std::raw_token::RawToken::ambiguous(std::shared_ptr<python::ispa_std::raw_token::RawTokenMeta> meta) -> std::shared_ptr<python::ispa_std::raw_token::RawToken> {
-	return ISPA_STD::construct<python::ispa_std::raw_token::RawToken>(meta, python::ispa_std::raw_token::NO_TYPE, 0);
+	return ISPA_STD::construct<python::ispa_std::raw_token::RawToken>(meta, python::ispa_std::raw_token::NO_TYPE);
 }
-auto python::ispa_std::raw_token::RawToken::make(std::shared_ptr<python::ispa_std::raw_token::RawTokenMeta> meta, long long type_id, std::any payload) -> std::shared_ptr<python::ispa_std::raw_token::RawToken> {
+auto python::ispa_std::raw_token::RawToken::make(std::shared_ptr<python::ispa_std::raw_token::RawTokenMeta> meta, long long type_id) -> std::shared_ptr<python::ispa_std::raw_token::RawToken> {
 	if (((type_id) < (0))) {
 		python::ispa_std::failures::logic_error("RawToken: payload type is not an alternative");
 	}
-	return ISPA_STD::construct<python::ispa_std::raw_token::RawToken>(meta, type_id, payload);
+	return ISPA_STD::construct<python::ispa_std::raw_token::RawToken>(meta, type_id);
 }
 auto python::ispa_std::raw_token::RawToken::from_node(std::shared_ptr<python::ispa_std::node::Node> node, long long type_id) -> std::shared_ptr<python::ispa_std::raw_token::RawToken> {
 	auto meta = ISPA_STD::construct<python::ispa_std::raw_token::RawTokenMeta>(((*node)).startpos(), ((*node)).source(), ((*node)).has_source(), ((*node)).length(), ((*node)).line(), ((*node)).column(), ((*node)).name());
 	if (((*node)).empty()) {
-		return ISPA_STD::construct<python::ispa_std::raw_token::RawToken>(meta, python::ispa_std::raw_token::NO_TYPE, 0);
+		return ISPA_STD::construct<python::ispa_std::raw_token::RawToken>(meta, python::ispa_std::raw_token::NO_TYPE);
 	}
-	return ISPA_STD::construct<python::ispa_std::raw_token::RawToken>(meta, type_id, ((*node)).data());
+	return ISPA_STD::construct<python::ispa_std::raw_token::RawToken>(meta, type_id);
 }
-auto python::ispa_std::raw_token::RawToken::create(long long startpos, const std::string& source, bool has_source, long long length, long long line, long long enumv, long long type_id, std::any value) -> std::shared_ptr<python::ispa_std::raw_token::RawToken> {
+auto python::ispa_std::raw_token::RawToken::create(long long startpos, const std::string& source, bool has_source, long long length, long long line, long long enumv, long long type_id) -> std::shared_ptr<python::ispa_std::raw_token::RawToken> {
 	auto meta = ISPA_STD::construct<python::ispa_std::raw_token::RawTokenMeta>(startpos, source, has_source, length, line, 0, enumv);
-	return ISPA_STD::construct<python::ispa_std::raw_token::RawToken>(meta, type_id, value);
+	return ISPA_STD::construct<python::ispa_std::raw_token::RawToken>(meta, type_id);
 }
 auto python::ispa_std::raw_token::RawToken::copy() -> std::shared_ptr<python::ispa_std::raw_token::RawToken> {
-	return ISPA_STD::construct<python::ispa_std::raw_token::RawToken>(((*this))._meta, ((*this))._type_id, ((*this))._payload);
+	return ISPA_STD::construct<python::ispa_std::raw_token::RawToken>(((*this))._meta, ((*this))._type_id);
 }
 auto python::ispa_std::raw_token::RawToken::empty() -> bool {
 	return ((((*this))._type_id) == (python::ispa_std::raw_token::NO_TYPE));
@@ -1039,19 +1038,13 @@ auto python::ispa_std::raw_token::RawToken::index() -> long long {
 auto python::ispa_std::raw_token::RawToken::holds(long long type_id) -> bool {
 	return ((((*this))._type_id) == (type_id));
 }
-auto python::ispa_std::raw_token::RawToken::get() -> std::any {
-	if (((((*this))._type_id) == (python::ispa_std::raw_token::NO_TYPE))) {
-		python::ispa_std::failures::logic_error("RawToken::get: alternative mismatch");
-	}
-	return ((*this))._payload;
-}
 auto python::ispa_std::raw_token::RawToken::to_node(long long type_id) -> std::shared_ptr<python::ispa_std::node::Node> {
-	"The payload as a Node (RawToken::to_node<T>): metadata always, data\n        only when this token holds `type_id`.";
+	"A Node reporting whether this token holds `type_id` (RawToken::to_node<T>): this base\n        has no payload to carry (see the module docstring), so a facade subclass that actually\n        holds one overrides this to carry it too.";
 	auto m = ((*this))._meta;
 	if (((((((*this))._type_id) == (python::ispa_std::raw_token::NO_TYPE))) || (((((*this))._type_id) != (type_id))))) {
 		return python::ispa_std::node::Node::with_meta(((*m)).startpos(), ((*m)).source(), ((*m)).has_source(), ((*m)).length(), ((*m)).line(), ((*m)).column(), ((*m)).name());
 	}
-	return python::ispa_std::node::Node::with_data(((*m)).startpos(), ((*m)).source(), ((*m)).has_source(), ((*m)).length(), ((*m)).line(), ((*m)).column(), ((*m)).name(), ((*this))._payload);
+	return python::ispa_std::node::Node::with_data(((*m)).startpos(), ((*m)).source(), ((*m)).has_source(), ((*m)).length(), ((*m)).line(), ((*m)).column(), ((*m)).name(), 0);
 }
 auto python::ispa_std::raw_token::RawToken::text() -> std::string {
 	"The source text this token covers (\"\" when it has no source).";
