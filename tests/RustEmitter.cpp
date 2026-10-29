@@ -161,6 +161,7 @@ TEST(RustEmitter, NeutralValuesCallsBorrowingAndControlFlowExecute) {
             << "extern crate self as ispa_std;\n#[path = \"" << ROOT_DIR
             << "/parser/stdlibs/target/rust/src/shared.rs\"] mod shared;\npub use shared::{Shared, WeakShared};\n"
             << "#[path = \"" << ROOT_DIR << "/parser/stdlibs/target/rust/src/primitives.rs\"] mod primitives;\npub use primitives::{fail, attempt};\n"
+            << "#[path = \"" << ROOT_DIR << "/parser/stdlibs/target/rust/src/pycoll.rs\"] pub mod pycoll;\n"
             << R"rs(
 #[path = "Emitter.rs"] mod generated;
 pub use generated::Emitter;

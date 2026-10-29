@@ -53,7 +53,7 @@ namespace Rust {
         constexpr const char *kAllow =
             "#![allow(non_snake_case, non_camel_case_types, non_upper_case_globals, unused_mut, unused_variables,\n"
             "         unused_parens, unused_labels, unused_imports, unreachable_patterns, unreachable_code, dead_code,\n"
-            "         unused_braces, clippy::all)]\n"
+            "         unused_braces, invalid_reference_casting, clippy::all)]\n"
             "use ::ispa_std::pycoll::{PyContains, PyPop};\n";
     }
 
@@ -373,7 +373,7 @@ namespace Rust {
         emitLine(w, "pub fn " + name + (generics.empty() ? "" : "<" + joinStrings(generics, ", ") + ">") + "(" +
                     joinStrings(params, ", ") + ")" + ret + " {");
         w.increaseIndentation();
-        if (kind == FnKind::Method && !func.is_static) emitLine(w, "let __p = (&mut *self) as *mut Self;");   // for closures that reach the object
+        if (kind == FnKind::Method && !func.is_static) emitLine(w, "let __p = self as *const Self as *mut Self;");   // for closures that reach the object
 
         const auto saved_counter = RustCore::counter;
         const auto saved_frames = RustCore::loop_frames;

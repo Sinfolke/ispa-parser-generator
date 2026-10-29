@@ -876,6 +876,8 @@ auto RustCore::convertInitializer(const LangAPI::Type& type, const LangAPI::Expr
         value[0].getRValue().type() == LangAPI::RValueType::Int && value[0].getRValue().getInt().value == 0)
         return "Default::default()";   // None
     auto result = convertInitializerValue(type, value);
+    // collection sizes and indices are the IR's `int` (i64); an unsigned target takes them by a numeric cast
+    if (!result.empty() && convertType(type) == "usize" && result.find(" as i64)") != std::string::npos) return "((" + result + ") as usize)";
     // a handle to an object is accepted wherever a handle to one of its base classes is expected
     if (!result.empty() && convertType(type).starts_with("::ispa_std::Shared<")) return "(" + result + ").upcast()";
     return result;
