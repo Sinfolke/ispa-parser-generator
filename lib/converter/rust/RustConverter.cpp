@@ -324,8 +324,14 @@ namespace Rust {
             }
             const auto marker = "__Allowed_" + fileSafe(scope) + "_" + fileSafe(func.name) + "_" + fileSafe(tp.first) + "_" +
                                 std::to_string(++context.marker_counter);
-            emitLine(aux, "pub trait " + marker + " {}");
-            for (const auto &allowed : tp.second) emitLine(aux, "impl " + marker + " for " + RustCore::convertType(allowed) + " {}");
+            // a generic cursor type brings what the combinators need of it
+            bool cursor = false;
+            for (const auto &allowed : tp.second) cursor = cursor || RustCore::convertType(allowed).find("::LexerTypes>::") != std::string::npos;
+            emitLine(aux, "pub trait " + marker + (cursor ? ": ::ispa_std::ParserCursor" : "") + " {}");
+            if (cursor)   // every parser cursor is allowed, so rules can call one another with their own generic cursor
+                emitLine(aux, "impl<__C: ::ispa_std::ParserCursor> " + marker + " for __C {}");
+            else
+                for (const auto &allowed : tp.second) emitLine(aux, "impl " + marker + " for " + RustCore::convertType(allowed) + " {}");
             generics.push_back(param + ": " + marker);
         }
 
@@ -337,6 +343,7 @@ namespace Rust {
         RustCore::callable_parameters.clear();
         RustCore::const_borrowed_parameters.clear();
         RustCore::callable_types.clear();
+        RustCore::reference_parameters.clear();
         RustCore::local_types.clear();
         RustCore::locals.clear();
         RustCore::locals.emplace_back();
@@ -353,6 +360,8 @@ namespace Rust {
                     isValueTypeOf(std::get<LangAPI::Type>(parameter.first.template_parameters[0]), LangAPI::ValueType::ImmutableSemantic))
                     RustCore::const_borrowed_parameters.insert(parameter.second);
             }
+            if (parameter.first.isIspaLibSymbol() && parameter.first.getIspaLibSymbol().Reference)
+                RustCore::reference_parameters.insert(parameter.second);
             if (isValueTypeOf(parameter.first, LangAPI::ValueType::Callable))
                 { RustCore::callable_parameters.insert(parameter.second); RustCore::callable_types[parameter.second] = &parameter.first; }
         }
@@ -425,7 +434,9 @@ namespace Rust {
         emitLine(w, "pub fn operator_shl_" + suffix + "<'a>(" + joinStrings(params, ", ") + ") -> &'a mut dyn ::std::fmt::Write {");
         w.increaseIndentation();
         RustCore::loop_frames.clear();
+        RustCore::reference_parameters = {"os"};   // the stream is a mutable reference, lent on to the printers
         convertStatements(func.statements, w);
+        RustCore::reference_parameters.clear();
         w.decreaseIndentation();
         emitLine(w, "}");
     }
@@ -640,6 +651,20 @@ namespace Rust {
                 return entry.first->isFunction() && entry.first->getFunction().name == "__init__"; }))
             emitLine(w, "pub fn __init__(&mut self) {}");
         if (cls.constructor) emitFunction(*cls.constructor, w, aux, FnKind::Constructor, scope, bases);
+        else if (!cls.shared_object && bases.empty() && !templated &&
+                 std::none_of(cls.data.begin(), cls.data.end(), [](const auto &entry) {
+                     return entry.first->isFunction() && entry.first->getFunction().name == "new"; })) {
+            // an aggregate: `T{a, b}` builds it from its fields in declaration order
+            std::vector<std::string> params;
+            for (const auto &f : fields) params.push_back(f.name + ": " + f.type);
+            emitLine(w, "pub fn new(" + joinStrings(params, ", ") + ") -> Self {");
+            w.increaseIndentation();
+            emitLine(w, std::string(fields.empty() ? "Self::default()" : "let mut __value = Self::default();"));
+            for (const auto &f : fields) emitLine(w, "__value." + f.name + " = " + f.name + ";");
+            if (!fields.empty()) emitLine(w, "__value");
+            w.decreaseIndentation();
+            emitLine(w, "}");
+        }
         for (const auto &[declaration, visibility] : cls.data) {
             if (!declaration->isFunction()) continue;
             const auto &fn = declaration->getFunction();
@@ -719,6 +744,15 @@ namespace Rust {
         w.decreaseIndentation();
         emitLine(w, "}");
 
+        if (!templated) {
+            const bool prints = std::any_of(cls.data.begin(), cls.data.end(), [](const auto &entry) {
+                return entry.first->isFunction() && entry.first->getFunction().name == "write_to_output"; });
+            if (prints)
+                emitLine(w, "impl ::ispa_std::PrintValue for " + name + " { fn structured(&self) -> bool { true } "
+                            "fn print_subtree(&self, printer: &mut ::ispa_std::ASTPrinter) { self.write_to_output(printer) } }");
+            if (cls.to_str_fun)
+                emitLine(w, "impl ::ispa_std::ToText for " + name + " { fn to_text(&self) -> String { self.to_string() } }");
+        }
         if (debug_instrumentation_ && !templated) {
             const auto in_types = std::find(context.module_path.begin(), context.module_path.end(), "Types") != context.module_path.end() ||
                                   std::find(context.module_path.begin(), context.module_path.end(), "FlatTypes") != context.module_path.end();
@@ -794,6 +828,60 @@ namespace Rust {
 
     // generated enums standing in for std::variant<std::monostate, ...>
     auto Construct::emitVariants(Converter::Writer &w) -> void {
+        // assign_compatible into a variant: an alternative sets it; another variant sets it when it only holds alternatives
+        // this one holds as well
+        for (const auto &def : RustCore::variants) {
+            for (const auto &alternative : def.alternatives)
+                emitLine(w, "impl ::ispa_std::AssignFrom<" + alternative + "> for " + def.name + " { fn assign_from(&mut self, source: " +
+                            alternative + ") { *self = source.into(); } }");
+            // a node of a rule is accepted boxed or unboxed, whichever form the variant holds
+            for (const auto &alternative : def.alternatives) {
+                const std::string node = "::ispa_std::Node<", shared = "::ispa_std::Shared<";
+                if (!alternative.starts_with(node) || !alternative.ends_with(">")) continue;
+                const auto inner = alternative.substr(node.size(), alternative.size() - node.size() - 1);
+                std::string other;
+                if (inner.starts_with(shared) && inner.ends_with(">")) {
+                    other = node + inner.substr(shared.size(), inner.size() - shared.size() - 1) + ">";
+                    if (std::find(def.alternatives.begin(), def.alternatives.end(), other) == def.alternatives.end())
+                        emitLine(w, "impl ::ispa_std::AssignFrom<" + other + "> for " + def.name + " { fn assign_from(&mut self, source: " + other +
+                                    ") { let mut boxed: " + alternative + " = Default::default(); ::ispa_std::AssignFrom::assign_from(&mut boxed, source); *self = boxed.into(); } }");
+                } else {
+                    other = node + shared + inner + ">>";
+                    if (std::find(def.alternatives.begin(), def.alternatives.end(), other) == def.alternatives.end())
+                        emitLine(w, "impl ::ispa_std::AssignFrom<" + other + "> for " + def.name + " { fn assign_from(&mut self, source: " + other +
+                                    ") { if !source.empty() { let mut node = ::ispa_std::Node::create(source.value.borrow().clone()); "
+                                    "node.start_pos = source.start_pos; node.length = source.length; node.line = source.line; node.column = source.column; "
+                                    "node.name = source.name; *self = node.into(); } } }");
+                }
+            }
+            for (const auto &other : RustCore::variants) {
+                if (other.name == def.name) continue;
+                // boxing of a rule is invisible to assignment: compare the alternatives without their `Shared<..>`
+                const auto unboxed = [](std::string text) {
+                    const std::string open = "::ispa_std::Shared<";
+                    for (auto at = text.find(open); at != std::string::npos; at = text.find(open)) {
+                        int depth = 1;
+                        std::size_t close = at + open.size();
+                        for (; close < text.size() && depth > 0; ++close) depth += text[close] == '<' ? 1 : text[close] == '>' ? -1 : 0;
+                        text.erase(close - 1, 1);
+                        text.erase(at, open.size());
+                    }
+                    // `Types::x` is an alias of `FlatTypes::x`: the namespace does not tell types apart here
+                    for (const std::string prefix : {"crate::o::FlatTypes::", "crate::o::Types::", "FlatTypes::", "Types::"})
+                        for (auto at = text.find(prefix); at != std::string::npos; at = text.find(prefix)) text.erase(at, prefix.size());
+                    return text;
+                };
+                const bool covered = std::all_of(other.alternatives.begin(), other.alternatives.end(), [&](const auto &alternative) {
+                    return std::any_of(def.alternatives.begin(), def.alternatives.end(),
+                                       [&](const auto &candidate) { return unboxed(candidate) == unboxed(alternative); }); });
+                if (!covered) continue;
+                emitLine(w, "impl ::ispa_std::AssignFrom<" + other.name + "> for " + def.name + " { fn assign_from(&mut self, source: " +
+                            other.name + ") { match source { " + other.name + "::Monostate => {}");
+                for (std::size_t i = 0; i < other.alternatives.size(); ++i)
+                    emitLine(w, "    " + other.name + "::V" + std::to_string(i) + "(x) => ::ispa_std::AssignFrom::assign_from(self, x),");
+                emitLine(w, "} } }");
+            }
+        }
         for (const auto &def : RustCore::variants) {
             emitLine(w, "#[derive(Clone, Default)]");
             emitLine(w, "pub enum " + def.name + " {");
@@ -814,6 +902,37 @@ namespace Rust {
                 w.decreaseIndentation();
                 emitLine(w, "}");
             }
+            emitLine(w, "impl ::ispa_std::PrintValue for " + def.name + " {");
+            w.increaseIndentation();
+            emitLine(w, "fn structured(&self) -> bool { true }");
+            emitLine(w, "fn print_subtree(&self, printer: &mut ::ispa_std::ASTPrinter) {");
+            w.increaseIndentation();
+            emitLine(w, "match self {");
+            w.increaseIndentation();
+            emitLine(w, def.name + "::Monostate => {}");
+            for (std::size_t i = 0; i < def.alternatives.size(); ++i)
+                emitLine(w, def.name + "::V" + std::to_string(i) + "(x) => ::ispa_std::PrintValue::print_subtree(x, printer),");
+            w.decreaseIndentation();
+            emitLine(w, "}");
+            w.decreaseIndentation();
+            emitLine(w, "}");
+            w.decreaseIndentation();
+            emitLine(w, "}");
+            emitLine(w, "impl ::ispa_std::ToText for " + def.name + " {");
+            w.increaseIndentation();
+            emitLine(w, "fn to_text(&self) -> String {");
+            w.increaseIndentation();
+            emitLine(w, "match self {");
+            w.increaseIndentation();
+            emitLine(w, def.name + "::Monostate => String::new(),");
+            for (std::size_t i = 0; i < def.alternatives.size(); ++i)
+                emitLine(w, def.name + "::V" + std::to_string(i) + "(x) => ::ispa_std::ToText::to_text(x),");
+            w.decreaseIndentation();
+            emitLine(w, "}");
+            w.decreaseIndentation();
+            emitLine(w, "}");
+            w.decreaseIndentation();
+            emitLine(w, "}");
             // which alternative a type is (a rule type is none of them): how the core addresses tokens by type
             emitLine(w, "impl ::ispa_std::TokenVariant for " + def.name + " {");
             w.increaseIndentation();

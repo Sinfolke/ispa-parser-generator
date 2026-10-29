@@ -15,7 +15,7 @@ pub mod recovery {
     #[derive(Clone)]
     pub struct CoreFail { pub handler: Shared<core_recovery::FailHandler> }
 
-    fn token_set(ids: &[usize]) -> Shared<core_recovery::TokenSet> {
+    pub(super) fn token_set(ids: &[usize]) -> Shared<core_recovery::TokenSet> {
         let set = core_recovery::TokenSet::shared_default();
         set.borrow_mut().__init__(&ids.iter().map(|id| *id as i64).collect());
         set
@@ -89,6 +89,27 @@ impl<Main, Token> LLParser<Main, Token> {
         let core = self.core();
         core.borrow_mut().enter_frame(&rule.as_ref().to_string());
         FrameGuard { core }
+    }
+    /// Where recovery may resume inside this rule: one claim (a label and a set of token ids) per set.
+    pub fn recovery_at(&mut self, sets: &[&[usize]], expecting: impl AsRef<str>, labels: &[String]) {
+        let claims: Vec<Shared<core_recovery::ContextClaim>> = sets.iter().zip(labels.iter().chain(std::iter::repeat(&String::new()))).map(|(set, label)| {
+            let claim = core_recovery::ContextClaim::shared_default();
+            claim.borrow_mut().__init__(label, recovery::token_set(set));
+            claim
+        }).collect();
+        self.core().borrow_mut().recovery_at(&expecting.as_ref().to_string(), &claims);
+    }
+    /// Which alternative to continue in after a failed choice; the cursor ends where recovery left it.
+    pub fn recover_choice<IT: BridgeCursor>(&mut self, sets: &[&[usize]], pos: &mut IT, rule: impl AsRef<str>, expected: impl AsRef<str>) -> i64 {
+        let (mut first, mut inner) = (Vec::new(), Vec::new());
+        for (index, set) in sets.iter().enumerate() {
+            (if index % 2 == 0 { &mut first } else { &mut inner }).push(recovery::token_set(set));
+        }
+        let cursor = TypedCursor::handle(pos.clone(), None);
+        let chosen = self.core().borrow_mut().recover_choice(cursor.clone().upcast(), &rule.as_ref().to_string(),
+                                                            &expected.as_ref().to_string(), &first, &inner);
+        *pos = cursor.borrow().it.clone();
+        chosen
     }
     /// A matched result made from an action's value (the rule short-circuits on an unwinding recovery).
     pub fn action_result<R, IT>(&mut self, value: R, pos: IT) -> MatchResult<R, IT> {

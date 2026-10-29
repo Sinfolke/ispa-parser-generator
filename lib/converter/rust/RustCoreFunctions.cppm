@@ -39,6 +39,7 @@ export namespace RustCore {
     std::vector<std::unordered_set<std::string>> locals;
     std::unordered_set<std::string> borrowed_parameters;
     std::unordered_set<std::string> const_borrowed_parameters;   // `const T&` parameters (a subset of borrowed_parameters)
+    std::unordered_set<std::string> reference_parameters;   // runtime-typed `T&` parameters (e.g. the lexer position)
     std::unordered_set<std::string> callable_parameters;   // `impl FnMut` parameters; stored into fields they are boxed
     std::unordered_set<std::string> callable_fields;       // fields holding a Box<dyn FnMut>, called as `(x.field)(...)`
     std::unordered_set<std::string> any_fields;            // fields typed `Any` (PyAny): assigned values are wrapped, None is empty

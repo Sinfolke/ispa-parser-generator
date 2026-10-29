@@ -104,6 +104,11 @@ namespace {
         return first;
     }
     auto argument(const LangAPI::Type& type, const LangAPI::Expression& source, const std::string& rendered) -> std::string {
+        if (type.isValueType() && type.getValueType() == LangAPI::ValueType::BorrowSemantic && source.size() == 1 && source[0].isRvalue() &&
+            source[0].getRValue().isSymbol() && source[0].getRValue().getSymbol().path.size() == 1 &&
+            std::holds_alternative<std::string>(source[0].getRValue().getSymbol().path[0]) &&
+            RustCore::reference_parameters.contains(std::get<std::string>(source[0].getRValue().getSymbol().path[0])))
+            return "&mut *" + RustCore::ident(std::get<std::string>(source[0].getRValue().getSymbol().path[0]));   // lent again
         if (type.isValueType() && type.getValueType() == LangAPI::ValueType::BorrowSemantic) {
             if (type.template_parameters.size() != 1 || !std::holds_alternative<LangAPI::Type>(type.template_parameters[0]))
                 throw Error("Rust target: BorrowSemantic requires one type parameter");
@@ -578,7 +583,13 @@ auto RustCore::convertStorageSymbol(const LangAPI::StorageSymbol &symbol, bool p
     if (!symbol.path.empty() && shared_locals.contains(bare) && !std::holds_alternative<LangAPI::StorageOffset>(symbol.path.front()))
         res = "(*" + res + ".borrow_mut())";
     std::vector<std::string> hoisted;
-    const auto touches_self = [&](const std::string& text) { return !receiver.empty() && text.find("(" + receiver + ")") != std::string::npos; };
+    const auto touches_self = [&](const std::string& text) {
+        if (receiver.empty()) return false;
+        if (text.find("(" + receiver + ")") != std::string::npos) return true;
+        for (auto at = text.find(receiver + "."); at != std::string::npos; at = text.find(receiver + ".", at + 1))
+            if (at == 0 || !(std::isalnum(static_cast<unsigned char>(text[at - 1])) || text[at - 1] == '_' || text[at - 1] == '.')) return true;
+        return false;
+    };
     const auto hoist = [&](std::string& text) {
         if (text.starts_with("|") || text.starts_with("move |")) return;   // a closure is typed by the callee
         const auto name = "__h" + std::to_string(++hoist_counter);
@@ -628,8 +639,7 @@ auto RustCore::convertStorageSymbol(const LangAPI::StorageSymbol &symbol, bool p
             }
             std::vector<std::string> args;
             for (const auto &param : method_call.args)
-                args.push_back(method_call.method == LangAPI::ArrayMethods::PythonExtend || method_call.method == LangAPI::ArrayMethods::Extend
-                                   ? convertExpression(param) : convertInitializerValue(LangAPI::Type{LangAPI::ValueType::Undef}, param));
+                args.push_back(convertInitializerValue(LangAPI::Type{LangAPI::ValueType::Undef}, param));
             // a handle to `self` stored in a list of base-class handles
             if (method_call.method == LangAPI::ArrayMethods::PythonAppend || method_call.method == LangAPI::ArrayMethods::Push)
                 for (auto& a : args) if (a.ends_with("instance has no shared owner\")")) a += ".upcast()";
@@ -639,7 +649,7 @@ auto RustCore::convertStorageSymbol(const LangAPI::StorageSymbol &symbol, bool p
                 args.push_back("Default::default()");
             if ((method_call.method == LangAPI::ArrayMethods::Extend || method_call.method == LangAPI::ArrayMethods::PythonExtend) &&
                 args.size() == 1)
-                args[0] += ".iter().cloned()";
+                args[0] += ".into_iter()";   // the argument is an owned copy: the receiver may be reached through the same object
             if (method_call.method == LangAPI::ArrayMethods::PythonContains && args.size() == 1) args[0] = "&" + args[0];
             if (method_call.method == LangAPI::ArrayMethods::PythonInsert && args.size() == 2)
                 args[0] = "(" + args[0] + ") as usize";
@@ -706,7 +716,8 @@ auto RustCore::convertIspaLibSymbol(const LangAPI::IspaLibSymbol &symbol, bool e
         case LangAPI::StdlibExports::LRParse: return "::ispa_std::lr_parse";
         case LangAPI::StdlibExports::Parser: return "::ispa_std::LLParser" + g();
         case LangAPI::StdlibExports::LexerMakeTokenParameter:
-            return symbol.Reference ? (symbol.Const ? "&::ispa_std::Ptr" : "&mut ::ispa_std::Ptr") : "::ispa_std::Ptr";
+            // `const char*&`: the cursor is advanced through the reference (the const is the pointee's)
+            return symbol.Reference ? "&mut ::ispa_std::Ptr" : "::ispa_std::Ptr";
         case LangAPI::StdlibExports::ParserFunctionParameter:
             return "<Self as ::ispa_std::LLParserApi>::Iterator";
         case LangAPI::StdlibExports::DfaState: return "::ispa_std::dfa::api::State" + g();
@@ -865,6 +876,13 @@ auto RustCore::convertExpression(const LangAPI::Expression &expression) -> std::
                     } else if (const auto& storage = std::get<LangAPI::StorageSymbol>(var.name); !storage.path.empty()) {
                         if (const auto* last = std::get_if<std::string>(&storage.path.back())) target_name = *last;
                     }
+                    // a value stored into a variant-typed local becomes one of its alternatives
+                    if (var.type == LangAPI::OperatorType::Assign && std::holds_alternative<LangAPI::Symbol>(var.name) &&
+                        std::get<LangAPI::Symbol>(var.name).path.size() == 1 && !target_name.empty()) {
+                        if (const auto it = local_types.find(target_name); it != local_types.end() &&
+                            (isValueTypeOf(*it->second, LangAPI::ValueType::Variant) || isValueTypeOf(*it->second, LangAPI::ValueType::LargeVariant)))
+                            value = asExpr(value) + ".into()";
+                    }
                     if (var.type == LangAPI::OperatorType::Assign) {
                         if (!target_name.empty() && any_fields.contains(ident(target_name))) {
                             const bool none = var.value.size() == 1 && var.value[0].isRvalue() &&
@@ -938,8 +956,20 @@ auto RustCore::convertInitializer(const LangAPI::Type& type, const LangAPI::Expr
     return result;
 }
 
+static auto soleRValue(const LangAPI::Expression &e) -> const LangAPI::RValue *;
 auto RustCore::convertInitializerValue(const LangAPI::Type& type, const LangAPI::Expression& value) -> std::string {
     if (value.empty()) return "";
+    if (value.size() > 1) {
+        // `(x)`: grouping around a single value does not change what it is
+        if (const auto* sole = soleRValue(value)) {
+            for (std::size_t i = 0; i < value.size(); ++i)
+                if (value[i].isRvalue() && &value[i].getRValue() == sole) {
+                    LangAPI::Expression inner;
+                    inner.push_back(value[i]);
+                    return convertInitializerValue(type, inner);
+                }
+        }
+    }
     if (isValueTypeOf(type, LangAPI::ValueType::Any)) {
         if (value.size() == 1 && value[0].isRvalue() && value[0].getRValue().type() == LangAPI::RValueType::Int &&
             value[0].getRValue().getInt().value == 0)
@@ -986,7 +1016,8 @@ auto RustCore::convertInitializerValue(const LangAPI::Type& type, const LangAPI:
             return convertExpression(value);   // `(&mut f)`: a reborrow, closures are not Clone
     }
     if (value.size() == 1 && value[0].isRvalue() &&
-        (value[0].getRValue().isSymbol() || value[0].getRValue().isStorageSymbol()) &&
+        (value[0].getRValue().isSymbol() || value[0].getRValue().isStorageSymbol() ||
+         (value[0].getRValue().type() == LangAPI::RValueType::Pos && !value[0].getRValue().getPos().dereference)) &&
         !isValueTypeOf(type, LangAPI::ValueType::BorrowSemantic) && !isValueTypeOf(type, LangAPI::ValueType::MoveSemantic))
         return asExpr(convertExpression(value)) + ".clone()";
     return convertExpression(value);
@@ -1101,7 +1132,17 @@ auto RustCore::convertFunctionCall(const LangAPI::FunctionCall &call, bool membe
         if (symbol_name == "recovery_at" || symbol_name == "recover_choice") {
             std::vector<std::string> sets;
             for (const auto& parameter : call.template_parameters) sets.push_back(recovery_set(parameter));
-            return "self." + symbol_name + "(&[" + joinStrings(sets, ", ") + "]" +
+            // the receiver is this object's parser base, whichever name it is reached by
+            const auto object = receiver.empty() ? std::string("self") : receiver;
+            if (symbol_name == "recovery_at") {
+                // (expected text, claim labels...) -> (expected text, [labels])
+                std::vector<std::string> labels(args.begin() + (args.empty() ? 0 : 1), args.end());
+                return object + ".recovery_at(&[" + joinStrings(sets, ", ") + "], " + (args.empty() ? "String::new()" : args.front()) +
+                       ", &[" + joinStrings(labels, ", ") + "])";
+            }
+            // recover_choice(pos, rule, expected): the cursor is advanced in place
+            if (!args.empty()) args[0] = "&mut " + args[0];
+            return object + ".recover_choice(&[" + joinStrings(sets, ", ") + "]" +
                    (args.empty() ? "" : ", " + joinStrings(args, ", ")) + ")";
         }
         // Python-frontend object helpers: ISPA_STD.construct[T](args) allocates a shared instance and runs `__init__`,
@@ -1190,7 +1231,29 @@ auto RustCore::convertFunctionCall(const LangAPI::FunctionCall &call, bool membe
             if (args[i] == raw_args[i]) {
                 // a namespace-level table handed to a runtime method is lent, not copied
                 if (args[i].starts_with("(*") && args[i].ends_with(".get())")) { args[i] = "&" + args[i]; continue; }
+                // a reference parameter handed on is lent again
+                if (call.args[i].size() == 1 && call.args[i][0].isRvalue() && call.args[i][0].getRValue().isSymbol() &&
+                    call.args[i][0].getRValue().getSymbol().path.size() == 1 &&
+                    std::holds_alternative<std::string>(call.args[i][0].getRValue().getSymbol().path[0]) &&
+                    reference_parameters.contains(std::get<std::string>(call.args[i][0].getRValue().getSymbol().path[0]))) {
+                    args[i] = "&mut *" + ident(std::get<std::string>(call.args[i][0].getRValue().getSymbol().path[0]));
+                    continue;
+                }
                 args[i] = convertInitializerValue(LangAPI::Type{LangAPI::ValueType::Undef}, call.args[i]);
+            }
+        auto callee = convertSymbol(symbol, !member);
+        // a bare call that names nothing in scope is an inherited runtime method of the base class
+        if (!member && !receiver.empty() && symbol.path.size() == 1 && std::holds_alternative<std::string>(symbol.path[0]) &&
+            !resolveFunction(symbol) && !callable_parameters.contains(std::get<std::string>(symbol.path[0])) &&
+            !members.contains(std::get<std::string>(symbol.path[0])) &&
+            !std::any_of(locals.rbegin(), locals.rend(), [&](const auto& frame) { return frame.contains(std::get<std::string>(symbol.path[0])); }))
+            callee = receiver + "." + callee;
+        if (!member)   // `Base.method(self, ...)` on a dispatching method runs the base implementation, not the dispatcher
+            if (const auto* function = resolveFunction(symbol); function && (slot_functions.contains(function) || overrides.contains(function))) {
+                const auto at = callee.rfind("::");
+                const auto method = at == std::string::npos ? callee : callee.substr(at + 2);
+                callee = (at == std::string::npos ? std::string() : callee.substr(0, at + 2)) +
+                         (overrides.contains(function) ? "__impl_" : "__base_") + method;
             }
         // arguments are evaluated before the call borrows its receiver / `&mut` operands: bind the ones that would clash
         std::vector<std::string> pending;
@@ -1207,8 +1270,15 @@ auto RustCore::convertFunctionCall(const LangAPI::FunctionCall &call, bool membe
             }
             return false;
         };
+        const bool self_call = !receiver.empty() && callee.starts_with(receiver + ".");
+        const auto touches_receiver = [&](const std::string& text) {
+            if (text.find("(" + receiver + ")") != std::string::npos) return true;
+            for (auto at = text.find(receiver + "."); at != std::string::npos; at = text.find(receiver + ".", at + 1))
+                if (at == 0 || !(std::isalnum(static_cast<unsigned char>(text[at - 1])) || text[at - 1] == '_' || text[at - 1] == '.')) return true;
+            return false;
+        };
         for (std::size_t i = 0; i < args.size(); ++i) {
-            if (sink && hoist_self_call && !receiver.empty() && args[i].find("(" + receiver + ")") != std::string::npos) { bind_arg(args[i]); continue; }
+            if (((sink && hoist_self_call) || self_call) && !receiver.empty() && touches_receiver(args[i])) { bind_arg(args[i]); continue; }
             if (args[i].starts_with("&")) continue;
             for (std::size_t other = 0; other < args.size(); ++other) {
                 if (other == i || !args[other].starts_with("&mut ")) continue;
@@ -1222,28 +1292,16 @@ auto RustCore::convertFunctionCall(const LangAPI::FunctionCall &call, bool membe
         if (!pending.empty()) {
             if (sink) sink->insert(sink->end(), pending.begin(), pending.end());
             else {
-                const auto callee = convertSymbol(symbol, !member) + generic(convertTemplates(call.template_parameters), true) + "(" + joinStrings(args, ", ") + ")";
-                return "{ " + joinStrings(pending, " ") + " " + callee + " }";
+                return "{ " + joinStrings(pending, " ") + " " + callee + generic(convertTemplates(call.template_parameters), true) + "(" + joinStrings(args, ", ") + ") }";
             }
-        }        auto callee = convertSymbol(symbol, !member);
-        // a bare call that names nothing in scope is an inherited runtime method of the base class
-        if (!member && !receiver.empty() && symbol.path.size() == 1 && std::holds_alternative<std::string>(symbol.path[0]) &&
-            !resolveFunction(symbol) && !callable_parameters.contains(std::get<std::string>(symbol.path[0])) &&
-            !members.contains(std::get<std::string>(symbol.path[0])) &&
-            !std::any_of(locals.rbegin(), locals.rend(), [&](const auto& frame) { return frame.contains(std::get<std::string>(symbol.path[0])); }))
-            callee = receiver + "." + callee;
-        if (!member)   // `Base.method(self, ...)` on a dispatching method runs the base implementation, not the dispatcher
-            if (const auto* function = resolveFunction(symbol); function && (slot_functions.contains(function) || overrides.contains(function))) {
-                const auto at = callee.rfind("::");
-                const auto method = at == std::string::npos ? callee : callee.substr(at + 2);
-                callee = (at == std::string::npos ? std::string() : callee.substr(0, at + 2)) +
-                         (overrides.contains(function) ? "__impl_" : "__base_") + method;
-            }
+        }
         return callee + generic(convertTemplates(call.template_parameters), true) + "(" + joinStrings(args, ", ") + ")";
     }
     const auto &lib = *std::get<std::shared_ptr<LangAPI::IspaLibSymbol>>(call.name);
     std::string callee = convertIspaLibSymbol(lib, true);
     if (lib.exports == LangAPI::StdlibExports::Error) callee += "::new";           // std::runtime_error(msg) -> Error::new(msg)
+    for (std::size_t i = 0; i < args.size(); ++i)   // runtime helpers take their arguments by value
+        if (args[i] == raw_args[i]) args[i] = convertInitializerValue(LangAPI::Type{LangAPI::ValueType::Undef}, call.args[i]);
     return callee + generic(convertTemplates(call.template_parameters), true) + "(" + joinStrings(args, ", ") + ")";
 }
 
@@ -1255,8 +1313,11 @@ auto RustCore::convertIspaLibFunctionCall(const LangAPI::IspaLibFunctionCall &ca
         if (call.args.size() != expected) throw Error("invalid token cursor operation arguments");
         const auto method = kind == LangAPI::StdlibExports::TokenCursor ? "token_cursor" :
             kind == LangAPI::StdlibExports::LazyTokenCursor ? "lazy_token_cursor" : "reset_token_stream";
-        return std::string("ispa_std::TokenStream::") + method + "(&mut " + convertExpression(call.args[0]) +
-            (expected == 2 ? ", " + convertExpression(call.args[1]) : "") + ")";
+        // the second operand is read before the first is lent out
+        if (expected == 2)
+            return "{ let __input = " + convertInitializerValue(LangAPI::Type{LangAPI::ValueType::Undef}, call.args[1]) +
+                   "; ispa_std::TokenStream::" + method + "(&mut " + convertExpression(call.args[0]) + ", __input) }";
+        return std::string("ispa_std::TokenStream::") + method + "(&mut " + convertExpression(call.args[0]) + ")";
     }
     if (kind == LangAPI::StdlibExports::Fail || kind == LangAPI::StdlibExports::Attempt ||
         kind == LangAPI::StdlibExports::FailureMessage) {
@@ -1304,19 +1365,40 @@ auto RustCore::convertIspaLibFunctionCall(const LangAPI::IspaLibFunctionCall &ca
     }
     const auto turbofish = generic(convertTemplates(call.template_parameters), true);
     if (parser_call) {
+        if (!args.empty()) args[0] = "&mut " + args[0];   // the cursor is advanced in place
         // inherited LLParser members: reached through the LLParserApi trait implemented by the generated parser
         std::string joined = args.empty() ? "" : ", " + joinStrings(args, ", ");
         return "::ispa_std::LLParserApi::" + convertIspaLibSymbol(call.symbol, true) + (has_callback ? "_rule" : "") + turbofish +
                "(self" + joined + ")";
     }
     std::string callee = convertIspaLibSymbol(call.symbol, true);
+    if (kind == LangAPI::StdlibExports::Concat) {
+        // variadic: every part by reference as something that can be turned into text
+        std::vector<std::string> parts;
+        for (const auto &argument : call.args) parts.push_back("&" + asExpr(convertExpression(argument)) + " as &dyn ::ispa_std::ToText");
+        return "::ispa_std::concat(&[" + joinStrings(parts, ", ") + "])";
+    }
     if (kind == LangAPI::StdlibExports::Error) callee += "::new";
+    if (kind == LangAPI::StdlibExports::AssignCompatible && call.args.size() == 2) {
+        // assign_compatible(target, source): the target is written through, the source is read
+        const auto* target = call.args[0].size() == 1 && call.args[0][0].isRvalue() ? &call.args[0][0].getRValue() : nullptr;
+        std::string place = target && target->isStorageSymbol() ? convertStorageSymbol(target->getStorageSymbol(), true) : convertExpression(call.args[0]);
+        // lists of nodes convert element by element
+        const auto* to = target ? typeOfExpression(call.args[0]) : nullptr;
+        const auto* from = typeOfExpression(call.args[1]);
+        const bool lists = to && from && isValueTypeOf(*to, LangAPI::ValueType::Array) && isValueTypeOf(*from, LangAPI::ValueType::Array) &&
+                           convertType(*to) != convertType(*from);
+        return (lists ? std::string("::ispa_std::assign_list") : callee) + "(&mut " + place + ", " +
+               convertInitializerValue(LangAPI::Type{LangAPI::ValueType::Undef}, call.args[1]) + ")";
+    }
+    for (std::size_t i = 0; i < args.size() && i < call.args.size(); ++i)   // runtime helpers take their arguments by value
+        args[i] = convertInitializerValue(LangAPI::Type{LangAPI::ValueType::Undef}, call.args[i]);
     return callee + turbofish + "(" + joinStrings(args, ", ") + ")";
 }
 
 auto RustCore::convertMakeTuple(const LangAPI::MakeTuple &make_tuple) -> std::string {
     std::vector<std::string> parts;
-    for (const auto &el : make_tuple.args) parts.push_back(convertExpression(el));
+    for (const auto &el : make_tuple.args) parts.push_back(convertInitializerValue(LangAPI::Type{LangAPI::ValueType::Undef}, el));
     return "(" + joinStrings(parts, ", ") + (parts.size() == 1 ? ",)" : ")");
 }
 
@@ -1455,7 +1537,15 @@ auto RustCore::convertRValue(const LangAPI::RValue &rvalue) -> std::string {
             else
                 base = convertType(*std::get<std::shared_ptr<LangAPI::Type>>(inheritance.name));
             std::vector<std::string> args;
-            for (const auto &a : inheritance.args) args.push_back(convertExpression(a));
+            for (const auto &a : inheritance.args) {
+                auto text = convertExpression(a);
+                // a borrowed parameter handed on to a constructor is passed as the borrow it is
+                if (a.size() == 1 && a[0].isRvalue() && a[0].getRValue().isSymbol() && a[0].getRValue().getSymbol().path.size() == 1 &&
+                    std::holds_alternative<std::string>(a[0].getRValue().getSymbol().path[0]) &&
+                    borrowed_parameters.contains(std::get<std::string>(a[0].getRValue().getSymbol().path[0])))
+                    text = ident(std::get<std::string>(a[0].getRValue().getSymbol().path[0]));
+                args.push_back(text);
+            }
             if (base == "String") {
                 if (args.empty()) return "String::new()";
                 if (args.size() == 1) return "String::from(" + args[0] + ")";
@@ -1502,8 +1592,14 @@ auto RustCore::convertRValue(const LangAPI::RValue &rvalue) -> std::string {
             const auto &span = rvalue.getIspaLibDfaSpan();
             return convertIspaLibSymbol(span.type, true) + "::from_slice(&" + convertSymbol(span.assing_name) + "[..])";
         }
-        case LangAPI::RValueType::Reference:
-            return "&" + convertRValue(*rvalue.getReference().value);
+        case LangAPI::RValueType::Reference: {
+            const auto& inner = *rvalue.getReference().value;
+            // a reference parameter taken a reference of is lent again
+            if (inner.isSymbol() && inner.getSymbol().path.size() == 1 && std::holds_alternative<std::string>(inner.getSymbol().path[0]) &&
+                reference_parameters.contains(std::get<std::string>(inner.getSymbol().path[0])))
+                return "&mut *" + ident(std::get<std::string>(inner.getSymbol().path[0]));
+            return "&" + convertRValue(inner);
+        }
         case LangAPI::RValueType::Span:
             return "::ispa_std::Span::<" + convertType(*rvalue.getSpan().type) + ">::from_slice(&" + convertSymbol(rvalue.getSpan().sym) + "[..])";
         case LangAPI::RValueType::MakeTuple:

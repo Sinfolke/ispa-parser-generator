@@ -130,7 +130,7 @@ pub struct LexerBase<Token> {
     pub __vt_init: fn(&mut LexerBase<Token>),
     pub __vt_on_token: fn(&mut LexerBase<Token>, Token),
     pub __vt_on_eof: fn(&mut LexerBase<Token>),
-    pub __vt_makeToken: fn(&mut LexerBase<Token>, &Ptr) -> Token,
+    pub __vt_makeToken: fn(&mut LexerBase<Token>, &mut Ptr) -> Token,
 }
 impl<Token: Clone + 'static> Clone for LexerBase<Token> {
     fn clone(&self) -> Self {
@@ -158,7 +158,7 @@ impl<Token: Clone + Default + 'static> LexerBase<Token> {
     pub fn init(&mut self) { (self.__vt_init)(self) }
     pub fn on_token(&mut self, token: Token) { (self.__vt_on_token)(self, token) }
     pub fn on_eof(&mut self) { (self.__vt_on_eof)(self) }
-    pub fn makeToken(&mut self, pos: &Ptr) -> Token { (self.__vt_makeToken)(self, pos) }
+    pub fn makeToken(&mut self, pos: &mut Ptr) -> Token { (self.__vt_makeToken)(self, pos) }
 }
 
 /// How a parser obtains cursors over a lexer.
@@ -168,6 +168,13 @@ pub trait TokenStream {
     fn token_cursor(&mut self) -> Self::Cursor;
     fn lazy_token_cursor(&mut self, input: Ptr) -> Self::LazyCursor;
     fn reset_token_stream(&mut self);
+}
+impl<Token: Clone + Default + 'static> TokenStream for Shared<LexerBase<Token>> {
+    type Cursor = TokenIterator<Token>;
+    type LazyCursor = LazyIterator<Token>;
+    fn token_cursor(&mut self) -> TokenIterator<Token> { TokenIterator::new(Rc::new(self.borrow().tokens.clone()), 0) }
+    fn lazy_token_cursor(&mut self, _input: Ptr) -> LazyIterator<Token> { unimplemented!("lazy lexing") }
+    fn reset_token_stream(&mut self) { self.borrow_mut().tokens.clear(); }
 }
 impl<L, Token: Clone + Default + 'static> TokenStream for L where L: std::ops::DerefMut<Target = LexerBase<Token>> {
     type Cursor = TokenIterator<Token>;
@@ -191,3 +198,23 @@ impl<V: TokenVariant> TokenCursorKind for LazyIterator<RawToken<V>> {
 }
 
 
+
+// ---------------------------------------------------------------------------------------------------------------
+// skipping
+// ---------------------------------------------------------------------------------------------------------------
+/// `skip_spaces::<T>(&mut cursor)`: in source text white space; in a token stream a token holding `T`.
+pub trait SkipSpaces { fn skip_space<T: 'static>(&mut self); }
+impl SkipSpaces for Ptr {
+    fn skip_space<T: 'static>(&mut self) { while self.get().is_some_and(|byte| byte.is_ascii_whitespace()) { self.inc(); } }
+}
+impl<V: TokenVariant> SkipSpaces for TokenIterator<RawToken<V>> {
+    fn skip_space<T: 'static>(&mut self) { if self.get().is_some_and(|token| token.value.held().is::<T>()) { self.advance(); } }
+}
+impl<V: TokenVariant> SkipSpaces for LazyIterator<RawToken<V>> {
+    fn skip_space<T: 'static>(&mut self) { unimplemented!("lazy lexing") }
+}
+pub fn skip_spaces<T: 'static>(pos: &mut impl SkipSpaces) { pos.skip_space::<T>() }
+
+/// Everything the generated rules need of the iterator they are generic over.
+pub trait ParserCursor: crate::BridgeCursor + Default + TokenCursorKind + SkipSpaces {}
+impl<C: crate::BridgeCursor + Default + TokenCursorKind + SkipSpaces> ParserCursor for C {}

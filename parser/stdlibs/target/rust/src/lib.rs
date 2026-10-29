@@ -24,6 +24,9 @@ mod bridge;
 pub use bridge::*;
 mod parser;
 pub use parser::*;
+mod printer;
+pub use printer::*;
+mod lexer;
 mod primitives;
 pub use primitives::{StdError, fail, attempt, failure_message};
 
@@ -56,6 +59,8 @@ pub struct Ptr {
 impl Ptr {
     pub fn new(input: &'static str) -> Self { Self { input, offset: 0 } }
     pub fn from_static(input: &'static str) -> Self { Self::new(input) }
+    pub fn at(input: &'static str, offset: usize) -> Self { Self { input, offset } }
+    pub fn text(self) -> &'static str { self.input }
     pub fn offset(self) -> usize { self.offset }
     pub fn is_eof(self) -> bool { self.offset >= self.input.len() }
     pub fn get(self) -> Option<u8> { self.input.as_bytes().get(self.offset).copied() }
@@ -111,41 +116,26 @@ impl fmt::Display for Error { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::
 impl std::error::Error for Error {}
 
 pub fn starts_with(pos: Ptr, value: &str) -> bool { pos.starts_with(value) }
-pub fn skip_spaces<T>(pos: &mut Ptr) {
-    let _ = std::marker::PhantomData::<T>;
-    while let Some(ch) = pos.get() { if !ch.is_ascii_whitespace() { break; } pos.inc(); }
-}
-pub fn concat<T: AsRef<str>>(values: &[T]) -> String { values.iter().map(AsRef::as_ref).collect() }
 
 pub trait VariantGet<T> { fn get(&self) -> &T; fn get_mut(&mut self) -> &mut T; fn holds(&self) -> bool { true } }
 pub fn bad_variant_access() -> ! { panic!("ISPA variant access failed") }
 
 /// Conversion hook used where the language neutral IR permits compatible values.
-pub fn assign_compatible<T: Clone>(target: &mut T, source: &T) { *target = source.clone(); }
-
-pub struct ASTPrinter<'a> { out: &'a mut dyn fmt::Write, branches: Vec<bool> }
-impl<'a> ASTPrinter<'a> {
-    pub fn new(out: &'a mut dyn fmt::Write) -> Self { Self { out, branches: Vec::new() } }
-    pub fn up(&mut self, has_more_siblings: bool) { self.branches.push(has_more_siblings); }
-    pub fn down(&mut self) { self.branches.pop(); }
-    fn prefix(&mut self, last: bool) {
-        for branch in self.branches.iter().take(self.branches.len().saturating_sub(1)) {
-            let _ = self.out.write_str(if *branch { "│   " } else { "    " });
-        }
-        if !self.branches.is_empty() { let _ = self.out.write_str(if last { "└── " } else { "├── " }); }
-    }
-    pub fn node(&mut self, name: &str, last: bool) { self.prefix(last); let _ = writeln!(self.out, "{name}"); }
-    pub fn node_with_value<T: fmt::Debug>(&mut self, name: &str, value: &T, last: bool) {
-        self.prefix(last);
-        let _ = writeln!(self.out, "{name}: {value:?}");
-    }
-    pub fn subtree<T: fmt::Debug>(&mut self, name: &str, value: &T, last: bool) {
-        self.node(name, last);
-        self.up(!last);
-        self.node_with_value("value", value, true);
-        self.down();
-    }
+/// `target = source` where the two may be different but compatible types (a node of a rule into a boxed field, an
+/// alternative into the variant that holds it...). The generated code adds the pairs it needs.
+pub trait AssignFrom<S> { fn assign_from(&mut self, source: S); }
+impl<T> AssignFrom<T> for T { fn assign_from(&mut self, source: T) { *self = source; } }
+impl<T: Clone> AssignFrom<Node<T>> for T {
+    fn assign_from(&mut self, source: Node<T>) { if !source.empty() { *self = source.value; } }
 }
+impl<T: 'static> AssignFrom<Node<T>> for Node<Shared<T>> {
+    fn assign_from(&mut self, source: Node<T>) { if !source.empty() { let mut node = Node::create(Shared::new(source.value)); node.start_pos = source.start_pos; node.length = source.length; node.line = source.line; node.column = source.column; node.name = source.name; *self = node; } }
+}
+/// `Vec<T> = Vec<U>`, converting each element.
+pub fn assign_list<T: Default + AssignFrom<U>, U>(target: &mut Vec<T>, source: Vec<U>) {
+    *target = source.into_iter().map(|item| { let mut converted = T::default(); converted.assign_from(item); converted }).collect();
+}
+pub fn assign_compatible<T: AssignFrom<S>, S>(target: &mut T, source: S) { target.assign_from(source) }
 
 pub fn lr_get<T: Default>() -> T { T::default() }
 pub fn lr_token<T>(value: T) -> T { value }
@@ -179,38 +169,37 @@ pub mod debug {
 pub mod dfa {
     pub mod api {
         use crate::Span;
-        pub const NULL_STATE: usize = usize::MAX;
-        pub const DYNAMIC_FAIL_STATE: usize = usize::MAX - 1;
-        pub type CharToClass = [u8; 256];
+        pub const NULL_STATE: i64 = -1;
+        pub const DYNAMIC_FAIL_STATE: i64 = -3;
+        pub const LEXER_DELETE_STATE: i64 = -2;
+        /// Byte -> character class.
+        pub type CharToClass = Vec<i64>;
+        /// Transition table: one row of next states per state, one column per character class.
+        pub type Table<const STATES: usize, const CLASSES: usize> = [Vec<i64>; STATES];
+        pub type AcceptTable<const STATES: usize> = [i64; STATES];
         #[derive(Clone, Copy, Debug, Default)] pub struct State<T = ()>(pub T);
-        #[derive(Clone, Copy, Debug)] pub struct Table<const S: usize, const C: usize>(pub [[usize; C]; S]);
-        #[derive(Clone, Copy, Debug)] pub struct AcceptTable<const S: usize>(pub [usize; S]);
-        #[derive(Clone, Debug, Default)]
-        pub struct Captures { pub registers: Vec<Option<usize>>, pub history: Vec<(usize, Option<usize>)>, pub source: &'static str, pub start: usize }
+        /// What a scan captured, read while its semantic action runs.
+        pub struct Captures { pub(crate) inner: crate::Shared<crate::python::ispa_std::dfa_api::Captures> }
         impl Captures {
-            pub fn view(&self, capture: usize) -> Option<&str> {
-                let begin = *self.registers.get(2 * capture)?.as_ref()?;
-                let end = *self.registers.get(2 * capture + 1)?.as_ref()?;
-                self.source.get(self.start + begin..self.start + end)
-            }
-            pub fn text(&self, capture: usize) -> Option<String> { self.view(capture).map(str::to_owned) }
-            pub fn is_set(&self, capture: usize) -> bool { self.view(capture).is_some() }
-            pub fn list(&self, capture: usize) -> Vec<&str> {
-                let mut positions = Vec::new();
-                let mut node = self.registers.get(2 * capture).copied().flatten();
-                while let Some(index) = node {
-                    if let Some(&(pos, prev)) = self.history.get(index) { positions.push(pos); node = prev; } else { break; }
-                }
-                positions.reverse();
-                positions.chunks_exact(2).filter_map(|pair| self.source.get(self.start + pair[0]..self.start + pair[1])).collect()
-            }
+            pub fn text(&self, capture: i64) -> String { self.inner.borrow_mut().text(capture) }
+            pub fn view(&self, capture: i64) -> String { self.inner.borrow_mut().view(capture) }
+            pub fn is_set(&self, capture: i64) -> bool { self.inner.borrow_mut().is_set(capture) }
+            pub fn begin(&self, capture: i64) -> i64 { self.inner.borrow_mut().begin(capture) }
+            pub fn end(&self, capture: i64) -> i64 { self.inner.borrow_mut().end(capture) }
+            pub fn character(&self, capture: i64) -> String { self.inner.borrow_mut().character(capture) }
+            pub fn list_texts(&self, capture: i64) -> Vec<String> { self.inner.borrow_mut().list_texts(capture) }
+            pub fn list_positions(&self, capture: i64) -> Vec<i64> { self.inner.borrow_mut().list_positions(capture) }
+            pub fn line(&self, capture: i64) -> i64 { self.inner.borrow_mut().line(capture) }
+            pub fn column(&self, capture: i64) -> i64 { self.inner.borrow_mut().column(capture) }
         }
         #[derive(Clone, Copy, Debug, Default)] pub struct DfaDebug;
         impl DfaDebug {
             pub fn new(_: &'static str, _: &'static str, _: i64, _: i64, _: i64,
                        _: i64, _: i64, _: i64, _: u8) -> Self { Self }
         }
-        #[derive(Clone, Copy, Debug, Default)] pub struct TdfaLayout<const REGISTERS: usize, const GROUPS: usize>;
+        /// Registers and outputs of a lexer's tagged DFA.
+        #[derive(Clone, Copy, Debug, Default)] pub struct TdfaLayout<const REGISTERS: usize, const OUTPUTS: usize>;
+        impl<const R: usize, const O: usize> TdfaLayout<R, O> { pub const REGISTERS: usize = R; pub const OUTPUTS: usize = O; }
         #[derive(Clone, Copy, Debug, Default)] pub struct SpanCharState<'a, T>(pub usize, pub usize, pub Span<'a, T>);
         impl<'a, T> SpanCharState<'a, T> { pub fn new(a: usize, b: usize, c: Span<'a,T>) -> Self { Self(a,b,c) } }
         #[derive(Clone, Copy, Debug, Default)] pub struct SpanMultiTableState<'a, T>(pub usize, pub usize, pub Span<'a,T>);
@@ -236,69 +225,6 @@ pub mod dfa {
             } else { false }
         }
     }
-    /// Execute one TDFA token. A semantic state is numbered after the transition
-    /// and action states. The callback returns a next state and optional token.
-    pub fn run<T, F, const S: usize, const C: usize, const A: usize>(
-        cursor: &mut crate::Ptr, table: &api::Table<S, C>, classes: &api::CharToClass,
-        actions: &[[usize; 4]; A], registers: usize, mut semantic: F,
-    ) -> Result<Option<T>, crate::Error>
-    where F: FnMut(usize, &api::Captures, usize, crate::Ptr, usize, usize, &mut crate::Ptr) -> (usize, Option<T>) {
-        let start = *cursor;
-        let mut captures = api::Captures { registers: vec![None; registers], history: Vec::new(), source: start.remaining(), start: 0 };
-        let mut state = 0usize;
-        let mut steps = 0usize;
-        let mut last_offset = cursor.offset();
-        while state != api::NULL_STATE {
-            if steps > 100 && cursor.offset() == last_offset { return Err(crate::Error::new("DFA zero-width transition cycle")); }
-            if cursor.offset() != last_offset { last_offset = cursor.offset(); steps = 0; }
-            steps += 1;
-            if state < S {
-                let byte = cursor.remaining().as_bytes().first().copied().unwrap_or(0);
-                let class = classes[byte as usize] as usize;
-                if class >= C { break; }
-                let next = table.0[state][class];
-                if next == api::NULL_STATE { break; }
-                state = next;
-                if state < S && !cursor.is_eof() { cursor.inc(); }
-            } else if state < S + A {
-                let [op, dst, src, next] = actions[state - S];
-                if dst >= captures.registers.len() { return Err(crate::Error::new("DFA register out of range")); }
-                let here = cursor.offset() - start.offset();
-                let source = captures.registers.get(src).copied().flatten();
-                captures.registers[dst] = match op {
-                    1 => Some(here), 2 => Some(here + 1), 3 => source,
-                    4 | 5 => {
-                        captures.history.push((here + usize::from(op == 5), source));
-                        Some(captures.history.len() - 1)
-                    }
-                    _ => return Err(crate::Error::new("unknown DFA register action")),
-                };
-                state = next;
-            } else {
-                let (next, token) = semantic(state - S - A, &captures, start.offset(), start,
-                    cursor.offset() - start.offset(), start.line(), cursor);
-                if next == api::DYNAMIC_FAIL_STATE { return Ok(None); }
-                if next == api::NULL_STATE { return Ok(token); }
-                state = next;
-            }
-        }
-        Ok(None)
-    }
-    /// Walk a byte-class DFA and return the last accepting state. State zero is the start.
-    /// A transition to NULL_STATE rejects the current byte.
-    pub fn decide<const S: usize, const C: usize>(table: &api::Table<S, C>, pos: crate::Ptr, _: &bool) -> usize {
-        let mut state = 0;
-        let mut accepted = api::NULL_STATE;
-        for byte in pos.remaining().bytes() {
-            let class = byte as usize;
-            if class >= C || state >= S { break; }
-            let next = table.0[state][class];
-            if next == api::NULL_STATE || next >= S { break; }
-            state = next;
-            accepted = state;
-        }
-        accepted
-    }
 }
 
 #[cfg(test)]
@@ -320,24 +246,6 @@ mod execution_tests {
         assert_eq!((cursor.line(), cursor.column(), cursor.get()), (2, 1, Some(b'!')));
     }
 
-    #[test]
-    fn dfa_runs_semantic_accept_and_captures() {
-        let mut rows = [[dfa::api::NULL_STATE; 256]; 2];
-        rows[0][b'a' as usize] = 1;
-        rows[1][b'b' as usize] = 2;
-        let table = dfa::api::Table(rows);
-        let mut classes = [0u8; 256];
-        for (index, class) in classes.iter_mut().enumerate() { *class = index as u8; }
-        let mut cursor = Ptr::new("ab!");
-        let token = dfa::run(&mut cursor, &table, &classes, &[], 0,
-            |state, _, _, _, _, _, cursor| {
-                assert_eq!(state, 0);
-                cursor.inc();
-                (dfa::api::NULL_STATE, Some("ab"))
-            }).unwrap();
-        assert_eq!(token, Some("ab"));
-        assert_eq!(cursor.remaining(), "!");
-    }
 
 }
 
