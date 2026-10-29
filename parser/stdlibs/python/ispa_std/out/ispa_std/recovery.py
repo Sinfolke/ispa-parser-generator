@@ -80,6 +80,7 @@ class State:
     diagnostics: list[Diagnostic]
     # Active call-site suffixes, including terminals inside nested productions.
     anchors: list[list[int]]
+    anchor_count: int
 
     def __init__(self):
         self.max_errors = 32
@@ -87,6 +88,7 @@ class State:
         self.total_skipped = 0
         self.diagnostics = []
         self.anchors = []
+        self.anchor_count = 0
 
     def exhausted(self) -> bool:
         return len(self.diagnostics) >= self.max_errors or self.total_skipped >= self.max_total_skipped
@@ -262,7 +264,7 @@ def _anchor(plan: Plan, state: State, id: int) -> bool:
     if contains(plan.explicit_sync, id):
         return True
     i = 0
-    while i < len(state.anchors):
+    while i < state.anchor_count:
         if contains(state.anchors[i], id):
             return True
         i = i + 1

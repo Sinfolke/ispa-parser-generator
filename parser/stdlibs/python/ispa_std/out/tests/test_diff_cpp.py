@@ -127,6 +127,7 @@ def test_recover_matches_cpp():
         it = PyIt(toks)
         st = recovery.State()
         st.anchors = [list(a) for a in anchors]
+        st.anchor_count = len(st.anchors)
         for _ in range(errs):
             st.diagnostics.append(recovery.Diagnostic())
         st.total_skipped = skipped

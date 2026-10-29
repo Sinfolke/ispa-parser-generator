@@ -564,8 +564,7 @@ class FrameGuard:
     def __init__(self, parser: "LLParser", rule: str):
         self.parser = parser
         self.open = True
-        parser.frames_.append(Frame(rule))
-        parser.recovery_state_.anchors.append([])
+        parser.enter_frame(rule)
 
     def close(self) -> None:
         # Abandoned frames count down the unwind request; the frame that is the
@@ -573,10 +572,7 @@ class FrameGuard:
         if not self.open:
             return
         self.open = False
-        self.parser.frames_.pop()
-        self.parser.recovery_state_.anchors.pop()
-        if self.parser.unwind_ != 0:
-            self.parser.unwind_ = self.parser.unwind_ - 1
+        self.parser.leave_frame()
 
 
 class CounterScope:
@@ -635,7 +631,9 @@ class Resume:
 class LLParser(Parser_base):
     recovery_state_: recovery.State
     counters_: StrIntMap
+    # Frames (and the recovery anchors that go with them) are pooled: frame_count of them are active.
     frames_: list[Frame]
+    frame_count: int
     unwind_: int
     last_resume_pos_: int
     recovering_: bool
@@ -652,6 +650,7 @@ class LLParser(Parser_base):
         self.recovery_state_ = recovery.State()
         self.counters_ = StrIntMap()
         self.frames_ = []
+        self.frame_count = 0
         self.unwind_ = 0
         # progress guard
         self.last_resume_pos_ = NPOS
@@ -687,8 +686,8 @@ class LLParser(Parser_base):
         self.counters_.clear()
         self.recovery_state_.diagnostics.clear()
         self.recovery_state_.total_skipped = 0
-        self.recovery_state_.anchors.clear()
-        self.frames_.clear()
+        self.recovery_state_.anchor_count = 0
+        self.frame_count = 0
         self.unwind_ = 0
         self.last_resume_pos_ = NPOS
         self.recovering_ = False
@@ -804,16 +803,41 @@ class LLParser(Parser_base):
     def recovery_frame(self, rule: str) -> FrameGuard:
         return FrameGuard(self, rule)
 
+    def enter_frame(self, rule: str) -> None:
+        """Open the recovery frame of a rule invocation, reusing a pooled frame when there is one."""
+        if self.frame_count < len(self.frames_):
+            frame = self.frames_[self.frame_count]
+            frame.rule = rule
+            frame.expecting = ""
+            frame.claims.clear()
+        else:
+            self.frames_.append(Frame(rule))
+        self.frame_count = self.frame_count + 1
+        state = self.recovery_state_
+        if state.anchor_count < len(state.anchors):
+            state.anchors[state.anchor_count].clear()
+        else:
+            state.anchors.append([])
+        state.anchor_count = state.anchor_count + 1
+
+    def leave_frame(self) -> None:
+        # Abandoned frames count down the unwind request; the frame that is the
+        # resume target is the first one that sees it reach zero.
+        self.frame_count = self.frame_count - 1
+        self.recovery_state_.anchor_count = self.recovery_state_.anchor_count - 1
+        if self.unwind_ != 0:
+            self.unwind_ = self.unwind_ - 1
+
     def recovery_at(self, expecting: str, claims: list[recovery.ContextClaim]) -> None:
         """Emitted before each child member: the claims of this frame here (the
         member itself if repeated, plus the suffix up to the first required
         member). `claims` is a list of recovery.ContextClaim."""
-        if len(self.frames_) == 0:
+        if self.frame_count == 0:
             return
-        frame = self.frames_[len(self.frames_) - 1]
+        frame = self.frames_[self.frame_count - 1]
         frame.expecting = expecting
         frame.claims = claims
-        anchors = self.recovery_state_.anchors[len(self.recovery_state_.anchors) - 1]
+        anchors = self.recovery_state_.anchors[self.recovery_state_.anchor_count - 1]
         anchors.clear()
         i = 0
         while i < len(claims):
@@ -837,7 +861,7 @@ class LLParser(Parser_base):
     def breadcrumb(self) -> str:
         out = ""
         i = 0
-        while i < len(self.frames_):
+        while i < self.frame_count:
             if len(out) > 0:
                 out = out + " > "
             out = out + self.frames_[i].rule
@@ -854,10 +878,10 @@ class LLParser(Parser_base):
         k = 0
         while k <= max_skip and not candidate.isEnd():
             token = candidate.current()
-            f = len(self.frames_)
+            f = self.frame_count
             while f > 0:
                 f = f - 1
-                if not (k == 0 and repeat_spot and f + 1 == len(self.frames_)):
+                if not (k == 0 and repeat_spot and f + 1 == self.frame_count):
                     claims = self.frames_[f].claims
                     c = 0
                     while c < len(claims):
@@ -866,12 +890,12 @@ class LLParser(Parser_base):
                         c = c + 1
             k = k + 1
             candidate.next()
-        if candidate.isEnd() and len(self.frames_) > 0:
+        if candidate.isEnd() and self.frame_count > 0:
             return Resume(k, 0, recovery.ContextClaim("", recovery.empty_token_set()), False)
         return Resume(0, -1, recovery.ContextClaim("", recovery.empty_token_set()), False)
 
     def report_context(self, pos: TokenCursor, kind: int, r: Resume) -> None:
-        inner = self.frames_[len(self.frames_) - 1]
+        inner = self.frames_[self.frame_count - 1]
         target = self.frames_[r.frame]
         d = recovery.ContextDiagnostic()
         d.kind = kind
@@ -921,14 +945,14 @@ class LLParser(Parser_base):
     def recover_at_context(self, pos: TokenCursor, kind: int) -> bool:
         """Local repair already failed (or does not apply). Find a recovery
         point in the enclosing frames, skip to it, and request unwinding."""
-        if len(self.frames_) == 0 or self.recovery_state_.exhausted():
+        if self.frame_count == 0 or self.recovery_state_.exhausted():
             return False
         remaining = self.recovery_state_.max_total_skipped - self.recovery_state_.total_skipped
         r = self.resolve_context(pos, minimum(self.context_max_skip_, remaining))
         if r.frame == -1:
             return False
         effective = kind
-        innermost = r.frame + 1 == len(self.frames_)
+        innermost = r.frame + 1 == self.frame_count
         if (not innermost) and r.skip == 0 and r.has_claim:
             effective = recovery.ContextKind.Misplaced
         if (not self.recovering_) or effective == recovery.ContextKind.Misplaced:
@@ -939,14 +963,14 @@ class LLParser(Parser_base):
             i = i + 1
         self.recovery_state_.total_skipped = self.recovery_state_.total_skipped + r.skip
         self.last_resume_pos_ = cursor_position(pos)
-        self.unwind_ = len(self.frames_) - 1 - r.frame
+        self.unwind_ = self.frame_count - 1 - r.frame
         self.recovering_ = True
         return True
 
     def sync_loop(self, pos: TokenCursor) -> None:
         """A loop ended on a token that no active frame can accept: report it
         here, where the mistake is, rather than at the next required member."""
-        if pos.isEnd() or len(self.frames_) == 0 or self.unwinding():
+        if pos.isEnd() or self.frame_count == 0 or self.unwinding():
             return
         candidate = pos.copy()
         if self.has_space_token_:
@@ -960,7 +984,7 @@ class LLParser(Parser_base):
         token = candidate.current()
         any_claims = False
         i = 0
-        while i < len(self.frames_):
+        while i < self.frame_count:
             claims = self.frames_[i].claims
             c = 0
             while c < len(claims):
@@ -1027,7 +1051,7 @@ class LLParser(Parser_base):
                 else:
                     boundary = False
                     a = 0
-                    while a < len(self.recovery_state_.anchors):
+                    while a < self.recovery_state_.anchor_count:
                         if recovery.contains(self.recovery_state_.anchors[a], ident):
                             boundary = True
                         a = a + 1
@@ -1058,10 +1082,10 @@ class LLParser(Parser_base):
     def raise_error(self, token: RawToken, message: str) -> None:
         self.reject_absent_rule()
         diagnostic = recovery.Diagnostic()
-        if len(self.frames_) == 0:
+        if self.frame_count == 0:
             diagnostic.rule = "<rule>"
         else:
-            diagnostic.rule = self.frames_[len(self.frames_) - 1].rule
+            diagnostic.rule = self.frames_[self.frame_count - 1].rule
         diagnostic.message = message
         diagnostic.offset = token.meta().startpos()
         diagnostic.length = token.meta().length()
@@ -1312,10 +1336,10 @@ class LLParser(Parser_base):
         if (has_limit and len(nodes) != limit) or len(nodes) < spec.minimum:
             self.reject_absent_rule()
             diagnostic = recovery.Diagnostic()
-            if len(self.frames_) == 0:
+            if self.frame_count == 0:
                 diagnostic.rule = "<rule>"
             else:
-                diagnostic.rule = self.frames_[len(self.frames_) - 1].rule
+                diagnostic.rule = self.frames_[self.frame_count - 1].rule
             wanted = spec.minimum
             if has_limit:
                 wanted = maximum(limit, spec.minimum)
