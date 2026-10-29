@@ -219,5 +219,10 @@ impl<V: TokenVariant> SkipSpaces for LazyIterator<RawToken<V>> {
 pub fn skip_spaces<T: 'static>(pos: &mut impl SkipSpaces) { pos.skip_space::<T>() }
 
 /// Everything the generated rules need of the iterator they are generic over.
-pub trait ParserCursor: crate::BridgeCursor + Default + TokenCursorKind + SkipSpaces {}
-impl<C: crate::BridgeCursor + Default + TokenCursorKind + SkipSpaces> ParserCursor for C {}
+pub trait ParserCursor: crate::BridgeCursor + Default + TokenCursorKind + SkipSpaces + Advance {}
+impl<C: crate::BridgeCursor + Default + TokenCursorKind + SkipSpaces + Advance> ParserCursor for C {}
+
+/// `++pos`: step to the next token; the new position is returned.
+pub trait Advance: Sized { fn inc(&mut self) -> Self; }
+impl<V: TokenVariant> Advance for TokenIterator<RawToken<V>> { fn inc(&mut self) -> Self { self.advance(); self.clone() } }
+impl<V: TokenVariant> Advance for LazyIterator<RawToken<V>> { fn inc(&mut self) -> Self { unimplemented!("lazy lexing") } }

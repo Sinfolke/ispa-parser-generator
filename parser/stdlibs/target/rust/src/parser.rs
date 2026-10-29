@@ -132,6 +132,16 @@ pub trait LLParserApi<IT: BridgeCursor> {
         -> Vec<Node<T>>;
 }
 
+/// The same combinators for repetitions that skip a space token between their elements (`range::<T, Space>`).
+pub trait LLParserSpaced<IT: BridgeCursor>: LLParserApi<IT> {
+    fn range_spaced<T: Clone + Default + 'static, S: 'static>(&mut self, pos: &mut IT, fail: impl IntoFail) -> Vec<Node<T>>;
+    fn range_rule_spaced<T: Clone + Default + 'static, S: 'static>(&mut self, pos: &mut IT, rec: impl FnMut(&mut Self, IT) -> MatchResult<T, IT>,
+                                                                   fail: impl IntoFail) -> Vec<Node<T>>;
+    fn range_optional_spaced<T: Clone + Default + 'static, S: 'static>(&mut self, pos: &mut IT) -> Vec<Node<T>>;
+    fn range_optional_rule_spaced<T: Clone + Default + 'static, S: 'static>(&mut self, pos: &mut IT,
+                                                                           rec: impl FnMut(&mut Self, IT) -> MatchResult<T, IT>) -> Vec<Node<T>>;
+}
+
 fn bridge<IT: BridgeCursor, T: Clone + Default + 'static>(it: IT, token: bool) -> Shared<TypedCursor<IT>> {
     TypedCursor::handle(it, if token { Some(crate::node_maker::<IT::Token, T>()) } else { None })
 }
@@ -224,5 +234,35 @@ where
         let nodes = core.borrow_mut().range_optional_rule(cursor.clone().upcast(), callback);
         take(&cursor, pos);
         typed_nodes::<T>(nodes)
+    }
+}
+
+impl<P, IT, Main, Token> LLParserSpaced<IT> for P
+where
+    P: DerefMut<Target = LLParser<Main, Token>>,
+    IT: BridgeCursor,
+{
+    fn range_spaced<T: Clone + Default + 'static, S: 'static>(&mut self, pos: &mut IT, fail: impl IntoFail) -> Vec<Node<T>> {
+        self.use_space_token::<IT, S>();
+        LLParserApi::range::<T>(self, pos, fail)
+    }
+    fn range_rule_spaced<T: Clone + Default + 'static, S: 'static>(&mut self, pos: &mut IT, rec: impl FnMut(&mut Self, IT) -> MatchResult<T, IT>,
+                                                                   fail: impl IntoFail) -> Vec<Node<T>> {
+        self.use_space_token::<IT, S>();
+        LLParserApi::range_rule::<T>(self, pos, rec, fail)
+    }
+    fn range_optional_spaced<T: Clone + Default + 'static, S: 'static>(&mut self, pos: &mut IT) -> Vec<Node<T>> {
+        self.use_space_token::<IT, S>();
+        LLParserApi::range_optional::<T>(self, pos)
+    }
+    fn range_optional_rule_spaced<T: Clone + Default + 'static, S: 'static>(&mut self, pos: &mut IT,
+                                                                           rec: impl FnMut(&mut Self, IT) -> MatchResult<T, IT>) -> Vec<Node<T>> {
+        self.use_space_token::<IT, S>();
+        LLParserApi::range_optional_rule::<T>(self, pos, rec)
+    }
+}
+impl<Main, Token> LLParser<Main, Token> {
+    fn use_space_token<IT: BridgeCursor, S: 'static>(&mut self) {
+        if let Some(id) = <IT::Token as BridgeToken>::alt_of::<S>() { self.core().borrow_mut().set_space_token(id); }
     }
 }

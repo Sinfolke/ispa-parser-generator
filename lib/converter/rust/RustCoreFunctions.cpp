@@ -900,19 +900,19 @@ auto RustCore::convertExpression(const LangAPI::Expression &expression) -> std::
                 out << counter.back() << ".inc()";
                 break;
             case LangAPI::ExpressionValueType::CounterAssignment:
-                out << counter.back() << " = " << convertExpression(*expr.getCounterAssignment().v);
+                out << counter.back() << " = " << convertInitializerValue(LangAPI::Type{LangAPI::ValueType::Undef}, *expr.getCounterAssignment().v);
                 break;
             case LangAPI::ExpressionValueType::ResetPosCounter:
                 counter.pop_back();
                 break;
             case LangAPI::ExpressionValueType::PushPosCounter: {
                 const auto &a = expr.getPushPosCounter();
-                out << "let mut " << ident(a.name) << " = " << counter.back();
+                out << "let mut " << ident(a.name) << " = " << counter.back() << ".clone()";
                 counter.push_back(ident(a.name));
                 break;
             }
             case LangAPI::ExpressionValueType::PopPosCounter: {
-                out << counter[counter.size() - 2] << " = " << counter.back();
+                out << counter[counter.size() - 2] << " = " << counter.back() << ".clone()";
                 counter.pop_back();
                 break;
             }
@@ -1387,7 +1387,9 @@ auto RustCore::convertIspaLibFunctionCall(const LangAPI::IspaLibFunctionCall &ca
         if (!args.empty()) args[0] = "&mut " + args[0];   // the cursor is advanced in place
         // inherited LLParser members: reached through the LLParserApi trait implemented by the generated parser
         std::string joined = args.empty() ? "" : ", " + joinStrings(args, ", ");
-        return "::ispa_std::LLParserApi::" + convertIspaLibSymbol(call.symbol, true) + (has_callback ? "_rule" : "") + turbofish +
+        return std::string(call.template_parameters.size() > 1 ? "::ispa_std::LLParserSpaced::" : "::ispa_std::LLParserApi::") +
+               convertIspaLibSymbol(call.symbol, true) + (has_callback ? "_rule" : "") +
+               (call.template_parameters.size() > 1 ? "_spaced" : "") + turbofish +
                "(self" + joined + ")";
     }
     std::string callee = convertIspaLibSymbol(call.symbol, true);
@@ -1407,6 +1409,24 @@ auto RustCore::convertIspaLibFunctionCall(const LangAPI::IspaLibFunctionCall &ca
         const auto* from = typeOfExpression(call.args[1]);
         const bool lists = to && from && isValueTypeOf(*to, LangAPI::ValueType::Array) && isValueTypeOf(*from, LangAPI::ValueType::Array) &&
                            convertType(*to) != convertType(*from);
+        std::string converter;
+        if (lists) {
+            // a list of groups (tuples): converted member by member
+            const auto elements = [](const LangAPI::Type& list) -> const LangAPI::Type* {
+                return list.template_parameters.size() == 1 && std::holds_alternative<LangAPI::Type>(list.template_parameters[0])
+                           ? &std::get<LangAPI::Type>(list.template_parameters[0]) : nullptr; };
+            const auto* to_element = elements(*to);
+            const auto* from_element = elements(*from);
+            if (to_element && from_element && isValueTypeOf(*to_element, LangAPI::ValueType::Tuple) && isValueTypeOf(*from_element, LangAPI::ValueType::Tuple) &&
+                to_element->template_parameters.size() == from_element->template_parameters.size()) {
+                std::string assigns;
+                for (std::size_t i = 0; i < to_element->template_parameters.size(); ++i)
+                    assigns += "::ispa_std::AssignFrom::assign_from(&mut converted." + std::to_string(i) + ", item." + std::to_string(i) + "); ";
+                return "::ispa_std::assign_list_with(&mut " + place + ", " +
+                       convertInitializerValue(LangAPI::Type{LangAPI::ValueType::Undef}, call.args[1]) +
+                       ", |item| { let mut converted: " + convertType(*to_element) + " = Default::default(); " + assigns + "converted })";
+            }
+        }
         return (lists ? std::string("::ispa_std::assign_list") : callee) + "(&mut " + place + ", " +
                convertInitializerValue(LangAPI::Type{LangAPI::ValueType::Undef}, call.args[1]) + ")";
     }

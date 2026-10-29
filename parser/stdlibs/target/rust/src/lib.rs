@@ -135,6 +135,8 @@ impl<T: 'static> AssignFrom<Node<T>> for Node<Shared<T>> {
 pub fn assign_list<T: Default + AssignFrom<U>, U>(target: &mut Vec<T>, source: Vec<U>) {
     *target = source.into_iter().map(|item| { let mut converted = T::default(); converted.assign_from(item); converted }).collect();
 }
+/// `Vec<T> = Vec<U>` with a conversion for each element (groups).
+pub fn assign_list_with<T, U>(target: &mut Vec<T>, source: Vec<U>, convert: impl FnMut(U) -> T) { *target = source.into_iter().map(convert).collect(); }
 pub fn assign_compatible<T: AssignFrom<S>, S>(target: &mut T, source: S) { target.assign_from(source) }
 
 pub fn lr_get<T: Default>() -> T { T::default() }

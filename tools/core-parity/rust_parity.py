@@ -24,6 +24,12 @@ GRAMMARS = {
     'dyn': (HERE / 'grammars' / 'dyn', 'dyn.isc', ['"abc", \'d\\\'e\', <<EOT\nline one\nEOT, "x\\"y"', "'a' , \"b\"", '<<A\nxx\nA,<<BB\nA\nBB', '"unterminated', '<<T\nbody T',
                         "'it\"s", '<<X\n\nX', '"a""b"', '', ',', '"a",'],
             ['"', "'", '<<', ',', '\\', '\n', ' ', 'EOT', 'A\n', 'a', 'b', 'T\n']),
+    # Python expressions: a deep precedence chain of rules with optional/repeated tails
+    'pyexpr': (REPO / 'examples' / 'python_expr', 'expr.isc',
+               ['1', 'a + b * c', 'a if b else c', 'not x and y or z', 'f(1, 2)(3)', '[1, 2, 3]', '{1: 2, 3: 4}', 'x.y.z', 'x[1][2]', '(1, 2)', '()', '(a)',
+                'a < b <= c', 'a is not b', 'a not in b', 'a | b ^ c & d', 'a << 2 >> 1', '-a ** 2', '~a', 'a // b % c', '1 +', '(1', '[1,', 'f(', '+', ''],
+               ['a', 'b', '1', '2', '+', '-', '*', '/', '(', ')', '[', ']', '{', '}', ':', ',', '.', ' ', 'if ', 'else ', 'not ', 'and ', 'or ', 'in ', 'is ',
+                '==', '<', '>', '**', 'None', 'True']),
     # SQL select statements: nested rules, groups, optional parts
     'sql': (REPO / 'examples' / 'sql', 'grammar.isc',
             ['SELECT a FROM t', 'SELECT a, b as c FROM t WHERE a = 1', "SELECT x FROM t WHERE name = 'bob' AND (age > 3 OR age < 1) ORDER BY x DESC;",
