@@ -231,7 +231,7 @@ TEST(RustEmitter, EmitsTokenStreamInterfaceCalls) {
     std::string output;
     for (const auto& [name, source] : files) output += source;
     EXPECT_NE(output.find("TokenStream::token_cursor(&mut stream)"), std::string::npos);
-    EXPECT_NE(output.find("TokenStream::lazy_token_cursor(&mut stream, text)"), std::string::npos);
+    EXPECT_NE(output.find("TokenStream::lazy_token_cursor(&mut stream, __input)"), std::string::npos);
     EXPECT_NE(output.find("TokenStream::reset_token_stream(&mut stream)"), std::string::npos);
 }
 
