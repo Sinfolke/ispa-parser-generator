@@ -827,8 +827,11 @@ class LLParser(Parser_base):
         if pos.isEnd():
             return "end of input"
         meta = pos.current().meta()
-        if meta.has_source() and meta.startpos() != NPOS:
-            return "'" + meta.text() + "'"
+        # C++ quotes the token only for cursors that know the source origin (lazy ones).
+        if pos.has_source() and meta.startpos() != NPOS:
+            origin = pos.sourceOrigin()
+            if meta.startpos() <= len(origin) and meta.length() <= len(origin) - meta.startpos():
+                return "'" + substr(origin, meta.startpos(), meta.length()) + "'"
         return "<token>"
 
     def breadcrumb(self) -> str:
