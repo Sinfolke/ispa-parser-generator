@@ -288,14 +288,14 @@ class Lexer_base:
     def lexer_failure_result(self, ctx: LexerFailureContext, inserted: RawToken) -> Pair[int, RawToken]:
         """(state, token) for a lexer fail handler; see DFA run()."""
         if ctx.decision == LexerDecision.DELETE:
-            return Pair(LEXER_DELETE_STATE, self.empty_token())
+            return Pair[int, RawToken](LEXER_DELETE_STATE, self.empty_token())
         if ctx.decision == LexerDecision.INSERT:
-            return Pair(NULL_STATE, inserted)
+            return Pair[int, RawToken](NULL_STATE, inserted)
         if len(self.errors) == 0:
             runtime_error("unmatched lexer input")
         else:
             runtime_error(self.errors[len(self.errors) - 1])
-        return Pair(NULL_STATE, inserted)
+        return Pair[int, RawToken](NULL_STATE, inserted)
 
     def lookup(self, tables: DfaTables, semantic: Callable[[int, Captures, int, int, int, Cursor], Pair[int, RawToken]], cur: Cursor) -> RawToken:
         """Run the DFA for one token at cur (empty token at end of input)."""

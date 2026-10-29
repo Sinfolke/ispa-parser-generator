@@ -263,7 +263,7 @@ class Captures:
 
 def semantic_result(state: int, token: RawToken) -> Pair[int, RawToken]:
     """What a generated semantic function returns: (next state, token)."""
-    return Pair(state, token)
+    return Pair[int, RawToken](state, token)
 
 
 def class_of(class_table: list[int], ch: str) -> int:

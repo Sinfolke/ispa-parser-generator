@@ -240,6 +240,17 @@ struct PythonConverter {
             default: unsupported(p, "operator has no LangAPI representation");
         }
     }
+    // Class instances have reference semantics: values of a class type are boxes (shared pointers).
+    static la::Type boxed(la::Type inner) { return la::Type{la::ValueType::Box, std::move(inner)}; }
+    bool is_class(const std::string& id) const { return class_names.contains(id) || (signatures && signatures->classes.contains(id)); }
+    static bool is_box(const la::Type& t) { return t.isValueType() && t.getValueType() == la::ValueType::Box; }
+    la::Expression receiver(const py::ExprPtr& base) {
+        if (auto n = base ? base->template get<py::Name>() : nullptr; n && !self_name.empty() && n->id == self_name)
+            return la::Symbol::createExpression(pythonSymbol("__ispa_python_self"));
+        auto value = expr(base);
+        if (is_box(inferred(base))) return la::GetFromBox::createExpression(la::GetFromBox{.what = std::move(value)});
+        return value;
+    }
     la::Type type(const py::ExprPtr& p) {
         if (!p) return la::Type{la::ValueType::Undef};
         if (auto n = p->template get<py::Name>()) {
@@ -249,6 +260,7 @@ struct PythonConverter {
             if (n->id == "str") return la::Type{la::ValueType::String};
             if (n->id == "object") return la::Type{la::ValueType::Any};
             if (typevars.contains(n->id)) return la::Type{la::Symbol{n->id}};
+            if (is_class(n->id)) return boxed(la::Type{pythonSymbol(n->id)});
             return la::Type{pythonSymbol(n->id)};
         }
         if (auto sub = p->template get<py::Subscript>(); sub && sub->value) {
@@ -274,7 +286,7 @@ struct PythonConverter {
                 if (auto args = sub->slice ? sub->slice->template get<py::Tuple>() : nullptr) {
                     for (const auto& arg : args->elts) result.template_parameters.emplace_back(type(arg));
                 } else result.template_parameters.emplace_back(type(sub->slice));
-                return result;
+                return is_class(name->id) ? boxed(result) : result;
             }
         }
         if (auto c = p->template get<py::Constant>(); c && c->kind == py::ConstantKind::None)
@@ -289,6 +301,8 @@ struct PythonConverter {
         return false;
     }
     static std::string symbol_id(const la::Type& t) {
+        if (is_box(t) && !t.template_parameters.empty())
+            if (const auto* inner = std::get_if<la::Type>(&t.template_parameters.front())) return symbol_id(*inner);
         if (!t.isSymbol()) return {};
         std::string id;
         for (const auto& part : t.getSymbol().path) {
@@ -331,7 +345,7 @@ struct PythonConverter {
             if (n->id == "bool") return la::Type{la::ValueType::Bool};
             if (signatures) {
                 if (const auto it = signatures->functions.find(n->id); it != signatures->functions.end()) return declared(it->second);
-                if (signatures->classes.contains(n->id)) return la::Type{pythonSymbol(n->id)};
+                if (signatures->classes.contains(n->id)) return boxed(la::Type{pythonSymbol(n->id)});
             }
             return unknown;
         }
@@ -345,7 +359,7 @@ struct PythonConverter {
         if (!value) return la::Type{la::ValueType::Undef};
         if (auto n = value->template get<py::Name>()) {
             if (auto found = local_types.find(n->id); found != local_types.end()) return found->second;
-            if (!self_name.empty() && n->id == self_name && !self_class.empty()) return la::Type{pythonSymbol(self_class)};
+            if (!self_name.empty() && n->id == self_name && !self_class.empty()) return boxed(la::Type{pythonSymbol(self_class)});
         }
         if (auto n = value->template get<py::Name>(); n && signatures && !locals.contains(n->id)) {
             if (const auto it = signatures->variables.find(n->id); it != signatures->variables.end()) return declared(it->second);
@@ -440,7 +454,7 @@ struct PythonConverter {
             using T = std::decay_t<decltype(x)>;
             if constexpr (std::is_same_v<T, py::Name>) {
                 if (!token_rule.empty() && !failure_context && x.id == "ctx") unsupported(e.pos, "token context needs a property");
-                return la::Symbol::createExpression(pythonSymbol(x.id == self_name ? "__ispa_python_self" : localName(x.id)));
+                return la::Symbol::createExpression(pythonSymbol(!self_name.empty() && x.id == self_name ? "__ispa_python_self_box" : localName(x.id)));
             }
             else if constexpr (std::is_same_v<T, py::Constant>) {
                 switch (x.kind) {
@@ -507,7 +521,7 @@ struct PythonConverter {
                     }
                 }
                 la::StorageSymbol s;
-                s.what = group(expr(x.value));
+                s.what = group(receiver(x.value));
                 if constexpr (std::is_same_v<T, py::Attribute>) s.path.emplace_back(x.attr);
                 else {
                     s.path.emplace_back(la::StorageOffset{.offset = expr(x.slice)});
@@ -664,7 +678,7 @@ struct PythonConverter {
                             }
                         }
                         la::StorageSymbol storage;
-                        storage.what = group(expr(method->value));
+                        storage.what = group(receiver(method->value));
                         storage.path.emplace_back(call);
                         return la::StorageSymbol::createExpression(storage);
                     }
@@ -723,14 +737,14 @@ struct PythonConverter {
                                 call.args = {la::String::createExpression(la::String{.value = token})};
                                 if (x.args.size() == 2) call.args.push_back(expr(x.args[1]));
                                 la::StorageSymbol storage;
-                                storage.what = group(expr(method->value));
+                                storage.what = group(receiver(method->value));
                                 storage.path.emplace_back(call);
                                 return la::StorageSymbol::createExpression(storage);
                             }
                         }
                         if (name == "delete" && failure_context && !token_rule.empty()) {
                             la::StorageSymbol storage;
-                            storage.what = group(expr(method->value));
+                            storage.what = group(receiver(method->value));
                             storage.path.emplace_back(la::FunctionCall{
                                 .name = std::make_shared<la::Symbol>("erase")});
                             return la::StorageSymbol::createExpression(storage);
@@ -745,12 +759,12 @@ struct PythonConverter {
                                 boundary.name = std::make_shared<la::Symbol>("token_boundary");
                                 boundary.args.push_back(la::String::createExpression(la::String{.value = token}));
                                 la::StorageSymbol tagged;
-                                tagged.what = group(expr(method->value));
+                                tagged.what = group(receiver(method->value));
                                 tagged.path.emplace_back(boundary);
                                 call.args.push_back(la::StorageSymbol::createExpression(tagged));
                             }
                             la::StorageSymbol storage;
-                            storage.what = group(expr(method->value));
+                            storage.what = group(receiver(method->value));
                             storage.path.emplace_back(call);
                             return la::StorageSymbol::createExpression(storage);
                         }
@@ -759,16 +773,30 @@ struct PythonConverter {
                 la::FunctionCall call;
                 for (const auto& a : x.args) call.args.push_back(expr(a));
                 if (auto n = x.func ? x.func->template get<py::Name>() : nullptr) {
+                    if (!locals.contains(n->id) && is_class(n->id)) {
+                        call.name = std::make_shared<la::Symbol>(pythonSymbol("ISPA_STD.construct"));
+                        call.template_parameters.emplace_back(std::make_shared<la::Type>(la::Type{pythonSymbol(n->id)}));
+                        return la::FunctionCall::createExpression(call);
+                    }
                     call.name = std::make_shared<la::Symbol>(pythonSymbol(localName(n->id)));
                     return la::FunctionCall::createExpression(call);
                 }
                 if (auto sub = x.func ? x.func->template get<py::Subscript>() : nullptr;
                     sub && sub->value && sub->value->template get<py::Name>()) {
                     // Explicit type arguments: Optional[T]() constructs Optional<T>.
-                    call.name = std::make_shared<la::Symbol>(pythonSymbol(sub->value->template get<py::Name>()->id));
+                    const auto class_id = sub->value->template get<py::Name>()->id;
+                    la::Type built{pythonSymbol(class_id)};
                     if (auto args = sub->slice ? sub->slice->template get<py::Tuple>() : nullptr) {
-                        for (const auto& arg : args->elts) call.template_parameters.emplace_back(std::make_shared<la::Type>(type(arg)));
-                    } else call.template_parameters.emplace_back(std::make_shared<la::Type>(type(sub->slice)));
+                        for (const auto& arg : args->elts) built.template_parameters.emplace_back(type(arg));
+                    } else built.template_parameters.emplace_back(type(sub->slice));
+                    if (is_class(class_id)) {
+                        call.name = std::make_shared<la::Symbol>(pythonSymbol("ISPA_STD.construct"));
+                        call.template_parameters.emplace_back(std::make_shared<la::Type>(std::move(built)));
+                        return la::FunctionCall::createExpression(call);
+                    }
+                    call.name = std::make_shared<la::Symbol>(pythonSymbol(class_id));
+                    for (const auto& item : built.template_parameters)
+                        if (const auto* t = std::get_if<la::Type>(&item)) call.template_parameters.emplace_back(std::make_shared<la::Type>(*t));
                     return la::FunctionCall::createExpression(call);
                 }
                 if (auto a = x.func ? x.func->template get<py::Attribute>() : nullptr) {
@@ -778,7 +806,7 @@ struct PythonConverter {
                     }
                     call.name = std::make_shared<la::Symbol>(a->attr);
                     la::StorageSymbol s;
-                    s.what = group(expr(a->value));
+                    s.what = group(receiver(a->value));
                     s.path.emplace_back(call);
                     return la::StorageSymbol::createExpression(s);
                 }
@@ -1135,6 +1163,7 @@ struct PythonConverter {
         if (auto c = s.get<py::ClassDef>()) {
             if (!c->decorators.empty() || !c->keywords.empty()) unsupported(s.pos, "class decorators and keywords are unsupported");
             la::Class out;
+            out.shared_object = true;
             out.name = la::Symbol{c->name};
             std::set<std::string> own_typevars;
             for (auto& b : c->bases) {
@@ -1221,9 +1250,10 @@ struct PythonConverter {
                     if (f->name == "__init__") {
                         if (is_static || (f->returns && function.type != la::ValueType::Void))
                             unsupported(member->pos, "__init__ must be an instance method returning None");
-                        function.name = c->name;
-                        if (out.constructor) unsupported(member->pos, "duplicate constructor");
-                        out.constructor = std::move(function);
+                        // A method run by construct(): `self` may escape while it executes.
+                        function.name = "__init__";
+                        function.type = la::Type{la::ValueType::Void};
+                        out.data.emplace_back(std::make_shared<la::Declaration>(std::move(lowered)), la::Visibility::Public);
                         scope.self_name.clear();
                         continue;
                     }

@@ -1444,6 +1444,8 @@ export namespace LangAPI {
         std::optional<Function> to_str_fun;
         std::optional<Function> output_fun;
         stdu::vector<Symbol> dependecies;
+        // Instances have reference semantics: held through shared pointers, `__init__` is a method (Python classes).
+        bool shared_object = false;
         bool operator==(const Class& other) const {
             return name == other.name && template_parameters == other.template_parameters && data == other.data && inherit_members == other.inherit_members && default_visibility == other.default_visibility && constructor == other.constructor;
         }

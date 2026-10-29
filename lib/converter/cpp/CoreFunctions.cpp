@@ -154,6 +154,8 @@ auto Core::convertSymbol(const LangAPI::Symbol &symbol) -> std::string {
     if (symbol.path.empty()) return "";
     if (symbol.path.size() == 1 && std::holds_alternative<std::string>(symbol.path.front()) &&
         std::get<std::string>(symbol.path.front()) == "__ispa_python_self") return "(*this)";
+    if (symbol.path.size() == 1 && std::holds_alternative<std::string>(symbol.path.front()) &&
+        std::get<std::string>(symbol.path.front()) == "__ispa_python_self_box") return "::ISPA_STD::self_ptr(this)";
     std::string res;
     bool first = true;
     for (const auto &part : symbol.path) {
@@ -567,7 +569,22 @@ auto Core::convertFunctionCall(const LangAPI::FunctionCall &call, bool need_temp
         str += "<" + convertTemplates(call.template_parameters) + ">";
     }
     str += "(";
-    str += convertFunctionParams(call.args);
+    // `Base.method(self, ...)` is a qualified call on this object.
+    const auto selfFirst = [&] {
+        if (call.args.empty() || call.args.front().size() != 1 || !call.args.front().front().isRvalue()) return false;
+        const auto &rv = call.args.front().front().getRValue();
+        if (!rv.isSymbol() || rv.getSymbol().path.size() != 1) return false;
+        const auto *name = std::get_if<std::string>(&rv.getSymbol().path.front());
+        return name && *name == "__ispa_python_self_box";
+    }();
+    if (selfFirst && std::holds_alternative<std::shared_ptr<LangAPI::Symbol>>(call.name) &&
+        std::get<std::shared_ptr<LangAPI::Symbol>>(call.name)->path.size() > 1 &&
+        std::holds_alternative<std::string>(std::get<std::shared_ptr<LangAPI::Symbol>>(call.name)->path.back()) &&
+        std::get<std::string>(std::get<std::shared_ptr<LangAPI::Symbol>>(call.name)->path.back()) == "__init__") {
+        auto rest = call.args;
+        rest.erase(rest.begin());
+        str += convertFunctionParams(rest);
+    } else str += convertFunctionParams(call.args);
     str += ")";
     return str;
 }

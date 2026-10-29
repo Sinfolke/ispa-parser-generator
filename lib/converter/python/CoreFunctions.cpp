@@ -273,7 +273,7 @@ std::string Core::symbol(const LangAPI::Symbol& s) {
         std::string item;
         if (const auto* str = std::get_if<std::string>(&piece)) {
             item = *str == "__ispa_parser__" ? module_name_ :
-                *str == "__ispa_python_self" ? "self" : path_identifiers(*str);
+                (*str == "__ispa_python_self" || *str == "__ispa_python_self_box") ? "self" : path_identifiers(*str);
             if (first && method_members_.contains(*str) &&
                 !std::ranges::any_of(scopes_, [&](const auto& scope) { return scope.contains(identifier(*str)); }))
                 item = "self." + item;
@@ -456,6 +456,15 @@ std::string Core::call(const LangAPI::FunctionCall& c) {
         [this](const std::shared_ptr<LangAPI::IspaLibSymbol>& name) { return lib(*name); }
     }, c.name);
     if (fn.starts_with("ISPA_STD.CountSpec.")) fn.replace(0, 8, "ispa_std");
+    // construct<Class>(args): Python constructs by calling the class.
+    if (fn == "ISPA_STD.construct" && c.template_parameters.size() == 1) {
+        if (const auto* built = std::get_if<std::shared_ptr<LangAPI::Type>>(&c.template_parameters.front()); built && *built) {
+            std::string out = type(**built) + "(";
+            for (std::size_t i = 0; i < c.args.size(); ++i) out += (i ? ", " : "") + expression(c.args[i]);
+            return out + ")";
+        }
+    }
+    // Base.method(self, ...) keeps its explicit self.
     if ((fn == "_ispa__line_prefix" || fn == "_ispa__next_char" || fn == "_ispa__line" ||
          fn == "_ispa__column") && c.args.size() == 1) {
         const auto offset = pointer_offset(expression(c.args.front()));

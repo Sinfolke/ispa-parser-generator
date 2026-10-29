@@ -26,7 +26,7 @@ class Pair(Generic[A, B]):
 
 
 def make_pair(first: A, second: B) -> Pair[A, B]:
-    return Pair(first, second)
+    return Pair[A, B](first, second)
 
 
 def minimum(a: T, b: T) -> T:

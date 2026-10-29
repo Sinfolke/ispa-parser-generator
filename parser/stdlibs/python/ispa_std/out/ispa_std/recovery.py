@@ -296,7 +296,8 @@ class TokenSet:
 
 
 def empty_token_set() -> TokenSet:
-    return TokenSet([])
+    none: list[int] = []
+    return TokenSet(none)
 
 
 class Policy:

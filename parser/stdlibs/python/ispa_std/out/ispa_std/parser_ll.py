@@ -155,7 +155,8 @@ class TokenNames:
         return self.names[id]
 
 
-NO_TOKEN_NAMES: TokenNames = TokenNames([])
+_NO_NAMES: list[str] = []
+NO_TOKEN_NAMES: TokenNames = TokenNames(_NO_NAMES)
 
 
 def context_peek(pos: TokenCursor, lookahead: int, token_names: TokenNames, ambiguous_id: int) -> ActionToken:

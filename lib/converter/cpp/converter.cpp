@@ -825,6 +825,8 @@ namespace Cpp {
                 bases.push_back(std::move(base));
             }
             head += " : " + joinStrings(bases, ", ");
+        } else if (cls.shared_object) {
+            head += " : public ::ISPA_STD::Object";
         }
         if (!cls.template_parameters.empty()) {
             std::vector<std::string> parameters;

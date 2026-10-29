@@ -214,7 +214,7 @@ def lr_pack(values: list[object], indices: list[int], offsets: list[int], splice
         value = values[indices[i]]
         if splice[i] != 0:
             c = 0
-            spliced = cast(LRCaptures, value)
+            spliced: LRCaptures = cast(LRCaptures, value)
             while c < len(spliced.columns):
                 columns[offsets[i] + c].extend(spliced.columns[c])
                 c = c + 1
