@@ -35,20 +35,16 @@ namespace Rust {
             for (const auto &n : names) idents.push_back(RustCore::ident(n));
             return "<" + joinStrings(idents, ", ") + ">";
         }
+        // impl-block generics: every lowered Python type parameter is assumed copyable/defaultable/comparable
+        auto genericBounds(const std::vector<std::string> &names) -> std::string {
+            if (names.empty()) return "";
+            std::vector<std::string> idents;
+            for (const auto &n : names)
+                idents.push_back(RustCore::ident(n) + (n == "K" ? ": ::ispa_std::PyKey" : ": ::ispa_std::PyVal"));
+            return "<" + joinStrings(idents, ", ") + ">";
+        }
         auto isValueTypeOf(const LangAPI::Type &t, LangAPI::ValueType vt) -> bool {
             return t.isValueType() && t.getValueType() == vt;
-        }
-        // `inline const int x = 5;` style scalars become a real `const`; anything else needs runtime construction
-        auto isConstScalar(const LangAPI::Type &t) -> bool {
-            if (!isValueTypeOf(t, LangAPI::ValueType::ImmutableSemantic) || t.template_parameters.size() != 1) return false;
-            if (!std::holds_alternative<LangAPI::Type>(t.template_parameters.front())) return false;
-            const auto &inner = std::get<LangAPI::Type>(t.template_parameters.front());
-            if (!inner.isValueType()) return false;
-            switch (inner.getValueType()) {
-                case LangAPI::ValueType::Int: case LangAPI::ValueType::LargeUInt: case LangAPI::ValueType::Float:
-                case LangAPI::ValueType::Bool: case LangAPI::ValueType::Char: return true;
-                default: return false;
-            }
         }
         auto singleStringLiteral(const LangAPI::Expression &e) -> bool {
             return e.size() == 1 && e[0].type() == LangAPI::ExpressionValueType::RValue &&
@@ -57,7 +53,8 @@ namespace Rust {
         constexpr const char *kAllow =
             "#![allow(non_snake_case, non_camel_case_types, non_upper_case_globals, unused_mut, unused_variables,\n"
             "         unused_parens, unused_labels, unused_imports, unreachable_patterns, unreachable_code, dead_code,\n"
-            "         unused_braces, clippy::all)]\n";
+            "         unused_braces, clippy::all)]\n"
+            "use ::ispa_std::pycoll::{PyContains, PyPop};\n";
     }
 
     // ========================================================================
@@ -88,7 +85,8 @@ namespace Rust {
     auto Construct::produceWhile(const LangAPI::While &while_stmt, Converter::Writer &o) -> void {
         const auto label = "'w" + std::to_string(++RustCore::label_counter);
         RustCore::loop_frames.push_back({"break " + label, "continue " + label});
-        emitLine(o, label + ": while " + RustCore::convertExpression(while_stmt.expr) + " {");
+        const auto condition = RustCore::convertExpression(while_stmt.expr);
+        emitLine(o, label + (condition == "true" ? std::string(": loop {") : ": while " + condition + " {"));
         o.increaseIndentation();
         convertStatements(while_stmt.stmt, o);
         o.decreaseIndentation();
@@ -140,7 +138,8 @@ namespace Rust {
     }
 
     auto Construct::produceVariableStatement(const LangAPI::Variable &variable, Converter::Writer &o) -> void {
-        const auto type = RustCore::convertType(variable.type);
+        auto type = RustCore::convertType(variable.type);
+        if (RustCore::isSharedClassType(variable.type)) type = "::ispa_std::Shared<" + type + ">";
         const bool inferred = type == "_";
         std::string line = "let mut " + RustCore::ident(variable.name);
         if (!inferred) line += ": " + type;
@@ -152,6 +151,8 @@ namespace Rust {
         }
         emitLine(o, line + ";");
         RustCore::bind(variable.name);
+        RustCore::local_types[variable.name] = &variable.type;
+        if (RustCore::isSharedClassType(variable.type) || RustCore::isSharedObjectInitializer(variable.value)) RustCore::shared_locals.insert(RustCore::ident(variable.name));
         if (debug_instrumentation_ && !variable.value.empty() &&
             RustCore::convertExpression(variable.value).find("captures.") != std::string::npos)
             emitLine(o, "if ::ispa_std::debug::enabled() { ::ispa_std::debug::lexer_capture(\"" + variable.name + "\", &" +
@@ -253,7 +254,34 @@ namespace Rust {
     //   constructor   pub fn new(...) -> Self { let mut this = Self::default(); ...; this }
     // Constrained templates (every type parameter has a fixed type list, C++ `enable_if<is_same<..> || ...>`) get a
     // marker trait implemented for exactly those types.
+    // ISPA_RUST_SURVEY=1 records each function that cannot be emitted and keeps going, to inventory every blocker at once.
     auto Construct::emitFunction(const LangAPI::Function &func, Converter::Writer &w, Converter::Writer &aux, FnKind kind,
+                                 const std::string &scope, const std::vector<std::string> &bases) -> void {
+        if (!std::getenv("ISPA_RUST_SURVEY")) return emitFunctionChecked(func, w, aux, kind, scope, bases);
+        const auto saved_receiver = RustCore::receiver;
+        const auto saved_return_type = RustCore::return_type;
+        const auto saved_locals = RustCore::locals;
+        const auto saved_borrowed = RustCore::borrowed_parameters;
+        const auto saved_counter = RustCore::counter;
+        const auto saved_frames = RustCore::loop_frames;
+        const auto backup = w;
+        const auto aux_backup = aux;
+        try {
+            emitFunctionChecked(func, w, aux, kind, scope, bases);
+        } catch (const std::exception &e) {
+            w = backup;
+            aux = aux_backup;
+            std::cerr << "SURVEY " << scope << "::" << func.name << ": " << e.what() << "\n";
+            RustCore::receiver = saved_receiver;
+            RustCore::return_type = saved_return_type;
+            RustCore::locals = saved_locals;
+            RustCore::borrowed_parameters = saved_borrowed;
+            RustCore::counter = saved_counter;
+            RustCore::loop_frames = saved_frames;
+        }
+    }
+
+    auto Construct::emitFunctionChecked(const LangAPI::Function &func, Converter::Writer &w, Converter::Writer &aux, FnKind kind,
                                  const std::string &scope, const std::vector<std::string> &bases) -> void {
         std::string name = kind == FnKind::Constructor ? "new" : RustCore::ident(func.name);
         const auto key = scope + "::" + name;
@@ -269,7 +297,7 @@ namespace Rust {
             if (tp.second.empty()) {
                 RustCore::warn("template parameter `" + tp.first + "` of `" + func.name +
                                "` has no fixed type list: the Rust generic is unbounded and the body will not type-check without bounds");
-                generics.push_back(param);
+                generics.push_back(param + (tp.first == "K" ? ": ::ispa_std::PyKey" : ": ::ispa_std::PyVal"));
                 continue;
             }
             const auto marker = "__Allowed_" + fileSafe(scope) + "_" + fileSafe(func.name) + "_" + fileSafe(tp.first) + "_" +
@@ -284,6 +312,9 @@ namespace Rust {
         const auto saved_locals = RustCore::locals;
         const auto saved_borrowed = RustCore::borrowed_parameters;
         RustCore::borrowed_parameters.clear();
+        RustCore::callable_parameters.clear();
+        RustCore::callable_types.clear();
+        RustCore::local_types.clear();
         RustCore::locals.clear();
         RustCore::locals.emplace_back();
         RustCore::return_type = &func.type;
@@ -292,8 +323,11 @@ namespace Rust {
         else RustCore::receiver = "self";
         for (const auto& parameter : func.parameters) {
             RustCore::bind(parameter.second);
+            RustCore::local_types[parameter.second] = &parameter.first;
             if (isValueTypeOf(parameter.first, LangAPI::ValueType::BorrowSemantic))
                 RustCore::borrowed_parameters.insert(parameter.second);
+            if (isValueTypeOf(parameter.first, LangAPI::ValueType::Callable))
+                { RustCore::callable_parameters.insert(parameter.second); RustCore::callable_types[parameter.second] = &parameter.first; }
         }
 
         // signature
@@ -381,13 +415,13 @@ namespace Rust {
                             library->exports == LangAPI::StdlibExports::Parser ||
                             library->exports == LangAPI::StdlibExports::LRParser ||
                             library->exports == LangAPI::StdlibExports::LRGeneralizedParser)) {
-#ifdef NDEBUG   // Release builds refuse; debug builds emit so the Rust backend can be developed.
-                throw Error("Rust target: parser generation is incomplete: shared lowering still uses C++ container/iterator operations and implicit inherited runtime calls. IR needs semantic token-stream operations and explicit runtime interface contracts; refusing to emit an invalid Rust parser");
-#endif
+                if (!std::getenv("ISPA_RUST_EXPERIMENTAL"))   // set to develop the Rust parser backend
+                    throw Error("Rust target: parser generation is incomplete: shared lowering still uses C++ container/iterator operations and implicit inherited runtime calls. IR needs semantic token-stream operations and explicit runtime interface contracts; refusing to emit an invalid Rust parser");
             }
         }
         const std::string name = RustCore::convertSymbol(cls.name, false);
         const std::string generics = genericParams(cls.template_parameters);
+        const std::string impl_generics = genericBounds(cls.template_parameters);
         const bool templated = !cls.template_parameters.empty();
         const auto saved_shared_receiver = RustCore::shared_receiver;
         RustCore::shared_receiver = cls.shared_object;
@@ -421,17 +455,26 @@ namespace Rust {
         for (const auto &[declaration, visibility] : cls.data) {
             if (declaration->isVariable() && !declaration->getVariable().is_static) {
                 const auto &v = declaration->getVariable();
-                fields.push_back({RustCore::ident(v.name), RustCore::convertType(v.type), &v.type, &v.value, visibility == LangAPI::Visibility::Public});
+                RustCore::owned_callable = true;
+                auto field_type = RustCore::convertType(v.type);
+                RustCore::owned_callable = false;
+                fields.push_back({RustCore::ident(v.name), std::move(field_type), &v.type, &v.value, visibility == LangAPI::Visibility::Public});
             } else if (declaration->isFunction()) {
                 if (visibility == LangAPI::Visibility::Public) methods.push_back(declaration->getFunction().name);
             } else {
                 siblings.push_back(declaration.get());
             }
         }
-        const bool has_defaults = std::any_of(fields.begin(), fields.end(), [](const Field &f) { return !f.init->empty(); });
+        for (const auto &f : fields) if (f.type == "::ispa_std::PyAny") RustCore::any_fields.insert(f.name);
+        const auto is_callable = [](const Field &f) { return f.type.starts_with("Box<dyn FnMut"); };
+        for (const auto &f : fields) if (is_callable(f)) RustCore::callable_fields.insert(f.name);
+        const bool has_callable = std::any_of(fields.begin(), fields.end(), is_callable);   // Box<dyn FnMut>: neither Clone nor Default
+        const bool has_defaults = has_callable || std::any_of(fields.begin(), fields.end(), [](const Field &f) { return !f.init->empty(); });
 
         // --- struct ---
-        emitLine(w, std::string("#[derive(Clone") + (has_defaults ? "" : ", Default") + ")]");
+        if (cls.shared_object) emitLine(w, "#[repr(C)]");   // the base part is the first field: handles to a base are plain pointers
+        if (has_callable) emitLine(w, "// a Callable field makes this class neither Clone nor derivable Default");
+        else emitLine(w, std::string("#[derive(Clone") + (has_defaults ? "" : ", Default") + ")]");
         emitLine(w, "pub struct " + name + generics + " {");
         w.increaseIndentation();
         if (cls.shared_object) emitLine(w, "pub __ispa_owner: ::ispa_std::WeakShared<Self>,");
@@ -446,7 +489,7 @@ namespace Rust {
         emitLine(w, "}");
 
         if (has_defaults) {
-            emitLine(w, "impl" + generics + " Default for " + name + generics + " {");
+            emitLine(w, "impl" + impl_generics + " Default for " + name + generics + " {");
             w.increaseIndentation();
             emitLine(w, "fn default() -> Self {");
             w.increaseIndentation();
@@ -455,7 +498,13 @@ namespace Rust {
             if (cls.shared_object) emitLine(w, "__ispa_owner: Default::default(),");
             for (std::size_t i = 0; i < bases.size(); ++i) emitLine(w, "base_" + std::to_string(i) + ": Default::default(),");
             for (const auto &f : fields) {
-                emitLine(w, f.name + ": " + (f.init->empty() ? std::string("Default::default()") : initializer(*f.ir_type, *f.init)) + ",");
+                std::string value = f.init->empty() ? std::string("Default::default()") : initializer(*f.ir_type, *f.init);
+                if (is_callable(f) && f.init->empty()) {
+                    const auto arity = f.ir_type->template_parameters.size() > 1 ? f.ir_type->template_parameters.size() - 1 : 0;
+                    std::vector<std::string> ignored(arity, "_");
+                    value = "Box::new(|" + joinStrings(ignored, ", ") + "| ::ispa_std::fail(9, \"callable field was never set\"))";
+                }
+                emitLine(w, f.name + ": " + value + ",");
             }
             if (templated) emitLine(w, "__phantom: Default::default(),");
             w.decreaseIndentation();
@@ -467,8 +516,15 @@ namespace Rust {
         }
         if (!bases.empty()) {
             if (bases.size() > 1) throw Error("Rust target: multiple inheritance on `{}` needs resolved base-member identities in IR", name);
-            emitLine(w, "impl" + generics + " ::std::ops::Deref for " + name + generics + " { type Target = " + bases[0] + "; fn deref(&self) -> &Self::Target { &self.base_0 } }");
-            emitLine(w, "impl" + generics + " ::std::ops::DerefMut for " + name + generics + " { fn deref_mut(&mut self) -> &mut Self::Target { &mut self.base_0 } }");
+            emitLine(w, "impl" + impl_generics + " ::std::ops::Deref for " + name + generics + " { type Target = " + bases[0] + "; fn deref(&self) -> &Self::Target { &self.base_0 } }");
+            emitLine(w, "impl" + impl_generics + " ::std::ops::DerefMut for " + name + generics + " { fn deref_mut(&mut self) -> &mut Self::Target { &mut self.base_0 } }");
+            if (cls.shared_object) {
+                // Shared<Self> converts to Shared<Base> and to everything Base converts to
+                std::string generic_list = impl_generics.empty() ? "<__X: 'static>" : impl_generics.substr(0, impl_generics.size() - 1) + ", __X: 'static>";
+                emitLine(w, "impl" + generic_list + " ::ispa_std::Upcast<__X> for " + name + generics + " where " + bases[0] +
+                            ": ::ispa_std::Upcast<__X> { unsafe fn up_ptr(this: *mut Self) -> *mut __X { <" + bases[0] +
+                            " as ::ispa_std::Upcast<__X>>::up_ptr(::std::ptr::addr_of_mut!((*this).base_0)) } }");
+            }
         }
 
         // --- impl ---
@@ -477,15 +533,27 @@ namespace Rust {
         std::vector<std::string> scope_parts = context.module_path;
         scope_parts.push_back(name);
         const auto scope = joinStrings(scope_parts, "::");
-        emitLine(w, "impl" + generics + " " + name + generics + " {");
+        emitLine(w, "impl" + impl_generics + " " + name + generics + " {");
         w.increaseIndentation();
         if (cls.shared_object) {
             emitLine(w, "pub fn shared_default() -> ::ispa_std::Shared<Self> {");
             w.increaseIndentation();
-            emitLine(w, "::ispa_std::Shared::new_with(|owner| { let mut value = Self::default(); value.__ispa_owner = owner.downgrade(); value })");
+            emitLine(w, "::ispa_std::Shared::new_with(|owner| { let mut value = Self::default(); value.__bind_owner(owner); value })");
+            w.decreaseIndentation();
+            emitLine(w, "}");
+            // every class of the chain learns the handle of the full object, as itself
+            emitLine(w, "pub fn __bind_owner(&mut self, owner: &::ispa_std::WeakShared<Self>) {");
+            w.increaseIndentation();
+            emitLine(w, "self.__ispa_owner = owner.clone();");
+            if (!bases.empty()) emitLine(w, "self.base_0.__bind_owner(&owner.upcast());");
             w.decreaseIndentation();
             emitLine(w, "}");
         }
+        // `construct[T](...)` runs `__init__` on every shared class; a root class without one gets the empty initialiser
+        if (cls.shared_object && cls.inherit_members.empty() && !cls.constructor &&
+            std::none_of(cls.data.begin(), cls.data.end(), [](const auto &entry) {
+                return entry.first->isFunction() && entry.first->getFunction().name == "__init__"; }))
+            emitLine(w, "pub fn __init__(&mut self) {}");
         if (cls.constructor) emitFunction(*cls.constructor, w, aux, FnKind::Constructor, scope, bases);
         for (const auto &[declaration, visibility] : cls.data)
             if (declaration->isFunction()) emitFunction(declaration->getFunction(), w, aux, FnKind::Method, scope, bases);
@@ -578,7 +646,7 @@ namespace Rust {
         if (type == "_") throw Error("Rust Converter: static `{}` needs an explicit type", v.name);
         const auto name = RustCore::ident(v.name);
         const auto value = v.value.empty() ? std::string("Default::default()") : initializer(v.type, v.value);
-        if (isConstScalar(v.type) && !v.value.empty()) {
+        if (RustCore::isConstScalar(v.type) && !v.value.empty()) {
             emitLine(w, "pub const " + name + ": " + type + " = " + value + ";");
         } else {
             emitLine(w, "pub static " + name + ": ::ispa_std::Lazy<" + type + "> = ::ispa_std::Lazy::new(|| " + value + ");");

@@ -10,18 +10,29 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 mod shared;
-pub use shared::{Shared, WeakShared};
+pub use shared::{Shared, WeakShared, Upcast, Ref, RefMut};
+pub mod pycoll;
+pub use pycoll::{PyAny, PyVal, PyKey};
 mod primitives;
 pub use primitives::{StdError, fail, attempt, failure_message};
 
-/// Lazy static initialization compatible with the Rust toolchain used by ISPA.
-pub struct Lazy<T> { value: OnceLock<T>, init: fn() -> T }
+/// Lazily built namespace-level variable. The runtime is single-threaded (objects are `Rc`), so `get` hands out the
+/// place mutably: lowered Python mutates module state through it.
+pub struct Lazy<T> { value: std::cell::UnsafeCell<Option<T>>, init: fn() -> T }
+unsafe impl<T> Sync for Lazy<T> {}
 impl<T> Lazy<T> {
-    pub const fn new(init: fn() -> T) -> Self { Self { value: OnceLock::new(), init } }
+    pub const fn new(init: fn() -> T) -> Self { Self { value: std::cell::UnsafeCell::new(None), init } }
+    #[allow(clippy::mut_from_ref)]
+    pub fn get(&self) -> &mut T {
+        // SAFETY: single-threaded use only; callers never hold the place across a call that re-enters `get`.
+        let slot = unsafe { &mut *self.value.get() };
+        if slot.is_none() { *slot = Some((self.init)()); }
+        slot.as_mut().unwrap()
+    }
 }
 impl<T> std::ops::Deref for Lazy<T> {
     type Target = T;
-    fn deref(&self) -> &T { self.value.get_or_init(self.init) }
+    fn deref(&self) -> &T { self.get() }
 }
 
 /// A small, copyable cursor into UTF-8 source text. DFA input is classified one byte at a time.
@@ -55,6 +66,10 @@ impl Ptr {
 }
 
 impl From<&'static str> for Ptr { fn from(value: &'static str) -> Self { Self::new(value) } }
+impl std::ops::Add<&i64> for Ptr {
+    type Output = Self;
+    fn add(self, count: &i64) -> Self { self.offset_by(*count) }
+}
 impl std::ops::Add<i64> for Ptr {
     type Output = Self;
     fn add(self, count: i64) -> Self { self.offset_by(count) }

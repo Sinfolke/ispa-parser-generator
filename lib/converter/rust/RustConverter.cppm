@@ -32,6 +32,8 @@ namespace Rust {
         auto emitClass(const LangAPI::Class &cls, ::Converter::Writer &w) -> void;
         auto emitFunction(const LangAPI::Function &func, ::Converter::Writer &w, ::Converter::Writer &aux, FnKind kind,
                           const std::string &scope, const std::vector<std::string> &bases) -> void;
+        auto emitFunctionChecked(const LangAPI::Function &func, ::Converter::Writer &w, ::Converter::Writer &aux, FnKind kind,
+                                 const std::string &scope, const std::vector<std::string> &bases) -> void;
         auto emitOutputFunction(const LangAPI::Function &func, ::Converter::Writer &w) -> void;
         auto emitEnum(const LangAPI::Enum &enum_, ::Converter::Writer &w) -> void;
         auto emitTypeAlias(const LangAPI::TypeAlias &alias, ::Converter::Writer &w) -> void;
