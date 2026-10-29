@@ -15,9 +15,10 @@ plus a thin native facade. A parser generated with `--stdlib core` behaves like 
 `--stdlib` takes a directory containing `ispa-stdlib.yaml`, or the `module` name of an installed package directory
 (searched under the ispa-pkg library root). `--stdlib-name` overrides the namespace. `--static` is not implemented yet.
 
-Packages (`ispa-pkg install cpp-target`): `cpp-target` requires `target-core`; its `cpp-core` directory is built into
-`libcpp-target-core.a` with C++17 when a toolchain allows it. `ispa-pkg --export` adds its headers and archive to
-`ISPA_CPP_INCLUDE_DIRS` / `ISPA_CPP_LIBRARIES`.
+Package (`ispa-pkg install cpp-core`): independent of `cpp-target`; it requires `target-core`, installs only this directory (plus the
+few `ispastdlib` headers the facade still includes) and builds `libcpp-core.a` with C++17. `ispa-pkg --export` adds its
+headers and archive to `ISPA_CPP_INCLUDE_DIRS` / `ISPA_CPP_LIBRARIES`, and lists the archive alone in `ISPA_CPP_CORE_LIBRARIES`.
+`ispa-pkg --build cpp-core` rebuilds it.
 
 LR runs in the core too (`ispa_core/lr_machine.hpp`, `lr_conflicts.hpp`): the generated static callbacks are adapted onto the lowered `LRGrammar<V>`, `V` being the parser's `LRValue`, which the core defines as closed tagged storage (`ispa_core/lr_value.hpp`, RawToken-style, no `std::any`) holding the rule nodes and shifted token nodes inline; `lr_recover` and `lr_semantic_reduce` are not available through the core (static_assert).
 Parity is checked by `tools/core-parity`.

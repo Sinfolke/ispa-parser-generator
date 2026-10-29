@@ -6,5 +6,3 @@ layout:
   ispalib: {}
   ispatarget:
     cpp: target/cpp
-    # `--stdlib core`: the core lowered to C++ plus its facade. Built best effort (C++17).
-    cpp-core: target/cpp-core

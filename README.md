@@ -44,6 +44,7 @@ Install the grammar standard library, then the runtime for each output language 
 ```sh
 ispa-pkg install std
 ispa-pkg install cpp-target    # for C++ output
+ispa-pkg install cpp-core      # for C++ output with --stdlib core (independent of cpp-target)
 ispa-pkg install python-target # for Python output
 ispa-pkg --export-permanent
 ```

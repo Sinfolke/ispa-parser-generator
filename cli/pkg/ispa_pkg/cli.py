@@ -26,6 +26,8 @@ DEFAULT_CATALOG = {"packages": {
                     "manifest": "ispa-package.target-core.yaml"},
     "cpp-target": {"github": "Sinfolke/ispa-parser-generator", "ref": "main",
                    "manifest": "ispa-package.cpp-target.yaml"},
+    "cpp-core": {"github": "Sinfolke/ispa-parser-generator", "ref": "main",
+                 "manifest": "ispa-package.cpp-core.yaml"},
     "python-target": {"github": "Sinfolke/ispa-parser-generator", "ref": "main",
                       "manifest": "ispa-package.python-target.yaml"},
     "rust-target": {"github": "Sinfolke/ispa-parser-generator", "ref": "main",
@@ -329,7 +331,7 @@ def build_cpp_core(package, name, root, only_missing=False):
     core = package / 'ispatarget' / 'cpp-core'
     if not core.is_dir() or not any(core.rglob('*.cpp')):
         return None
-    output = f'{name}-core'
+    output = name if name.endswith('-core') else f'{name}-core'   # package `cpp-core` -> libcpp-core.a
     library_dir = core / 'lib'
     if only_missing and ((library_dir / f'lib{output}.a').is_file() or (library_dir / f'{output}.lib').is_file()):
         return None
@@ -599,7 +601,9 @@ def write_export_files(root):
                 'sources': [str(path) for path in sources],
                 'library_dirs': [str(path) for path in library_dirs],
                 'runtime_dirs': [str(path) for path in runtime_dirs],
-                'libraries': [str(path) for path in libraries]},
+                'libraries': [str(path) for path in libraries],
+                # the `--stdlib core` archives (ispatarget/cpp-core/lib), also part of `libraries`
+                'core_libraries': [str(path) for path in libraries if 'cpp-core' in path.parts]},
         'python': {'interpreter_dirs': [str(path) for path in python_dirs]},
     }
     (output / 'targets.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
@@ -634,6 +638,7 @@ def export_variables(root, output, manifest):
         'ISPA_CPP_SOURCES': os.pathsep.join(manifest['cpp']['sources']),
         'ISPA_CPP_LIBRARY_DIRS': os.pathsep.join(manifest['cpp']['library_dirs']),
         'ISPA_CPP_LIBRARIES': os.pathsep.join(manifest['cpp']['libraries']),
+        'ISPA_CPP_CORE_LIBRARIES': os.pathsep.join(manifest['cpp'].get('core_libraries', [])),
         'ISPA_PYTHON_INTERPRETER_DIRS': os.pathsep.join(manifest['python']['interpreter_dirs']),
     }
     for name, paths in sorted(manifest['targets'].items()):
@@ -836,12 +841,15 @@ def main(argv=None):
             if not marker.is_file():
                 raise PackageError(f"Package not installed: {args.build}")
             archive = build_cpp_library(package, args.build, root)
+            core_archive = build_cpp_core(package, args.build, root)
             rust_crates = build_rust_package(package, args.build, required=True)
-            if archive or rust_crates:
+            if archive or core_archive or rust_crates:
                 refresh_saved_exports(root)
                 STATUS.done()
                 if archive:
                     print(f"{args.build}: built {archive}")
+                if core_archive:
+                    print(f"{args.build}: built {core_archive}")
                 if rust_crates:
                     print(f"{args.build}: built {len(rust_crates)} Rust crate(s)")
             else:
