@@ -1271,9 +1271,18 @@ pub mod python {
 			pub static NO_TYPE: ::ispa_std::Lazy<i64> = ::ispa_std::Lazy::new(|| ( - (1)));
 			pub static AMBIGUOUS_ID: ::ispa_std::Lazy<i64> = ::ispa_std::Lazy::new(|| ( - (2)));
 			#[repr(C)]
-			#[derive(Clone, Default)]
+			#[derive(Clone)]
 			pub struct RawTokenMeta {
 				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
+				pub __vt_startpos: fn(&mut RawTokenMeta) -> i64,
+				pub __vt_length: fn(&mut RawTokenMeta) -> i64,
+				pub __vt_line: fn(&mut RawTokenMeta) -> i64,
+				pub __vt_column: fn(&mut RawTokenMeta) -> i64,
+				pub __vt_name: fn(&mut RawTokenMeta) -> i64,
+				pub __vt_source: fn(&mut RawTokenMeta) -> &String,
+				pub __vt_has_source: fn(&mut RawTokenMeta) -> bool,
+				pub __vt_end_pos: fn(&mut RawTokenMeta) -> i64,
+				pub __vt_text: fn(&mut RawTokenMeta) -> String,
 				pub _startpos: i64,
 				pub _length: i64,
 				pub _line: i64,
@@ -1281,6 +1290,29 @@ pub mod python {
 				pub _source: String,
 				pub _has_source: bool,
 				pub _name: i64,
+			}
+			impl Default for RawTokenMeta {
+				fn default() -> Self {
+					Self {
+						__ispa_owner: Default::default(),
+						__vt_startpos: RawTokenMeta::__base_startpos,
+						__vt_length: RawTokenMeta::__base_length,
+						__vt_line: RawTokenMeta::__base_line,
+						__vt_column: RawTokenMeta::__base_column,
+						__vt_name: RawTokenMeta::__base_name,
+						__vt_source: RawTokenMeta::__base_source,
+						__vt_has_source: RawTokenMeta::__base_has_source,
+						__vt_end_pos: RawTokenMeta::__base_end_pos,
+						__vt_text: RawTokenMeta::__base_text,
+						_startpos: Default::default(),
+						_length: Default::default(),
+						_line: Default::default(),
+						_column: Default::default(),
+						_source: Default::default(),
+						_has_source: Default::default(),
+						_name: Default::default(),
+					}
+				}
 			}
 			impl RawTokenMeta {
 				pub fn shared_default() -> ::ispa_std::Shared<Self> {
@@ -1302,56 +1334,92 @@ pub mod python {
 				pub fn blank() -> ::ispa_std::Shared<python::ispa_std::raw_token::RawTokenMeta> {
 					return ({ let __object = <python::ispa_std::raw_token::RawTokenMeta>::shared_default(); __object.borrow_mut().__init__(((*python::ispa_std::raw_token::NO_POS.get())).clone(), &(String::from("")), false, 0, 0, 0, ((*python::ispa_std::raw_token::NO_NAME.get())).clone()); __object }).upcast();
 				}
-				pub fn startpos(&mut self) -> i64 {
+				pub fn __base_startpos(&mut self) -> i64 {
 					let __p = self as *const Self as *mut Self;
 					return ((self)._startpos).clone();
 				}
-				pub fn length(&mut self) -> i64 {
+				pub fn startpos(&mut self) -> i64 { (self.__vt_startpos)(self) }
+				pub fn __base_length(&mut self) -> i64 {
 					let __p = self as *const Self as *mut Self;
 					return ((self)._length).clone();
 				}
-				pub fn line(&mut self) -> i64 {
+				pub fn length(&mut self) -> i64 { (self.__vt_length)(self) }
+				pub fn __base_line(&mut self) -> i64 {
 					let __p = self as *const Self as *mut Self;
 					return ((self)._line).clone();
 				}
-				pub fn column(&mut self) -> i64 {
+				pub fn line(&mut self) -> i64 { (self.__vt_line)(self) }
+				pub fn __base_column(&mut self) -> i64 {
 					let __p = self as *const Self as *mut Self;
 					return ((self)._column).clone();
 				}
-				pub fn name(&mut self) -> i64 {
+				pub fn column(&mut self) -> i64 { (self.__vt_column)(self) }
+				pub fn __base_name(&mut self) -> i64 {
 					let __p = self as *const Self as *mut Self;
 					return ((self)._name).clone();
 				}
-				pub fn source(&mut self) -> &String {
+				pub fn name(&mut self) -> i64 { (self.__vt_name)(self) }
+				pub fn __base_source(&mut self) -> &String {
 					let __p = self as *const Self as *mut Self;
 					return &((self)._source);
 				}
-				pub fn has_source(&mut self) -> bool {
+				pub fn source(&mut self) -> &String { (self.__vt_source)(self) }
+				pub fn __base_has_source(&mut self) -> bool {
 					let __p = self as *const Self as *mut Self;
 					return ((self)._has_source).clone();
 				}
-				pub fn end_pos(&mut self) -> i64 {
+				pub fn has_source(&mut self) -> bool { (self.__vt_has_source)(self) }
+				pub fn __base_end_pos(&mut self) -> i64 {
 					let __p = self as *const Self as *mut Self;
 					return ((((self)._startpos).clone()) + &((self)._length));
 				}
-				pub fn text(&mut self) -> String {
+				pub fn end_pos(&mut self) -> i64 { (self.__vt_end_pos)(self) }
+				pub fn __base_text(&mut self) -> String {
 					let __p = self as *const Self as *mut Self;
 					if (((!((self)._has_source))) || ((((self)._startpos) < (0)))) {
 						return String::from("");
 					}
 					return python::ispa_std::string::substr(&((self)._source), ((self)._startpos).clone(), ((self)._length).clone());
 				}
+				pub fn text(&mut self) -> String { (self.__vt_text)(self) }
 				pub fn members(&self) -> (&i64, &i64, &i64, &i64, &String, &bool, &i64) { (&self._startpos, &self._length, &self._line, &self._column, &self._source, &self._has_source, &self._name) }
 				pub fn members_mut(&mut self) -> (&mut i64, &mut i64, &mut i64, &mut i64, &mut String, &mut bool, &mut i64) { (&mut self._startpos, &mut self._length, &mut self._line, &mut self._column, &mut self._source, &mut self._has_source, &mut self._name) }
 				pub fn members_str() -> [&'static str; 7] { ["_startpos", "_length", "_line", "_column", "_source", "_has_source", "_name"] }
 				pub fn methods_str() -> [&'static str; 11] { ["__init__", "blank", "startpos", "length", "line", "column", "name", "source", "has_source", "end_pos", "text"] }
 			}
 			#[repr(C)]
-			#[derive(Clone, Default)]
+			#[derive(Clone)]
 			pub struct RawToken {
 				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
+				pub __vt_copy: fn(&mut RawToken) -> ::ispa_std::Shared<python::ispa_std::raw_token::RawToken>,
+				pub __vt_empty: fn(&mut RawToken) -> bool,
+				pub __vt_isAmbiguous: fn(&mut RawToken) -> bool,
+				pub __vt_meta: fn(&mut RawToken) -> ::ispa_std::Shared<python::ispa_std::raw_token::RawTokenMeta>,
+				pub __vt_kind: fn(&mut RawToken) -> i64,
+				pub __vt_index: fn(&mut RawToken) -> i64,
+				pub __vt_holds: fn(&mut RawToken, i64) -> bool,
+				pub __vt_to_node: fn(&mut RawToken, i64) -> ::ispa_std::Shared<python::ispa_std::node::Node>,
+				pub __vt_text: fn(&mut RawToken) -> String,
 				pub _type_id: i64,
 				pub _meta: ::ispa_std::Shared<python::ispa_std::raw_token::RawTokenMeta>,
+			}
+			impl Default for RawToken {
+				fn default() -> Self {
+					Self {
+						__ispa_owner: Default::default(),
+						__vt_copy: RawToken::__base_copy,
+						__vt_empty: RawToken::__base_empty,
+						__vt_isAmbiguous: RawToken::__base_isAmbiguous,
+						__vt_meta: RawToken::__base_meta,
+						__vt_kind: RawToken::__base_kind,
+						__vt_index: RawToken::__base_index,
+						__vt_holds: RawToken::__base_holds,
+						__vt_to_node: RawToken::__base_to_node,
+						__vt_text: RawToken::__base_text,
+						_type_id: Default::default(),
+						_meta: Default::default(),
+					}
+				}
 			}
 			impl RawToken {
 				pub fn shared_default() -> ::ispa_std::Shared<Self> {
@@ -1389,35 +1457,42 @@ pub mod python {
 					let mut meta = { let __object = <python::ispa_std::raw_token::RawTokenMeta>::shared_default(); __object.borrow_mut().__init__((startpos).clone(), &((*source)), (has_source).clone(), (length).clone(), (line).clone(), 0, (enumv).clone()); __object };
 					return ({ let __object = <python::ispa_std::raw_token::RawToken>::shared_default(); __object.borrow_mut().__init__(((meta).clone()).upcast(), (type_id).clone()); __object }).upcast();
 				}
-				pub fn copy(&mut self) -> ::ispa_std::Shared<python::ispa_std::raw_token::RawToken> {
+				pub fn __base_copy(&mut self) -> ::ispa_std::Shared<python::ispa_std::raw_token::RawToken> {
 					let __p = self as *const Self as *mut Self;
 					return ({ let __object = <python::ispa_std::raw_token::RawToken>::shared_default(); __object.borrow_mut().__init__((((self)._meta).clone()).upcast(), ((self)._type_id).clone()); __object }).upcast();
 				}
-				pub fn empty(&mut self) -> bool {
+				pub fn copy(&mut self) -> ::ispa_std::Shared<python::ispa_std::raw_token::RawToken> { (self.__vt_copy)(self) }
+				pub fn __base_empty(&mut self) -> bool {
 					let __p = self as *const Self as *mut Self;
 					return (((self)._type_id) == ((*python::ispa_std::raw_token::NO_TYPE.get())));
 				}
-				pub fn isAmbiguous(&mut self) -> bool {
+				pub fn empty(&mut self) -> bool { (self.__vt_empty)(self) }
+				pub fn __base_isAmbiguous(&mut self) -> bool {
 					let __p = self as *const Self as *mut Self;
 					return ((((*((self)._meta).borrow_mut())).name()) == ((*python::ispa_std::raw_token::AMBIGUOUS_ID.get())));
 				}
-				pub fn meta(&mut self) -> ::ispa_std::Shared<python::ispa_std::raw_token::RawTokenMeta> {
+				pub fn isAmbiguous(&mut self) -> bool { (self.__vt_isAmbiguous)(self) }
+				pub fn __base_meta(&mut self) -> ::ispa_std::Shared<python::ispa_std::raw_token::RawTokenMeta> {
 					let __p = self as *const Self as *mut Self;
 					return (((self)._meta).clone()).upcast();
 				}
-				pub fn kind(&mut self) -> i64 {
+				pub fn meta(&mut self) -> ::ispa_std::Shared<python::ispa_std::raw_token::RawTokenMeta> { (self.__vt_meta)(self) }
+				pub fn __base_kind(&mut self) -> i64 {
 					let __p = self as *const Self as *mut Self;
 					return (((*((self)._meta).borrow_mut())).name()).clone();
 				}
-				pub fn index(&mut self) -> i64 {
+				pub fn kind(&mut self) -> i64 { (self.__vt_kind)(self) }
+				pub fn __base_index(&mut self) -> i64 {
 					let __p = self as *const Self as *mut Self;
 					return ((self)._type_id).clone();
 				}
-				pub fn holds(&mut self, mut type_id: i64) -> bool {
+				pub fn index(&mut self) -> i64 { (self.__vt_index)(self) }
+				pub fn __base_holds(&mut self, mut type_id: i64) -> bool {
 					let __p = self as *const Self as *mut Self;
 					return (((self)._type_id) == (type_id));
 				}
-				pub fn to_node(&mut self, mut type_id: i64) -> ::ispa_std::Shared<python::ispa_std::node::Node> {
+				pub fn holds(&mut self, type_id: i64) -> bool { (self.__vt_holds)(self, type_id) }
+				pub fn __base_to_node(&mut self, mut type_id: i64) -> ::ispa_std::Shared<python::ispa_std::node::Node> {
 					let __p = self as *const Self as *mut Self;
 					String::from("A Node reporting whether this token holds `type_id` (RawToken::to_node<T>): this base\n        has no payload to carry (see the module docstring), so a facade subclass that actually\n        holds one overrides this to carry it too.");
 					let mut m = ((self)._meta).clone();
@@ -1426,11 +1501,13 @@ pub mod python {
 					}
 					return (python::ispa_std::node::Node::with_data((((*(m).borrow_mut())).startpos()).clone(), &(((*(m).borrow_mut())).source()), (((*(m).borrow_mut())).has_source()).clone(), (((*(m).borrow_mut())).length()).clone(), (((*(m).borrow_mut())).line()).clone(), (((*(m).borrow_mut())).column()).clone(), (((*(m).borrow_mut())).name()).clone(), Default::default())).upcast();
 				}
-				pub fn text(&mut self) -> String {
+				pub fn to_node(&mut self, type_id: i64) -> ::ispa_std::Shared<python::ispa_std::node::Node> { (self.__vt_to_node)(self, type_id) }
+				pub fn __base_text(&mut self) -> String {
 					let __p = self as *const Self as *mut Self;
 					String::from("The source text this token covers (\"\" when it has no source).");
 					return (((*((self)._meta).borrow_mut())).text()).clone();
 				}
+				pub fn text(&mut self) -> String { (self.__vt_text)(self) }
 				pub fn members(&self) -> (&i64, &::ispa_std::Shared<python::ispa_std::raw_token::RawTokenMeta>) { (&self._type_id, &self._meta) }
 				pub fn members_mut(&mut self) -> (&mut i64, &mut ::ispa_std::Shared<python::ispa_std::raw_token::RawTokenMeta>) { (&mut self._type_id, &mut self._meta) }
 				pub fn members_str() -> [&'static str; 2] { ["_type_id", "_meta"] }
@@ -2665,6 +2742,7 @@ pub mod python {
 			pub struct TokenCursor {
 				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
 				pub __vt_copy: fn(&mut TokenCursor) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>,
+				pub __vt_assign: fn(&mut TokenCursor, ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>),
 				pub __vt_has_source: fn(&mut TokenCursor) -> bool,
 				pub __vt_sourceOrigin: fn(&mut TokenCursor) -> String,
 				pub __vt_getErrors: fn(&mut TokenCursor) -> Vec<String>,
@@ -2674,7 +2752,10 @@ pub mod python {
 				pub __vt_next: fn(&mut TokenCursor) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>,
 				pub __vt_prev: fn(&mut TokenCursor) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>,
 				pub __vt_advance_by: fn(&mut TokenCursor, i64) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>,
+				pub __vt_plus: fn(&mut TokenCursor, i64) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>,
 				pub __vt_current: fn(&mut TokenCursor) -> ::ispa_std::Shared<python::ispa_std::raw_token::RawToken>,
+				pub __vt_minus: fn(&mut TokenCursor, ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>) -> i64,
+				pub __vt_distance: fn(&mut TokenCursor) -> i64,
 				pub __vt_resumePosition: fn(&mut TokenCursor) -> i64,
 				pub __vt_advanceCharacters: fn(&mut TokenCursor, i64) -> bool,
 				pub owner: ::ispa_std::Shared<python::ispa_std::lexer::Lexer_base>,
@@ -2689,6 +2770,7 @@ pub mod python {
 					Self {
 						__ispa_owner: Default::default(),
 						__vt_copy: TokenCursor::__base_copy,
+						__vt_assign: TokenCursor::__base_assign,
 						__vt_has_source: TokenCursor::__base_has_source,
 						__vt_sourceOrigin: TokenCursor::__base_sourceOrigin,
 						__vt_getErrors: TokenCursor::__base_getErrors,
@@ -2698,7 +2780,10 @@ pub mod python {
 						__vt_next: TokenCursor::__base_next,
 						__vt_prev: TokenCursor::__base_prev,
 						__vt_advance_by: TokenCursor::__base_advance_by,
+						__vt_plus: TokenCursor::__base_plus,
 						__vt_current: TokenCursor::__base_current,
+						__vt_minus: TokenCursor::__base_minus,
+						__vt_distance: TokenCursor::__base_distance,
 						__vt_resumePosition: TokenCursor::__base_resumePosition,
 						__vt_advanceCharacters: TokenCursor::__base_advanceCharacters,
 						owner: Default::default(),
@@ -2732,7 +2817,7 @@ pub mod python {
 					return (self.__ispa_owner.upgrade().expect("instance has no shared owner")).upcast();
 				}
 				pub fn copy(&mut self) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> { (self.__vt_copy)(self) }
-				pub fn assign(&mut self, mut other: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>) {
+				pub fn __base_assign(&mut self, mut other: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>) {
 					let __p = self as *const Self as *mut Self;
 					(self).owner = (((*(other).borrow_mut())).owner).clone();
 					(self).state = (((*(other).borrow_mut())).state).clone();
@@ -2741,6 +2826,7 @@ pub mod python {
 					(self).owned_owner = (((*(other).borrow_mut())).owned_owner).clone();
 					(self).has_owned = (((*(other).borrow_mut())).has_owned).clone();
 				}
+				pub fn assign(&mut self, other: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>) { (self.__vt_assign)(self, other) }
 				pub fn __base_has_source(&mut self) -> bool {
 					let __p = self as *const Self as *mut Self;
 					return false;
@@ -2790,26 +2876,29 @@ pub mod python {
 					return (self.__ispa_owner.upgrade().expect("instance has no shared owner")).upcast();
 				}
 				pub fn advance_by(&mut self, count: i64) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> { (self.__vt_advance_by)(self, count) }
-				pub fn plus(&mut self, mut count: i64) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
+				pub fn __base_plus(&mut self, mut count: i64) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> {
 					let __p = self as *const Self as *mut Self;
 					let mut out = ((self).copy()).clone();
 					((*(out).borrow_mut())).advance_by((count).clone());
 					return ((out).clone()).upcast();
 				}
+				pub fn plus(&mut self, count: i64) -> ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor> { (self.__vt_plus)(self, count) }
 				pub fn __base_current(&mut self) -> ::ispa_std::Shared<python::ispa_std::raw_token::RawToken> {
 					let __p = self as *const Self as *mut Self;
 					python::ispa_std::failures::logic_error(&(String::from("TokenCursor.current is abstract")));
 					return ((((*((self).owner).borrow_mut())).empty_token()).clone()).upcast();
 				}
 				pub fn current(&mut self) -> ::ispa_std::Shared<python::ispa_std::raw_token::RawToken> { (self.__vt_current)(self) }
-				pub fn minus(&mut self, mut other: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>) -> i64 {
+				pub fn __base_minus(&mut self, mut other: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>) -> i64 {
 					let __p = self as *const Self as *mut Self;
 					return (((self).distance()) - (((*(other).borrow_mut())).distance()));
 				}
-				pub fn distance(&mut self) -> i64 {
+				pub fn minus(&mut self, other: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>) -> i64 { (self.__vt_minus)(self, other) }
+				pub fn __base_distance(&mut self) -> i64 {
 					let __p = self as *const Self as *mut Self;
 					return ((((self).distance_base).clone()) + &((self).token_index));
 				}
+				pub fn distance(&mut self) -> i64 { (self.__vt_distance)(self) }
 				pub fn __base_resumePosition(&mut self) -> i64 {
 					let __p = self as *const Self as *mut Self;
 					return ( - (1));
@@ -4901,10 +4990,20 @@ return ((a) < (b));
 				return ({ let __object = <python::ispa_std::parser_ll::TokenBoundary>::shared_default(); __object.borrow_mut().__init__(&((*name)), true); __object }).upcast();
 			}
 			#[repr(C)]
-			#[derive(Clone, Default)]
+			#[derive(Clone)]
 			pub struct TokenNames {
 				pub __ispa_owner: ::ispa_std::WeakShared<Self>,
+				pub __vt_lookup: fn(&mut TokenNames, i64) -> String,
 				pub names: Vec<String>,
+			}
+			impl Default for TokenNames {
+				fn default() -> Self {
+					Self {
+						__ispa_owner: Default::default(),
+						__vt_lookup: TokenNames::__base_lookup,
+						names: Default::default(),
+					}
+				}
 			}
 			impl TokenNames {
 				pub fn shared_default() -> ::ispa_std::Shared<Self> {
@@ -4917,13 +5016,14 @@ return ((a) < (b));
 					let __p = self as *const Self as *mut Self;
 					(self).names = ((*names)).clone();
 				}
-				pub fn lookup(&mut self, mut id: i64) -> String {
+				pub fn __base_lookup(&mut self, mut id: i64) -> String {
 					let __p = self as *const Self as *mut Self;
 					if ((((id) < (0))) || (((id) >= (((self).names.len() as i64))))) {
 						return String::from("");
 					}
 					return (::ispa_std::pycoll::PyIndex::py_index(&((self).names), &(id))).clone();
 				}
+				pub fn lookup(&mut self, id: i64) -> String { (self.__vt_lookup)(self, id) }
 				pub fn members(&self) -> (&Vec<String>,) { (&self.names,) }
 				pub fn members_mut(&mut self) -> (&mut Vec<String>,) { (&mut self.names,) }
 				pub fn members_str() -> [&'static str; 1] { ["names"] }

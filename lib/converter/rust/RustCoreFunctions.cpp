@@ -188,6 +188,15 @@ auto RustCore::indexFunctions(const LangAPI::Declarations& declarations) -> void
         }
     };
     walk(walk, declarations);
+    // classes the hand-written facade subclasses (its typed cursors, tokens and name tables): every method dispatches
+    for (const auto* cls : all_classes) {
+        static const std::unordered_set<std::string> open_classes{"TokenCursor", "RawToken", "RawTokenMeta", "TokenNames"};
+        if (!open_classes.contains(symbolKey(cls->name))) continue;
+        for (const auto& [member, visibility] : cls->data)
+            if (member->isFunction() && !member->getFunction().is_static && member->getFunction().name != "__init__" &&
+                member->getFunction().is_virtual)
+                slot_functions.insert(&member->getFunction());
+    }
     // dispatch slots: an overriding method registers in the first-base chain's topmost class that declares the method
     for (const auto* cls : all_classes) {
         for (const auto& [member, visibility] : cls->data) {
