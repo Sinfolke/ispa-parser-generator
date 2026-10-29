@@ -40,6 +40,8 @@ pub trait PrintValue {
     fn print_subtree(&self, printer: &mut ASTPrinter) {
         printer.node_with_value("value", ScalarText(self.scalar()), true);
     }
+    /// What `Node::print` shows for a filled node: the value's tree (nothing for an unset handle).
+    fn print_data(&self, printer: &mut ASTPrinter) { self.print_subtree(printer) }
 }
 struct ScalarText(String);
 impl PrintValue for ScalarText { fn scalar(&self) -> String { self.0.clone() } }
@@ -61,9 +63,10 @@ impl<T: PrintValue> PrintValue for Vec<T> {
     }
 }
 impl<T: PrintValue> PrintValue for Node<T> {
-    fn structured(&self) -> bool { self.value.structured() }
+    // a node prints itself (`<empty>` when unset), so it is always a nested tree
+    fn structured(&self) -> bool { true }
     fn scalar(&self) -> String { self.value.scalar() }
-    fn print_subtree(&self, printer: &mut ASTPrinter) { self.value.print_subtree(printer) }
+    fn print_subtree(&self, printer: &mut ASTPrinter) { self.print(printer) }
 }
 impl<T: PrintValue + 'static> PrintValue for Shared<T> {
     fn structured(&self) -> bool { !self.is_null() && self.borrow().structured() }
@@ -71,10 +74,14 @@ impl<T: PrintValue + 'static> PrintValue for Shared<T> {
     fn print_subtree(&self, printer: &mut ASTPrinter) {
         if self.is_null() { printer.node("nullptr", true); } else { self.borrow().print_subtree(printer); }
     }
+    fn print_data(&self, printer: &mut ASTPrinter) { if !self.is_null() { self.borrow().print_data(printer); } }
 }
 impl<T: PrintValue> Node<T> {
     /// Print the node's value as the children of the current tree position.
-    pub fn print(&self, printer: &mut ASTPrinter) { self.value.print_subtree(printer) }
+    pub fn print(&self, printer: &mut ASTPrinter) {
+        if self.empty() { printer.node("<empty>", false); return; }
+        self.value.print_data(printer)
+    }
 }
 
 /// `to_string` of a value as the generated code concatenates it.

@@ -2,7 +2,7 @@
 //! (`python::ispa_std::dfa_run::run`); the typed token a semantic action builds stays on this side.
 use crate::dfa::api::{Captures, CharToClass, TdfaLayout, NULL_STATE};
 use crate::python::ispa_std::{dfa_api, dfa_run, raw_token::RawToken as CoreToken, refs, utility::Pair};
-use crate::{LexerBase, Ptr, Shared};
+use crate::{Error, LexerBase, Ptr, Shared};
 use std::cell::RefCell;
 use std::collections::HashMap;
 
@@ -68,3 +68,36 @@ impl<Token: Clone + Default + 'static> LexerBase<Token> {
         accepted.unwrap_or_default()
     }
 }
+
+impl<Token: Clone + Default + 'static> LexerBase<Token> {
+    /// The text to lex. It is kept for the life of the program: tokens point into it.
+    pub fn set_input(&mut self, text: &str) {
+        let text: &'static str = Box::leak(text.to_string().into_boxed_str());
+        self.input = Some(text);
+        self.line = 1;
+        self.tokens.clear();
+        self.errors.clear();
+    }
+    /// Tokenize the whole input: every non-empty token goes through `on_token`, the end through `on_eof`.
+    pub fn make_tokens(&mut self) -> Result<(), Error>
+    where Token: TokenEnd {
+        let text = self.input.ok_or_else(|| Error::new("can't lex because no input provided. "))?;
+        let mut pos = Ptr::new(text);
+        self.init();
+        while !pos.is_eof() {
+            let before = pos.offset();
+            let token = self.makeToken(&mut pos);
+            if pos.offset() == before {
+                return Err(Error::new(format!("no matches at position {}, on character {}, and no exception can handle it", before,
+                                              text[before..].chars().next().unwrap_or('\0'))));
+            }
+            if !token.is_end() { self.on_token(token); }
+        }
+        self.on_eof();
+        Ok(())
+    }
+}
+
+/// A token that can say it is the empty end marker.
+pub trait TokenEnd { fn is_end(&self) -> bool; }
+impl<V: crate::TokenVariant> TokenEnd for crate::RawToken<V> { fn is_end(&self) -> bool { self.empty() } }

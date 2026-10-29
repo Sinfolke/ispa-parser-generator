@@ -39,7 +39,8 @@ pub trait BridgeCursor: Clone + 'static {
 }
 impl<V: TokenVariant> BridgeCursor for TokenIterator<RawToken<V>> {
     type Token = RawToken<V>;
-    fn is_end(&self) -> bool { TokenIterator::is_end(self) }
+    // the empty token that closes the stream is the end
+    fn is_end(&self) -> bool { self.get().map_or(true, |token| token.empty()) }
     fn advance(&mut self) { TokenIterator::advance(self) }
     fn retreat(&mut self) { TokenIterator::retreat(self) }
     fn distance(&self) -> i64 { TokenIterator::distance(self) as i64 }
@@ -95,6 +96,30 @@ impl TypedRawToken {
         }).upcast()
     }
 }
+/// Token metadata whose text is the token's own, not a slice of a source string the core would have to hold.
+#[repr(C)]
+struct TypedMeta {
+    base_0: RawTokenMeta,
+    text: String,
+}
+impl Upcast<RawTokenMeta> for TypedMeta {
+    unsafe fn up_ptr(this: *mut Self) -> *mut RawTokenMeta { std::ptr::addr_of_mut!((*this).base_0) }
+}
+impl TypedMeta {
+    fn this(base: &mut RawTokenMeta) -> &mut TypedMeta { unsafe { &mut *(base as *mut RawTokenMeta as *mut TypedMeta) } }
+
+    fn handle(start: i64, text: String, length: i64, line: i64, column: i64, kind: i64) -> Shared<RawTokenMeta> {
+        Shared::new_with(|owner: &WeakShared<TypedMeta>| {
+            let mut meta = TypedMeta { base_0: RawTokenMeta::default(), text };
+            meta.base_0.__bind_owner(&owner.upcast());
+            meta.base_0.__init__(start, &String::new(), false, length, line, column, kind);
+            meta.base_0.__vt_has_source = |_| true;
+            meta.base_0.__vt_text = |base| TypedMeta::this(base).text.clone();
+            meta
+        }).upcast()
+    }
+}
+
 /// A node already wrapped for the core, kept as the token's payload.
 #[derive(Clone)]
 struct CarriedNode(Shared<CoreNode>);
@@ -180,8 +205,8 @@ impl<IT: BridgeCursor> TypedCursor<IT> {
             if let Some((at, token)) = &this.cached { if *at == distance { return token.clone(); } }
             let Some(token) = this.it.current() else { return CoreToken::empty_token() };
             let (start, text, has_source, length, line, column, kind) = token.span();
-            let meta = RawTokenMeta::shared_default();
-            meta.borrow_mut().__init__(start, &text, has_source, length, line, column, kind);
+            let _ = has_source;
+            let meta = TypedMeta::handle(start, text, length, line, column, kind);
             let node = match this.make_node.and_then(|make| make(&token)) {
                 Some(node) => to_any(CarriedNode(node)),
                 None => PyAny::default(),

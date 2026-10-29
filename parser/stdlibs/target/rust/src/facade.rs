@@ -126,6 +126,7 @@ pub struct LexerBase<Token> {
     pub line: i64,
     pub external_boundary: bool,
     pub bound: i64,
+    pub(crate) input: Option<&'static str>,
     pub __vt_clone_: fn(&LexerBase<Token>) -> Shared<LexerBase<Token>>,
     pub __vt_init: fn(&mut LexerBase<Token>),
     pub __vt_on_token: fn(&mut LexerBase<Token>, Token),
@@ -135,13 +136,13 @@ pub struct LexerBase<Token> {
 impl<Token: Clone + 'static> Clone for LexerBase<Token> {
     fn clone(&self) -> Self {
         Self { tokens: self.tokens.clone(), errors: self.errors.clone(), line: self.line, external_boundary: self.external_boundary,
-               bound: self.bound, __vt_clone_: self.__vt_clone_, __vt_init: self.__vt_init, __vt_on_token: self.__vt_on_token,
+               bound: self.bound, input: self.input, __vt_clone_: self.__vt_clone_, __vt_init: self.__vt_init, __vt_on_token: self.__vt_on_token,
                __vt_on_eof: self.__vt_on_eof, __vt_makeToken: self.__vt_makeToken }
     }
 }
 impl<Token: Clone + Default + 'static> Default for LexerBase<Token> {
     fn default() -> Self {
-        Self { tokens: Vec::new(), errors: Vec::new(), line: 1, external_boundary: false, bound: -1,
+        Self { tokens: Vec::new(), errors: Vec::new(), line: 1, external_boundary: false, bound: -1, input: None,
                __vt_clone_: |lexer| Shared::new(lexer.clone()),
                __vt_init: |_| {}, __vt_on_token: |lexer, token| lexer.append_token(token), __vt_on_eof: |_| {},
                __vt_makeToken: |_, _| Token::default() }
@@ -191,7 +192,7 @@ impl<L, Token: Clone + Default + 'static> TokenStream for L where L: std::ops::D
 pub fn lookahead_kind<IT: TokenCursorKind>(cursor: IT) -> usize { cursor.kind() }
 pub trait TokenCursorKind { fn kind(&self) -> usize; }
 impl<V: TokenVariant> TokenCursorKind for TokenIterator<RawToken<V>> {
-    fn kind(&self) -> usize { self.get().map_or(crate::recovery::END_OF_INPUT, |token| token.id) }
+    fn kind(&self) -> usize { self.get().filter(|token| !token.empty()).map_or(crate::recovery::END_OF_INPUT, |token| token.id) }
 }
 impl<V: TokenVariant> TokenCursorKind for LazyIterator<RawToken<V>> {
     fn kind(&self) -> usize { unimplemented!("lazy lexing") }

@@ -867,7 +867,7 @@ namespace Rust {
                         text.erase(at, open.size());
                     }
                     // `Types::x` is an alias of `FlatTypes::x`: the namespace does not tell types apart here
-                    for (const std::string prefix : {"crate::o::FlatTypes::", "crate::o::Types::", "FlatTypes::", "Types::"})
+                    for (const std::string prefix : {RustCore::crateRoot() + "::FlatTypes::", RustCore::crateRoot() + "::Types::", std::string("FlatTypes::"), std::string("Types::")})
                         for (auto at = text.find(prefix); at != std::string::npos; at = text.find(prefix)) text.erase(at, prefix.size());
                     return text;
                 };
