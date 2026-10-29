@@ -303,11 +303,12 @@ namespace Rust {
     auto Construct::emitFunctionChecked(const LangAPI::Function &func, Converter::Writer &w, Converter::Writer &aux, FnKind kind,
                                  const std::string &scope, const std::vector<std::string> &bases) -> void {
         std::string name = kind == FnKind::Constructor ? "new" : RustCore::ident(func.name);
+        if (!RustCore::emit_name.empty()) { name = RustCore::emit_name; RustCore::emit_name.clear(); }
         const auto key = scope + "::" + name;
         if (++context.fn_counts[key] > 1)
             throw Error("Rust target: overloaded function `{}` needs a resolved callee identity in IR", key);
-        if (func.override)
-            throw Error("Rust target: virtual method `{}` needs a semantic runtime/interface contract in IR", func.name);
+        if (func.override && !RustCore::overrides.contains(&func))
+            throw Error("Rust target: virtual method `{}` overrides a method the IR does not declare in a base class", func.name);
 
         // generics + marker traits
         std::vector<std::string> generics;
@@ -467,6 +468,14 @@ namespace Rust {
             }
         }
         if (cls.to_str_fun) RustCore::members.insert(cls.to_str_fun->name);
+        // data members the runtime base class provides (reached unqualified, like `this->tokens`)
+        if (!cls.inherit_members.empty())
+            if (const auto* library = std::get_if<LangAPI::IspaLibSymbol>(&cls.inherit_members.front().second)) {
+                if (library->exports == LangAPI::StdlibExports::Lexer)
+                    RustCore::members.insert({"tokens", "errors", "line", "external_boundary", "bound"});
+                else if (library->exports == LangAPI::StdlibExports::Parser)
+                    RustCore::members.insert({"lexer", "has_lexer", "text", "has_text", "tree"});
+            }
 
 
         std::vector<std::string> bases;
@@ -492,20 +501,44 @@ namespace Rust {
                 siblings.push_back(declaration.get());
             }
         }
+        // dynamic dispatch: a method some subclass overrides becomes a function-pointer slot in this class; overriding
+        // methods register a thunk in the slot when the object is built
+        std::vector<const LangAPI::Function *> slots, overriding;
+        for (const auto &[declaration, visibility] : cls.data) {
+            if (!declaration->isFunction()) continue;
+            const auto &fn = declaration->getFunction();
+            if (RustCore::slot_functions.contains(&fn)) slots.push_back(&fn);
+            if (RustCore::overrides.contains(&fn)) overriding.push_back(&fn);
+        }
+        if ((!slots.empty() || !overriding.empty()) && (templated || bases.size() > 1))
+            throw Error("Rust target: virtual dispatch in generic or multiply-inheriting class `{}` is not supported", name);
+        const auto fn_pointer_type = [&](const LangAPI::Function &fn, const std::string &receiver_type) {
+            std::vector<std::string> types{std::string(fn.is_const ? "&" : "&mut ") + receiver_type};
+            for (const auto &p : fn.parameters) {
+                auto type = RustCore::convertType(p.first);
+                if (type.starts_with("impl "))
+                    throw Error("Rust target: virtual method `{}` takes a callable parameter", fn.name);
+                types.push_back(type);
+            }
+            return "fn(" + joinStrings(types, ", ") + ")" +
+                   (fn.type.isValueType() && fn.type.getValueType() == LangAPI::ValueType::Void ? std::string() : " -> " + RustCore::convertType(fn.type));
+        };
         for (const auto &f : fields) if (f.type == "::ispa_std::PyAny") RustCore::any_fields.insert(f.name);
         const auto is_callable = [](const Field &f) { return f.type.starts_with("Box<dyn FnMut"); };
         for (const auto &f : fields) if (is_callable(f)) RustCore::callable_fields.insert(f.name);
         const bool has_callable = std::any_of(fields.begin(), fields.end(), is_callable);   // Box<dyn FnMut>: neither Clone nor Default
-        const bool has_defaults = has_callable || std::any_of(fields.begin(), fields.end(), [](const Field &f) { return !f.init->empty(); });
+        const bool has_defaults = has_callable || !slots.empty() || !overriding.empty() ||
+                                  std::any_of(fields.begin(), fields.end(), [](const Field &f) { return !f.init->empty(); });
 
         // --- struct ---
-        if (cls.shared_object) emitLine(w, "#[repr(C)]");   // the base part is the first field: handles to a base are plain pointers
+        if (cls.shared_object || !overriding.empty()) emitLine(w, "#[repr(C)]");   // the base part is the first field: handles to a base are plain pointers
         if (has_callable) emitLine(w, "// a Callable field makes this class neither Clone nor derivable Default");
         else emitLine(w, std::string("#[derive(Clone") + (has_defaults ? "" : ", Default") + ")]");
         emitLine(w, "pub struct " + name + generics + " {");
         w.increaseIndentation();
         if (cls.shared_object) emitLine(w, "pub __ispa_owner: ::ispa_std::WeakShared<Self>,");
         for (std::size_t i = 0; i < bases.size(); ++i) emitLine(w, "pub base_" + std::to_string(i) + ": " + bases[i] + ",");
+        for (const auto *slot : slots) emitLine(w, "pub __vt_" + RustCore::ident(slot->name) + ": " + fn_pointer_type(*slot, name) + ",");
         for (const auto &f : fields) emitLine(w, "pub " + f.name + ": " + f.type + ",");
         if (templated) {
             std::vector<std::string> names;
@@ -523,7 +556,18 @@ namespace Rust {
             emitLine(w, "Self {");
             w.increaseIndentation();
             if (cls.shared_object) emitLine(w, "__ispa_owner: Default::default(),");
-            for (std::size_t i = 0; i < bases.size(); ++i) emitLine(w, "base_" + std::to_string(i) + ": Default::default(),");
+            for (std::size_t i = 0; i < bases.size(); ++i) {
+                if (overriding.empty()) { emitLine(w, "base_" + std::to_string(i) + ": Default::default(),"); continue; }
+                std::string registrations;
+                for (const auto *fn : overriding) {
+                    std::string path = "__base";
+                    for (std::size_t hop = 1; hop < RustCore::overrides.at(fn).depth; ++hop) path += ".base_0";
+                    registrations += path + ".__vt_" + RustCore::ident(fn->name) + " = " + name + "::__thunk_" + RustCore::ident(fn->name) + "; ";
+                }
+                emitLine(w, "base_" + std::to_string(i) + ": { let mut __base: " + bases[i] + " = Default::default(); " + registrations + "__base },");
+            }
+            for (const auto *slot : slots)
+                emitLine(w, "__vt_" + RustCore::ident(slot->name) + ": " + name + "::__base_" + RustCore::ident(slot->name) + ",");
             for (const auto &f : fields) {
                 std::string value = f.init->empty() ? std::string("Default::default()") : initializer(*f.ir_type, *f.init);
                 if (is_callable(f) && f.init->empty()) {
@@ -554,6 +598,15 @@ namespace Rust {
             }
         }
 
+        // a lexer exposes the iterator types of its runtime base to the parser generics
+        if (!cls.inherit_members.empty() && !templated)
+            if (const auto* library = std::get_if<LangAPI::IspaLibSymbol>(&cls.inherit_members.front().second);
+                library && library->exports == LangAPI::StdlibExports::Lexer) {
+                const auto base = "<" + bases[0] + " as ::ispa_std::LexerTypes>";
+                emitLine(w, "impl ::ispa_std::LexerTypes for " + name + " { type Token = " + base + "::Token; type Iterator = " + base +
+                            "::Iterator; type LazyIterator = " + base + "::LazyIterator; }");
+            }
+
         // --- impl ---
         Converter::Writer aux;
         const auto saved_modules = context.module_path;
@@ -582,8 +635,42 @@ namespace Rust {
                 return entry.first->isFunction() && entry.first->getFunction().name == "__init__"; }))
             emitLine(w, "pub fn __init__(&mut self) {}");
         if (cls.constructor) emitFunction(*cls.constructor, w, aux, FnKind::Constructor, scope, bases);
-        for (const auto &[declaration, visibility] : cls.data)
-            if (declaration->isFunction()) emitFunction(declaration->getFunction(), w, aux, FnKind::Method, scope, bases);
+        for (const auto &[declaration, visibility] : cls.data) {
+            if (!declaration->isFunction()) continue;
+            const auto &fn = declaration->getFunction();
+            if (RustCore::slot_functions.contains(&fn)) {
+                // the body keeps running as the default of the slot; the method itself dispatches
+                RustCore::emit_name = "__base_" + RustCore::ident(fn.name);
+                emitFunction(fn, w, aux, FnKind::Method, scope, bases);
+                std::vector<std::string> params, args;
+                for (const auto &p : fn.parameters) {
+                    params.push_back(RustCore::ident(p.second) + ": " + RustCore::convertType(p.first));
+                    args.push_back(RustCore::ident(p.second));
+                }
+                const bool is_void = fn.type.isValueType() && fn.type.getValueType() == LangAPI::ValueType::Void;
+                emitLine(w, "pub fn " + RustCore::ident(fn.name) + "(" + (fn.is_const ? "&self" : "&mut self") +
+                            (params.empty() ? "" : ", " + joinStrings(params, ", ")) + ")" +
+                            (is_void ? "" : " -> " + RustCore::convertType(fn.type)) + " { (self.__vt_" + RustCore::ident(fn.name) + ")(self" +
+                            (args.empty() ? "" : ", " + joinStrings(args, ", ")) + ") }");
+                continue;
+            }
+            emitFunction(fn, w, aux, FnKind::Method, scope, bases);
+            if (RustCore::overrides.contains(&fn)) {
+                const auto &info = RustCore::overrides.at(&fn);
+                std::vector<std::string> params, args;
+                for (const auto &p : fn.parameters) {
+                    params.push_back(RustCore::ident(p.second) + ": " + RustCore::convertType(p.first));
+                    args.push_back(RustCore::ident(p.second));
+                }
+                const bool is_void = fn.type.isValueType() && fn.type.getValueType() == LangAPI::ValueType::Void;
+                const auto introducer = info.library ? bases[0] : info.introducer;
+                emitLine(w, "pub fn __thunk_" + RustCore::ident(fn.name) + "(base: " + (fn.is_const ? "&" : "&mut ") + introducer +
+                            (params.empty() ? "" : ", " + joinStrings(params, ", ")) + ")" +
+                            (is_void ? "" : " -> " + RustCore::convertType(fn.type)) + " { let this = unsafe { &" + (fn.is_const ? "" : "mut ") +
+                            "*(base as *const " + introducer + " as *" + (fn.is_const ? "const " : "mut ") + name + ") }; this." +
+                            RustCore::ident(fn.name) + "(" + joinStrings(args, ", ") + ") }");
+            }
+        }
         if (cls.to_str_fun) emitFunction(*cls.to_str_fun, w, aux, FnKind::Method, scope, bases);
 
         // reflection used by printers: members() / members_mut() / members_str(), methods_str()

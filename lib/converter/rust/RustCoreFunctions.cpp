@@ -148,6 +148,10 @@ auto RustCore::indexFunctions(const LangAPI::Declarations& declarations) -> void
     class_methods.clear();
     class_fields.clear();
     class_generics.clear();
+    class_decls.clear();
+    slot_functions.clear();
+    overrides.clear();
+    std::vector<const LangAPI::Class*> all_classes;
     std::vector<std::string> path;
     const auto add = [&](const LangAPI::Function& function) {
         functions[joinStrings(path, "::") + (path.empty() ? "" : "::") + function.name].push_back(&function);
@@ -165,6 +169,8 @@ auto RustCore::indexFunctions(const LangAPI::Declarations& declarations) -> void
                     globals.insert(joinStrings(path, "::") + (path.empty() ? "" : "::") + variable.name);
             } else if (declaration.isClass()) {
                 const auto& cls = declaration.getClass();
+                class_decls[symbolKey(cls.name)] = &cls;
+                all_classes.push_back(&cls);
                 if (cls.shared_object) shared_classes.insert(symbolKey(cls.name));
                 class_generics[symbolKey(cls.name)] = cls.template_parameters.size();
                 path.push_back(symbolKey(cls.name));
@@ -182,6 +188,39 @@ auto RustCore::indexFunctions(const LangAPI::Declarations& declarations) -> void
         }
     };
     walk(walk, declarations);
+    // dispatch slots: an overriding method registers in the first-base chain's topmost class that declares the method
+    for (const auto* cls : all_classes) {
+        for (const auto& [member, visibility] : cls->data) {
+            if (!member->isFunction() || !member->getFunction().override) continue;
+            const auto& function = member->getFunction();
+            const LangAPI::Class* current = cls;
+            const LangAPI::Function* introduced = nullptr;
+            const LangAPI::Class* introducer = nullptr;
+            std::size_t hops = 0, found_hops = 0;
+            while (!current->inherit_members.empty()) {
+                const auto* base = std::get_if<LangAPI::Symbol>(&current->inherit_members.front().second);
+                if (!base) break;
+                const auto it = class_decls.find(symbolKey(*base));
+                if (it == class_decls.end()) break;
+                current = it->second;
+                ++hops;
+                for (const auto& [candidate, v] : current->data)
+                    if (candidate->isFunction() && candidate->getFunction().name == function.name && !candidate->getFunction().is_static) {
+                        introduced = &candidate->getFunction();
+                        introducer = current;
+                        found_hops = hops;
+                    }
+            }
+            if (!introduced) {
+                // the base is the runtime (a library type): its slot lives there, registered like any other
+                if (!current->inherit_members.empty() && std::holds_alternative<LangAPI::IspaLibSymbol>(current->inherit_members.front().second))
+                    overrides[&function] = {"", hops + 1, true};
+                continue;
+            }
+            slot_functions.insert(introduced);
+            overrides[&function] = {symbolKey(introducer->name), found_hops};
+        }
+    }
 }
 
 auto RustCore::isSharedObjectInitializer(const LangAPI::Expression &value) -> bool {
@@ -442,6 +481,9 @@ auto RustCore::convertType(const LangAPI::Type &type) -> std::string {
                 throw Error("Unknown type: {}", (int) type.getValueType());
         }
     } else if (type.isSymbol()) {
+        if (type.getSymbol().path.size() == 1 && std::holds_alternative<std::string>(type.getSymbol().path[0]) &&
+            std::get<std::string>(type.getSymbol().path[0]) == "auto")
+            return "_";
         auto text = convertSymbol(type.getSymbol(), false);
         if (!type.template_parameters.empty())
             text += "<" + convertTemplates(type.template_parameters) + ">";
@@ -1166,7 +1208,20 @@ auto RustCore::convertFunctionCall(const LangAPI::FunctionCall &call, bool membe
                 const auto callee = convertSymbol(symbol, !member) + generic(convertTemplates(call.template_parameters), true) + "(" + joinStrings(args, ", ") + ")";
                 return "{ " + joinStrings(pending, " ") + " " + callee + " }";
             }
-        }        return convertSymbol(symbol, !member) + generic(convertTemplates(call.template_parameters), true) + "(" + joinStrings(args, ", ") + ")";
+        }        auto callee = convertSymbol(symbol, !member);
+        // a bare call that names nothing in scope is an inherited runtime method of the base class
+        if (!member && !receiver.empty() && symbol.path.size() == 1 && std::holds_alternative<std::string>(symbol.path[0]) &&
+            !resolveFunction(symbol) && !callable_parameters.contains(std::get<std::string>(symbol.path[0])) &&
+            !members.contains(std::get<std::string>(symbol.path[0])) &&
+            !std::any_of(locals.rbegin(), locals.rend(), [&](const auto& frame) { return frame.contains(std::get<std::string>(symbol.path[0])); }))
+            callee = receiver + "." + callee;
+        if (!member)   // `Base.method(self, ...)` on a dispatching method runs the base implementation, not the dispatcher
+            if (const auto* function = resolveFunction(symbol); function && slot_functions.contains(function)) {
+                const auto at = callee.rfind("::");
+                const auto method = at == std::string::npos ? callee : callee.substr(at + 2);
+                callee = (at == std::string::npos ? std::string() : callee.substr(0, at + 2)) + "__base_" + method;
+            }
+        return callee + generic(convertTemplates(call.template_parameters), true) + "(" + joinStrings(args, ", ") + ")";
     }
     const auto &lib = *std::get<std::shared_ptr<LangAPI::IspaLibSymbol>>(call.name);
     std::string callee = convertIspaLibSymbol(lib, true);

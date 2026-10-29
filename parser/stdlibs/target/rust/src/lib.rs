@@ -1,7 +1,12 @@
+#![allow(non_snake_case, non_camel_case_types, non_upper_case_globals, unused_mut, unused_variables, unused_parens,
+         unused_labels, unused_imports, unreachable_patterns, unreachable_code, dead_code, unused_braces,
+         invalid_reference_casting, clippy::all)]
 //! Runtime primitives used by code emitted from ISPA's Rust backend.
 //!
 //! The crate intentionally has no third party dependencies so generated parsers
 //! can use it from an offline Cargo build.
+
+extern crate self as ispa_std;
 
 use std::fmt;
 use std::marker::PhantomData;
@@ -536,3 +541,6 @@ mod execution_tests {
         assert_eq!(parser.errors().len(), 1);
     }
 }
+
+// The Python runtime (parser/stdlibs/python/ispa_std) lowered to Rust by ispa itself: `python::ispa_std::*`.
+include!("lowered.rs");

@@ -49,6 +49,11 @@ export namespace RustCore {
     std::unordered_map<std::string, std::vector<const LangAPI::Function*>> class_methods;   // "Class::method" (bare class name)
     std::unordered_map<std::string, std::unordered_map<std::string, const LangAPI::Type*>> class_fields;
     std::unordered_map<std::string, const LangAPI::Type*> local_types;   // declared types of locals/parameters of the function being emitted
+    struct OverrideInfo { std::string introducer; std::size_t depth; bool library = false; };   // class that owns the dispatch slot, and base_0 hops to it
+    std::unordered_map<std::string, const LangAPI::Class*> class_decls;     // by bare class name
+    std::unordered_set<const LangAPI::Function*> slot_functions;            // introduced methods that some subclass overrides
+    std::unordered_map<const LangAPI::Function*, OverrideInfo> overrides;   // overriding methods
+    std::string emit_name;                                                  // name to give the next emitted function
     std::unordered_map<std::string, std::size_t> class_generics;   // bare class name -> number of type parameters
     std::vector<std::string>* hoist_sink = nullptr;        // call arguments that re-borrow `self` are bound before the receiver is borrowed
     bool hoist_self = false;                               // ... and the receiver is rooted at `self`, so arguments touching `self` are hoisted too
