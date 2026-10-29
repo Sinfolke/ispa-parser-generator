@@ -9,7 +9,7 @@ from ispa_std.format import int_to_string, join
 from ispa_std.node import Node
 
 EOF_TOKEN = -1
-END_OF_INPUT = EOF_TOKEN
+END_OF_INPUT: int = EOF_TOKEN
 NO_OFFSET = -1
 
 

@@ -88,7 +88,7 @@ class DebugState:
         self.serial = 0
 
 
-_S = DebugState()
+_S: DebugState = DebugState()
 
 
 def configure(sink, control) -> None:

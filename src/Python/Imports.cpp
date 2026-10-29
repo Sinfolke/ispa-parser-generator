@@ -459,6 +459,11 @@ std::string Imports::module(const Modules::Path& source_path, const std::string&
             if (declaration.isVariable() && declaration.getVariable().type == LangAPI::ValueType::Undef) {
                 const auto* assignment = statement->get<py::Assign>();
                 const auto* literal = assignment && assignment->value ? assignment->value->get<py::Constant>() : nullptr;
+                // A negated numeric literal (`NPOS = -1`) is still a literal.
+                if (!literal && assignment && assignment->value)
+                    if (auto negated = assignment->value->get<py::UnaryExpr>(); negated && negated->operand &&
+                        (negated->op == py::UnaryOp::USub || negated->op == py::UnaryOp::UAdd))
+                        literal = negated->operand->get<py::Constant>();
                 if (!literal) fail(statement->pos, "nonliteral module variables require a type annotation");
                 auto& type = declaration.getVariable().type;
                 switch (literal->kind) {

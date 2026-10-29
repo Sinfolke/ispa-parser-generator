@@ -40,8 +40,8 @@ class TraceSink:
         return
 
 
-_TRACE = [TraceSink()]
-_TRACE_ON = [False]
+_TRACE: list[TraceSink] = [TraceSink()]
+_TRACE_ON: list[bool] = [False]
 
 
 def set_trace_sink(sink) -> None:
