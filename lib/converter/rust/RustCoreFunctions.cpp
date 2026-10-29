@@ -144,6 +144,7 @@ auto RustCore::bind(const std::string& name) -> void {
     if (!locals.empty()) locals.back().insert(name);
     borrowed_parameters.erase(name);
     shared_locals.erase(ident(name));
+    lent_locals.erase(ident(name));
 }
 auto RustCore::indexFunctions(const LangAPI::Declarations& declarations) -> void {
     functions.clear();
@@ -500,7 +501,7 @@ auto RustCore::convertType(const LangAPI::Type &type) -> std::string {
         }
     } else if (type.isSymbol()) {
         if (type.getSymbol().path.size() == 1 && std::holds_alternative<std::string>(type.getSymbol().path[0]) &&
-            std::get<std::string>(type.getSymbol().path[0]) == "auto")
+            (std::get<std::string>(type.getSymbol().path[0]) == "auto" || std::get<std::string>(type.getSymbol().path[0]) == "auto&"))
             return "_";
         auto text = convertSymbol(type.getSymbol(), false);
         if (!type.template_parameters.empty())
@@ -1061,6 +1062,8 @@ auto RustCore::convertLambda(const LangAPI::Lambda &lambda) -> std::string {
     for (const auto &p : lambda.parameters) {
         bind(p.second);
         if (isValueTypeOf(p.first, LangAPI::ValueType::BorrowSemantic)) borrowed_parameters.insert(p.second);
+        if (p.first.isSymbol() && p.first.getSymbol().path.size() == 1 && std::holds_alternative<std::string>(p.first.getSymbol().path[0]) &&
+            std::get<std::string>(p.first.getSymbol().path[0]) == "auto&") reference_parameters.insert(p.second);   // `auto&`: a lent argument
         const auto type = convertType(p.first);
         params.push_back(ident(p.second) + (type == "_" ? "" : ": " + type));
     }
@@ -1090,6 +1093,7 @@ auto RustCore::runtimeArgument(const LangAPI::Expression &expression, const std:
             const auto &name = std::get<std::string>(rvalue.getSymbol().path[0]);
             if (reference_parameters.contains(name) || (borrowed_parameters.contains(name) && !const_borrowed_parameters.contains(name)))
                 return "&mut *" + ident(name);
+            if (lent_locals.contains(ident(name))) return "&mut " + ident(name);
         }
         if (rvalue.type() == LangAPI::RValueType::Pos && !rvalue.getPos().dereference && rendered.find("(*") != std::string::npos &&
             rendered.find(".offset(") == std::string::npos)
@@ -1148,6 +1152,16 @@ auto RustCore::convertFunctionCall(const LangAPI::FunctionCall &call, bool membe
         const auto &symbol = *std::get<std::shared_ptr<LangAPI::Symbol>>(call.name);
         // a method name after `.` never refers to a local or member of the same spelling
         const auto symbol_name = convertSymbol(symbol, !member);
+        if (symbol_name == "custom_failure" && !member && !counter.empty()) {
+            // the cursor is named so the block's parameters have a known type
+            const auto object = receiver.empty() ? std::string("self") : receiver;
+            return object + ".custom_failure(&" + counter.back() + (args.empty() ? "" : ", " + joinStrings(args, ", ")) + ")";
+        }
+        if (symbol_name == "custom_failure_decision" && !member && args.size() == 3) {
+            // the context holds the failing position: the decision is taken from it, not from a second borrow of the cursor
+            const auto object = receiver.empty() ? std::string("self") : receiver;
+            return object + ".custom_failure_decision(" + runtimeArgument(call.args[0], args[0]) + ", " + runtimeArgument(call.args[2], args[2]) + ")";
+        }
         if (symbol_name == "recovery_at" || symbol_name == "recover_choice") {
             std::vector<std::string> sets;
             for (const auto& parameter : call.template_parameters) sets.push_back(recovery_set(parameter));
@@ -1250,17 +1264,7 @@ auto RustCore::convertFunctionCall(const LangAPI::FunctionCall &call, bool membe
             if (args[i] == raw_args[i]) {
                 // a namespace-level table handed to a runtime method is lent, not copied
                 if (args[i].starts_with("(*") && args[i].ends_with(".get())")) { args[i] = "&" + args[i]; continue; }
-                // a reference parameter handed on is lent again
-                if (call.args[i].size() == 1 && call.args[i][0].isRvalue() && call.args[i][0].getRValue().isSymbol() &&
-                    call.args[i][0].getRValue().getSymbol().path.size() == 1 &&
-                    std::holds_alternative<std::string>(call.args[i][0].getRValue().getSymbol().path[0]) &&
-                    (reference_parameters.contains(std::get<std::string>(call.args[i][0].getRValue().getSymbol().path[0])) ||
-             (borrowed_parameters.contains(std::get<std::string>(call.args[i][0].getRValue().getSymbol().path[0])) &&
-              !const_borrowed_parameters.contains(std::get<std::string>(call.args[i][0].getRValue().getSymbol().path[0]))))) {
-                    args[i] = "&mut *" + ident(std::get<std::string>(call.args[i][0].getRValue().getSymbol().path[0]));
-                    continue;
-                }
-                args[i] = convertInitializerValue(LangAPI::Type{LangAPI::ValueType::Undef}, call.args[i]);
+                args[i] = runtimeArgument(call.args[i], args[i]);   // a copy, or a lent reference parameter / fail context
             }
         auto callee = convertSymbol(symbol, !member);
         // a bare call that names nothing in scope is an inherited runtime method of the base class
@@ -1387,6 +1391,27 @@ auto RustCore::convertIspaLibFunctionCall(const LangAPI::IspaLibFunctionCall &ca
     const auto turbofish = generic(convertTemplates(call.template_parameters), true);
     if (parser_call) {
         if (!args.empty()) args[0] = "&mut " + args[0];   // the cursor is advanced in place
+        // an argument that reads the cursor (a fail block naming it) is evaluated before the cursor is lent
+        std::vector<std::string> pending;
+        if (!args.empty()) {
+            const auto cursor = args[0].substr(5);
+            for (std::size_t i = 1; i < args.size(); ++i) {
+                bool mentions = false;
+                for (auto at = args[i].find(cursor); at != std::string::npos && !mentions; at = args[i].find(cursor, at + 1)) {
+                    const auto word = [](char c) { return std::isalnum(static_cast<unsigned char>(c)) || c == '_'; };
+                    mentions = (at == 0 || !word(args[i][at - 1])) && (at + cursor.size() >= args[i].size() || !word(args[i][at + cursor.size()]));
+                }
+                if (!mentions || args[i].starts_with("|")) continue;
+                const auto name = "__h" + std::to_string(++hoist_counter);
+                pending.push_back("let " + name + " = " + args[i] + ";");
+                args[i] = name;
+            }
+        }
+        if (!pending.empty()) {
+            std::string joined = args.empty() ? "" : ", " + joinStrings(args, ", ");
+            return "{ " + joinStrings(pending, " ") + " ::ispa_std::LLParserApi::" + convertIspaLibSymbol(call.symbol, true) + (has_callback ? "_rule" : "") +
+                   turbofish + "(self" + joined + ") }";
+        }
         // inherited LLParser members: reached through the LLParserApi trait implemented by the generated parser
         std::string joined = args.empty() ? "" : ", " + joinStrings(args, ", ");
         return std::string(call.template_parameters.size() > 1 ? "::ispa_std::LLParserSpaced::" : "::ispa_std::LLParserApi::") +

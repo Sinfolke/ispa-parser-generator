@@ -152,6 +152,11 @@ namespace Rust {
         emitLine(o, line + ";");
         RustCore::bind(variable.name);
         RustCore::local_types[variable.name] = &variable.type;
+        if (variable.value.size() == 1 && variable.value[0].isFunctionCall())
+            if (const auto* callee = std::get_if<std::shared_ptr<LangAPI::Symbol>>(&variable.value[0].getFunctionCall().name);
+                callee && *callee && !(*callee)->path.empty())
+                if (const auto* last = std::get_if<std::string>(&(*callee)->path.back()); last && (*last == "fail_context" || *last == "rule_context"))
+                    RustCore::lent_locals.insert(RustCore::ident(variable.name));
         if (RustCore::isSharedClassType(variable.type) || RustCore::isSharedObjectInitializer(variable.value)) RustCore::shared_locals.insert(RustCore::ident(variable.name));
         if (debug_instrumentation_ && !variable.value.empty() &&
             RustCore::convertExpression(variable.value).find("captures.") != std::string::npos)

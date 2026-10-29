@@ -34,6 +34,10 @@ GRAMMARS = {
     'counted': (HERE / 'grammars' / 'counted', 'counted.isc',
                 ['abcc', 'aabbcc', 'aaabbbcc', 'aaabbcc', 'aabbbcc', 'abc', 'abccc', 'bcc', 'cc', 'a', '', 'aaaaabbbbbcc', 'abbcc', 'aabcc'],
                 ['a', 'b', 'c', 'aa', 'bb', 'cc']),
+    # custom fail blocks: `%need_semi` repairs a missing ';' (and skips an 'x' first)
+    'failblock': (HERE / 'grammars' / 'failblock', 'failblock.isc',
+                  ['1;', '1;2;3;', '1', '1 2;', '1x;', '1x2;', '1;2', ';', '', '1;;', 'x', '1 ; 2 ;'],
+                  ['1', '2', ';', 'x', ' ', '12']),
     # SQL select statements: nested rules, groups, optional parts
     'sql': (REPO / 'examples' / 'sql', 'grammar.isc',
             ['SELECT a FROM t', 'SELECT a, b as c FROM t WHERE a = 1', "SELECT x FROM t WHERE name = 'bob' AND (age > 3 OR age < 1) ORDER BY x DESC;",

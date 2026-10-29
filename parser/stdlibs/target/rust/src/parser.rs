@@ -41,8 +41,130 @@ pub mod recovery {
 pub use recovery::CoreFail;
 
 /// What stands for the failure behaviour of a required element.
-pub trait IntoFail { fn into_handler(self) -> Shared<core_recovery::FailHandler>; }
-impl IntoFail for CoreFail { fn into_handler(self) -> Shared<core_recovery::FailHandler> { self.handler } }
+pub trait IntoFail<IT> { fn into_handler(self, core: &Shared<parser_ll::LLParser>) -> Shared<core_recovery::FailHandler>; }
+impl<IT> IntoFail<IT> for CoreFail { fn into_handler(self, _core: &Shared<parser_ll::LLParser>) -> Shared<core_recovery::FailHandler> { self.handler } }
+
+/// The state recovery is in while a fail block runs (the typed blocks do not read it).
+#[derive(Default)]
+pub struct RecoveryState;
+/// `custom_failure(|pos, state| ...)`: a fail block written in the grammar, kept typed until a combinator gives it the cursor type.
+pub struct CustomFail<Action> { pub action: Action }
+impl<IT: BridgeCursor, Action> IntoFail<IT> for CustomFail<Action>
+where Action: FnMut(&mut IT, &mut RecoveryState) -> Shared<core_recovery::Decision>,
+{
+    fn into_handler(mut self, core: &Shared<parser_ll::LLParser>) -> Shared<core_recovery::FailHandler> {
+        let mut run = move |base: Shared<TokenCursor>, _state: Shared<core_recovery::State>| {
+            let mut base = base.borrow_mut();
+            let cursor = unsafe { &mut *(&mut *base as *mut TokenCursor as *mut TypedCursor<IT>) };
+            (self.action)(&mut cursor.it, &mut RecoveryState)
+        };
+        // the handler lives for the one combinator call this is passed to, and the block borrows locals of the rule
+        let run: Box<dyn FnMut(Shared<TokenCursor>, Shared<core_recovery::State>) -> Shared<core_recovery::Decision> + '_> = Box::new(move |c, s| run(c, s));
+        let run: Box<dyn FnMut(Shared<TokenCursor>, Shared<core_recovery::State>) -> Shared<core_recovery::Decision> + 'static> =
+            unsafe { std::mem::transmute(run) };
+        let mut run = run;
+        core.borrow_mut().custom_failure(move |c, s| run(c, s)).upcast()
+    }
+}
+
+/// `ctx` of a fail block: reads see the typed cursor, repairs and diagnostics run in the core's `FailContext`.
+pub struct FailContext<'a, IT: BridgeCursor> {
+    pub pos: &'a mut IT,
+    pub ast: (),
+    pub rule: String,
+    pub failed_rule: String,
+    cursor: Shared<TypedCursor<IT>>,
+    core: Shared<parser_ll::FailContext<()>>,
+}
+impl<'a, IT: BridgeCursor> FailContext<'a, IT> {
+    fn push(&mut self) { self.cursor.borrow_mut().it = self.pos.clone(); }
+    fn pull(&mut self) { *self.pos = self.cursor.borrow().it.clone(); }
+    pub fn at(&mut self, spelling: impl AsRef<str>) -> bool { self.at_ahead(spelling, 0) }
+    pub fn at_ahead(&mut self, spelling: impl AsRef<str>, lookahead: i64) -> bool {
+        self.push();
+        self.core.borrow_mut().at(&spelling.as_ref().to_string(), lookahead)
+    }
+    pub fn at_token(&mut self, name: impl AsRef<str>) -> bool { self.at_token_ahead(name, 0) }
+    pub fn at_token_ahead(&mut self, name: impl AsRef<str>, lookahead: i64) -> bool {
+        self.push();
+        self.core.borrow_mut().at_token(&name.as_ref().to_string(), lookahead)
+    }
+    pub fn peek(&mut self) -> Shared<parser_ll::ActionToken> { self.push(); self.core.borrow_mut().peek(0) }
+    pub fn peek_ahead(&mut self, lookahead: i64) -> Shared<parser_ll::ActionToken> { self.push(); self.core.borrow_mut().peek(lookahead) }
+    pub fn take(&mut self) -> Shared<parser_ll::ActionToken> { self.push(); let token = self.core.borrow_mut().take(); self.pull(); token }
+    pub fn prev(&mut self) -> Shared<parser_ll::ActionToken> { self.push(); self.core.borrow_mut().prev() }
+    pub fn mark(&mut self, name: impl AsRef<str>) { self.push(); self.core.borrow_mut().mark(&name.as_ref().to_string()) }
+    pub fn restore(&mut self, name: impl AsRef<str>) { self.core.borrow_mut().restore(&name.as_ref().to_string()); self.pull(); }
+    pub fn commit(&mut self, name: impl AsRef<str>) { self.core.borrow_mut().commit(&name.as_ref().to_string()) }
+    pub fn error(&mut self, message: impl AsRef<str>) { self.error_at(message, "", -1, -1) }
+    pub fn error_at(&mut self, message: impl AsRef<str>, code: impl AsRef<str>, offset: i64, length: i64) {
+        self.push();
+        self.core.borrow_mut().error(&message.as_ref().to_string(), &code.as_ref().to_string(), offset, length);
+        self.pull();
+    }
+    pub fn note(&mut self, message: impl AsRef<str>) { self.core.borrow_mut().note(&message.as_ref().to_string()) }
+    pub fn sync(&mut self, boundaries: &[&str]) {
+        self.push();
+        self.core.borrow_mut().sync(&boundaries.iter().map(|b| b.to_string()).collect());
+        self.pull();
+    }
+    pub fn skip(&mut self) { self.push(); self.core.borrow_mut().skip(); self.pull(); }
+    pub fn insert(&mut self) { self.core.borrow_mut().insert() }
+    pub fn replace(&mut self) { self.push(); self.core.borrow_mut().replace(); self.pull(); }
+    pub fn retry(&mut self) { self.core.borrow_mut().retry() }
+    pub fn abort(&mut self) { self.core.borrow_mut().abort() }
+    fn finish(&mut self, before: &IT) -> Shared<core_recovery::Decision> {
+        self.push();
+        let marker: Shared<TokenCursor> = TypedCursor::handle(before.clone(), None).upcast();
+        let decision = self.core.borrow_mut().finish(marker);
+        self.pull();
+        decision
+    }
+}
+
+impl<Main, Token> LLParser<Main, Token> {
+    /// `ctx` for a fail block running at `pos`; `token_name` spells the ids of tokens.
+    pub fn fail_context<'a, IT: BridgeCursor, R>(&mut self, pos: &'a mut IT, _ast: R, start: IT, rule: impl AsRef<str>, failed_rule: impl AsRef<str>,
+                                                  token_name: fn(usize) -> Ptr) -> FailContext<'a, IT> {
+        let core = self.core();
+        let names = TOKEN_NAMES.with(|cache| cache.borrow_mut().entry(token_name as usize).or_insert_with(|| spell_names(token_name)).clone());
+        core.borrow_mut().set_token_names(names, -1);
+        let cursor = TypedCursor::handle(pos.clone(), None);
+        let start_cursor: Shared<TokenCursor> = TypedCursor::handle(start, None).upcast();
+        let context = core.borrow_mut().fail_context(cursor.clone().upcast(), (), start_cursor, &rule.as_ref().to_string(),
+                                                      &failed_rule.as_ref().to_string());
+        FailContext { pos, ast: (), rule: rule.as_ref().to_string(), failed_rule: failed_rule.as_ref().to_string(), cursor, core: context }
+    }
+    /// The decision a fail block ends with.
+    pub fn custom_failure_decision<IT: BridgeCursor>(&mut self, before: IT, ctx: &mut FailContext<IT>) -> Shared<core_recovery::Decision> {
+        ctx.finish(&before)
+    }
+    /// A fail block, typed until a combinator gives it the cursor type.
+    pub fn custom_failure<IT: BridgeCursor, Action>(&self, _cursor: &IT, action: Action) -> CustomFail<Action>
+    where Action: FnMut(&mut IT, &mut RecoveryState) -> Shared<core_recovery::Decision> { CustomFail { action } }
+}
+
+thread_local! { static TOKEN_NAMES: std::cell::RefCell<HashMap<usize, Shared<parser_ll::TokenNames>>> = Default::default(); }
+/// The core's table of token names, asking the generated function (token ids are hashes, there is no table to index).
+#[repr(C)]
+struct FnNames { base_0: parser_ll::TokenNames, spell: fn(usize) -> Ptr }
+impl Upcast<parser_ll::TokenNames> for FnNames {
+    unsafe fn up_ptr(this: *mut Self) -> *mut parser_ll::TokenNames { std::ptr::addr_of_mut!((*this).base_0) }
+}
+fn spell_names(token_name: fn(usize) -> Ptr) -> Shared<parser_ll::TokenNames> {
+    Shared::new_with(|owner: &crate::WeakShared<FnNames>| {
+        let mut names = FnNames { base_0: parser_ll::TokenNames::default(), spell: token_name };
+        names.base_0.__bind_owner(&owner.upcast());
+        names.base_0.__init__(&Vec::new());
+        names.base_0.__vt_lookup = |base, id| {
+            let this = unsafe { &mut *(base as *mut parser_ll::TokenNames as *mut FnNames) };
+            let spell = this.spell;
+            // the generated function panics for an id that is not a token
+            std::panic::catch_unwind(|| spell(id as usize).remaining().to_string()).unwrap_or_default()
+        };
+        names
+    }).upcast()
+}
 
 /// Closes the rule's recovery frame when it goes out of scope.
 pub struct FrameGuard { core: Shared<parser_ll::LLParser> }
@@ -156,14 +278,14 @@ impl Drop for CounterScopeGuard { fn drop(&mut self) { self.scope.borrow_mut().r
 
 /// The combinators generated rules call. `Self` is the generated parser; its `LLParser` base holds the core.
 pub trait LLParserApi<IT: BridgeCursor> {
-    fn required<T: Clone + Default + 'static>(&mut self, pos: &mut IT, fail: impl IntoFail) -> Node<T>;
+    fn required<T: Clone + Default + 'static>(&mut self, pos: &mut IT, fail: impl IntoFail<IT>) -> Node<T>;
     fn required_rule<T: Clone + Default + 'static>(&mut self, pos: &mut IT, rec: impl FnMut(&mut Self, IT) -> MatchResult<T, IT>,
-                                                   fail: impl IntoFail) -> Node<T>;
+                                                   fail: impl IntoFail<IT>) -> Node<T>;
     fn optional<T: Clone + Default + 'static>(&mut self, pos: &mut IT) -> Node<T>;
     fn optional_rule<T: Clone + Default + 'static>(&mut self, pos: &mut IT, rec: impl FnMut(&mut Self, IT) -> MatchResult<T, IT>) -> Node<T>;
-    fn range<T: Clone + Default + 'static>(&mut self, pos: &mut IT, fail: impl IntoFail) -> Vec<Node<T>>;
+    fn range<T: Clone + Default + 'static>(&mut self, pos: &mut IT, fail: impl IntoFail<IT>) -> Vec<Node<T>>;
     fn range_rule<T: Clone + Default + 'static>(&mut self, pos: &mut IT, rec: impl FnMut(&mut Self, IT) -> MatchResult<T, IT>,
-                                                fail: impl IntoFail) -> Vec<Node<T>>;
+                                                fail: impl IntoFail<IT>) -> Vec<Node<T>>;
     fn range_optional<T: Clone + Default + 'static>(&mut self, pos: &mut IT) -> Vec<Node<T>>;
     fn range_optional_rule<T: Clone + Default + 'static>(&mut self, pos: &mut IT, rec: impl FnMut(&mut Self, IT) -> MatchResult<T, IT>)
         -> Vec<Node<T>>;
@@ -174,9 +296,9 @@ pub trait LLParserApi<IT: BridgeCursor> {
 
 /// The same combinators for repetitions that skip a space token between their elements (`range::<T, Space>`).
 pub trait LLParserSpaced<IT: BridgeCursor>: LLParserApi<IT> {
-    fn range_spaced<T: Clone + Default + 'static, S: 'static>(&mut self, pos: &mut IT, fail: impl IntoFail) -> Vec<Node<T>>;
+    fn range_spaced<T: Clone + Default + 'static, S: 'static>(&mut self, pos: &mut IT, fail: impl IntoFail<IT>) -> Vec<Node<T>>;
     fn range_rule_spaced<T: Clone + Default + 'static, S: 'static>(&mut self, pos: &mut IT, rec: impl FnMut(&mut Self, IT) -> MatchResult<T, IT>,
-                                                                   fail: impl IntoFail) -> Vec<Node<T>>;
+                                                                   fail: impl IntoFail<IT>) -> Vec<Node<T>>;
     fn range_optional_spaced<T: Clone + Default + 'static, S: 'static>(&mut self, pos: &mut IT) -> Vec<Node<T>>;
     fn range_optional_rule_spaced<T: Clone + Default + 'static, S: 'static>(&mut self, pos: &mut IT,
                                                                            rec: impl FnMut(&mut Self, IT) -> MatchResult<T, IT>) -> Vec<Node<T>>;
@@ -215,19 +337,19 @@ where
     P: DerefMut<Target = LLParser<Main, Token>>,
     IT: BridgeCursor,
 {
-    fn required<T: Clone + Default + 'static>(&mut self, pos: &mut IT, fail: impl IntoFail) -> Node<T> {
+    fn required<T: Clone + Default + 'static>(&mut self, pos: &mut IT, fail: impl IntoFail<IT>) -> Node<T> {
         let core = self.core();
         let cursor = bridge::<IT, T>(pos.clone(), true);
-        let node = core.borrow_mut().required_token(cursor.clone().upcast(), token_id::<IT, T>(), fail.into_handler());
+        let node = core.borrow_mut().required_token(cursor.clone().upcast(), token_id::<IT, T>(), fail.into_handler(&core));
         take(&cursor, pos);
         typed_node::<T>(&node)
     }
     fn required_rule<T: Clone + Default + 'static>(&mut self, pos: &mut IT, rec: impl FnMut(&mut Self, IT) -> MatchResult<T, IT>,
-                                                   fail: impl IntoFail) -> Node<T> {
+                                                   fail: impl IntoFail<IT>) -> Node<T> {
         let core = self.core();
         let cursor = bridge::<IT, T>(pos.clone(), false);
         let callback = rule_callback::<Self, IT, T>(self as *mut Self, rec);
-        let node = core.borrow_mut().required_rule(cursor.clone().upcast(), &String::new(), callback, fail.into_handler());
+        let node = core.borrow_mut().required_rule(cursor.clone().upcast(), &String::new(), callback, fail.into_handler(&core));
         take(&cursor, pos);
         typed_node::<T>(&node)
     }
@@ -246,19 +368,19 @@ where
         take(&cursor, pos);
         typed_node::<T>(&node)
     }
-    fn range<T: Clone + Default + 'static>(&mut self, pos: &mut IT, fail: impl IntoFail) -> Vec<Node<T>> {
+    fn range<T: Clone + Default + 'static>(&mut self, pos: &mut IT, fail: impl IntoFail<IT>) -> Vec<Node<T>> {
         let core = self.core();
         let cursor = bridge::<IT, T>(pos.clone(), true);
-        let nodes = core.borrow_mut().range_token(cursor.clone().upcast(), token_id::<IT, T>(), fail.into_handler());
+        let nodes = core.borrow_mut().range_token(cursor.clone().upcast(), token_id::<IT, T>(), fail.into_handler(&core));
         take(&cursor, pos);
         typed_nodes::<T>(nodes)
     }
     fn range_rule<T: Clone + Default + 'static>(&mut self, pos: &mut IT, rec: impl FnMut(&mut Self, IT) -> MatchResult<T, IT>,
-                                                fail: impl IntoFail) -> Vec<Node<T>> {
+                                                fail: impl IntoFail<IT>) -> Vec<Node<T>> {
         let core = self.core();
         let cursor = bridge::<IT, T>(pos.clone(), false);
         let callback = rule_callback::<Self, IT, T>(self as *mut Self, rec);
-        let nodes = core.borrow_mut().range_rule(cursor.clone().upcast(), &String::new(), callback, fail.into_handler());
+        let nodes = core.borrow_mut().range_rule(cursor.clone().upcast(), &String::new(), callback, fail.into_handler(&core));
         take(&cursor, pos);
         typed_nodes::<T>(nodes)
     }
@@ -301,12 +423,12 @@ where
     P: DerefMut<Target = LLParser<Main, Token>>,
     IT: BridgeCursor,
 {
-    fn range_spaced<T: Clone + Default + 'static, S: 'static>(&mut self, pos: &mut IT, fail: impl IntoFail) -> Vec<Node<T>> {
+    fn range_spaced<T: Clone + Default + 'static, S: 'static>(&mut self, pos: &mut IT, fail: impl IntoFail<IT>) -> Vec<Node<T>> {
         self.use_space_token::<IT, S>();
         LLParserApi::range::<T>(self, pos, fail)
     }
     fn range_rule_spaced<T: Clone + Default + 'static, S: 'static>(&mut self, pos: &mut IT, rec: impl FnMut(&mut Self, IT) -> MatchResult<T, IT>,
-                                                                   fail: impl IntoFail) -> Vec<Node<T>> {
+                                                                   fail: impl IntoFail<IT>) -> Vec<Node<T>> {
         self.use_space_token::<IT, S>();
         LLParserApi::range_rule::<T>(self, pos, rec, fail)
     }

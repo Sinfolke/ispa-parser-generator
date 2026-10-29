@@ -1,0 +1,22 @@
+NUM:
+    @ [0-9]+
+    {@}
+;
+SEMI:
+    @ ';'
+    {@}
+;
+fail need_semi {
+    ctx.error("expected ';' after the number")
+    if ctx.at("x"):
+        ctx.skip()
+    ctx.insert()
+}
+stmt:
+    @ NUM @ %need_semi SEMI
+    @{value, end}
+;
+main:
+    @ stmt+
+    {@}
+;

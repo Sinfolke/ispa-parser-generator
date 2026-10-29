@@ -45,6 +45,7 @@ export namespace RustCore {
     std::unordered_set<std::string> any_fields;            // fields typed `Any` (PyAny): assigned values are wrapped, None is empty
     std::unordered_set<std::string> shared_classes;        // bare names of reference-semantic (shared-object) classes
     auto isSharedClassType(const LangAPI::Type &t) -> bool;
+    std::unordered_set<std::string> lent_locals;           // locals that cannot be copied (a fail block's `ctx`): lent to helpers
     std::unordered_set<std::string> shared_locals;         // locals holding a Shared<..> handle (by emitted identifier)
     std::string member_class;                              // bare class name of the receiver of the storage symbol being converted
     std::unordered_map<std::string, std::vector<const LangAPI::Function*>> class_methods;   // "Class::method" (bare class name)
