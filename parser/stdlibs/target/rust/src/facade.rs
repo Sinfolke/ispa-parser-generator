@@ -2,6 +2,7 @@
 //! and the cursors between them. Parsing itself (combinators, recovery, frames) runs in the lowered core
 //! (`python::ispa_std::parser_ll`); this layer keeps ASTs and tokens typed on the way in and out.
 use crate::{Error, Ptr, Shared, VariantGet};
+use crate::lexer::TokenEnd;
 use std::marker::PhantomData;
 use std::rc::Rc;
 
@@ -115,10 +116,42 @@ impl<Token> TokenIterator<Token> {
     pub fn retreat(&mut self) { self.index = self.index.saturating_sub(1); }
 }
 
-/// Cursor that lexes on demand from source text.
-pub struct LazyIterator<Token> { _token: PhantomData<Token>, index: usize }
-impl<Token> Clone for LazyIterator<Token> { fn clone(&self) -> Self { Self { _token: PhantomData, index: self.index } } }
-impl<Token> Default for LazyIterator<Token> { fn default() -> Self { Self { _token: PhantomData, index: 0 } } }
+/// The lexing a lazy cursor shares with its copies: the lexer, and where in the input it has got to.
+struct LazyState<Token> { lexer: *mut LexerBase<Token>, pos: Ptr, finished: bool }
+/// Cursor that lexes on demand: tokens are made (through the lexer's hooks, into its token list) when a position
+/// past the last one is asked for. Copies share the lexer and keep their own index.
+pub struct LazyIterator<Token> { state: Option<Rc<std::cell::RefCell<LazyState<Token>>>>, index: usize }
+impl<Token> Clone for LazyIterator<Token> { fn clone(&self) -> Self { Self { state: self.state.clone(), index: self.index } } }
+impl<Token> Default for LazyIterator<Token> { fn default() -> Self { Self { state: None, index: 0 } } }
+impl<Token: Clone + Default + 'static + TokenEnd> LazyIterator<Token> {
+    pub fn new(lexer: &mut LexerBase<Token>, input: Ptr) -> Self {
+        Self { state: Some(Rc::new(std::cell::RefCell::new(LazyState { lexer, pos: input, finished: false }))), index: 0 }
+    }
+    /// Make tokens until there is one at `index` (or the input is over).
+    fn ensure(&self) -> Option<&LexerBase<Token>> {
+        let shared = self.state.as_ref()?;
+        let lexer_ptr = shared.borrow().lexer;   // (a place taken straight from the borrow would keep it alive)
+        let lexer = unsafe { &mut *lexer_ptr };
+        loop {
+            if lexer.tokens.len() > self.index { break; }
+            let (finished, mut pos) = { let state = shared.borrow(); (state.finished, state.pos) };
+            if finished { break; }
+            if pos.is_eof() { shared.borrow_mut().finished = true; lexer.on_eof(); continue; }
+            let before = pos.offset();
+            let token = lexer.makeToken(&mut pos);
+            if pos.offset() == before { crate::fail(1, "Lazy lexer did not advance source position"); }
+            shared.borrow_mut().pos = pos;
+            if !token.is_end() { lexer.on_token(token); }
+        }
+        Some(&*lexer)
+    }
+    pub fn token(&self) -> Option<Token> { self.ensure()?.tokens.get(self.index).cloned() }
+    pub fn at_end(&self) -> bool { self.token().map_or(true, |token| token.is_end()) }
+    pub fn distance(&self) -> usize { self.index }
+    // stepping onto a position makes its token (so a lexical error shows up when the parser gets there)
+    pub fn advance(&mut self) { if !self.at_end() { self.index += 1; self.ensure(); } }
+    pub fn retreat(&mut self) { self.index = self.index.saturating_sub(1); }
+}
 
 /// Base of generated lexers. `makeToken` and the hooks are dispatch slots the generated `Lexer` fills in.
 #[repr(C)]
@@ -172,18 +205,18 @@ pub trait TokenStream {
     fn lazy_token_cursor(&mut self, input: Ptr) -> Self::LazyCursor;
     fn reset_token_stream(&mut self);
 }
-impl<Token: Clone + Default + 'static> TokenStream for Shared<LexerBase<Token>> {
+impl<Token: Clone + Default + 'static + TokenEnd> TokenStream for Shared<LexerBase<Token>> {
     type Cursor = TokenIterator<Token>;
     type LazyCursor = LazyIterator<Token>;
     fn token_cursor(&mut self) -> TokenIterator<Token> { TokenIterator::new(Rc::new(self.borrow().tokens.clone()), 0) }
-    fn lazy_token_cursor(&mut self, _input: Ptr) -> LazyIterator<Token> { unimplemented!("lazy lexing") }
+    fn lazy_token_cursor(&mut self, input: Ptr) -> LazyIterator<Token> { self.borrow_mut().begin_lazy(input) }
     fn reset_token_stream(&mut self) { self.borrow_mut().tokens.clear(); }
 }
-impl<L, Token: Clone + Default + 'static> TokenStream for L where L: std::ops::DerefMut<Target = LexerBase<Token>> {
+impl<L, Token: Clone + Default + 'static + TokenEnd> TokenStream for L where L: std::ops::DerefMut<Target = LexerBase<Token>> {
     type Cursor = TokenIterator<Token>;
     type LazyCursor = LazyIterator<Token>;
     fn token_cursor(&mut self) -> TokenIterator<Token> { TokenIterator::new(Rc::new(self.tokens.clone()), 0) }
-    fn lazy_token_cursor(&mut self, _input: Ptr) -> LazyIterator<Token> { unimplemented!("lazy lexing") }
+    fn lazy_token_cursor(&mut self, input: Ptr) -> LazyIterator<Token> { self.begin_lazy(input) }
     fn reset_token_stream(&mut self) { self.tokens.clear(); }
 }
 
@@ -197,7 +230,7 @@ impl<V: TokenVariant> TokenCursorKind for TokenIterator<RawToken<V>> {
     fn kind(&self) -> usize { self.get().filter(|token| !token.empty()).map_or(crate::recovery::END_OF_INPUT, |token| token.id) }
 }
 impl<V: TokenVariant> TokenCursorKind for LazyIterator<RawToken<V>> {
-    fn kind(&self) -> usize { unimplemented!("lazy lexing") }
+    fn kind(&self) -> usize { self.token().filter(|token| !token.empty()).map_or(crate::recovery::END_OF_INPUT, |token| token.id) }
 }
 
 
@@ -214,7 +247,7 @@ impl<V: TokenVariant> SkipSpaces for TokenIterator<RawToken<V>> {
     fn skip_space<T: 'static>(&mut self) { if self.get().is_some_and(|token| token.value.held().is::<T>()) { self.advance(); } }
 }
 impl<V: TokenVariant> SkipSpaces for LazyIterator<RawToken<V>> {
-    fn skip_space<T: 'static>(&mut self) { unimplemented!("lazy lexing") }
+    fn skip_space<T: 'static>(&mut self) { if self.token().is_some_and(|token| token.value.held().is::<T>()) { self.advance(); } }
 }
 pub fn skip_spaces<T: 'static>(pos: &mut impl SkipSpaces) { pos.skip_space::<T>() }
 
@@ -225,4 +258,4 @@ impl<C: crate::BridgeCursor + Default + TokenCursorKind + SkipSpaces + Advance> 
 /// `++pos`: step to the next token; the new position is returned.
 pub trait Advance: Sized { fn inc(&mut self) -> Self; }
 impl<V: TokenVariant> Advance for TokenIterator<RawToken<V>> { fn inc(&mut self) -> Self { self.advance(); self.clone() } }
-impl<V: TokenVariant> Advance for LazyIterator<RawToken<V>> { fn inc(&mut self) -> Self { unimplemented!("lazy lexing") } }
+impl<V: TokenVariant> Advance for LazyIterator<RawToken<V>> { fn inc(&mut self) -> Self { self.advance(); self.clone() } }

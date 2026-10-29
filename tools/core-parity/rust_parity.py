@@ -90,14 +90,16 @@ def main():
     different = 0
     inputs = GRAMMARS[args.grammar][2] + list(fuzz_inputs(args.fuzz, args.seed, GRAMMARS[args.grammar][3]))
     for text in inputs:
-        want = subprocess.run([str(cpp), text], capture_output=True, text=True).stdout
-        got = subprocess.run([str(rust), text], capture_output=True, text=True).stdout
+      for lazy in (False, True):   # tokens made up front, or on demand while parsing
+        environment = {**os.environ, **({'LAZY': '1'} if lazy else {})}
+        want = subprocess.run([str(cpp), text], capture_output=True, text=True, env=environment).stdout
+        got = subprocess.run([str(rust), text], capture_output=True, text=True, env=environment).stdout
         if want != got:
             different += 1
-            print(f'DIFF for {text!r}')
+            print(f'DIFF for {text!r}' + (' (lazy)' if lazy else ''))
             for label, out in (('C++ ', want), ('Rust', got)):
                 print('\n'.join(f'  {label}: {line}' for line in out.splitlines()[:4]))
-    print(f'{len(inputs) - different} of {len(inputs)} identical')
+    print(f'{2 * len(inputs) - different} of {2 * len(inputs)} identical (eager and lazy)')
     sys.exit(1 if different else 0)
 
 

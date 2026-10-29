@@ -4,10 +4,11 @@
 int main(int argc, char** argv) {
     generated::Parser parser;
     generated::Lexer lexer;
+    const bool lazy = getenv("LAZY") != nullptr;
     lexer.setInput(argv[1]);
     try {
-        lexer.makeTokens();
-        auto& tree = parser.parse(lexer);
+        if (!lazy) lexer.makeTokens();
+        auto& tree = lazy ? parser.parse(argv[1]) : parser.parse(lexer);
         tree.print(std::cout);
     } catch (const std::exception& e) { std::cout << "exception: " << e.what() << "\n"; }
 }

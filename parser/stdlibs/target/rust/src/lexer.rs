@@ -104,3 +104,15 @@ impl<V: crate::TokenVariant> TokenEnd for crate::RawToken<V> { fn is_end(&self) 
 
 /// The text a pointer points into, as the core's string.
 pub(crate) fn source_text(text: &'static str) -> Shared<dfa_api::SourceText> { core_source(text) }
+
+impl<Token: Clone + Default + 'static + TokenEnd> LexerBase<Token> {
+    /// Start lexing `input` on demand: the cursor makes tokens as the parser reaches them.
+    pub fn begin_lazy(&mut self, input: Ptr) -> crate::LazyIterator<Token> {
+        self.input = Some(input.text());
+        self.line = 1;
+        self.tokens.clear();
+        self.errors.clear();
+        self.init();
+        crate::LazyIterator::new(self, input)
+    }
+}

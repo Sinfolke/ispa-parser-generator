@@ -4,16 +4,19 @@ use ispa_std::Shared;
 
 fn main() {
     let text = std::env::args().nth(1).unwrap_or_default();
-    let mut lexer = Lexer::default();
-    lexer.set_input(&text);
-    if let Err(error) = lexer.make_tokens() {
-        println!("exception: {error}");
-        return;
-    }
+    let lazy = std::env::var_os("LAZY").is_some();
     let mut parser = Parser::default();
-    parser.lexer = Shared::new(lexer).upcast();
+    if !lazy {
+        let mut lexer = Lexer::default();
+        lexer.set_input(&text);
+        if let Err(error) = lexer.make_tokens() {
+            println!("exception: {error}");
+            return;
+        }
+        parser.lexer = Shared::new(lexer).upcast();
+    }
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        parser.parseFromTokens();
+        if lazy { parser.parse_text(&text); } else { parser.parseFromTokens(); }
         let mut out = String::new();
         parser.tree.print(&mut out);
         out

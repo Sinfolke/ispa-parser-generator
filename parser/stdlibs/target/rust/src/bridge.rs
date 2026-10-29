@@ -48,11 +48,11 @@ impl<V: TokenVariant> BridgeCursor for TokenIterator<RawToken<V>> {
 }
 impl<V: TokenVariant> BridgeCursor for LazyIterator<RawToken<V>> {
     type Token = RawToken<V>;
-    fn is_end(&self) -> bool { unimplemented!("lazy lexing") }
-    fn advance(&mut self) { unimplemented!("lazy lexing") }
-    fn retreat(&mut self) { unimplemented!("lazy lexing") }
-    fn distance(&self) -> i64 { unimplemented!("lazy lexing") }
-    fn current(&self) -> Option<RawToken<V>> { unimplemented!("lazy lexing") }
+    fn is_end(&self) -> bool { self.at_end() }
+    fn advance(&mut self) { LazyIterator::advance(self) }
+    fn retreat(&mut self) { LazyIterator::retreat(self) }
+    fn distance(&self) -> i64 { LazyIterator::distance(self) as i64 }
+    fn current(&self) -> Option<RawToken<V>> { self.token() }
 }
 
 /// A typed node as the core's `Node`: the core carries it, only the facade looks inside.

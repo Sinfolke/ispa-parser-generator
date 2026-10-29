@@ -83,6 +83,13 @@ impl<Main, Token> LLParser<Main, Token> {
     }
     pub fn parseFromTokens(&mut self) where Main: 'static, Token: 'static { (self.__vt_parseFromTokens)(self) }
     pub fn lazyParse(&mut self) -> MatchResult<Main, LazyIterator<Token>> { (self.__vt_lazyParse)(self) }
+    /// Parse `text`, lexing it on demand; the tree is `self.tree`. The text is kept for the life of the program.
+    pub fn parse_text(&mut self, text: &str) -> &Main where Main: Clone {
+        self.text = Ptr::new(Box::leak(text.to_string().into_boxed_str()));
+        let result = self.lazyParse();
+        self.tree = result.node.data().clone();
+        &self.tree
+    }
 
     pub fn unwinding(&mut self) -> bool { self.core().borrow_mut().unwinding() }
     pub fn recovery_frame(&mut self, rule: impl AsRef<str>) -> FrameGuard {

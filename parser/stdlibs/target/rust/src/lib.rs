@@ -26,7 +26,8 @@ mod parser;
 pub use parser::*;
 mod printer;
 pub use printer::*;
-mod lexer;
+pub(crate) mod lexer;
+pub use lexer::TokenEnd;
 mod primitives;
 pub use primitives::{StdError, fail, attempt, failure_message};
 
