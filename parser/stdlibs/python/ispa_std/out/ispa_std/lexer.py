@@ -269,14 +269,14 @@ class Lexer_base:
         if not self._has_input or pos < 0:
             logic_error("Lexer line prefix has no source position")
         begin = pos
-        while begin > 0 and at(self._in, begin - 1) != "\n" and at(self._in, begin - 1) != "\r":
+        while begin > 0 and char_at(self._in, begin - 1) != "\n" and char_at(self._in, begin - 1) != "\r":
             begin = begin - 1
         return substr(self._in, begin, pos - begin)
 
     def next_char(self, pos: int) -> str:
         if pos < 0:
             logic_error("Lexer next character has no source position")
-        return at(self._in, pos)
+        return char_at(self._in, pos)
 
     def panic_mode(self, cur: Cursor) -> None:
         if cur.pos < len(self._in):
@@ -323,7 +323,7 @@ class Lexer_base:
             if cur.pos == before:
                 internal_error("no matches at position {}, on character {}, and no exception can handle it",
                                "Lexer TDFA generation", True,
-                               [int_to_string(cur.pos), at(self._in, cur.pos)])
+                               [int_to_string(cur.pos), char_at(self._in, cur.pos)])
             if not is_token_end(token):
                 self.push(token)
         self.push_eof()

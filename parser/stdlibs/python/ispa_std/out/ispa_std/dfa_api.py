@@ -261,7 +261,7 @@ class Captures:
         return (b - line_start) + 1
 
 
-def semantic_result(state: int, token: RawToken) -> Pair:
+def semantic_result(state: int, token: RawToken) -> Pair[int, RawToken]:
     """What a generated semantic function returns: (next state, token)."""
     return Pair(state, token)
 

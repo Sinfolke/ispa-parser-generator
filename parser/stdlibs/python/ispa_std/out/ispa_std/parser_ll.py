@@ -449,7 +449,8 @@ class FailContext(ActionCheckpoint):
             logic_error("ctx.sync requires a lazy source cursor")
             return
         begin = self.pos.sourcePosition()
-        budget = minimum(4096, self.recovery_state.max_total_skipped - self.recovery_state.total_skipped)
+        cap: int = 4096
+        budget = minimum(cap, self.recovery_state.max_total_skipped - self.recovery_state.total_skipped)
         scanned = scan_balanced(self.pos.sourceOrigin(), begin, boundaries, budget)
         count = scanned.end - begin
         if count > 0:
@@ -459,7 +460,7 @@ class FailContext(ActionCheckpoint):
         if scanned.exhausted or self.recovery_state.exhausted():
             self.abort()
 
-    def sync_tokens(self, boundaries: list[str]) -> None:
+    def sync_tokens(self, boundaries: list[TokenBoundary]) -> None:
         """Skip whole tokens to one of `boundaries` (TokenBoundary), preserving
         token-stream structure (including synthetic indentation)."""
         if len(boundaries) == 0:
@@ -556,7 +557,7 @@ class Frame:
 
 
 class FrameGuard:
-    parser: object
+    parser: "LLParser"
     open: bool
 
     def __init__(self, parser: "LLParser", rule: str):
@@ -579,7 +580,7 @@ class FrameGuard:
 
 class CounterScope:
     """Bindings belong to an invocation; callees see their caller's bindings."""
-    parser: object
+    parser: "LLParser"
     saved: StrIntMap
     open: bool
 
@@ -598,29 +599,23 @@ class CounterScope:
 class RuleProbe:
     """`optional(pos, rec)` and custom fail actions probe a rule: if a required
     descendant never started, the probe absorbs the NoMatch."""
-    parser: object
-    previous: object
-    has_previous: bool
+    parser: "LLParser"
     start: int
     committed: bool
     open: bool
 
     def __init__(self, parser: "LLParser", start: int):
         self.parser = parser
-        self.previous = parser.probe_
-        self.has_previous = parser.has_probe_
         self.start = start
         self.committed = False
         self.open = True
-        parser.probe_ = self
-        parser.has_probe_ = True
+        parser.probes_.append(self)
 
     def close(self) -> None:
         if not self.open:
             return
         self.open = False
-        self.parser.probe_ = self.previous
-        self.parser.has_probe_ = self.has_previous
+        self.parser.probes_.pop()
 
 
 class Resume:
@@ -645,8 +640,7 @@ class LLParser(Parser_base):
     recovering_: bool
     context_max_skip_: int
     context_errors_: list[recovery.ContextDiagnostic]
-    probe_: object
-    has_probe_: bool
+    probes_: list[RuleProbe]
     token_names_: TokenNames
     ambiguous_id_: int
     space_token_: int
@@ -664,8 +658,7 @@ class LLParser(Parser_base):
         self.recovering_ = False
         self.context_max_skip_ = 64
         self.context_errors_ = []
-        self.probe_ = 0
-        self.has_probe_ = False
+        self.probes_ = []
         self.token_names_ = NO_TOKEN_NAMES
         self.ambiguous_id_ = NPOS
         # The token id generated code passes as `SpaceToken`; -1 = none.
@@ -761,17 +754,16 @@ class LLParser(Parser_base):
     def reject_absent_rule(self) -> None:
         """Raise NoMatch when we are inside an uncommitted probe: the rule never
         started, so the caller's `optional` should simply not match."""
-        if self.has_probe_ and not self.probe_.committed:
+        if len(self.probes_) > 0 and not self.probes_[len(self.probes_) - 1].committed:
             no_match()
 
     def commit_rule(self, pos: TokenCursor) -> None:
-        probe = self.probe_
-        active = self.has_probe_
-        while active:
-            if cursor_position(pos) != probe.start:
-                probe.committed = True
-            active = probe.has_previous
-            probe = probe.previous
+        here = cursor_position(pos)
+        k = len(self.probes_) - 1
+        while k >= 0:
+            if here != self.probes_[k].start:
+                self.probes_[k].committed = True
+            k = k - 1
 
     def note_match(self) -> None:
         self.recovering_ = False
