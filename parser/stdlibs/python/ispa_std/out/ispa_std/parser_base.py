@@ -4,8 +4,9 @@ Overloads are split: parse_lexer(lex) / parse_text(text) (C++ parse(...)),
 set_input_lexer / set_input_text. The generated parser overrides
 parseFromTokens and lazyParse."""
 from ispa_std.failures import api_error, logic_error
-from ispa_std.lexer import Lexer_base
-from ispa_std.node import MatchResult, Node
+from ispa_std.lexer import Lexer_base, TokenIterator
+from ispa_std.match_result import MatchResult
+from ispa_std.node import Node
 
 
 class Parser_base:
@@ -28,12 +29,12 @@ class Parser_base:
         parser.has_lexer = True
         return parser
 
-    def parse_lexer(self, lex: Lexer_base):
+    def parse_lexer(self, lex: Lexer_base) -> object:
         self.lexer = lex
         self.has_lexer = True
         return self.parse_tokens()
 
-    def parse_text(self, text: str):
+    def parse_text(self, text: str) -> object:
         self.text = text
         self.has_text = True
         return self.parseLazy()
@@ -53,7 +54,7 @@ class Parser_base:
         self.text = ""
 
     # Parse NON-LAZILY input (C++ protected virtual parse()).
-    def parse_tokens(self):
+    def parse_tokens(self) -> object:
         if not self.has_lexer:
             api_error("Can't parse because no input lexer is provided", [])
         if not self.lexer.hasInput():
@@ -62,7 +63,7 @@ class Parser_base:
         return self.tree
 
     # Parse LAZILY input.
-    def parseLazy(self):
+    def parseLazy(self) -> object:
         if not self.has_text:
             api_error("Can't parse because no input text is provided", [])
         result = self.lazyParse()
@@ -76,4 +77,4 @@ class Parser_base:
 
     def lazyParse(self) -> MatchResult:
         logic_error("Parser_base.lazyParse is abstract")
-        return MatchResult.failed(0)
+        return MatchResult.failed(TokenIterator(self.lexer, 0))

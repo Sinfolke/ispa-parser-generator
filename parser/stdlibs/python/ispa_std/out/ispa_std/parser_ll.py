@@ -25,8 +25,11 @@ from ispa_std.counter import CountSpec
 from ispa_std.errors import ErrorKind
 from ispa_std.failures import invalid_argument, length_error, logic_error, no_match, out_of_range, rethrow
 from ispa_std.format import fmt, int_to_string, replace_all
-from ispa_std.lexer import Lexer_base, TokenIterator, is_token_end
-from ispa_std.node import MatchResult, Node
+from typing import Callable
+from ispa_std.lexer import Lexer_base, TokenCursor, TokenIterator, is_token_end
+from ispa_std.raw_token import RawToken
+from ispa_std.match_result import MatchResult
+from ispa_std.node import Node
 from ispa_std.parser_base import Parser_base
 from ispa_std.scan import scan_balanced
 from ispa_std.sortedmap import StrIntMap
@@ -38,18 +41,18 @@ MAX_ACTION_CHECKPOINTS = 32
 NPOS = -1
 
 
-def lookahead_kind(pos) -> int:
+def lookahead_kind(pos: TokenCursor) -> int:
     """Recovery::TokenId of the token at pos (EOF_TOKEN at end of input)."""
     if pos.isEnd():
         return recovery.END_OF_INPUT
     return pos.current().kind()
 
 
-def cursor_position(pos) -> int:
+def cursor_position(pos: TokenCursor) -> int:
     return pos.distance()
 
 
-def parse_token_stream(lexer: Lexer_base, tokens: list, rule) -> Node:
+def parse_token_stream(lexer: Lexer_base, tokens: list[RawToken], rule: Callable[[TokenCursor], MatchResult]) -> Node:
     """Run a generated rule against a separate token stream. The returned node
     owns its data; the temporary cursor never escapes with the result."""
     i = 0
@@ -64,7 +67,7 @@ def parse_token_stream(lexer: Lexer_base, tokens: list, rule) -> Node:
     return result.node
 
 
-def parse_source_span(lexer: Lexer_base, tokens: list, rule) -> Node:
+def parse_source_span(lexer: Lexer_base, tokens: list[RawToken], rule: Callable[[TokenCursor], MatchResult]) -> Node:
     """External rules need the original source bytes. Tokens collected from a
     contiguous source region provide its bounds while retaining the source
     positions in the returned AST."""
@@ -155,7 +158,7 @@ class TokenNames:
 NO_TOKEN_NAMES: TokenNames = TokenNames([])
 
 
-def context_peek(pos, lookahead: int, token_names: TokenNames, ambiguous_id: int) -> ActionToken:
+def context_peek(pos: TokenCursor, lookahead: int, token_names: TokenNames, ambiguous_id: int) -> ActionToken:
     if lookahead > MAX_ACTION_LOOKAHEAD:
         out_of_range("ctx.peek lookahead exceeds 64 tokens")
     candidate = pos.copy()
@@ -184,7 +187,7 @@ def context_peek(pos, lookahead: int, token_names: TokenNames, ambiguous_id: int
     return result
 
 
-def context_prev(pos, start_pos, token_names: TokenNames, ambiguous_id: int) -> ActionToken:
+def context_prev(pos: TokenCursor, start_pos: TokenCursor, token_names: TokenNames, ambiguous_id: int) -> ActionToken:
     """Step pos back one token (never before start_pos) and return it."""
     if cursor_position(pos) <= cursor_position(start_pos):
         return ActionToken()
@@ -196,7 +199,7 @@ def context_prev(pos, start_pos, token_names: TokenNames, ambiguous_id: int) -> 
     return context_peek(pos, 0, token_names, ambiguous_id)
 
 
-def context_at(pos, text: str, lookahead: int, token_names: TokenNames, match_name: bool,
+def context_at(pos: TokenCursor, text: str, lookahead: int, token_names: TokenNames, match_name: bool,
                ambiguous_id: int) -> bool:
     if lookahead > MAX_ACTION_LOOKAHEAD:
         out_of_range("ctx.at lookahead exceeds 64 tokens")
@@ -229,7 +232,7 @@ class ActionCheckpoint:
     names: list
     saved: list
 
-    def __init__(self, pos):
+    def __init__(self, pos: TokenCursor):
         self.pos = pos
         self.names = []
         self.saved = []
@@ -277,7 +280,7 @@ class RuleContext(ActionCheckpoint):
     token_names: TokenNames
     ambiguous_id: int
 
-    def __init__(self, pos, ast, start_pos, rule: str, token_names: TokenNames, ambiguous_id: int):
+    def __init__(self, pos: TokenCursor, ast: object, start_pos: TokenCursor, rule: str, token_names: TokenNames, ambiguous_id: int):
         ActionCheckpoint.__init__(self, pos)
         self.ast = ast
         self.start_pos = start_pos
@@ -355,7 +358,7 @@ class FailContext(ActionCheckpoint):
     has_request: bool
     skipped: int
 
-    def __init__(self, pos, ast, start_pos, rule: str, failed_rule: str, state: recovery.State,
+    def __init__(self, pos: TokenCursor, ast: object, start_pos: TokenCursor, rule: str, failed_rule: str, state: recovery.State,
                  source: str, has_source_text: bool, diagnostic_begin: int, token_names: TokenNames,
                  ambiguous_id: int):
         ActionCheckpoint.__init__(self, pos)
@@ -513,7 +516,7 @@ class FailContext(ActionCheckpoint):
         self.requested = recovery.Mode.Abort
         self.has_request = True
 
-    def finish(self, before) -> recovery.Decision:
+    def finish(self, before: TokenCursor) -> recovery.Decision:
         begin = cursor_position(before)
         end = cursor_position(self.pos)
         moved = 0
@@ -559,7 +562,7 @@ class FrameGuard:
     parser: object
     open: bool
 
-    def __init__(self, parser, rule: str):
+    def __init__(self, parser: "LLParser", rule: str):
         self.parser = parser
         self.open = True
         parser.frames_.append(Frame(rule))
@@ -583,7 +586,7 @@ class CounterScope:
     saved: StrIntMap
     open: bool
 
-    def __init__(self, parser):
+    def __init__(self, parser: "LLParser"):
         self.parser = parser
         self.saved = parser.counters_.copy()
         self.open = True
@@ -605,7 +608,7 @@ class RuleProbe:
     committed: bool
     open: bool
 
-    def __init__(self, parser, start: int):
+    def __init__(self, parser: "LLParser", start: int):
         self.parser = parser
         self.previous = parser.probe_
         self.has_previous = parser.has_probe_
@@ -700,11 +703,11 @@ class LLParser(Parser_base):
         self.recovering_ = False
         self.context_errors_.clear()
 
-    def parse_tokens(self):
+    def parse_tokens(self) -> object:
         self.reset_recovery()
         return Parser_base.parse_tokens(self)
 
-    def parseLazy(self):
+    def parseLazy(self) -> object:
         self.reset_recovery()
         if not self.has_text:
             from ispa_std.failures import api_error
@@ -756,7 +759,7 @@ class LLParser(Parser_base):
         self.bind_counter_count(name, count)
 
     # --- probes --------------------------------------------------------------
-    def begin_probe(self, pos) -> RuleProbe:
+    def begin_probe(self, pos: TokenCursor) -> RuleProbe:
         return RuleProbe(self, cursor_position(pos))
 
     def reject_absent_rule(self) -> None:
@@ -765,7 +768,7 @@ class LLParser(Parser_base):
         if self.has_probe_ and not self.probe_.committed:
             no_match()
 
-    def commit_rule(self, pos) -> None:
+    def commit_rule(self, pos: TokenCursor) -> None:
         probe = self.probe_
         active = self.has_probe_
         while active:
@@ -778,7 +781,7 @@ class LLParser(Parser_base):
         self.recovering_ = False
 
     # --- debug ---------------------------------------------------------------
-    def debug_actual(self, pos) -> str:
+    def debug_actual(self, pos: TokenCursor) -> str:
         if not debug.enabled():
             return ""
         if pos.isEnd():
@@ -831,7 +834,7 @@ class LLParser(Parser_base):
     def unwinding(self) -> bool:
         return self.unwind_ != 0
 
-    def describe_token(self, pos) -> str:
+    def describe_token(self, pos: TokenCursor) -> str:
         if pos.isEnd():
             return "end of input"
         meta = pos.current().meta()
@@ -849,7 +852,7 @@ class LLParser(Parser_base):
             i = i + 1
         return out
 
-    def resolve_context(self, pos, max_skip: int) -> Resume:
+    def resolve_context(self, pos: TokenCursor, max_skip: int) -> Resume:
         """Earliest token (within max_skip) claimed by any frame; ties go to the
         innermost frame. If an identical spot already failed, the innermost
         frame may not claim the current token again (guarantees progress).
@@ -875,7 +878,7 @@ class LLParser(Parser_base):
             return Resume(k, 0, recovery.ContextClaim("", recovery.empty_token_set()), False)
         return Resume(0, -1, recovery.ContextClaim("", recovery.empty_token_set()), False)
 
-    def report_context(self, pos, kind: int, r: Resume) -> None:
+    def report_context(self, pos: TokenCursor, kind: int, r: Resume) -> None:
         inner = self.frames_[len(self.frames_) - 1]
         target = self.frames_[r.frame]
         d = recovery.ContextDiagnostic()
@@ -923,7 +926,7 @@ class LLParser(Parser_base):
                 d.message = d.message + "; reached end of input"
         self.context_errors_.append(d)
 
-    def recover_at_context(self, pos, kind: int) -> bool:
+    def recover_at_context(self, pos: TokenCursor, kind: int) -> bool:
         """Local repair already failed (or does not apply). Find a recovery
         point in the enclosing frames, skip to it, and request unwinding."""
         if len(self.frames_) == 0 or self.recovery_state_.exhausted():
@@ -948,7 +951,7 @@ class LLParser(Parser_base):
         self.recovering_ = True
         return True
 
-    def sync_loop(self, pos) -> None:
+    def sync_loop(self, pos: TokenCursor) -> None:
         """A loop ended on a token that no active frame can accept: report it
         here, where the mistake is, rather than at the next required member."""
         if pos.isEnd() or len(self.frames_) == 0 or self.unwinding():
@@ -980,7 +983,7 @@ class LLParser(Parser_base):
         pos.assign(candidate)
         self.recover_at_context(pos, recovery.ContextKind.Stray)
 
-    def recover_choice(self, pos, rule: str, expected: str, first_sets: list, inner_sets: list) -> int:
+    def recover_choice(self, pos: TokenCursor, rule: str, expected: str, first_sets: list, inner_sets: list) -> int:
         """Called only after normal LL(k) selection failed. Prefer an
         unambiguous FIRST token, then an unambiguous terminal inside an
         alternative (shared interior terminals do not identify a branch).
@@ -1060,7 +1063,7 @@ class LLParser(Parser_base):
             return -1
         return selected
 
-    def raise_error(self, token, message: str) -> None:
+    def raise_error(self, token: RawToken, message: str) -> None:
         self.reject_absent_rule()
         diagnostic = recovery.Diagnostic()
         if len(self.frames_) == 0:
@@ -1073,7 +1076,7 @@ class LLParser(Parser_base):
         self.recovery_state_.diagnostics.append(diagnostic)
 
     # --- required ------------------------------------------------------------
-    def required_recovering(self, pos, type_id: int, fail: recovery.FailHandler) -> recovery.RequiredResult:
+    def required_recovering(self, pos: TokenCursor, type_id: int, fail: recovery.FailHandler) -> recovery.RequiredResult:
         if self.unwinding():
             return recovery.RequiredResult.boundary_only()
         retries = 0
@@ -1105,7 +1108,7 @@ class LLParser(Parser_base):
                     self.recover_at_context(pos, recovery.ContextKind.Mismatch)
                 return recovery.RequiredResult(recovery.RequiredStatus.Boundary, False, Node.blank(), decision)
 
-    def _attempt_rule(self, rec, attempt) -> MatchResult:
+    def _attempt_rule(self, rec: Callable[[TokenCursor], MatchResult], attempt: TokenCursor) -> MatchResult:
         """Run `rec(attempt)` inside a probe, absorbing NoMatch and
         ExternalParse so an explicitly bound parent handler can run (C++
         `catch (const NoMatch&)` / `catch (const ExternalParseError&)`)."""
@@ -1122,7 +1125,7 @@ class LLParser(Parser_base):
         rethrow(failed, prim.failure_message())
         return MatchResult.failed(attempt)
 
-    def required_rule_recovering(self, pos, rec, fail: recovery.FailHandler) -> recovery.RequiredResult:
+    def required_rule_recovering(self, pos: TokenCursor, rec: Callable[[TokenCursor], MatchResult], fail: recovery.FailHandler) -> recovery.RequiredResult:
         if self.unwinding():
             return recovery.RequiredResult.boundary_only()
         retries = 0
@@ -1163,7 +1166,7 @@ class LLParser(Parser_base):
                     status = recovery.RequiredStatus.Missing
                 return recovery.RequiredResult(status, False, Node.blank(), decision)
 
-    def _required_outcome(self, result: recovery.RequiredResult, pos, scope: debug.MatchScope,
+    def _required_outcome(self, result: recovery.RequiredResult, pos: TokenCursor, scope: debug.MatchScope,
                           what: str) -> Node:
         """Shared tail of required_token / required_rule: a repaired or unwound
         match yields an empty Node; anything else is unrecoverable."""
@@ -1186,7 +1189,7 @@ class LLParser(Parser_base):
             logic_error(self.recovery_state_.diagnostics[len(self.recovery_state_.diagnostics) - 1].message)
         return Node.blank()
 
-    def required_token(self, pos, type_id: int, fail: recovery.FailHandler) -> Node:
+    def required_token(self, pos: TokenCursor, type_id: int, fail: recovery.FailHandler) -> Node:
         scope = debug.MatchScope(self.token_names_.lookup(type_id), self.debug_actual(pos))
         if fail.is_recovering():
             result = self.required_recovering(pos, type_id, fail)
@@ -1208,7 +1211,7 @@ class LLParser(Parser_base):
             logic_error(self.recovery_state_.diagnostics[len(self.recovery_state_.diagnostics) - 1].message)
         return Node.blank()
 
-    def required_rule(self, pos, rule_name: str, rec, fail: recovery.FailHandler) -> Node:
+    def required_rule(self, pos: TokenCursor, rule_name: str, rec: Callable[[TokenCursor], MatchResult], fail: recovery.FailHandler) -> Node:
         scope = debug.MatchScope(rule_name, self.debug_actual(pos))
         if fail.is_recovering():
             result = self.required_rule_recovering(pos, rec, fail)
@@ -1231,7 +1234,7 @@ class LLParser(Parser_base):
         return Node.blank()
 
     # --- optional ------------------------------------------------------------
-    def optional_token(self, pos, type_id: int) -> Node:
+    def optional_token(self, pos: TokenCursor, type_id: int) -> Node:
         scope = debug.MatchScope(self.token_names_.lookup(type_id), self.debug_actual(pos))
         if pos.current().holds(type_id):
             node = pos.current().to_node(type_id)
@@ -1243,7 +1246,7 @@ class LLParser(Parser_base):
         scope.close()
         return Node.blank()
 
-    def optional_rule(self, pos, rec) -> Node:
+    def optional_rule(self, pos: TokenCursor, rec: Callable[[TokenCursor], MatchResult]) -> Node:
         """NOTE: a rule that abandons itself during unwinding must still return
         status == True (a partial match) or the committed-probe check throws."""
         attempt = pos.copy()
@@ -1272,13 +1275,13 @@ class LLParser(Parser_base):
         return Node.blank()
 
     # --- repetition ----------------------------------------------------------
-    def skip_spaces(self, pos) -> None:
+    def skip_spaces(self, pos: TokenCursor) -> None:
         if not self.has_space_token_:
             return
         if pos.current().holds(self.space_token_):
             pos.next()
 
-    def skip_external_spaces(self, pos) -> None:
+    def skip_external_spaces(self, pos: TokenCursor) -> None:
         from ispa_std.chars import at, is_space
         if pos.has_source():
             origin = pos.sourceOrigin()
@@ -1291,7 +1294,7 @@ class LLParser(Parser_base):
         else:
             self.skip_spaces(pos)
 
-    def counted_impl(self, pos, spec: CountSpec, match) -> list:
+    def counted_impl(self, pos: TokenCursor, spec: CountSpec, match: Callable[[TokenCursor], Node]) -> list:
         has_limit = spec.has_count
         limit = spec.count
         if len(spec.name) > 0:
@@ -1341,13 +1344,13 @@ class LLParser(Parser_base):
         self.commit_rule(pos)
         return nodes
 
-    def counted_token(self, pos, type_id: int, spec: CountSpec) -> list:
+    def counted_token(self, pos: TokenCursor, type_id: int, spec: CountSpec) -> list:
         return self.counted_impl(pos, spec, lambda attempt: self.optional_token(attempt, type_id))
 
-    def counted_rule(self, pos, rec, spec: CountSpec) -> list:
+    def counted_rule(self, pos: TokenCursor, rec: Callable[[TokenCursor], MatchResult], spec: CountSpec) -> list:
         return self.counted_impl(pos, spec, lambda attempt: self.optional_rule(attempt, rec))
 
-    def repeat_optional(self, pos, match, separated: bool) -> Node:
+    def repeat_optional(self, pos: TokenCursor, match: Callable[[TokenCursor], Node], separated: bool) -> Node:
         """Separators belong to a successful next iteration, not to the end of
         the list: leave pos (including whitespace) intact on absence."""
         attempt = pos.copy()
@@ -1360,7 +1363,7 @@ class LLParser(Parser_base):
         pos.assign(attempt)
         return node
 
-    def range_token(self, pos, type_id: int, fail: recovery.FailHandler) -> list:
+    def range_token(self, pos: TokenCursor, type_id: int, fail: recovery.FailHandler) -> list:
         result = []
         if fail.is_recovering():
             first = self.required_recovering(pos, type_id, fail)
@@ -1382,7 +1385,7 @@ class LLParser(Parser_base):
         self.sync_loop(pos)
         return result
 
-    def range_rule(self, pos, rule_name: str, rec, fail: recovery.FailHandler) -> list:
+    def range_rule(self, pos: TokenCursor, rule_name: str, rec: Callable[[TokenCursor], MatchResult], fail: recovery.FailHandler) -> list:
         start = cursor_position(pos)
         result = []
         if fail.is_recovering():
@@ -1404,7 +1407,7 @@ class LLParser(Parser_base):
         self.sync_loop(pos)
         return result
 
-    def range_optional_token(self, pos, type_id: int) -> list:
+    def range_optional_token(self, pos: TokenCursor, type_id: int) -> list:
         result = []
         repeating = True
         while repeating and (not pos.isEnd()) and not self.unwinding():
@@ -1417,7 +1420,7 @@ class LLParser(Parser_base):
         self.sync_loop(pos)
         return result
 
-    def range_optional_rule(self, pos, rec) -> list:
+    def range_optional_rule(self, pos: TokenCursor, rec: Callable[[TokenCursor], MatchResult]) -> list:
         result = []
         repeating = True
         while repeating and (not pos.isEnd()) and not self.unwinding():
@@ -1431,15 +1434,15 @@ class LLParser(Parser_base):
         return result
 
     # --- contexts ------------------------------------------------------------
-    def rule_context(self, pos, ast, start, rule: str) -> RuleContext:
+    def rule_context(self, pos: TokenCursor, ast: object, start: TokenCursor, rule: str) -> RuleContext:
         return RuleContext(pos, ast, start, rule, self.token_names_, self.ambiguous_id_)
 
-    def fail_context(self, pos, ast, start, rule: str, failed_rule: str) -> FailContext:
+    def fail_context(self, pos: TokenCursor, ast: object, start: TokenCursor, rule: str, failed_rule: str) -> FailContext:
         return FailContext(pos, ast, start, rule, failed_rule, self.recovery_state_, self.text,
                            self.has_text, len(self.recovery_state_.diagnostics), self.token_names_,
                            self.ambiguous_id_)
 
-    def custom_failure_decision(self, before, after) -> recovery.Decision:
+    def custom_failure_decision(self, before: TokenCursor, after: TokenCursor) -> recovery.Decision:
         decision = recovery.Decision.default()
         if cursor_position(before) == cursor_position(after):
             decision.mode = recovery.Mode.Insert
@@ -1447,13 +1450,13 @@ class LLParser(Parser_base):
             decision.mode = recovery.Mode.Retry
         return decision
 
-    def custom_failure_decision_ctx(self, before, ctx: FailContext) -> recovery.Decision:
+    def custom_failure_decision_ctx(self, before: TokenCursor, ctx: FailContext) -> recovery.Decision:
         return ctx.finish(before)
 
-    def custom_failure(self, action) -> recovery.ActionFailure:
+    def custom_failure(self, action: Callable[[TokenCursor, recovery.State], recovery.Decision]) -> recovery.ActionFailure:
         return recovery.ActionFailure(action)
 
-    def action_result(self, ast, pos) -> MatchResult:
+    def action_result(self, ast: object, pos: TokenCursor) -> MatchResult:
         node = Node.blank()
         node.set_data(ast)
         return MatchResult(True, node, pos.copy())

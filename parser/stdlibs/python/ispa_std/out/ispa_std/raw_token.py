@@ -80,7 +80,7 @@ class RawToken:
     _payload: object
     _meta: RawTokenMeta
 
-    def __init__(self, meta: RawTokenMeta, type_id: int, payload):
+    def __init__(self, meta: RawTokenMeta, type_id: int, payload: object):
         self._meta = meta
         self._type_id = type_id
         self._payload = payload
@@ -96,7 +96,7 @@ class RawToken:
         return RawToken(meta, NO_TYPE, 0)
 
     @staticmethod
-    def make(meta: RawTokenMeta, type_id: int, payload) -> "RawToken":
+    def make(meta: RawTokenMeta, type_id: int, payload: object) -> "RawToken":
         if type_id < 0:
             logic_error("RawToken: payload type is not an alternative")
         return RawToken(meta, type_id, payload)
@@ -111,7 +111,7 @@ class RawToken:
 
     @staticmethod
     def create(startpos: int, source: str, has_source: bool, length: int, line: int,
-               enumv: int, type_id: int, value) -> "RawToken":
+               enumv: int, type_id: int, value: object) -> "RawToken":
         meta = RawTokenMeta(startpos, source, has_source, length, line, 0, enumv)
         return RawToken(meta, type_id, value)
 
@@ -137,7 +137,7 @@ class RawToken:
     def holds(self, type_id: int) -> bool:
         return self._type_id == type_id
 
-    def get(self):
+    def get(self) -> object:
         if self._type_id == NO_TYPE:
             logic_error("RawToken::get: alternative mismatch")
         return self._payload

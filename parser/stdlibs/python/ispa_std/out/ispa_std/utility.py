@@ -14,10 +14,10 @@ class Pair(Generic[A, B]):
         self.first = first
         self.second = second
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: "Pair[A, B]") -> bool:
         return self.first == other.first and self.second == other.second
 
-    def __lt__(self, other) -> bool:
+    def __lt__(self, other: "Pair[A, B]") -> bool:
         if self.first < other.first:
             return True
         if other.first < self.first:

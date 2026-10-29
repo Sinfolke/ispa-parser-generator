@@ -6,7 +6,11 @@ length, start_line, cur)` is the generated accept handler and returns
 `Pair(next_state, token)`: NULL_STATE accepts the token, LEXER_DELETE_STATE
 drops one character, DYNAMIC_FAIL_STATE abandons the token, anything else
 continues the walk. It may advance `cur` (dynamic matchers do)."""
+from typing import Callable
+
 from ispa_std import debug
+from ispa_std.raw_token import RawToken
+from ispa_std.utility import Pair
 from ispa_std.chars import at, code_of
 from ispa_std.dfa_api import (Action, Captures, DebugIndex, DFADebug, DYNAMIC_FAIL_STATE, HistoryNode,
                               LEXER_DELETE_STATE, NULL_STATE, TdfaLayout, UNSET)
@@ -44,7 +48,7 @@ _TRACE: list[TraceSink] = [TraceSink()]
 _TRACE_ON: list[bool] = [False]
 
 
-def set_trace_sink(sink) -> None:
+def set_trace_sink(sink: TraceSink) -> None:
     _TRACE[0] = sink
     _TRACE_ON[0] = True
 
@@ -99,7 +103,7 @@ def _trace_step(tables: DfaTables, state: int, cls: int, current_ch: str, pos_ch
         sink.write("State " + int_to_string(state) + " char '" + pos_ch + "'\n")
 
 
-def run(src: str, cur: Cursor, start_pos: int, tables: DfaTables, semantic, empty_token):
+def run(src: str, cur: Cursor, start_pos: int, tables: DfaTables, semantic: Callable[[int, Captures, int, int, int, Cursor], Pair[int, RawToken]], empty_token: RawToken) -> RawToken:
     """Scan one token starting at cur.pos. Returns the accepted token, or
     `empty_token` when nothing matched (cur is then left where the walk died,
     which the caller treats as no progress)."""

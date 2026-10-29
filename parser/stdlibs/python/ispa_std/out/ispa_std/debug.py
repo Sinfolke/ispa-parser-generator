@@ -57,10 +57,28 @@ class Location:
         return Location(self.file, self.line, self.column)
 
 
+class DebugSink:
+    """Where framed records go; hosts subclass it."""
+
+    def write(self, text: str) -> bool:
+        return False
+
+
+class DebugControl:
+    """Where stepping commands come from; hosts subclass it."""
+
+    def read_byte(self) -> int:
+        return -1
+
+
+class ScopeBase:
+    serial: int
+
+
 class DebugState:
-    sink: object
+    sink: DebugSink
     has_sink: bool
-    control: object
+    control: DebugControl
     has_control: bool
     stepping: bool
     target_depth: int
@@ -69,13 +87,13 @@ class DebugState:
     break_lines: list
     failure_seen: bool
     location: Location
-    scopes: list
+    scopes: list[ScopeBase]
     serial: int
 
     def __init__(self):
-        self.sink = 0
+        self.sink = DebugSink()
         self.has_sink = False
-        self.control = 0
+        self.control = DebugControl()
         self.has_control = False
         self.stepping = False
         self.target_depth = -1
@@ -91,14 +109,14 @@ class DebugState:
 _S: DebugState = DebugState()
 
 
-def configure(sink, control) -> None:
+def configure(sink: DebugSink, control: DebugControl) -> None:
     _S.sink = sink
     _S.has_sink = True
     _S.control = control
     _S.has_control = True
 
 
-def configure_sink_only(sink) -> None:
+def configure_sink_only(sink: DebugSink) -> None:
     _S.sink = sink
     _S.has_sink = True
     _S.has_control = False
@@ -180,7 +198,7 @@ def obj(type_name: str, data: str) -> str:
     return '{"type":' + quote(type_name) + ',"value":' + data + "}"
 
 
-def encode(value, depth: int) -> str:
+def encode(value: object, depth: int) -> str:
     """Typed JSON for a value; objects expose debug_type()/debug_fields()."""
     kind = reflect.kind_of(value)
     if kind == reflect.NONE:
@@ -266,11 +284,11 @@ def lexer_result(token: str, success: bool, actual: str, reason: str, loc: Locat
                  '"success":' + flag + ',"actual":' + quote(actual) + ',"reason":' + quote(reason))
 
 
-def value(name: str, data, loc: Location) -> bool:
+def value(name: str, data: object, loc: Location) -> bool:
     return event(Kind.value, loc, name, '"data":' + encode(data, 0))
 
 
-def lexer_capture(name: str, data, loc: Location) -> bool:
+def lexer_capture(name: str, data: object, loc: Location) -> bool:
     return event(Kind.lexer_capture, loc, name, '"data":' + encode(data, 0))
 
 
@@ -280,7 +298,7 @@ class Snapshot:
     def __init__(self):
         self._values = []
 
-    def add(self, name: str, data) -> "Snapshot":
+    def add(self, name: str, data: object) -> "Snapshot":
         self._values.append(quote(name) + ":" + encode(data, 0))
         return self
 
@@ -407,7 +425,7 @@ def _next_serial() -> int:
     return _S.serial
 
 
-def _forget(scope) -> None:
+def _forget(scope: ScopeBase) -> None:
     i = len(_S.scopes) - 1
     while i >= 0:
         if _S.scopes[i].serial == scope.serial:
@@ -416,12 +434,11 @@ def _forget(scope) -> None:
         i = i - 1
 
 
-class RuleScope:
+class RuleScope(ScopeBase):
     name: str
     loc: Location
     previous: Location
     open: bool
-    serial: int
 
     def __init__(self, name: str, loc: Location):
         self.name = name
@@ -444,12 +461,11 @@ class RuleScope:
         _S.location = self.previous
 
 
-class ProductionScope:
+class ProductionScope(ScopeBase):
     name: str
     loc: Location
     previous: Location
     open: bool
-    serial: int
 
     def __init__(self, name: str, loc: Location):
         self.name = name
@@ -472,7 +488,7 @@ class ProductionScope:
         _S.location = self.previous
 
 
-class MatchScope:
+class MatchScope(ScopeBase):
     expected: str
     actual: str
     reason: str
@@ -480,7 +496,6 @@ class MatchScope:
     matched: bool
     active: bool
     open: bool
-    serial: int
 
     def __init__(self, want: str, got: str):
         self.expected = want

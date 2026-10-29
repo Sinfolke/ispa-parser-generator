@@ -6,7 +6,8 @@ the complete input has exactly one surviving derivation."""
 from ispa_std.failures import runtime_error
 from ispa_std.format import int_to_string, join
 from ispa_std.lr import ABSENT, LR_CONFLICT, LR_INVALID, LRGrammar, LRParser
-from ispa_std.node import MatchResult
+from ispa_std.lexer import TokenCursor
+from ispa_std.match_result import MatchResult
 from ispa_std.sortedmap import IntSet, StrIntMap
 
 NODE_LIMIT = 250000
@@ -53,7 +54,7 @@ class _Forest:
     token: object
     alternatives: list
 
-    def __init__(self, span: _Span, has_token: bool, token):
+    def __init__(self, span: _Span, has_token: bool, token: object):
         self.span = span
         self.has_token = has_token
         self.token = token
@@ -89,7 +90,7 @@ class LRGeneralizedParser(LRParser):
         if self.work > WORK_LIMIT or len(forest) + len(stacks) > NODE_LIMIT:
             runtime_error("LR automatic conflict resolution resource limit exceeded")
 
-    def lr_parse_generalized(self, g: LRGrammar, pos) -> MatchResult:
+    def lr_parse_generalized(self, g: LRGrammar, pos: TokenCursor) -> MatchResult:
         self.work = 0
         forest = []
         stacks = [_Stack(ABSENT, 0, ABSENT)]
@@ -315,7 +316,7 @@ class LRGeneralizedParser(LRParser):
         return join(out, ",")
 
     def _intern(self, forest: list, index: StrIntMap, terminal: bool, symbol: int, span: _Span,
-                has_token: bool, token) -> int:
+                has_token: bool, token: object) -> int:
         self._tick(forest, [])
         key = self._key([_b(terminal), int_to_string(symbol), int_to_string(span.begin), int_to_string(span.end),
                          _b(span.leading), _b(span.trailing), _b(span.empty)])

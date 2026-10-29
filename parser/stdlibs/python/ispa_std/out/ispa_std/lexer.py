@@ -12,7 +12,11 @@ Differences forced by the language-neutral model:
     (cpp_residue/ispastdlib/file_io.hpp);
   * cursors are mutable objects: use copy() where C++ copies an iterator and
     assign() where it assigns one."""
+from typing import Callable
+
 from ispa_std.chars import at, is_space
+from ispa_std.dfa_api import Captures
+from ispa_std.utility import Pair
 from ispa_std.dfa_run import DfaTables, run
 from ispa_std.failures import api_error, internal_error, logic_error, out_of_range, runtime_error
 from ispa_std.format import int_to_string
@@ -69,7 +73,7 @@ class LexerFailureContext:
         self.decision = LexerDecision.ABORT
 
 
-def is_token_end(token) -> bool:
+def is_token_end(token: RawToken) -> bool:
     """End-of-stream: an empty token that is not the ambiguous marker."""
     return token.empty() and not token.isAmbiguous()
 
@@ -106,18 +110,18 @@ class Lexer_base:
         self.bound = -1
 
     # --- overridable ---------------------------------------------------------
-    def makeToken(self, cur: Cursor):
+    def makeToken(self, cur: Cursor) -> RawToken:
         logic_error("Lexer_base.makeToken is abstract")
         return self.empty_token()
 
     def init(self) -> None:
         return
 
-    def empty_token(self):
+    def empty_token(self) -> RawToken:
         """The default-constructed token (what C++ spells `Token{}`)."""
         return RawToken.empty_token()
 
-    def ambiguous_token(self, before: int, after: int):
+    def ambiguous_token(self, before: int, after: int) -> RawToken:
         """Marker for one source unit an external rule may still claim."""
         meta = RawTokenMeta(before, self._in, True, 1, self.line_at(before), self.column_at(before), AMBIGUOUS_ID)
         return RawToken.ambiguous(meta)
@@ -126,10 +130,10 @@ class Lexer_base:
         logic_error("External parser handoff requires a cloneable lexer")
         return self
 
-    def checkpoint(self):
+    def checkpoint(self) -> object:
         return 0
 
-    def restoreCheckpoint(self, state) -> None:
+    def restoreCheckpoint(self, state: object) -> None:
         return
 
     def externalAdvance(self, begin: int, end: int) -> None:
@@ -138,25 +142,25 @@ class Lexer_base:
     def hasExternalRules(self) -> bool:
         return False
 
-    def on_token(self, token) -> None:
+    def on_token(self, token: RawToken) -> None:
         self.tokens.append(token)
 
     def on_eof(self) -> None:
         self.tokens.append(self.empty_token())
 
-    def push(self, token) -> None:
+    def push(self, token: RawToken) -> None:
         self.on_token(token)
 
     def push_eof(self) -> None:
         self.on_eof()
 
-    def append_token(self, token) -> None:
+    def append_token(self, token: RawToken) -> None:
         self.tokens.append(token)
 
     def has_buffered_tokens(self) -> bool:
         return len(self.tokens) > 0
 
-    def pop_buffered_token(self):
+    def pop_buffered_token(self) -> RawToken:
         return self.tokens.pop(0)
 
     # --- state ---------------------------------------------------------------
@@ -281,7 +285,7 @@ class Lexer_base:
     def lexer_failure_context(self, cursor: int, rule: str, failed_rule: str) -> LexerFailureContext:
         return LexerFailureContext(self._in, cursor, self.errors, rule, failed_rule)
 
-    def lexer_failure_result(self, ctx: LexerFailureContext, inserted):
+    def lexer_failure_result(self, ctx: LexerFailureContext, inserted: RawToken) -> Pair[int, RawToken]:
         """(state, token) for a lexer fail handler; see DFA run()."""
         from ispa_std.dfa_api import LEXER_DELETE_STATE, NULL_STATE
         from ispa_std.utility import Pair
@@ -295,7 +299,7 @@ class Lexer_base:
             runtime_error(self.errors[len(self.errors) - 1])
         return Pair(NULL_STATE, inserted)
 
-    def lookup(self, tables: DfaTables, semantic, cur: Cursor):
+    def lookup(self, tables: DfaTables, semantic: Callable[[int, Captures, int, int, int, Cursor], Pair[int, RawToken]], cur: Cursor) -> RawToken:
         """Run the DFA for one token at cur (empty token at end of input)."""
         if cur.pos >= len(self._in):
             return self.empty_token()
@@ -332,7 +336,7 @@ class Lexer_base:
         return self.makeTokens()
 
 
-def _token_equal(a, b) -> bool:
+def _token_equal(a: RawToken, b: RawToken) -> bool:
     if a.empty() != b.empty():
         return False
     if a.empty():
@@ -341,15 +345,86 @@ def _token_equal(a, b) -> bool:
         and a.meta().length() == b.meta().length()
 
 
-class LazyIterator:
-    """Lexer_base::lazy_iterator. Copies made with copy() share the token
-    cache and source cursor but keep independent logical indices."""
+class TokenCursor:
+    """What the parsers see of a token position. LazyIterator lexes on demand
+    from source; TokenIterator walks tokens that already exist. Both keep their
+    state in these fields so assign() works through the base type."""
     owner: Lexer_base
     state: _SharedState
     token_index: int
     distance_base: int
     owned_owner: Lexer_base
     has_owned: bool
+
+    def copy(self) -> "TokenCursor":
+        logic_error("TokenCursor.copy is abstract")
+        return self
+
+    def assign(self, other: "TokenCursor") -> None:
+        self.owner = other.owner
+        self.state = other.state
+        self.token_index = other.token_index
+        self.distance_base = other.distance_base
+        self.owned_owner = other.owned_owner
+        self.has_owned = other.has_owned
+
+    def has_source(self) -> bool:
+        return False
+
+    def sourceOrigin(self) -> str:
+        return ""
+
+    def getErrors(self) -> list:
+        return self.owner.getErrors()
+
+    def sourcePosition(self) -> int:
+        return -1
+
+    def consumeExternal(self, end: int) -> None:
+        logic_error("TokenCursor.consumeExternal needs a lazy cursor")
+
+    def isEnd(self) -> bool:
+        logic_error("TokenCursor.isEnd is abstract")
+        return True
+
+    def next(self) -> "TokenCursor":
+        logic_error("TokenCursor.next is abstract")
+        return self
+
+    def prev(self) -> "TokenCursor":
+        logic_error("TokenCursor.prev is abstract")
+        return self
+
+    def advance_by(self, count: int) -> "TokenCursor":
+        logic_error("TokenCursor.advance_by is abstract")
+        return self
+
+    def plus(self, count: int) -> "TokenCursor":
+        out = self.copy()
+        out.advance_by(count)
+        return out
+
+    def current(self) -> RawToken:
+        logic_error("TokenCursor.current is abstract")
+        return self.owner.empty_token()
+
+    def minus(self, other: "TokenCursor") -> int:
+        return self.distance() - other.distance()
+
+    def distance(self) -> int:
+        return self.distance_base + self.token_index
+
+    def resumePosition(self) -> int:
+        return -1
+
+    def advanceCharacters(self, count: int) -> bool:
+        runtime_error("advanceCharacters needs a lazy cursor (external parser integration)")
+        return False
+
+
+class LazyIterator(TokenCursor):
+    """Lexer_base::lazy_iterator. Copies made with copy() share the token
+    cache and source cursor but keep independent logical indices."""
 
     def __init__(self, lexer: Lexer_base, state: _SharedState, token_index: int, distance_base: int):
         self.owner = lexer
@@ -372,19 +447,11 @@ class LazyIterator:
             lexer.line = lexer.line_at(start)
         return it
 
-    def copy(self) -> "LazyIterator":
+    def copy(self) -> "TokenCursor":
         out = LazyIterator(self.owner, self.state, self.token_index, self.distance_base)
         out.owned_owner = self.owned_owner
         out.has_owned = self.has_owned
         return out
-
-    def assign(self, other: "LazyIterator") -> None:
-        self.owner = other.owner
-        self.state = other.state
-        self.token_index = other.token_index
-        self.distance_base = other.distance_base
-        self.owned_owner = other.owned_owner
-        self.has_owned = other.has_owned
 
     def has_source(self) -> bool:
         return True
@@ -470,19 +537,19 @@ class LazyIterator:
             return True
         return is_token_end(self.owner.tokens[self.token_index])
 
-    def next(self) -> "LazyIterator":
+    def next(self) -> "TokenCursor":
         """operator++"""
         if not self.isEnd():
             self.token_index = self.token_index + 1
         return self
 
-    def prev(self) -> "LazyIterator":
+    def prev(self) -> "TokenCursor":
         """operator--"""
         if self.token_index > 0:
             self.token_index = self.token_index - 1
         return self
 
-    def advance_by(self, count: int) -> "LazyIterator":
+    def advance_by(self, count: int) -> "TokenCursor":
         """operator+="""
         left = count
         while left > 0 and not self.isEnd():
@@ -490,23 +557,12 @@ class LazyIterator:
             left = left - 1
         return self
 
-    def plus(self, count: int) -> "LazyIterator":
-        out = self.copy()
-        out.advance_by(count)
-        return out
-
-    def current(self):
+    def current(self) -> RawToken:
         """operator* / operator->"""
         self.ensure_token()
         if self.token_index >= len(self.owner.tokens):
             out_of_range("lazy_iterator: dereference beyond EOF")
         return self.owner.tokens[self.token_index]
-
-    def minus(self, other: "LazyIterator") -> int:
-        return self.distance() - other.distance()
-
-    def distance(self) -> int:
-        return self.distance_base + self.token_index
 
     def resumePosition(self) -> int:
         """Source position just after the current token (-1 when unknown)."""
@@ -543,72 +599,54 @@ class LazyIterator:
         return True
 
 
-class TokenIterator:
+class TokenIterator(TokenCursor):
     """Lexer_base::iterator over already-accumulated tokens (run makeTokens() first)."""
-    owner: Lexer_base
-    index: int
 
     def __init__(self, owner: Lexer_base, index: int):
         self.owner = owner
-        self.index = index
+        self.state = _SharedState(0)
+        self.token_index = index
+        self.distance_base = 0
+        self.owned_owner = owner
+        self.has_owned = False
 
     @staticmethod
-    def begin(owner: Lexer_base) -> "TokenIterator":
+    def begin(owner: Lexer_base) -> "TokenCursor":
         return TokenIterator(owner, 0)
 
-    def copy(self) -> "TokenIterator":
-        return TokenIterator(self.owner, self.index)
+    def copy(self) -> "TokenCursor":
+        return TokenIterator(self.owner, self.token_index)
 
-    def assign(self, other: "TokenIterator") -> None:
-        self.owner = other.owner
-        self.index = other.index
-
-    def has_source(self) -> bool:
-        return False
-
-    def next(self) -> "TokenIterator":
-        self.index = self.index + 1
+    def next(self) -> "TokenCursor":
+        self.token_index = self.token_index + 1
         return self
 
-    def prev(self) -> "TokenIterator":
-        if self.index != 0:
-            self.index = self.index - 1
+    def prev(self) -> "TokenCursor":
+        if self.token_index != 0:
+            self.token_index = self.token_index - 1
         return self
 
-    def advance_by(self, count: int) -> "TokenIterator":
-        self.index = self.index + count
+    def advance_by(self, count: int) -> "TokenCursor":
+        self.token_index = self.token_index + count
         return self
-
-    def plus(self, count: int) -> "TokenIterator":
-        return TokenIterator(self.owner, self.index + count)
-
-    def minus(self, other: "TokenIterator") -> int:
-        return self.index - other.index
 
     def isEnd(self) -> bool:
-        if self.index >= len(self.owner.tokens):
+        if self.token_index >= len(self.owner.tokens):
             return True
-        return is_token_end(self.owner.tokens[self.index])
+        return is_token_end(self.owner.tokens[self.token_index])
 
-    def current(self):
-        if self.index >= len(self.owner.tokens):
+    def current(self) -> RawToken:
+        if self.token_index >= len(self.owner.tokens):
             out_of_range("token iterator: dereference beyond the token list")
-        return self.owner.tokens[self.index]
-
-    def distance(self) -> int:
-        return self.index
+        return self.owner.tokens[self.token_index]
 
     def resumePosition(self) -> int:
         """Source position after the current token, -1 when it has none.
         (The C++ body referenced members that do not exist and was never
         instantiated; this is its documented intent.)"""
-        if self.index >= len(self.owner.tokens):
+        if self.token_index >= len(self.owner.tokens):
             return -1
-        token = self.owner.tokens[self.index]
+        token = self.owner.tokens[self.token_index]
         if is_token_end(token) or not token.meta().has_source():
             return -1
         return token.meta().end_pos()
-
-    def advanceCharacters(self, count: int) -> bool:
-        runtime_error("Lexer_base::iterator::advanceCharacters() is not implemented. Use lazy_iterator for external parser integration.")
-        return False

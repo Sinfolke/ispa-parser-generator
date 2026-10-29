@@ -9,6 +9,7 @@ A state number < len(table) is a table state; the next len(action_table) are
 action rows; everything above is a semantic dispatch index."""
 from ispa_std.chars import at, code_of
 from ispa_std.failures import runtime_error
+from ispa_std.raw_token import RawToken
 from ispa_std.string import substr
 from ispa_std.utility import Pair
 
@@ -258,7 +259,7 @@ class Captures:
         return (b - line_start) + 1
 
 
-def semantic_result(state: int, token) -> Pair:
+def semantic_result(state: int, token: RawToken) -> Pair:
     """What a generated semantic function returns: (next state, token)."""
     return Pair(state, token)
 

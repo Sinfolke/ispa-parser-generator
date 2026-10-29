@@ -3,7 +3,7 @@
 No uninitialised storage is needed, so T need not be default-constructible and
 no target primitive is involved.
 """
-from typing import Generic, TypeVar
+from typing import Callable, Generic, TypeVar
 
 from ispa_std import prim
 from ispa_std.errors import ErrorKind
@@ -13,7 +13,7 @@ U = TypeVar("U")
 
 
 class Optional(Generic[T]):
-    _items: list
+    _items: list[T]
 
     def __init__(self):
         self._items = []
@@ -48,22 +48,22 @@ class Optional(Generic[T]):
         self._items.clear()
         self._items.append(value)
 
-    def transform(self, fn) -> "Optional[U]":
+    def transform(self, fn: Callable[[T], U]) -> "Optional[U]":
         if len(self._items) == 1:
             return Optional.some(fn(self._items[0]))
         return Optional.none()
 
-    def and_then(self, fn) -> "Optional[U]":
+    def and_then(self, fn: Callable[[T], "Optional[U]"]) -> "Optional[U]":
         if len(self._items) == 1:
             return fn(self._items[0])
         return Optional.none()
 
-    def or_else(self, fn) -> "Optional[T]":
+    def or_else(self, fn: Callable[[], "Optional[T]"]) -> "Optional[T]":
         if len(self._items) == 1:
             return self
         return fn()
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: "Optional[T]") -> bool:
         if len(self._items) != len(other._items):
             return False
         if len(self._items) == 0:

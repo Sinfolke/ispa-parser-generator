@@ -26,7 +26,7 @@ class Node:
     _data: object
 
     def __init__(self, startpos: int, source: str, has_source: bool, length: int, line: int,
-                 column: int, name: int, empty: bool, data):
+                 column: int, name: int, empty: bool, data: object):
         self._startpos = startpos
         self._length = length
         self._line = line
@@ -50,11 +50,11 @@ class Node:
 
     @staticmethod
     def with_data(startpos: int, source: str, has_source: bool, length: int, line: int,
-                  column: int, name: int, data) -> "Node":
+                  column: int, name: int, data: object) -> "Node":
         return Node(startpos, source, has_source, length, line, column, name, False, data)
 
     @staticmethod
-    def create(startpos: int, source: str, length: int, line: int, enumv: int, value) -> "Node":
+    def create(startpos: int, source: str, length: int, line: int, enumv: int, value: object) -> "Node":
         # Column cannot be recovered from the start alone; callers needing it
         # use with_data.
         return Node(startpos, source, True, length, line, 0, enumv, False, value)
@@ -114,10 +114,10 @@ class Node:
     def name(self) -> int:
         return self._name
 
-    def data(self):
+    def data(self) -> object:
         return self._data
 
-    def set_data(self, value) -> None:
+    def set_data(self, value: object) -> None:
         self._data = value
         self._empty = False
 
@@ -153,26 +153,3 @@ class Node:
             out.append(Pair("column", self._column))
             out.append(Pair("data", self._data))
         return out
-
-
-class MatchResult:
-    """MatchResult<Data, IT>: did the rule match, the node, and the cursor after it."""
-    status: bool
-    node: Node
-    it: object
-
-    def __init__(self, status: bool, node: Node, it):
-        self.status = status
-        self.node = node
-        self.it = it
-
-    @staticmethod
-    def failed(it) -> "MatchResult":
-        return MatchResult(False, Node.blank(), it)
-
-    def debug_type(self) -> str:
-        return "ISPA.MatchResult"
-
-    def debug_fields(self) -> list:
-        from ispa_std.utility import Pair
-        return [Pair("status", self.status), Pair("node", self.node)]

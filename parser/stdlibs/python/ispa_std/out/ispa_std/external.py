@@ -10,7 +10,9 @@ they expose has_source(), sourceOrigin(), sourcePosition(), consumeExternal(end)
 from ispa_std import prim
 from ispa_std.errors import ErrorKind
 from ispa_std.failures import external_parse_error, logic_error, rethrow
-from ispa_std.node import MatchResult, Node
+from ispa_std.lexer import TokenCursor
+from ispa_std.match_result import MatchResult
+from ispa_std.node import Node
 
 
 class ExternalResult:
@@ -26,6 +28,16 @@ class ExternalResult:
     @staticmethod
     def failed() -> "ExternalResult":
         return ExternalResult(False, Node.blank(), -1)
+
+
+class ExternalBinding:
+    """A foreign parser; hosts subclass it."""
+
+    def starts(self, origin: str, pos: int) -> bool:
+        return False
+
+    def parse(self, origin: str, pos: int) -> ExternalResult:
+        return ExternalResult.failed()
 
 
 def external_node(origin: str, start: int, end: int, node: Node) -> Node:
@@ -44,17 +56,17 @@ def external_node(origin: str, start: int, end: int, node: Node) -> Node:
     return Node.with_data(start, origin, True, end - start, line, start - line_start + 1, node.name(), node.data())
 
 
-def _require_lazy(pos) -> None:
+def _require_lazy(pos: TokenCursor) -> None:
     if not pos.has_source():
         logic_error("AMBIGUOUS eager token stream: external parsers require lazy tokenization")
 
 
-def external_starts(binding, pos) -> bool:
+def external_starts(binding: ExternalBinding, pos: TokenCursor) -> bool:
     _require_lazy(pos)
     return binding.starts(pos.sourceOrigin(), pos.sourcePosition())
 
 
-def external_match(binding, pos) -> MatchResult:
+def external_match(binding: ExternalBinding, pos: TokenCursor) -> MatchResult:
     """Try the binding at pos. On success `pos` is advanced past the foreign text."""
     _require_lazy(pos)
     if not binding.starts(pos.sourceOrigin(), pos.sourcePosition()):

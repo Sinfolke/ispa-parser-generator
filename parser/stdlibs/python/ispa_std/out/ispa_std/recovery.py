@@ -6,7 +6,11 @@ optional/probing/backtracking alternatives. Token ids are Ints; EOF_TOKEN
 isEnd(), current(), next(), copy()."""
 from ispa_std.failures import invalid_argument, logic_error
 from ispa_std.format import int_to_string, join
+from typing import Callable
+
+from ispa_std.lexer import TokenCursor
 from ispa_std.node import Node
+from ispa_std.raw_token import RawToken
 
 EOF_TOKEN = -1
 END_OF_INPUT: int = EOF_TOKEN
@@ -150,17 +154,17 @@ def _digit(c: str) -> int:
     return d
 
 
-def token_id(token) -> int:
+def token_id(token: RawToken) -> int:
     return token.kind()
 
 
-def _kind(pos) -> int:
+def _kind(pos: TokenCursor) -> int:
     if pos.isEnd():
         return EOF_TOKEN
     return token_id(pos.current())
 
 
-def recover(pos, state: State, plan: Plan, token_kind) -> Decision:
+def recover(pos: TokenCursor, state: State, plan: Plan, token_kind: int) -> Decision:
     """Pick and perform a repair at `pos`. `token_kind(token) -> id`; pos is
     advanced in place when tokens are skipped."""
     at = EOF_TOKEN
@@ -265,11 +269,11 @@ def _anchor(plan: Plan, state: State, id: int) -> bool:
     return False
 
 
-def recover_default(pos, state: State, plan: Plan) -> Decision:
+def recover_default(pos: TokenCursor, state: State, plan: Plan) -> Decision:
     return recover(pos, state, plan, token_id)
 
 
-def recover_encoded(pos, state: State, rule: str, expected: str, continuation: str, follow: str,
+def recover_encoded(pos: TokenCursor, state: State, rule: str, expected: str, continuation: str, follow: str,
                     explicit_sync: str, allow_insertion: bool, allow_deletion: bool,
                     allow_replacement: bool, max_skip: int) -> Decision:
     return recover_default(pos, state, Plan(rule, decode(expected), decode(continuation), decode(follow),
@@ -287,7 +291,7 @@ class TokenSet:
     def values(self) -> list:
         return self._values
 
-    def matches(self, token) -> bool:
+    def matches(self, token: RawToken) -> bool:
         return contains(self._values, token_id(token))
 
 
@@ -320,7 +324,7 @@ class FailHandler:
     may itself raise NoMatch (C++ `custom_action`); is_recovering() is False
     for the legacy `fail(pos)` form that never repairs."""
 
-    def run(self, pos, state: State) -> Decision:
+    def run(self, pos: TokenCursor, state: State) -> Decision:
         logic_error("FailHandler.run is abstract")
         return Decision.default()
 
@@ -350,7 +354,7 @@ class Handler(FailHandler):
         self.synchronization = synchronization
         self.policy = policy
 
-    def run(self, pos, state: State) -> Decision:
+    def run(self, pos: TokenCursor, state: State) -> Decision:
         plan = Plan(self.rule, self.expected.values(), self.continuation.values(), self.follow.values(),
                     self.synchronization.values(), self.policy.allow_insertion, self.policy.allow_deletion,
                     self.policy.allow_replacement, self.policy.max_skip)
@@ -374,12 +378,12 @@ class Handler(FailHandler):
 
 class ActionFailure(FailHandler):
     """A user-written fail action: action(pos, state) -> Decision."""
-    action: object
+    action: Callable[[TokenCursor, State], Decision]
 
-    def __init__(self, action):
+    def __init__(self, action: Callable[[TokenCursor, State], Decision]):
         self.action = action
 
-    def run(self, pos, state: State) -> Decision:
+    def run(self, pos: TokenCursor, state: State) -> Decision:
         return self.action(pos, state)
 
     def is_custom(self) -> bool:
@@ -388,12 +392,12 @@ class ActionFailure(FailHandler):
 
 class LegacyFail(FailHandler):
     """The pre-recovery `fail(pos)` form: reports and never repairs."""
-    action: object
+    action: Callable[[TokenCursor], None]
 
-    def __init__(self, action):
+    def __init__(self, action: Callable[[TokenCursor], None]):
         self.action = action
 
-    def run(self, pos, state: State) -> Decision:
+    def run(self, pos: TokenCursor, state: State) -> Decision:
         self.action(pos)
         return Decision.default()
 

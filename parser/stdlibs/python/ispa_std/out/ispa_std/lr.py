@@ -16,7 +16,10 @@ stays in cpp_residue."""
 from ispa_std import reflect
 from ispa_std.failures import runtime_error
 from ispa_std.format import int_to_string
-from ispa_std.node import MatchResult, Node
+from ispa_std.lexer import TokenCursor
+from ispa_std.match_result import MatchResult
+from ispa_std.node import Node
+from ispa_std.raw_token import RawToken
 from ispa_std.recovery import Diagnostic
 
 LR_INVALID = -9223372036854775807
@@ -75,7 +78,7 @@ class LRRegionFrame:
     recovered_prefix: bool
     control: LRControlState
 
-    def __init__(self, start, continuation: int):
+    def __init__(self, start: TokenCursor, continuation: int):
         self.pos = start
         self.states = [0]
         self.values = []
@@ -99,13 +102,13 @@ class LRGrammar:
     def lr_conflict(self, state: int, window: list) -> list:
         return []
 
-    def lr_shift(self, token):
+    def lr_shift(self, token: RawToken) -> object:
         return token
 
     def lr_length(self, rule: int) -> int:
         return 0
 
-    def lr_reduce(self, rule: int, rhs: list):
+    def lr_reduce(self, rule: int, rhs: list) -> object:
         return 0
 
     def lr_lhs(self, rule: int) -> int:
@@ -117,7 +120,7 @@ class LRGrammar:
     def has_is_space(self) -> bool:
         return False
 
-    def lr_is_space(self, token) -> bool:
+    def lr_is_space(self, token: RawToken) -> bool:
         return False
 
     def has_space(self) -> bool:
@@ -159,7 +162,7 @@ class LRGrammar:
     def has_semantic_reduce(self) -> bool:
         return False
 
-    def lr_semantic_reduce(self, rule: int, region: LRRegionFrame, span: LRRuleSpan, rhs: list):
+    def lr_semantic_reduce(self, rule: int, region: LRRegionFrame, span: LRRuleSpan, rhs: list) -> object:
         return 0
 
 
@@ -169,12 +172,12 @@ class LRTokenValue:
     node: object
     text: str
 
-    def __init__(self, node, text: str):
+    def __init__(self, node: Node, text: str):
         self.node = node
         self.text = text
 
 
-def lr_token(node) -> LRTokenValue:
+def lr_token(node: Node) -> LRTokenValue:
     text = ""
     if node.has_source() and node.length() >= 0:
         text = node.text()
@@ -219,11 +222,11 @@ def lr_pack(values: list, indices: list, offsets: list, splice: list, count: int
     return LRCaptures(columns, repeated)
 
 
-def lr_get(values: list, index: int):
+def lr_get(values: list, index: int) -> object:
     return values[index]
 
 
-def lr_node(value) -> Node:
+def lr_node(value: object) -> Node:
     node = Node.blank()
     node.set_data(value)
     return node
@@ -277,20 +280,20 @@ class Converted:
     ok: bool
     value: object
 
-    def __init__(self, ok: bool, value):
+    def __init__(self, ok: bool, value: object):
         self.ok = ok
         self.value = value
 
 
-def _is_token_value(v) -> bool:
+def _is_token_value(v: object) -> bool:
     return reflect.has_attr(v, "text") and reflect.has_attr(v, "node") and not reflect.has_attr(v, "columns")
 
 
-def _is_captures(v) -> bool:
+def _is_captures(v: object) -> bool:
     return reflect.has_attr(v, "columns") and reflect.has_attr(v, "repeated")
 
 
-def _empty_for(shape: Shape):
+def _empty_for(shape: Shape) -> object:
     if shape.kind == ShapeKind.TEXT:
         return ""
     if shape.kind == ShapeKind.CHAR:
@@ -300,7 +303,7 @@ def _empty_for(shape: Shape):
     return Node.blank()
 
 
-def lr_convert(shape: Shape, value) -> Converted:
+def lr_convert(shape: Shape, value: object) -> Converted:
     if _is_token_value(value):
         if shape.kind == ShapeKind.CHAR:
             if len(value.text) != 1:
@@ -397,7 +400,7 @@ class Variant:
     index: int
     value: object
 
-    def __init__(self, index: int, value):
+    def __init__(self, index: int, value: object):
         self.index = index
         self.value = value
 
@@ -425,7 +428,7 @@ class LRParser:
     def getErrors(self) -> list:
         return self.errors_
 
-    def _skip(self, g: LRGrammar, it, offset: list) -> None:
+    def _skip(self, g: LRGrammar, it: TokenCursor, offset: list) -> None:
         if g.has_is_space():
             while (not it.isEnd()) and g.lr_is_space(it.current()):
                 it.next()
@@ -437,7 +440,7 @@ class LRParser:
             return g.lr_space(rule, index)
         return False
 
-    def _window(self, g: LRGrammar, position) -> list:
+    def _window(self, g: LRGrammar, position: TokenCursor) -> list:
         peek = position.copy()
         window = []
         i = 0
@@ -452,7 +455,7 @@ class LRParser:
             i = i + 1
         return window
 
-    def _unexpected(self, g: LRGrammar, states: list, window: list, position) -> Diagnostic:
+    def _unexpected(self, g: LRGrammar, states: list, window: list, position: TokenCursor) -> Diagnostic:
         d = Diagnostic()
         d.unexpected = window[0]
         if g.has_expected():
@@ -511,7 +514,7 @@ class LRParser:
             span.leading = allowed
         return span
 
-    def lr_parse(self, g: LRGrammar, pos) -> MatchResult:
+    def lr_parse(self, g: LRGrammar, pos: TokenCursor) -> MatchResult:
         self.errors_ = []
         region = LRRegionFrame(pos, 0)
         states = region.states
