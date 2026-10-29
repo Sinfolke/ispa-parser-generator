@@ -53,7 +53,7 @@ namespace Rust {
         constexpr const char *kAllow =
             "#![allow(non_snake_case, non_camel_case_types, non_upper_case_globals, unused_mut, unused_variables,\n"
             "         unused_parens, unused_labels, unused_imports, unreachable_patterns, unreachable_code, dead_code,\n"
-            "         unused_braces, invalid_reference_casting, clippy::all)]\n"
+            "         unused_braces, invalid_reference_casting, unused_must_use, clippy::all)]\n"
             "use ::ispa_std::pycoll::{PyContains, PyPop};\n";
     }
 

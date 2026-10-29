@@ -1,6 +1,6 @@
 #![allow(non_snake_case, non_camel_case_types, non_upper_case_globals, unused_mut, unused_variables, unused_parens,
          unused_labels, unused_imports, unreachable_patterns, unreachable_code, dead_code, unused_braces,
-         invalid_reference_casting, clippy::all)]
+         invalid_reference_casting, unused_must_use, clippy::all)]
 //! Runtime primitives used by code emitted from ISPA's Rust backend.
 //!
 //! The crate intentionally has no third party dependencies so generated parsers
