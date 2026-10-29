@@ -94,6 +94,9 @@ export namespace Parser {
         static auto convertPythonDeclaration(const UAST::py::Stmt& declaration, const std::set<std::string>& classes = {}, const std::set<std::string>& typevars = {},
             const UAST::py::Signatures* signatures = nullptr, const std::string& module_prefix = {}) -> LangAPI::Declaration;
         static auto convertPythonDeclarations(const UAST::py::Module& module) -> LangAPI::Declarations;
+        // Escape analysis of the functions and methods in `declaration`: records summaries into `signatures`.
+        static auto analyzePythonDeclaration(const UAST::py::Stmt& declaration, const std::set<std::string>& classes,
+            const std::set<std::string>& typevars, UAST::py::Signatures& signatures, const std::string& module_prefix) -> void;
         static auto convertPythonType(const UAST::py::ExprPtr& annotation) -> LangAPI::Type;
         // Action scopes reserve ctx; locals persist across sequential blocks.
         static auto convertPythonAction(const AST::PythonAction& action,

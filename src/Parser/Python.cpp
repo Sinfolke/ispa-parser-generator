@@ -202,6 +202,239 @@ struct PythonConverter {
         walk(body, visit);
         return count;
     }
+
+    // ---------------------------------------------------------------------------------------------------------
+    // Escape analysis. A value "escapes" when it can outlive the call it was made in (returned, stored in a field
+    // or container, captured by a lambda, passed to a parameter the callee retains, ...). Objects that never
+    // escape live on the stack. Everything unknown is treated as escaping.
+    py::Signatures* mutable_signatures = nullptr;
+    std::string function_key;
+    std::set<std::string> retained;
+    std::map<std::string, std::set<std::string>> flows_into;  // alias target -> source names
+    std::set<std::string> previous_retained;                  // from the analysis pass (for decisions)
+    bool analysing = false;
+    bool analysis_missing = true;     // no escape analysis for this function: nothing is proven
+    bool construct_as_value = false;  // the next constructor call builds a stack object
+
+    const py::Signatures::Summary* summary_of(const std::string& key) const {
+        if (!signatures) return nullptr;
+        const auto it = signatures->summaries.find(key);
+        return it == signatures->summaries.end() ? nullptr : &it->second;
+    }
+    std::string method_key(const std::string& cls, const std::string& method, std::size_t depth = 0) const {
+        if (!signatures || depth > 16) return {};
+        if (signatures->summaries.contains(cls + "." + method)) return cls + "." + method;
+        const auto found = signatures->classes.find(cls);
+        if (found == signatures->classes.end()) return {};
+        for (const auto& base : found->second.bases)
+            if (auto key = method_key(base, method, depth + 1); !key.empty()) return key;
+        return {};
+    }
+    void retain_name(const std::string& name) { retained.insert(name); }
+    // The names whose objects the value of `e` can be (a name, either branch of `a if c else b`, `a or b`, cast).
+    void flow_names(const py::ExprPtr& e, std::vector<std::string>& out) const {
+        if (!e) return;
+        if (auto n = e->template get<py::Name>()) out.push_back(n->id);
+        else if (auto c = e->template get<py::IfExpr>()) { flow_names(c->body, out); flow_names(c->orelse, out); }
+        else if (auto b = e->template get<py::BoolExpr>()) { for (const auto& v : b->values) flow_names(v, out); }
+        else if (auto call = e->template get<py::Call>(); call && call->func)
+            if (auto f = call->func->template get<py::Name>(); f && f->id == "cast" && call->args.size() == 2) flow_names(call->args[1], out);
+    }
+    void retain_flow(const py::ExprPtr& e) {
+        std::vector<std::string> names;
+        flow_names(e, names);
+        for (const auto& n : names) retain_name(n);
+    }
+    void scan_args(const py::ExprList& args, const py::Signatures::Summary* summary, std::size_t first) {
+        for (std::size_t i = 0; i < args.size(); ++i) {
+            const bool keeps = !summary || first + i >= summary->retains.size() || summary->retains[first + i];
+            if (keeps) retain_flow(args[i]);
+            scan(args[i], true);  // the argument is itself an expression to look into
+        }
+    }
+    void scan(const py::ExprPtr& e, bool safe) {
+        if (!e) return;
+        if (auto n = e->template get<py::Name>()) { if (!safe) retain_name(n->id); return; }
+        if (e->template get<py::Constant>()) return;
+        if (auto a = e->template get<py::Attribute>()) { scan(a->value, true); return; }
+        if (auto s = e->template get<py::Subscript>()) { scan(s->value, true); scan(s->slice, true); return; }
+        if (auto u = e->template get<py::UnaryExpr>()) { scan(u->operand, true); return; }
+        if (auto b = e->template get<py::BinaryExpr>()) { scan(b->left, true); scan(b->right, true); return; }
+        if (auto c = e->template get<py::Compare>()) {
+            scan(c->left, true);
+            for (const auto& item : c->comparators) scan(item, true);
+            return;
+        }
+        if (auto b = e->template get<py::BoolExpr>()) { for (const auto& v : b->values) scan(v, safe); return; }
+        if (auto c = e->template get<py::IfExpr>()) { scan(c->test, true); scan(c->body, safe); scan(c->orelse, safe); return; }
+        if (auto l = e->template get<py::List>()) { for (const auto& item : l->elts) scan(item, false); return; }
+        if (auto t = e->template get<py::Tuple>()) { for (const auto& item : t->elts) scan(item, false); return; }
+        if (auto d = e->template get<py::Dict>()) {
+            for (const auto& k : d->keys) scan(k, false);
+            for (const auto& v : d->values) scan(v, false);
+            return;
+        }
+        if (auto lambda = e->template get<py::Lambda>()) {
+            // Whatever the closure mentions may be used after this call returns.
+            auto visit = [&](const auto& node) {
+                if constexpr (std::is_same_v<std::decay_t<decltype(node)>, py::Expr>)
+                    if (auto n = node.template get<py::Name>()) retain_name(n->id);
+            };
+            walk(lambda->body, visit);
+            return;
+        }
+        if (auto call = e->template get<py::Call>()) { scan_call(*call); return; }
+        // Anything else: every name inside is treated as escaping.
+        auto visit = [&](const auto& node) {
+            if constexpr (std::is_same_v<std::decay_t<decltype(node)>, py::Expr>)
+                if (auto n = node.template get<py::Name>()) retain_name(n->id);
+        };
+        walk(*e, visit);
+    }
+    void scan_call(const py::Call& call) {
+        for (const auto& keyword : call.keywords) { retain_flow(keyword.value); scan(keyword.value, true); }
+        if (!call.func) return;
+        if (auto f = call.func->template get<py::Name>()) {
+            const auto& id = f->id;
+            if (!locals.contains(id)) {
+                if (id == "len" || id == "int" || id == "str" || id == "float" || id == "bool") { scan_args(call.args, nullptr, 0); for (const auto& a : call.args) (void)a; return; }
+                if (id == "cast") { for (const auto& a : call.args) { retain_flow(a); scan(a, true); } return; }
+                if (id.starts_with("__ispa_ir__.")) {
+                    for (const auto& a : call.args) { retain_flow(a); scan(a, true); }
+                    return;
+                }
+                if (is_class(id)) { scan_args(call.args, summary_of(method_key(id, "__init__")), 1); return; }
+                if (const auto* s = summary_of(id)) { scan_args(call.args, s, 0); return; }
+            }
+            scan_args(call.args, nullptr, 0);  // a callable value: unknown callee
+            return;
+        }
+        if (auto m = call.func->template get<py::Attribute>(); m && m->value) {
+            // Class.static(...)
+            if (auto owner = m->value->template get<py::Name>(); owner && !locals.contains(owner->id) && is_class(owner->id)) {
+                const auto key = method_key(owner->id, m->attr);
+                const auto* s = key.empty() ? nullptr : summary_of(key);
+                scan_args(call.args, s, 0);
+                return;
+            }
+            static const std::set<std::string> collection_methods{"append", "extend", "insert", "remove", "pop", "clear",
+                "copy", "count", "index", "reverse", "sort", "get", "setdefault", "update", "keys", "values", "items", "popitem"};
+            const auto receiver_class = symbol_id(inferred(m->value));
+            std::string key = receiver_class.empty() ? std::string() : method_key(receiver_class, m->attr);
+            if (key.empty() && collection_methods.contains(m->attr) && receiver_class.empty()) {
+                // list/dict/str method: only the inserted elements can be kept
+                const bool stores = m->attr == "append" || m->attr == "insert" || m->attr == "setdefault" || m->attr == "get";
+                for (const auto& a : call.args) { if (stores) retain_flow(a); scan(a, true); }
+                scan(m->value, true);
+                return;
+            }
+            const auto* s = key.empty() ? nullptr : summary_of(key);
+            // The receiver is retained when the method can keep `self` (or when it is not known).
+            if (!s || s->retains.empty() || s->retains[0]) retain_flow(m->value);
+            scan(m->value, true);
+            scan_args(call.args, s, 1);
+            return;
+        }
+        // calling the result of an expression
+        scan(call.func, false);
+        scan_args(call.args, nullptr, 0);
+    }
+    void scan_stmts(const py::StmtList& list) {
+        for (const auto& statement : list) if (statement) scan_stmt(*statement);
+    }
+    void scan_stmt(const py::Stmt& s) {
+        std::visit([&](const auto& x) {
+            using T = std::decay_t<decltype(x)>;
+            if constexpr (std::is_same_v<T, py::ExprStmt>) scan(x.value, true);
+            else if constexpr (std::is_same_v<T, py::Return>) { retain_flow(x.value); scan(x.value, true); }
+            else if constexpr (std::is_same_v<T, py::Assign>) {
+                for (const auto& target : x.targets) {
+                    if (auto n = target ? target->template get<py::Name>() : nullptr) {
+                        std::vector<std::string> sources;
+                        flow_names(x.value, sources);
+                        for (const auto& source : sources) flows_into[n->id].insert(source);
+                        scan(x.value, true);
+                        if (!local_types.contains(n->id)) { locals.insert(n->id); local_types.insert_or_assign(n->id, inferred(x.value)); }
+                    } else { retain_flow(x.value); scan(x.value, true); scan(target, true); }
+                }
+            } else if constexpr (std::is_same_v<T, py::AnnAssign>) {
+                if (auto n = x.target ? x.target->template get<py::Name>() : nullptr) {
+                    std::vector<std::string> sources;
+                    flow_names(x.value, sources);
+                    for (const auto& source : sources) flows_into[n->id].insert(source);
+                    scan(x.value, true);
+                    locals.insert(n->id);
+                    local_types.insert_or_assign(n->id, declared(x.annotation));
+                } else { retain_flow(x.value); scan(x.value, true); scan(x.target, true); }
+            } else if constexpr (std::is_same_v<T, py::AugAssign>) { scan(x.value, true); scan(x.target, true); }
+            else if constexpr (std::is_same_v<T, py::If>) { scan(x.test, true); scan_stmts(x.body); scan_stmts(x.orelse); }
+            else if constexpr (std::is_same_v<T, py::While>) { scan(x.test, true); scan_stmts(x.body); scan_stmts(x.orelse); }
+            else if constexpr (std::is_same_v<T, py::Pass> || std::is_same_v<T, py::Break> || std::is_same_v<T, py::Continue>) {}
+            else {
+                // statements outside the lowered subset: everything they mention escapes
+                auto visit = [&](const auto& node) {
+                    if constexpr (std::is_same_v<std::decay_t<decltype(node)>, py::Expr>)
+                        if (auto n = node.template get<py::Name>()) retain_name(n->id);
+                };
+                walk(x, visit);
+            }
+        }, s.kind);
+    }
+    // Analyse one function body: record which parameters and locals can outlive the call.
+    void analyse_function(const py::FunctionDef& f, const std::string& key, bool is_method, bool is_static) {
+        retained.clear();
+        flows_into.clear();
+        analysing = true;
+        function_key = key;
+        std::vector<std::string> parameters;
+        for (const auto& p : f.params) {
+            parameters.push_back(p.name);
+            locals.insert(p.name);
+            local_types.insert_or_assign(p.name, p.annotation ? declared(p.annotation) : la::Type{la::ValueType::Undef});
+        }
+        if (is_method && !is_static && !parameters.empty()) {
+            self_name = parameters.front();
+            local_types.insert_or_assign(self_name, boxed(la::Type{pythonSymbol(self_class)}));
+        }
+        scan_stmts(f.body);
+        // aliases: x = y means y is retained when x is
+        for (bool changed = true; changed;) {
+            changed = false;
+            for (const auto& [target, sources] : flows_into)
+                if (retained.contains(target))
+                    for (const auto& source : sources) changed |= retained.insert(source).second;
+        }
+        if (mutable_signatures) {
+            py::Signatures::Summary summary;
+            for (const auto& name : parameters) summary.retains.push_back(retained.contains(name));
+            mutable_signatures->summaries[key] = std::move(summary);
+            // Not eligible for the stack: escaping values, and anything another name is bound to (an alias would
+            // have to be a different kind of variable).
+            auto blocked = retained;
+            for (const auto& [target, sources] : flows_into) blocked.insert(sources.begin(), sources.end());
+            mutable_signatures->retained_locals[key] = std::move(blocked);
+        }
+    }
+    // Entry point used by the module loader: analyse every function and method of a statement.
+    void analyse_statement(const py::Stmt& s) {
+        if (auto f = s.template get<py::FunctionDef>()) {
+            PythonConverter scope;
+            scope.class_names = class_names; scope.typevars = typevars; scope.signatures = signatures;
+            scope.mutable_signatures = mutable_signatures; scope.module_prefix = module_prefix;
+            scope.analyse_function(*f, module_prefix + f->name, false, false);
+        } else if (auto c = s.template get<py::ClassDef>()) {
+            for (const auto& member : c->body) if (member)
+                if (auto m = member->template get<py::FunctionDef>()) {
+                    PythonConverter scope;
+                    scope.class_names = class_names; scope.typevars = typevars; scope.signatures = signatures;
+                    scope.mutable_signatures = mutable_signatures; scope.module_prefix = module_prefix;
+                    scope.self_class = module_prefix + c->name;
+                    bool is_static = m->decorators.size() == 1 && m->decorators[0] && m->decorators[0]->template get<py::Name>() &&
+                                     m->decorators[0]->template get<py::Name>()->id == "staticmethod";
+                    scope.analyse_function(*m, scope.self_class + "." + m->name, true, is_static);
+                }
+        }
+    }
     la::Type return_type{la::ValueType::Undef};
     // `x = []` carries no element type. Python code states it later: `return x` (the declared return type)
     // or `x.append(value)` (the value's type).
@@ -269,6 +502,19 @@ struct PythonConverter {
     la::Expression expr(const py::ExprPtr& p) {
         if (!p) throw std::invalid_argument("Python conversion: missing expression");
         return expr(*p);
+    }
+    // A stack object is handed to a callee as a non-owning pointer: the analysis proved the callee does not keep it.
+    la::Expression argument(const py::ExprPtr& a) {
+        auto value = expr(a);
+        if (auto n = a ? a->template get<py::Name>() : nullptr)
+            if (const auto found = local_types.find(n->id); found != local_types.end() && found->second.isSymbol() &&
+                !found->second.getSymbol().path.empty() && is_class(symbol_id(found->second))) {
+                la::FunctionCall borrow;
+                borrow.name = std::make_shared<la::Symbol>(pythonSymbol("ISPA_STD.borrow"));
+                borrow.args.push_back(std::move(value));
+                return la::FunctionCall::createExpression(borrow);
+            }
+        return value;
     }
     la::Expression group(la::Expression e) {
         e.insert(e.begin(), la::ExpressionElement::GroupOpen);
@@ -584,6 +830,7 @@ struct PythonConverter {
                 }
                 return la::StorageSymbol::createExpression(s);
             } else if constexpr (std::is_same_v<T, py::Call>) {
+                const bool as_value = std::exchange(construct_as_value, false);
                 if (const auto* builtin = x.func ? x.func->template get<py::Name>() : nullptr;
                     builtin && builtin->id == "len" && !locals.contains("len") && x.args.size() == 1 && x.keywords.empty()) {
                     la::StorageSymbol access;
@@ -831,10 +1078,10 @@ struct PythonConverter {
                     }
                 }
                 la::FunctionCall call;
-                for (const auto& a : x.args) call.args.push_back(expr(a));
+                for (const auto& a : x.args) call.args.push_back(argument(a));
                 if (auto n = x.func ? x.func->template get<py::Name>() : nullptr) {
                     if (!locals.contains(n->id) && is_class(n->id)) {
-                        call.name = std::make_shared<la::Symbol>(pythonSymbol("ISPA_STD.construct"));
+                        call.name = std::make_shared<la::Symbol>(pythonSymbol(as_value ? "ISPA_STD.make_value" : "ISPA_STD.construct"));
                         call.template_parameters.emplace_back(std::make_shared<la::Type>(la::Type{pythonSymbol(n->id)}));
                         return la::FunctionCall::createExpression(call);
                     }
@@ -1082,7 +1329,27 @@ struct PythonConverter {
                 return la::Statements{la::While{expr(x.test), nested(x.body, true)}};
             } else if constexpr (std::is_same_v<T, py::Assign>) {
                 if (x.targets.size() != 1) unsupported(s.pos, "multiple assignment targets are unsupported");
+                // `x = Class(...)` where x never outlives the call and is bound once: a stack object.
+                std::string stack_class;
+                if (!action_context && !analysis_missing && function_body && x.value)
+                    if (auto call = x.value->template get<py::Call>(); call && call->func)
+                        if (auto cn = call->func->template get<py::Name>(); cn && !locals.contains(cn->id) && is_class(cn->id) && signatures)
+                            if (auto target_name = x.targets[0] ? x.targets[0]->template get<py::Name>() : nullptr;
+                                target_name && !locals.contains(target_name->id) && !previous_retained.contains(target_name->id) &&
+                                store_count(*function_body, target_name->id) == 1 && !(block_depth && escapes_block(target_name->id))) {
+                                const auto cls = signatures->classes.find(cn->id);
+                                if (cls != signatures->classes.end() && !cls->second.generic) stack_class = cn->id;
+                            }
+                construct_as_value = !stack_class.empty();
                 auto value = expr(x.value);
+                construct_as_value = false;
+                if (!stack_class.empty()) {
+                    const auto name = x.targets[0]->template get<py::Name>()->id;
+                    locals.insert(name);
+                    local_types.insert_or_assign(name, la::Type{pythonSymbol(stack_class)});
+                    if (block_depth) { block_assigned.back().push_back(name); block_declared.back().push_back(name); }
+                    return la::Statements{la::Variable{.name = localName(name), .type = la::Type{pythonSymbol(stack_class)}, .value = value}};
+                }
                 if (auto n = x.targets[0] ? x.targets[0]->template get<py::Name>() : nullptr; n && !locals.contains(n->id)) {
                     if (action_context && n->id == "ctx") unsupported(s.pos, "ctx cannot be rebound");
                     const bool hoist = block_depth && escapes_block(n->id);
@@ -1177,6 +1444,13 @@ struct PythonConverter {
             scope.signatures = signatures;
             scope.module_prefix = module_prefix;
             scope.self_class = self_class;
+            scope.function_key = self_class.empty() ? module_prefix + f->name : self_class + "." + f->name;
+            if (signatures) {
+                if (const auto found = signatures->retained_locals.find(scope.function_key); found != signatures->retained_locals.end()) {
+                    scope.previous_retained = found->second;
+                    scope.analysis_missing = false;
+                }
+            } else scope.analysis_missing = true;
             {
                 // Type variables the class does not already own become template parameters of the function.
                 std::vector<std::string> used;
@@ -1380,6 +1654,17 @@ auto ParserBase::convertPythonDeclaration(const UAST::py::Stmt& s, const std::se
     converter.signatures = signatures;
     converter.module_prefix = module_prefix;
     return converter.declaration(s);
+}
+auto ParserBase::analyzePythonDeclaration(const UAST::py::Stmt& s, const std::set<std::string>& classes,
+                                          const std::set<std::string>& typevars, UAST::py::Signatures& signatures,
+                                          const std::string& module_prefix) -> void {
+    PythonConverter converter;
+    converter.class_names = classes;
+    converter.typevars = typevars;
+    converter.signatures = &signatures;
+    converter.mutable_signatures = &signatures;
+    converter.module_prefix = module_prefix;
+    converter.analyse_statement(s);
 }
 auto ParserBase::convertPythonDeclarations(const UAST::py::Module& m) -> LangAPI::Declarations {
     PythonConverter converter;

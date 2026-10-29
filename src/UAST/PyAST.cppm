@@ -491,7 +491,16 @@ struct Signatures {
     struct Class {
         std::vector<std::string> bases;
         std::map<std::string, ExprPtr> fields, methods;
+        bool generic = false;
     };
+    // Escape summary of a function or method (key: qualified name, or Class.method): whether the callee can let
+    // argument i outlive the call. Index 0 is `self` for methods. A missing summary means "unknown: retains".
+    struct Summary {
+        std::vector<bool> retains;
+    };
+    std::map<std::string, Summary> summaries;
+    // Names (parameters and locals) of a function whose value may outlive the call, from the last analysis.
+    std::map<std::string, std::set<std::string>> retained_locals;
     std::map<std::string, ExprPtr> functions;
     // Module variables: the annotation, or a synthesized one for literal initializers.
     std::map<std::string, ExprPtr> variables;

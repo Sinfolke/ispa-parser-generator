@@ -501,6 +501,7 @@ std::string Imports::module(const Modules::Path& source_path, const std::string&
                     }
                 } else if (auto c = statement->get<py::ClassDef>()) {
                     auto& entry = signatures.classes[prefix + c->name];
+                    entry.generic = std::ranges::any_of(c->bases, [](const py::ExprPtr& base) { return base && base->get<py::Subscript>(); });
                     for (auto& base : c->bases) {
                         walk(base, type_bind);
                         if (auto n = base ? base->get<py::Name>() : nullptr) entry.bases.push_back(n->id);
@@ -525,6 +526,43 @@ std::string Imports::module(const Modules::Path& source_path, const std::string&
                 }
             }
         }
+        // Escape analysis: bind every body first (a copy is not needed: binding is idempotent), then iterate the
+        // summaries until they stop shrinking.
+        for (auto& statement : syntax.body) {
+            if (auto f = statement->get<py::FunctionDef>()) {
+                Locals local;
+                for (const auto& p : f->params) local.names.insert(p.name);
+                walk(f->body, local);
+                auto bindings = symbols;
+                bindings.insert(dependencies.begin(), dependencies.end());
+                Bind bind{bindings, std::move(local.names)};
+                walk(f->body, bind);
+            } else if (auto c = statement->get<py::ClassDef>()) {
+                auto bindings = symbols;
+                bindings.insert(dependencies.begin(), dependencies.end());
+                for (auto& member : c->body) if (auto f = member->get<py::FunctionDef>()) {
+                    Locals local;
+                    for (const auto& p : f->params) local.names.insert(p.name);
+                    walk(f->body, local);
+                    Bind bind{bindings, std::move(local.names)};
+                    walk(f->body, bind);
+                }
+            }
+        }
+        for (int round = 0; round < 3; ++round)
+            for (const auto& statement : syntax.body)
+                if (statement->get<py::FunctionDef>() || statement->get<py::ClassDef>())
+                    Parser::ParserBase::analyzePythonDeclaration(*statement, classes, typevars, signatures, "python." + name + ".");
+        if (std::getenv("ISPA_DUMP_ESCAPES"))
+            for (const auto& [key, summary] : signatures.summaries) {
+                if (!key.starts_with("python." + name + ".")) continue;
+                std::cerr << "escape " << key << ":";
+                for (bool keeps : summary.retains) std::cerr << (keeps ? " keeps" : " borrows");
+                std::cerr << " | retained:";
+                if (const auto found = signatures.retained_locals.find(key); found != signatures.retained_locals.end())
+                    for (const auto& local : found->second) std::cerr << ' ' << local;
+                std::cerr << '\n';
+            }
         LangAPI::Declarations lowered;
         // Python resolves names late: a class may mention one defined further down.
         for (const auto& statement : syntax.body) if (auto c = statement->get<py::ClassDef>()) {

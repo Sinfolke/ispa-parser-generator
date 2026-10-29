@@ -462,7 +462,8 @@ std::string Core::call(const LangAPI::FunctionCall& c) {
             "(chr(" + value + ") if 0 <= " + value + " <= 255 else \"\")";
     }
     // construct<Class>(args): Python constructs by calling the class.
-    if (fn == "ISPA_STD.construct" && c.template_parameters.size() == 1) {
+    if (fn == "ISPA_STD.borrow" && c.args.size() == 1) return expression(c.args.front());
+    if ((fn == "ISPA_STD.construct" || fn == "ISPA_STD.make_value") && c.template_parameters.size() == 1) {
         if (const auto* built = std::get_if<std::shared_ptr<LangAPI::Type>>(&c.template_parameters.front()); built && *built) {
             std::string out = type(**built) + "(";
             for (std::size_t i = 0; i < c.args.size(); ++i) out += (i ? ", " : "") + expression(c.args[i]);
