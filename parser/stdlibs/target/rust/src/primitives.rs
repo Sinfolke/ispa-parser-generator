@@ -7,7 +7,20 @@ pub struct StdError { pub kind: i64, pub message: String }
 
 thread_local! { static LAST_MESSAGE: RefCell<String> = const { RefCell::new(String::new()) }; }
 
+/// Failures are control flow here (an `optional` element that is absent fails and is caught): they must not be reported
+/// as panics. Everything else still reaches the previous hook.
+fn quiet_failures() {
+    static INSTALLED: std::sync::Once = std::sync::Once::new();
+    INSTALLED.call_once(|| {
+        let previous = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            if !info.payload().is::<StdError>() { previous(info); }
+        }));
+    });
+}
+
 pub fn fail(kind: i64, message: impl Into<String>) -> ! {
+    quiet_failures();
     panic_any(StdError { kind, message: message.into() })
 }
 
