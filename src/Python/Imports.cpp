@@ -30,7 +30,7 @@ struct Validate {
     void expression(py::Expr& e) { walk(e.kind, *this); }
     void statement(py::Stmt& s) {
         if (s.get<py::Import>())
-            fail(s.pos, "only sibling imports from internals are supported in imported Python files");
+            fail(s.pos, "imports are supported only at module level in imported Python files");
         walk(s.kind, *this);
     }
 };
@@ -44,7 +44,7 @@ std::optional<std::pair<std::string, std::optional<std::size_t>>> native(const p
         fail(statement.pos, "__ispa_internal__ expects a native name and optional arity");
     auto name = call->args[0] ? call->args[0]->get<py::Constant>() : nullptr;
     if (!name || name->kind != py::ConstantKind::Str ||
-        !(name->value.starts_with("__ispa_parser__.") || name->value.starts_with("ISPA_STD.")) ||
+        !(name->value.starts_with("__ispa_parser__.") || name->value.starts_with("ISPA_STD.") || name->value.starts_with("__ispa_ir__.")) ||
         name->value.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.") != std::string::npos)
         fail(statement.pos, "invalid native name in __ispa_internal__");
     std::optional<std::size_t> arity;
@@ -65,7 +65,7 @@ std::string path(const py::Expr& e) {
     return {};
 }
 bool nativeName(const std::string& name) {
-    return name.starts_with("__ispa_parser__.") || name.starts_with("ISPA_STD.");
+    return name.starts_with("__ispa_parser__.") || name.starts_with("ISPA_STD.") || name.starts_with("__ispa_ir__.");
 }
 struct Locals {
     std::set<std::string> names;
@@ -130,13 +130,12 @@ Imports::Imports(const Modules::Project* project) {
             if (imp.python_import)
                 load(source, imp, *project);
 }
-void Imports::load(const Modules::Source& source, const Modules::Import& imp,
-                   const Modules::Project& project) {
-    const auto at = UAST::SourcePosition{imp.position.file, imp.position.offset, 0, imp.position.line, imp.position.column};
-
+std::string Imports::module(const Modules::Path& source_path, const std::string& from_file,
+                            const Modules::Project& project, const UAST::SourcePosition& at,
+                            const fs::path& package_root) {
     // Resolve only Python modules here; grammar modules are handled by Modules::preprocess.
     fs::path relative;
-    for (const auto& part : imp.source) {
+    for (const auto& part : source_path) {
         if (part.empty() || part == "." || part == ".." ||
             part.find('/') != std::string::npos ||
             part.find('\\') != std::string::npos)
@@ -149,7 +148,8 @@ void Imports::load(const Modules::Source& source, const Modules::Import& imp,
     roots.reserve(project.search_directories.size() + project.library_search_directories.size() + 1);
     for (const auto& directory : project.search_directories)
         roots.emplace_back(directory);
-    roots.push_back(fs::path(source.file).parent_path());
+    roots.push_back(fs::path(from_file).parent_path());
+    if (!package_root.empty()) roots.push_back(package_root);
     const auto local_root_count = roots.size();
     for (const auto& directory : project.library_search_directories)
         roots.emplace_back(directory);
@@ -168,7 +168,7 @@ void Imports::load(const Modules::Source& source, const Modules::Import& imp,
         if (file.extension() != ".py") continue;
         const auto actual = tryFile(file);
         if (actual.empty()) continue;
-        bool matches = imp.source.size() == 1 && actual.stem() == imp.source.front();
+        bool matches = source_path.size() == 1 && actual.stem() == source_path.front();
         for (const auto& root : roots) {
             std::error_code error;
             const auto relative_file = fs::relative(actual, root, error);
@@ -178,7 +178,7 @@ void Imports::load(const Modules::Source& source, const Modules::Import& imp,
         }
         if (matches) {
             if (!canonical.empty() && canonical != actual)
-                fail(at, "ambiguous Python module: " + Modules::spelling(imp.source));
+                fail(at, "ambiguous Python module: " + Modules::spelling(source_path));
             canonical = actual;
         }
     }
@@ -192,17 +192,13 @@ void Imports::load(const Modules::Source& source, const Modules::Import& imp,
             if (candidate.empty()) candidate = tryFile(root / relative / "__init__.py");
             if (candidate.empty()) continue;
             if (!canonical.empty() && candidate != canonical)
-                fail(at, "ambiguous Python module: " + Modules::spelling(imp.source));
+                fail(at, "ambiguous Python module: " + Modules::spelling(source_path));
             canonical = std::move(candidate);
         }
     }
     if (canonical.empty())
-        fail(at, "Python module not found: " + Modules::spelling(imp.source));
-    const auto name = Modules::spelling(imp.source);
-    const auto local = imp.alias.empty() ? name : imp.alias;
-    if (local == "ctx") fail(at, "ctx is reserved for the action context");
-    const auto [alias, inserted] = aliases.emplace(std::make_pair(source.file, local), name);
-    if (!inserted && alias->second != name) fail(at, "ambiguous import " + local);
+        fail(at, "Python module not found: " + Modules::spelling(source_path));
+    const auto name = Modules::spelling(source_path);
     if (paths.contains(name) && paths.at(name) != canonical)
         fail(at, "module " + name + " resolves to different Python files");
     if (!paths.contains(name)) {
@@ -210,13 +206,104 @@ void Imports::load(const Modules::Source& source, const Modules::Import& imp,
         if (!input) fail(at, "cannot read " + canonical.string());
         const std::string text(std::istreambuf_iterator<char>{input}, {});
         auto syntax = UAST::parsePythonModule(text, {canonical.string(), 0, text.size(), 1, 1});
+        if (!loading.insert(name).second) fail(at, "circular Python import: " + name);
         Validate validate;
-        walk(syntax, validate);
+        for (auto& statement : syntax.body)
+            if (!statement->get<py::Import>() && !statement->get<py::ImportFrom>()) walk(statement->kind, validate);
         Bindings dependencies;
+        std::set<std::string> imported_classes;
+        // Package root: strip the module's own path (and __init__) from its file location.
+        auto package_base = canonical.parent_path();
+        for (std::size_t i = canonical.filename() == "__init__.py" ? 0 : 1; i < source_path.size(); ++i)
+            package_base = package_base.parent_path();
+        const auto inherit = [&](const std::string& module_name, const std::string& prefix,
+                                 const std::string& only, const UAST::SourcePosition& where) {
+            for (const auto& [key, value] : exports.at(module_name)) {
+                if (!only.empty() && key != only && !key.starts_with(only + ".")) continue;
+                if (!dependencies.emplace(prefix + key, value).second &&
+                    dependencies.at(prefix + key).qualified != value.qualified)
+                    fail(where, "duplicate imported name " + prefix + key);
+            }
+        };
+        const auto split = [](const std::string& dotted) {
+            Modules::Path parts;
+            std::size_t begin = 0;
+            while (begin <= dotted.size()) {
+                const auto end = dotted.find('.', begin);
+                parts.push_back(dotted.substr(begin, end == std::string::npos ? end : end - begin));
+                if (end == std::string::npos) break;
+                begin = end + 1;
+            }
+            return parts;
+        };
+        const auto ignorable = [](const std::string& module_name) {
+            return module_name == "typing" || module_name == "__future__" || module_name == "__ispa_internal__";
+        };
+        for (const auto& statement : syntax.body) if (auto plain = statement->get<py::Import>()) {
+            for (const auto& item : plain->names) {
+                if (ignorable(item.name)) continue;
+                const auto target = module(split(item.name), canonical.string(), project, item.pos, package_base);
+                inherit(target, (item.asname.empty() ? target : item.asname) + ".", "", item.pos);
+            }
+        }
         for (const auto& statement : syntax.body) if (auto from = statement->get<py::ImportFrom>()) {
-            if (from->module_name != "internals" || from->level > 1)
-                fail(statement->pos, "only sibling imports from internals are supported");
-            const auto internal_file = canonical.parent_path() / "internals.py";
+            const bool internal = (from->module_name == "internals" || from->module_name == "langapi") && from->level <= 1;
+            if (!internal) {
+                if (from->level == 0 && ignorable(from->module_name)) continue;
+                Modules::Path base;
+                if (from->level > 0) {
+                    base = source_path;
+                    if (canonical.filename() != "__init__.py") base.pop_back();
+                    for (std::size_t i = 1; i < from->level; ++i) {
+                        if (base.empty()) fail(statement->pos, "relative import goes beyond the top-level package");
+                        base.pop_back();
+                    }
+                }
+                if (!from->module_name.empty()) for (auto& part : split(from->module_name)) base.push_back(std::move(part));
+                if (base.empty()) fail(statement->pos, "empty Python import");
+                for (const auto& item : from->names) {
+                    const auto key = item.asname.empty() ? item.name : item.asname;
+                    if (item.name == "*") {
+                        inherit(module(base, canonical.string(), project, item.pos, package_base), "", "", item.pos);
+                        continue;
+                    }
+                    auto submodule = base;
+                    submodule.push_back(item.name);
+                    const auto sub_name = Modules::spelling(submodule);
+                    if (!paths.contains(sub_name)) {
+                        // `from pkg import name` names a submodule when pkg/name(.py|/__init__.py) exists.
+                        std::error_code probe;
+                        bool is_module = false;
+                        fs::path relative_sub;
+                        for (const auto& part : submodule) relative_sub /= part;
+                        std::vector<fs::path> probe_roots{package_base};
+                        for (const auto& directory : project.search_directories) probe_roots.emplace_back(directory);
+                        for (const auto& directory : project.library_search_directories) probe_roots.emplace_back(directory);
+                        probe_roots.push_back(canonical.parent_path());
+                        for (const auto& root : probe_roots)
+                            if (fs::is_regular_file(root / (relative_sub.string() + ".py"), probe) ||
+                                fs::is_regular_file(root / relative_sub / "__init__.py", probe)) { is_module = true; break; }
+                        if (!is_module) {
+                            const auto target = module(base, canonical.string(), project, item.pos, package_base);
+                            if (!exports.at(target).contains(item.name))
+                                fail(item.pos, "unknown imported name " + item.name + " in " + target);
+                            if (!dependencies.emplace(key, exports.at(target).at(item.name)).second &&
+                                dependencies.at(key).qualified != exports.at(target).at(item.name).qualified)
+                                fail(item.pos, "duplicate imported name " + key);
+                            for (const auto& [member, value] : exports.at(target))
+                                if (member.starts_with(item.name + "."))
+                                    dependencies.emplace(key + member.substr(item.name.size()), value);
+                            if (class_names.contains(exports.at(target).at(item.name).qualified))
+                                imported_classes.insert(exports.at(target).at(item.name).qualified);
+                            continue;
+                        }
+                    }
+                    const auto target = module(submodule, canonical.string(), project, item.pos, package_base);
+                    inherit(target, key + ".", "", item.pos);
+                }
+                continue;
+            }
+            const auto internal_file = canonical.parent_path() / (from->module_name + ".py");
             std::ifstream internal_input(internal_file, std::ios::binary);
             if (!internal_input) fail(statement->pos, "cannot read " + internal_file.string());
             const std::string internal_text(std::istreambuf_iterator<char>{internal_input}, {});
@@ -251,9 +338,9 @@ void Imports::load(const Modules::Source& source, const Modules::Import& imp,
         }
         Bindings symbols;
         for (const auto& statement : syntax.body) {
-            if (statement->get<py::ImportFrom>()) continue;
+            if (statement->get<py::ImportFrom>() || statement->get<py::Import>()) continue;
             if (auto spec = native(*statement)) {
-                if (canonical.filename() != "internals.py")
+                if (canonical.filename() != "internals.py" && canonical.filename() != "langapi.py")
                     fail(statement->pos, "native declarations belong in internals.py");
                 auto assignment = statement->get<py::Assign>();
                 if (assignment->targets.size() != 1 || !assignment->targets[0] ||
@@ -300,10 +387,11 @@ void Imports::load(const Modules::Source& source, const Modules::Import& imp,
             if (!symbols.emplace(symbol, Export{"python." + name + "." + symbol, arity}).second)
                 fail(statement->pos, "duplicate declaration " + symbol);
         }
-        std::set<std::string> classes;
+        std::set<std::string> classes = imported_classes;
         for (const auto& statement : syntax.body) if (auto c = statement->get<py::ClassDef>()) {
             classes.insert(c->name);
             classes.insert(symbols.at(c->name).qualified);
+            class_names.insert(symbols.at(c->name).qualified);
             for (const auto& member : c->body) if (auto f = member->get<py::FunctionDef>(); f &&
                 f->decorators.size() == 1 && f->decorators[0]->get<py::Name>() && f->decorators[0]->get<py::Name>()->id == "staticmethod") {
                 const auto key = c->name + "." + f->name;
@@ -312,7 +400,7 @@ void Imports::load(const Modules::Source& source, const Modules::Import& imp,
         }
         LangAPI::Declarations lowered;
         for (auto& statement : syntax.body) {
-            if (statement->get<py::ImportFrom>() || native(*statement)) continue;
+            if (statement->get<py::ImportFrom>() || statement->get<py::Import>() || native(*statement)) continue;
             if (auto f = statement->get<py::FunctionDef>()) {
                 Locals local;
                 for (const auto& p : f->params) local.names.insert(p.name);
@@ -373,7 +461,7 @@ void Imports::load(const Modules::Source& source, const Modules::Import& imp,
             }
             lowered.push_back(std::move(declaration));
         }
-        for (auto it = imp.source.rbegin(); it != imp.source.rend(); ++it) {
+        for (auto it = source_path.rbegin(); it != source_path.rend(); ++it) {
             LangAPI::Namespace ns;
             ns.name = *it;
             ns.declarations = std::move(lowered);
@@ -383,7 +471,18 @@ void Imports::load(const Modules::Source& source, const Modules::Import& imp,
         declarations.insert(declarations.end(), lowered.begin(), lowered.end());
         paths.emplace(name, canonical);
         exports.emplace(name, std::move(symbols));
+        loading.erase(name);
     }
+    return name;
+}
+void Imports::load(const Modules::Source& source, const Modules::Import& imp,
+                   const Modules::Project& project) {
+    const auto at = UAST::SourcePosition{imp.position.file, imp.position.offset, 0, imp.position.line, imp.position.column};
+    const auto name = module(imp.source, source.file, project, at, {});
+    const auto local = imp.alias.empty() ? name : imp.alias;
+    if (local == "ctx") fail(at, "ctx is reserved for the action context");
+    const auto [alias, inserted] = aliases.emplace(std::make_pair(source.file, local), name);
+    if (!inserted && alias->second != name) fail(at, "ambiguous import " + local);
     auto& bindings = files[source.file];
     for (const auto& [symbol, item] : exports.at(name)) {
         const auto key = local + "." + symbol;

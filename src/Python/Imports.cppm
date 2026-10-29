@@ -17,6 +17,11 @@ class Imports {
     std::map<std::string, std::filesystem::path> paths;
     std::map<std::string, Bindings> exports;
     LangAPI::Declarations declarations;
+    std::set<std::string> class_names, loading;
+    // Resolves, compiles (once) and returns the dotted name of a Python module.
+    std::string module(const Modules::Path& source_path, const std::string& from_file,
+                       const Modules::Project& project, const UAST::SourcePosition& at,
+                       const std::filesystem::path& package_root);
     void load(const Modules::Source& source, const Modules::Import& imp,
                    const Modules::Project& project);
 public:
