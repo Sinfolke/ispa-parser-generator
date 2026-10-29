@@ -38,7 +38,7 @@ inline std::pmr::memory_resource*& current_arena() { static thread_local std::pm
 struct ArenaScope {
     std::pmr::unsynchronized_pool_resource pool;
     std::pmr::memory_resource* previous;
-    ArenaScope() : previous(current_arena()) { if (!std::getenv("ISPA_NO_ARENA")) current_arena() = &pool; }
+    ArenaScope() : previous(current_arena()) { /* opt-in: measured no faster yet */ if (std::getenv("ISPA_ARENA")) current_arena() = &pool; }
     ~ArenaScope() { current_arena() = previous; }
     ArenaScope(const ArenaScope&) = delete;
     ArenaScope& operator=(const ArenaScope&) = delete;

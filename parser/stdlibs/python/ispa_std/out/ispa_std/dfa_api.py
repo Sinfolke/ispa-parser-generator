@@ -176,28 +176,37 @@ class SourceText:
         self.text = text
 
 
+class CaptureState:
+    """The registers of the token being scanned. One instance serves every token of a DfaTables: the walk resets
+    it instead of allocating a new set of lists for each token."""
+    src: SourceText
+    base: int
+    regs: list[int]
+    history: list[HistoryNode]
+    first_line: int
+
+    def __init__(self, src: SourceText):
+        self.src = src
+        self.base = 0
+        self.regs = []
+        self.history = []
+        self.first_line = 1
+
+
 class Captures:
     """Read access to the registers a token's DFA run recorded. Offsets are
     relative to the token start `base` inside `src`. Capture k owns registers
     2k (begin, or the head of a list capture's history) and 2k + 1 (end)."""
-    _src: SourceText
-    _base: int
-    _regs: list[int]
-    _history: list[HistoryNode]
-    _first_line: int
+    _state: CaptureState
 
-    def __init__(self, src: SourceText, base: int, regs: list[int], history: list[HistoryNode], first_line: int):
-        self._src = src
-        self._base = base
-        self._regs = regs
-        self._history = history
-        self._first_line = first_line
+    def __init__(self, state: CaptureState):
+        self._state = state
 
     def begin_off(self, k: int) -> int:
-        return self._regs[2 * k]
+        return self._state.regs[2 * k]
 
     def end_off(self, k: int) -> int:
-        return self._regs[2 * k + 1]
+        return self._state.regs[2 * k + 1]
 
     def is_set(self, k: int) -> bool:
         b = self.begin_off(k)
@@ -205,28 +214,28 @@ class Captures:
         return b != UNSET and e != UNSET and e >= b
 
     def begin(self, k: int) -> int:
-        return self._base + self.begin_off(k)
+        return self._state.base + self.begin_off(k)
 
     def end(self, k: int) -> int:
-        return self._base + self.end_off(k)
+        return self._state.base + self.end_off(k)
 
     def text(self, k: int) -> str:
         if not self.is_set(k):
             return ""
-        return substr(self._src.text, self.begin(k), self.end_off(k) - self.begin_off(k))
+        return substr(self._state.src.text, self.begin(k), self.end_off(k) - self.begin_off(k))
 
     def view(self, k: int) -> str:
         return self.text(k)
 
     def character(self, k: int) -> str:
-        return at(self._src.text, self.begin(k))
+        return at(self._state.src.text, self.begin(k))
 
     def list_positions(self, k: int) -> list[int]:
         positions = []
         h = self.begin_off(k)
         while h != UNSET:
-            positions.append(self._history[h].pos)
-            h = self._history[h].prev
+            positions.append(self._state.history[h].pos)
+            h = self._state.history[h].prev
         positions.reverse()
         return positions
 
@@ -236,7 +245,7 @@ class Captures:
         out = []
         i = 0
         while i + 1 < len(positions):
-            out.append(substr(self._src.text, self._base + positions[i], positions[i + 1] - positions[i]))
+            out.append(substr(self._state.src.text, self._state.base + positions[i], positions[i + 1] - positions[i]))
             i = i + 2
         return out
 
@@ -254,18 +263,18 @@ class Captures:
 
     def line(self, k: int) -> int:
         count = 0
-        i = self._base
+        i = self._state.base
         stop = self.begin(k)
-        while i < stop and i < len(self._src.text):
-            if self._src.text[i] == "\n":
+        while i < stop and i < len(self._state.src.text):
+            if self._state.src.text[i] == "\n":
                 count = count + 1
             i = i + 1
-        return self._first_line + count
+        return self._state.first_line + count
 
     def column(self, k: int) -> int:
         b = self.begin(k)
         line_start = b
-        while line_start > self._base and at(self._src.text, line_start - 1) != "\n":
+        while line_start > self._state.base and at(self._state.src.text, line_start - 1) != "\n":
             line_start = line_start - 1
         return (b - line_start) + 1
 

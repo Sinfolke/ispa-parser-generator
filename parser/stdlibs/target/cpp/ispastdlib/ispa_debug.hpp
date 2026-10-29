@@ -40,7 +40,8 @@ inline int fd_env(const char* name) {
     char* end=nullptr; long n=std::strtol(p,&end,10);
     return (*end || n<0 || n>std::numeric_limits<int>::max()) ? -1 : int(n);
 }
-inline bool enabled() { return fd_env("ISPA_DEBUG_FD") >= 0; }
+// The debug channel is chosen by the environment at start-up: read it once (this is asked on every rule/match).
+inline bool enabled() { static const bool on = fd_env("ISPA_DEBUG_FD") >= 0; return on; }
 inline bool write_all(int fd, const char* p, std::size_t n) {
     while (n) {
 #ifdef _WIN32
@@ -160,6 +161,7 @@ struct Location{std::string_view file;int line=0,column=0;};
 inline Location& active_location(){static thread_local Location loc;return loc;}
 inline std::string location(Location l){return "\"file\":"+quote(l.file)+",\"line\":"+std::to_string(l.line)+",\"column\":"+std::to_string(l.column);}
 inline bool event(Kind k,Location l,std::string_view name,std::string extra=""){
+    if (!enabled()) return false;  // do not build the payload nobody receives
     return emit(k,"{"+location(l)+",\"name\":"+quote(name)+(extra.empty()?"":","+extra)+'}');
 }
 inline bool trace(std::string_view s){return event(Kind::trace,{},s);}

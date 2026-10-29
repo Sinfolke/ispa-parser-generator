@@ -12,7 +12,7 @@ from ispa_std import debug
 from ispa_std.raw_token import RawToken
 from ispa_std.utility import Pair
 from ispa_std.chars import at, code_of
-from ispa_std.dfa_api import (Action, Captures, SourceText, DebugIndex, DFADebug, DYNAMIC_FAIL_STATE, HistoryNode,
+from ispa_std.dfa_api import (Action, CaptureState, Captures, SourceText, DebugIndex, DFADebug, DYNAMIC_FAIL_STATE, HistoryNode,
                               LEXER_DELETE_STATE, NULL_STATE, TdfaLayout, UNSET)
 from ispa_std.failures import internal_error, runtime_error
 from ispa_std.format import int_to_string, repeat
@@ -26,6 +26,8 @@ class DfaTables:
     layout: TdfaLayout
     debug_array: list[DFADebug]
     debug_index: DebugIndex
+    state: CaptureState
+    captures: Captures
 
     def __init__(self, table: list[list[int]], class_table: list[int], action_table: list[list[int]], layout: TdfaLayout,
                  debug_array: list[DFADebug], debug_index: DebugIndex):
@@ -35,6 +37,9 @@ class DfaTables:
         self.layout = layout
         self.debug_array = debug_array
         self.debug_index = debug_index
+        # Registers and captures are reused by every scan (not reentrant: a semantic action must not scan).
+        self.state = CaptureState(SourceText(""))
+        self.captures = Captures(self.state)
 
 
 class TraceSink:
@@ -123,7 +128,12 @@ def run(source: SourceText, cur: Cursor, start_pos: int, tables: DfaTables, sema
     nactions = len(action_table)
     trace_on = len(tables.debug_array) > 1 or (len(tables.debug_array) == 1 and tables.debug_array[0].member != "<Undefined>")
 
-    regs: list[int] = []
+    scan_state = tables.state
+    scan_state.src = source
+    scan_state.base = start
+    scan_state.first_line = start_line
+    regs = scan_state.regs
+    regs.clear()
     i = 0
     width = registers
     if width < 1:
@@ -131,7 +141,8 @@ def run(source: SourceText, cur: Cursor, start_pos: int, tables: DfaTables, sema
     while i < width:
         regs.append(UNSET)
         i = i + 1
-    history = []
+    history = scan_state.history
+    history.clear()
 
     state = 0
     immediate_action = False
@@ -193,7 +204,7 @@ def run(source: SourceText, cur: Cursor, start_pos: int, tables: DfaTables, sema
                 runtime_error("DFA: unknown action; Report this error to github")
             state = row[3]
         else:
-            captures = Captures(source, start, regs, history, start_line)
+            captures = tables.captures
             semantic_pos = cur.pos
             result = semantic(state - nstates - nactions, captures, start_pos, cur.pos - start, start_line, cur)
             if cur.pos != semantic_pos:

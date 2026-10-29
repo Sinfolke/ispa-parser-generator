@@ -1437,6 +1437,25 @@ struct PythonConverter {
             la::Function out;
             out.name = f->name;
             out.type = type(f->returns);
+            // An accessor (`return self.field`) hands out the field itself: a const reference, not a copy.
+            if (!self_name.empty() && out.type.isValueType() &&
+                (out.type.getValueType() == la::ValueType::Array || out.type.getValueType() == la::ValueType::Map ||
+                 out.type.getValueType() == la::ValueType::String)) {
+                const py::Stmt* only = nullptr;
+                std::size_t statements = 0;
+                for (const auto& statement : f->body) {
+                    if (!statement || statement->template get<py::Pass>()) continue;
+                    if (auto text = statement->template get<py::ExprStmt>(); text && text->value &&
+                        text->value->template get<py::Constant>()) continue;  // docstring
+                    only = statement.get();
+                    ++statements;
+                }
+                if (statements == 1 && only)
+                    if (auto r = only->template get<py::Return>(); r && r->value)
+                        if (auto a = r->value->template get<py::Attribute>(); a && a->value)
+                            if (auto base = a->value->template get<py::Name>(); base && base->id == self_name)
+                                out.type = la::Type{la::ValueType::BorrowSemantic, la::Type{la::ValueType::ImmutableSemantic, out.type}};
+            }
             scope.self_name = self_name;
             scope.class_names = class_names;
             scope.typevars = typevars;
