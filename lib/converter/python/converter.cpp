@@ -342,6 +342,13 @@ void Construct::variable(const LangAPI::Variable& var) {
         deferred_aliases_.emplace_back(current_scope_ + "." + Core::identifier(var.name), rhs);
         return;
     }
+    // A namespace is a class body: an initializer naming the namespace's own classes by their qualified
+    // path runs before that path exists, so it is assigned once the outermost namespace is complete.
+    if (namespace_context_ && !class_context_ && !inside_function_ && !current_scope_.empty() && !rhs.empty() &&
+        rhs.find(current_scope_.substr(0, current_scope_.find('.')) + ".") != std::string::npos) {
+        deferred_aliases_.emplace_back(current_scope_ + "." + Core::identifier(var.name), rhs);
+        return;
+    }
     emit_pending_lambdas();
     line(Core::identifier(var.name) + " = " + rhs);
     if (debug_instrumentation_ && rhs.find("captures.") != std::string::npos)
@@ -464,7 +471,12 @@ void Construct::cls(const LangAPI::Class& value) {
     for (const auto& inherit : value.inherit_members) {
         if (!bases.empty()) bases += ", ";
         if (const auto* sym = std::get_if<LangAPI::Symbol>(&inherit.second)) {
-            bases += Core::symbol_path(core_.type(LangAPI::Type{*sym}));
+            auto base = Core::symbol_path(core_.type(LangAPI::Type{*sym}));
+            // The class body runs before its qualified path exists: a sibling is named directly.
+            if (!current_scope_.empty() && base.starts_with(current_scope_ + ".") &&
+                base.find('.', current_scope_.size() + 1) == std::string::npos)
+                base = base.substr(current_scope_.size() + 1);
+            bases += base;
         } else {
             // ISPA lexer/parser inheritance is a real Python subclass.
             has_lib_base = true;
@@ -624,7 +636,7 @@ void Construct::ns(const LangAPI::Namespace& value) {
     class_context_ = saved_class;
     current_scope_ = saved_scope;
     --indentation_;
-    if (saved_scope.empty() && value.name == "FlatTypes") {
+    if (saved_scope.empty()) {
         for (const auto& [target, rhs] : deferred_aliases_) line(target + " = " + rhs);
         deferred_aliases_.clear();
     }
