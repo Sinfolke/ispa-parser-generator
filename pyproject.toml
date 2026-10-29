@@ -9,11 +9,19 @@ description = "ISPA library package manager"
 requires-python = ">=3.9"
 dependencies = ["PyYAML>=6,<7"]
 
+[project.optional-dependencies]
+antlr-to-ispa = ["tree-sitter-language-pack==0.10.0", "tree-sitter>=0.25.2,<0.27"]
+
 [project.scripts]
 ispa-pkg = "ispa_pkg.cli:main"
 ispa-lsp = "ispa_pkg.lsp:main"
 ispa-ai = "ispa_pkg.ai:main"
+antlr-to-ispa = "antlr_to_ispa.cli:main"
+cpp-to-ispa = "antlr_to_ispa.cpp_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["cli/pkg"]
-include = ["ispa_pkg*"]
+include = ["ispa_pkg*", "antlr_to_ispa*"]
+
+[tool.setuptools.package-data]
+antlr_to_ispa = ["grammar/*.isc"]

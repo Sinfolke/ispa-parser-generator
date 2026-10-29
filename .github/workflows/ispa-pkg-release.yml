@@ -71,12 +71,14 @@ jobs:
         shell: bash
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e . nuitka ordered-set zstandard
+          python -m pip install -e '.[antlr-to-ispa]' nuitka ordered-set zstandard
 
       - name: Test Python CLI
         shell: bash
         run: |
           python -m unittest tests/test_ispa_pkg.py -v
+          python -m unittest tests/test_antlr_to_ispa.py -v
+          python -m unittest tests/test_antlr_companions.py -v
           python cli/ispadbg.py --help
 
       - name: Compile onefile executable
@@ -110,6 +112,19 @@ jobs:
             --output-dir=dist \
             "--output-filename=$AI" \
             cli/pkg/ispa_pkg/ai.py
+          python -m nuitka \
+            --mode=onefile \
+            --assume-yes-for-downloads \
+            --include-package=antlr_to_ispa \
+            --include-package=tree_sitter_language_pack \
+            --include-package-data=tree_sitter_language_pack \
+            --include-package=tree_sitter \
+            --include-package=tree_sitter_c_sharp \
+            --include-package=tree_sitter_embedded_template \
+            --include-package=tree_sitter_yaml \
+            --output-dir=dist \
+            --output-filename=antlr-to-ispa \
+            cli/pkg/antlr_to_ispa_entry.py
 
       - name: Compile Windows onefile executable
         if: runner.os == 'Windows'
@@ -144,6 +159,20 @@ jobs:
             --output-dir=dist `
             "--output-filename=$env:AI" `
             cli/pkg/ispa_pkg/ai.py
+          python -m nuitka `
+            --mode=onefile `
+            --msvc=latest `
+            --assume-yes-for-downloads `
+            --include-package=antlr_to_ispa `
+            --include-package=tree_sitter_language_pack `
+            --include-package-data=tree_sitter_language_pack `
+            --include-package=tree_sitter `
+            --include-package=tree_sitter_c_sharp `
+            --include-package=tree_sitter_embedded_template `
+            --include-package=tree_sitter_yaml `
+            --output-dir=dist `
+            --output-filename=antlr-to-ispa.exe `
+            cli/pkg/antlr_to_ispa_entry.py
 
       - name: Smoke test compiled CLI
         shell: bash
@@ -160,6 +189,10 @@ jobs:
           "dist/$DEBUGGER" --help
           test -f "dist/$AI"
           "dist/$AI" --help
+          CONVERTER=dist/antlr-to-ispa
+          if [ "$RUNNER_OS" = Windows ]; then CONVERTER="$CONVERTER.exe"; fi
+          "$CONVERTER" --help
+          python tests/antlr_compiled_smoke.py "$CONVERTER"
 
       - name: Package executable
         shell: bash
@@ -170,6 +203,7 @@ jobs:
           DEBUGGER_ARCHIVE: ${{ matrix.debugger_archive }}
           AI: ${{ matrix.ai }}
           AI_ARCHIVE: ${{ matrix.ai_archive }}
+          PLATFORM: ${{ matrix.platform }}
         run: |
           set -euo pipefail
           mkdir -p packages
@@ -183,6 +217,8 @@ jobs:
               (os.environ['EXECUTABLE'], os.environ['ARCHIVE']),
               (os.environ['DEBUGGER'], os.environ['DEBUGGER_ARCHIVE']),
               (os.environ['AI'], os.environ['AI_ARCHIVE']),
+              ('antlr-to-ispa' + ('.exe' if os.environ['RUNNER_OS'] == 'Windows' else ''),
+               'antlr-to-ispa-' + os.environ['PLATFORM'] + ('.zip' if os.environ['RUNNER_OS'] == 'Windows' else '.tar.gz')),
           ):
               executable = Path('dist') / executable_name
               archive = Path('packages') / archive_name
@@ -216,6 +252,13 @@ jobs:
           path: packages/${{ matrix.ai_archive }}
           if-no-files-found: error
 
+      - name: Save ANTLR converter workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: antlr-to-ispa-${{ matrix.platform }}
+          path: packages/antlr-to-ispa-*
+          if-no-files-found: error
+
       - name: Upload to GitHub Release
         shell: bash
         env:
@@ -227,4 +270,4 @@ jobs:
           AI_ARCHIVE: ${{ matrix.ai_archive }}
         run: |
           set -euo pipefail
-          gh release upload "$TAG" "packages/$ARCHIVE" "packages/$DEBUGGER_ARCHIVE" "packages/$AI_ARCHIVE" --clobber
+          gh release upload "$TAG" "packages/$ARCHIVE" "packages/$DEBUGGER_ARCHIVE" "packages/$AI_ARCHIVE" packages/antlr-to-ispa-* --clobber

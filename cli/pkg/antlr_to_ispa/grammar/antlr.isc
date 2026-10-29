@@ -1,0 +1,69 @@
+// ANTLR 4 metagrammar. Target-language blocks stay opaque; no target grammars.
+// The Python bootstrap in parser.py supplies exact source spans and foreign
+// string/comment boundary handling needed by the static conversion passes.
+module antlr -> main;
+
+#[skip]
+LINE_COMMENT: '//' [^\n\r]*;
+#[skip]
+BLOCK_COMMENT: '/*' ([^*] | ('*'+ [^*/]))* '*'+ '/';
+
+ID: @ ([a-zA-Z_] [a-zA-Z_0-9]*) {@};
+INT: @ [0-9]+ {@};
+STRING: @ ('\'' (('\\' [*]) | [^'\\])* '\'') {@};
+DOUBLE_STRING: @ ('"' (('\\' [*]) | [^"\\])* '"') {@};
+BACKTICK_STRING: @ ('`' (('\\' [*]) | [^`\\])* '`') {@};
+BRACKET: @ ('[' (('\\' [*]) | [^\\\]])* ']') {@};
+OTHER: @ [^{}] {@};
+
+main: @ grammar_spec {@};
+grammar_spec:
+    @ grammar_kind? 'grammar' @ ID ';' @ prequel* @ rule_spec* @ mode_spec*
+    @{kind, name, prequels, rules, modes}
+;
+grammar_kind: @ 'lexer' | 'parser' {@};
+prequel: @ options_spec | import_spec | tokens_spec | channels_spec | named_action {@};
+options_spec: 'options' '{' @ option* '}' {@};
+option: @ ID '=' @ option_value ';' @{name, value};
+option_value: @ qualified_id | STRING | INT | action {@};
+qualified_id: @ ID ('.' @ ID)* @{first, rest};
+import_spec: 'import' @ delegate (',' @ delegate)* ';' @{first, rest};
+delegate: @ ID ('=' @ ID)? @{name, target};
+tokens_spec: 'tokens' '{' @ id_list? '}' {@};
+channels_spec: 'channels' '{' @ id_list? '}' {@};
+id_list: @ ID (',' @ ID)* ','? @{first, rest};
+named_action: '@' @ ID ('::' @ ID)? @ action @{scope, name, body};
+mode_spec: 'mode' @ ID ';' @ rule_spec* @{name, rules};
+rule_spec:
+    @ modifier? @ ID @ BRACKET? @ rule_header* ':' @ alternatives ';' @ exception_handler*
+    @{modifier, name, arguments, headers, body, handlers}
+;
+modifier: @ 'fragment' | 'public' | 'private' | 'protected' {@};
+rule_header: @ returns_spec | throws_spec | locals_spec | options_spec | named_action {@};
+returns_spec: 'returns' @ BRACKET {@};
+locals_spec: 'locals' @ BRACKET {@};
+throws_spec: 'throws' @ qualified_id (',' @ qualified_id)* @{first, rest};
+exception_handler: @ catch_spec | finally_spec {@};
+catch_spec: 'catch' @ BRACKET @ action @{arguments, body};
+finally_spec: 'finally' @ action {@};
+alternatives: @ alternative ('|' @ alternative)* @{first, rest};
+alternative: @ element* @ commands? ('#' @ ID)? @{elements, commands, label};
+element: @ labeled | action_element | quantified {@};
+labeled: @ ID @ label_operator @ quantified @{name, operator, element};
+label_operator: @ '=' | '+=' {@};
+action_element: @ action @ '?'? @ element_options? @{body, predicate, options};
+quantified: @ atom @ element_options? @ suffix? @{atom, options, suffix};
+suffix: @ '?' | '*' | '+' @ '?'? @{operator, nongreedy};
+atom: @ block | negation | terminal {@};
+block: '(' @ block_header? @ alternatives ')' @{header, alternatives};
+block_header: @ options_spec? @ named_action* ':' @{options, actions};
+negation: '~' @ terminal | block {@};
+terminal: @ range | reference | STRING | BRACKET | '.' {@};
+range: @ STRING '..' @ STRING @{first, last};
+reference: @ ID @ BRACKET? @{name, arguments};
+element_options: '<' @ element_option (',' @ element_option)* '>' @{first, rest};
+element_option: @ ID ('=' @ option_value)? @{name, value};
+commands: '->' @ command (',' @ command)* @{first, rest};
+command: @ ID ('(' @ ID | INT ')')? @{name, argument};
+action: '{' @ action_piece* '}' {@};
+action_piece: @ action | !('{' | '}') {@};
