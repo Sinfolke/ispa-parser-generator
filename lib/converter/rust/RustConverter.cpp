@@ -380,8 +380,11 @@ namespace Rust {
                 library && (library->exports == LangAPI::StdlibExports::Lexer ||
                             library->exports == LangAPI::StdlibExports::Parser ||
                             library->exports == LangAPI::StdlibExports::LRParser ||
-                            library->exports == LangAPI::StdlibExports::LRGeneralizedParser))
+                            library->exports == LangAPI::StdlibExports::LRGeneralizedParser)) {
+#ifdef NDEBUG   // Release builds refuse; debug builds emit so the Rust backend can be developed.
                 throw Error("Rust target: parser generation is incomplete: shared lowering still uses C++ container/iterator operations and implicit inherited runtime calls. IR needs semantic token-stream operations and explicit runtime interface contracts; refusing to emit an invalid Rust parser");
+#endif
+            }
         }
         const std::string name = RustCore::convertSymbol(cls.name, false);
         const std::string generics = genericParams(cls.template_parameters);
