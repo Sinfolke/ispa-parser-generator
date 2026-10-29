@@ -75,6 +75,7 @@ namespace Cpp {
         auto determineOffloadCompatible(const LangAPI::Function &func) -> bool;
         auto produceNamespace(const LangAPI::Namespace &ns, OutputSrc &o) -> void;
         auto produceFunction(const LangAPI::Function &cls, OutputSrc &o, bool constructor = false) -> void;
+        std::set<std::string> constructor_members;
         auto produceClass(const LangAPI::Class &cls, OutputSrc &o) -> void;
         auto produceTypeAlias(const LangAPI::TypeAlias &alias, OutputSrc &o) -> void;
         auto produceEnum(const LangAPI::Enum &enum_, OutputSrc &o) -> void;

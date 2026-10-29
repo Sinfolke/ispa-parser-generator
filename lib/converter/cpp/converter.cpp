@@ -704,11 +704,49 @@ namespace Cpp {
                 ~PathGuard() { path.pop_back(); }
             } guard{context.symbol_path};
 
+            // Python constructors assign fields in the body; C++ members without a default constructor must
+            // be initialized before it. Leading `self.field = value` statements and an explicit
+            // `Base.__init__(self, ...)` call become the member-initializer list.
+            std::vector<std::string> initializers;
+            LangAPI::Statements body_statements = func.statements;
+            if (constructor) {
+                const std::string self = "((*this))";
+                std::vector<std::size_t> taken;
+                std::size_t index = 0;
+                for (const auto &statement : func.statements) {
+                    if (statement.isComment()) { ++index; continue; }
+                    if (!statement.isExpression() || statement.getExpression().size() != 1) break;
+                    const auto &item = statement.getExpression().front();
+                    if (item.isVariableAssignment()) {
+                        const auto &assign = item.getVariableAssignment();
+                        if (assign.type != LangAPI::OperatorType::Assign || !std::holds_alternative<LangAPI::StorageSymbol>(assign.name)) break;
+                        const auto target = Core::convertStorageSymbol(std::get<LangAPI::StorageSymbol>(assign.name));
+                        const auto value = Core::convertExpression(assign.value);
+                        if (!target.starts_with(self + ".")) break;
+                        const auto field = target.substr(self.size() + 1);
+                        if (!constructor_members.contains(field) || value.find("(*this)") != std::string::npos ||
+                            field.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_") != std::string::npos) break;
+                        initializers.push_back(field + "(" + value + ")");
+                    } else if (item.isFunctionCall()) {
+                        const auto call = Core::convertExpression(statement.getExpression());
+                        const std::string marker = "::__init__((*this)";
+                        const auto at = call.find(marker);
+                        if (at == std::string::npos || !initializers.empty() || call.back() != ')') break;
+                        auto rest = call.substr(at + marker.size());
+                        rest.pop_back();
+                        if (rest.starts_with(", ")) rest = rest.substr(2);
+                        initializers.push_back(call.substr(0, at) + "(" + rest + ")");
+                    } else break;
+                    taken.push_back(index++);
+                }
+                for (auto it = taken.rbegin(); it != taken.rend(); ++it) body_statements.erase(body_statements.begin() + *it);
+            }
             auto writeDefinition = [&](Converter::Writer &w) {
-                emitLine(w, buildSignature(func, SigKind::Definition, qualifier, false, {}, constructor) + " {");
+                emitLine(w, buildSignature(func, SigKind::Definition, qualifier, false, {}, constructor) +
+                    (initializers.empty() ? std::string() : " : " + joinStrings(initializers, ", ")) + " {");
                 w.increaseIndentation();
                 if (debug_rule) { emitLine(w, "try {"); w.increaseIndentation(); }
-                convertStatements(func.statements, w);
+                convertStatements(body_statements, w);
                 if (debug_rule) {
                     w.decreaseIndentation();
                     emitLine(w, "} catch (const NoMatch&) { throw;");
@@ -811,6 +849,9 @@ namespace Cpp {
             emitLine(*o.h, "public:");
             auto constructor = *cls.constructor;
             constructor.name = split.leaf;
+            constructor_members.clear();
+            for (const auto &[declaration, visibility] : cls.data)
+                if (declaration->isVariable()) constructor_members.insert(declaration->getVariable().name);
             produceFunction(constructor, member, true);
             if (cls.default_visibility != LangAPI::Visibility::Public) emitLine(*o.h, getVisibility(cls.default_visibility));
         }
