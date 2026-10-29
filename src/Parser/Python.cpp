@@ -108,10 +108,51 @@ struct PythonConverter {
         return {};
     }
     std::size_t block_depth = 0, loop_depth = 0;
+    // Python locals are function-scoped; the targets' are block-scoped. A first assignment inside a block
+    // is declared there when the block alone uses the name, otherwise it is hoisted to the function top.
+    const py::StmtList* function_body = nullptr;
+    std::vector<const py::StmtList*> block_lists;
+    std::vector<std::vector<std::string>> block_declared;
+    // Names first assigned in a block (declared there or hoisted): not definitely assigned after it.
+    std::vector<std::vector<std::string>> block_assigned;
+    std::vector<std::pair<std::string, la::Type>> hoisted;
+    template<class T> static void count_name(const T& value, const std::string& name, std::size_t& total) {
+        if constexpr (std::is_same_v<T, py::Expr>) {
+            if (auto n = value.template get<py::Name>(); n && n->id == name) ++total;
+            count_name(value.kind, name, total);
+        } else if constexpr (requires { std::visit([](const auto&) {}, value); }) {
+            std::visit([&](const auto& item) { count_name(item, name, total); }, value);
+        } else if constexpr (requires { value.get(); *value; }) {
+            if (value) count_name(*value, name, total);
+        } else if constexpr (requires { value.members(); }) {
+            std::apply([&](const auto&... items) { (count_name(items, name, total), ...); }, value.members());
+        } else if constexpr (std::ranges::range<T> && !std::is_same_v<T, std::string>) {
+            for (const auto& item : value) count_name(item, name, total);
+        }
+    }
+    bool escapes_block(const std::string& name) const {
+        if (!function_body || block_lists.empty()) return false;
+        std::size_t everywhere = 0, inside = 0;
+        count_name(*function_body, name, everywhere);
+        count_name(*block_lists.back(), name, inside);
+        return everywhere > inside;
+    }
     la::Statements nested(const py::StmtList& list, bool loop = false) {
         ++block_depth;
         loop_depth += loop;
+        block_lists.push_back(&list);
+        block_declared.emplace_back();
+        block_assigned.emplace_back();
         auto out = body(list);
+        for (const auto& name : block_assigned.back()) debug_ready.erase(name);
+        block_assigned.pop_back();
+        for (const auto& name : block_declared.back()) {
+            locals.erase(name);
+            local_types.erase(name);
+            objects.erase(name);
+        }
+        block_declared.pop_back();
+        block_lists.pop_back();
         loop_depth -= loop;
         --block_depth;
         return out;
@@ -201,6 +242,31 @@ struct PythonConverter {
                 case py::ConstantKind::Str: return la::Type{la::ValueType::String};
                 default: break;
             }
+        }
+        const auto is = [](const la::Type& t, la::ValueType v) { return t.isValueType() && t.getValueType() == v; };
+        if (auto b = value->template get<py::BinaryExpr>()) {
+            const auto l = inferred(b->left), r = inferred(b->right);
+            if (is(l, la::ValueType::Int) && is(r, la::ValueType::Int)) return l;
+            if ((is(l, la::ValueType::Float) || is(l, la::ValueType::Int)) &&
+                (is(r, la::ValueType::Float) || is(r, la::ValueType::Int))) return la::Type{la::ValueType::Float};
+            if (b->op == py::BinOp::Add && l == r && (is(l, la::ValueType::String) || is(l, la::ValueType::Array))) return l;
+            return la::Type{la::ValueType::Undef};
+        }
+        if (auto u = value->template get<py::UnaryExpr>())
+            return u->op == py::UnaryOp::Not ? la::Type{la::ValueType::Bool} : inferred(u->operand);
+        if (value->template get<py::Compare>()) return la::Type{la::ValueType::Bool};
+        if (auto b = value->template get<py::BoolExpr>()) {
+            for (const auto& item : b->values) if (!is(inferred(item), la::ValueType::Bool)) return la::Type{la::ValueType::Undef};
+            return la::Type{la::ValueType::Bool};
+        }
+        if (auto c = value->template get<py::IfExpr>()) {
+            const auto l = inferred(c->body);
+            return l == inferred(c->orelse) ? l : la::Type{la::ValueType::Undef};
+        }
+        if (auto sub = value->template get<py::Subscript>()) {
+            const auto base = inferred(sub->value);
+            if (is(base, la::ValueType::Array) && !base.template_parameters.empty())
+                if (const auto* element = std::get_if<la::Type>(&base.template_parameters.front())) return *element;
         }
         if (auto list = value->template get<py::List>(); list && !list->elts.empty())
             return la::Type{la::ValueType::Array, inferred(list->elts.front())};
@@ -763,10 +829,19 @@ struct PythonConverter {
                 auto value = expr(x.value);
                 if (auto n = x.targets[0] ? x.targets[0]->template get<py::Name>() : nullptr; n && !locals.contains(n->id)) {
                     if (action_context && n->id == "ctx") unsupported(s.pos, "ctx cannot be rebound");
-                    if (block_depth) unsupported(s.pos, "declare local before entering a branch or loop");
+                    const bool hoist = block_depth && escapes_block(n->id);
+                    const auto value_type = inferred(x.value);
+                    if (hoist && value_type.isValueType() && value_type.getValueType() == la::ValueType::Undef)
+                        unsupported(s.pos, "cannot infer the type of '" + n->id + "', which is used outside this block; declare it with an annotation first");
                     locals.insert(n->id);
                     if (object(x.value)) objects.insert(n->id);
-                    local_types.insert_or_assign(n->id, inferred(x.value));
+                    local_types.insert_or_assign(n->id, value_type);
+                    if (block_depth) block_assigned.back().push_back(n->id);
+                    if (hoist) {
+                        hoisted.emplace_back(localName(n->id), value_type);
+                        return la::VariableAssignment::createStatements(la::VariableAssignment{.name = target(x.targets[0]), .value = value});
+                    }
+                    if (block_depth) block_declared.back().push_back(n->id);
                     return la::Statements{la::Variable{.name = localName(n->id), .type = la::Type{la::ValueType::Undef}, .value = value}};
                 }
                 return la::VariableAssignment::createStatements(la::VariableAssignment{.name = target(x.targets[0]), .value = value});
@@ -780,9 +855,18 @@ struct PythonConverter {
                 }
                 if (!n) unsupported(s.pos, "annotated target must be a name");
                 if (action_context && n->id == "ctx") unsupported(s.pos, "ctx cannot be rebound");
-                if (block_depth || locals.contains(n->id)) unsupported(s.pos, "annotated declaration must introduce a local outside branches and loops");
+                if (locals.contains(n->id)) unsupported(s.pos, "annotated declaration must introduce a new local");
+                const bool hoist = block_depth && escapes_block(n->id);
                 locals.insert(n->id);
                 local_types.insert_or_assign(n->id, type(x.annotation));
+                if (block_depth) block_assigned.back().push_back(n->id);
+                if (hoist) {
+                    hoisted.emplace_back(localName(n->id), type(x.annotation));
+                    if (!x.value) return {};
+                    return la::VariableAssignment::createStatements(la::VariableAssignment{
+                        .name = target(x.target), .value = initializer(x.value, type(x.annotation))});
+                }
+                if (block_depth) block_declared.back().push_back(n->id);
                 if (auto annotation = x.annotation ? x.annotation->template get<py::Name>() : nullptr;
                     annotation && class_names.contains(annotation->id)) objects.insert(n->id);
                 return la::Statements{la::Variable{.name = localName(n->id), .type = type(x.annotation), .value = x.value ? initializer(x.value, type(x.annotation)) : la::Expression{}}};
@@ -834,7 +918,10 @@ struct PythonConverter {
                 if (auto annotation = p.annotation ? p.annotation->template get<py::Name>() : nullptr;
                     annotation && class_names.contains(annotation->id)) scope.objects.insert(p.name);
             }
+            scope.function_body = &f->body;
             out.statements = scope.body(f->body);
+            for (auto it = scope.hoisted.rbegin(); it != scope.hoisted.rend(); ++it)
+                out.statements.insert(out.statements.begin(), la::Statement{la::Variable{.name = it->first, .type = it->second}});
             if (out.statements.empty() && (out.type == la::ValueType::Void || f->name == "__init__")) out.statements = la::Return::createStatements(la::Return{});
             return la::Declaration{out};
         }
