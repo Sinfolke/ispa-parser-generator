@@ -1,6 +1,7 @@
 // Python collection operations used by the language-neutral ArrayMethodCall lowering.
 #pragma once
 #include <algorithm>
+#include <any>
 #include <iterator>
 #include <cstdint>
 #include <string>
@@ -14,6 +15,10 @@
 #include <vector>
 
 namespace ISPA_STD {
+// Cast with Python meaning: an object held as std::any comes back as its dynamic type; other values convert.
+template<typename T> T python_cast(const std::any& value) { return std::any_cast<T>(value); }
+template<typename T, typename V, typename = std::enable_if_t<!std::is_same_v<std::decay_t<V>, std::any>>>
+T python_cast(V&& value) { return static_cast<T>(std::forward<V>(value)); }
 // `needle in container`: vectors, strings and associative containers (C++17 overloads).
 template<class T, class A, class V>
 bool python_contains(const std::vector<T, A>& values, const V& needle) {

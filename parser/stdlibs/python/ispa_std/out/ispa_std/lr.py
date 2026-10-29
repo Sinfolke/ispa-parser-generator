@@ -13,7 +13,7 @@ marks a missing cell, LR_CONFLICT a cell with several candidate actions
 The type-directed capture conversion (lr_convert & co) is expressed with an
 explicit `Shape` instead of the target's static type; the typed C++ version
 stays in cpp_residue."""
-from typing import ClassVar
+from typing import ClassVar, cast
 
 from ispa_std.failures import runtime_error
 from ispa_std.format import int_to_string
@@ -214,8 +214,9 @@ def lr_pack(values: list[object], indices: list[int], offsets: list[int], splice
         value = values[indices[i]]
         if splice[i] != 0:
             c = 0
-            while c < len(value.columns):
-                columns[offsets[i] + c].extend(value.columns[c])
+            spliced = cast(LRCaptures, value)
+            while c < len(spliced.columns):
+                columns[offsets[i] + c].extend(spliced.columns[c])
                 c = c + 1
         else:
             columns[offsets[i]].append(value)

@@ -714,7 +714,12 @@ std::string Core::rvalue(const LangAPI::RValue& v) {
         }
         case R::ToString: return "str(" + expression(v.getToString().what) + ")";
         case R::CharToStringConstructor: return "str(" + expression(v.getCharToStringConstructor().what) + ")";
-        case R::Cast: return type(*v.getCast().type) + "(" + expression(v.getCast().what) + ")";
+        case R::Cast: {
+            // A cast to a class recovers the object itself; only scalar types convert.
+            const auto& cast = v.getCast();
+            if (cast.type && cast.type->isSymbol()) return expression(cast.what);
+            return type(*cast.type) + "(" + expression(cast.what) + ")";
+        }
         case R::GetFromBox: return expression(v.getGetFromBox().what);
     }
     unsupported("RValueType");

@@ -524,6 +524,11 @@ struct PythonConverter {
                     access.path.emplace_back(la::ArrayMethodCall{.method = la::ArrayMethods::Size});
                     return la::StorageSymbol::createExpression(access);
                 }
+                if (const auto* builtin = x.func ? x.func->template get<py::Name>() : nullptr;
+                    builtin && builtin->id == "cast" && !locals.contains("cast") && x.args.size() == 2 && x.keywords.empty()) {
+                    // typing.cast(T, value): an object recovered as its dynamic type.
+                    return la::Cast::createExpression(la::Cast{.type = std::make_shared<la::Type>(type(x.args[0])), .what = expr(x.args[1])});
+                }
                 if (const auto* intrinsic = x.func ? x.func->template get<py::Name>() : nullptr;
                     intrinsic && intrinsic->id.starts_with("__ispa_ir__.")) {
                     const auto name = intrinsic->id.substr(12);

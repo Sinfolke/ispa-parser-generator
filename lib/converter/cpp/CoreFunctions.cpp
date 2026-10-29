@@ -986,7 +986,7 @@ auto Core::convertRValue(const LangAPI::RValue &rvalue) -> std::string {
         case LangAPI::RValueType::CharToStringConstructor:
             return "std::string(1, " + convertExpression(rvalue.getCharToStringConstructor().what) + ")";
         case LangAPI::RValueType::Cast:
-            return "static_cast<" + convertType(*rvalue.getCast().type) + ">(" + convertExpression(rvalue.getCast().what) + ")";
+            return "::ISPA_STD::python_cast<" + convertType(*rvalue.getCast().type) + ">(" + convertExpression(rvalue.getCast().what) + ")";
         case LangAPI::RValueType::GetFromBox:
             return "(*" + convertExpression(rvalue.getGetFromBox().what) + ")";
         default:
