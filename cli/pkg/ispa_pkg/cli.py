@@ -22,6 +22,8 @@ import yaml
 CATALOG_URL = "https://raw.githubusercontent.com/Sinfolke/ispa-parser-generator/main/ispa-libraries.yaml"
 DEFAULT_CATALOG = {"packages": {
     "std": {"github": "Sinfolke/ispa-parser-generator", "ref": "main"},
+    "target-core": {"github": "Sinfolke/ispa-parser-generator", "ref": "main",
+                    "manifest": "ispa-package.target-core.yaml"},
     "cpp-target": {"github": "Sinfolke/ispa-parser-generator", "ref": "main",
                    "manifest": "ispa-package.cpp-target.yaml"},
     "python-target": {"github": "Sinfolke/ispa-parser-generator", "ref": "main",
@@ -196,9 +198,12 @@ def layout_entries(config):
     return root, result, file_entries
 
 
-def build_cpp_library(package, name, root, required=False):
-    """Compile a package's C++ sources into a static archive beside its headers."""
-    cpp = package / 'ispatarget' / 'cpp'
+def build_cpp_library(package, name, root, required=False, kind='cpp', standard=17, output=None):
+    """Compile a package's C++ sources into a static archive beside its headers.
+
+    `kind` is the ispatarget directory to build; `output` names the archive (default: the package name)."""
+    cpp = package / 'ispatarget' / kind
+    output = output or name
     sources = sorted(source for source in cpp.rglob('*.cpp') if source.is_file())
     if not sources:
         return None
@@ -210,6 +215,10 @@ def build_cpp_library(package, name, root, required=False):
         return None
     compiler = shlex.split(os.environ.get('CXX', ''))
     includes = [cpp, cpp / 'include']
+    if kind != 'cpp':
+        # The native parts of the package itself are not installed yet while it is staged.
+        sibling = package / 'ispatarget' / 'cpp'
+        includes.extend((sibling, sibling / 'include'))
     for other in discover_exports(root).get('cpp', []):
         includes.extend((other, other / 'include'))
     with tempfile.TemporaryDirectory(prefix='.ispa-cpp-', dir=root) as temporary:
@@ -222,9 +231,9 @@ def build_cpp_library(package, name, root, required=False):
                  'add_library(ispa_package STATIC']
         lines.extend(f'  {cmake_quote(source)}' for source in sources)
         lines.extend([')', 'set_target_properties(ispa_package PROPERTIES',
-                      f'  OUTPUT_NAME {cmake_quote(name)}',
+                      f'  OUTPUT_NAME {cmake_quote(output)}',
                       f'  ARCHIVE_OUTPUT_DIRECTORY {cmake_quote(work)}', ')',
-                      'target_compile_features(ispa_package PRIVATE cxx_std_17)'])
+                      f'target_compile_features(ispa_package PRIVATE cxx_std_{standard})'])
         valid_includes = [directory for directory in dict.fromkeys(includes) if directory.is_dir()]
         if valid_includes:
             lines.append('target_include_directories(ispa_package PRIVATE')
@@ -251,11 +260,11 @@ def build_cpp_library(package, name, root, required=False):
         print(f'{name}: building C++ library', file=sys.stderr)
         subprocess.run([cmake, '--build', str(work / 'build'), '--config', 'Release', '--parallel'],
                        check=True, stdout=sys.stderr)
-        archive_names = (f'{name}.lib', f'lib{name}.a')
+        archive_names = (f'{output}.lib', f'lib{output}.a')
         matches = [candidate for search_root in (work, work / 'build')
                    for archive_name in archive_names for candidate in search_root.rglob(archive_name)]
         if not matches:
-            raise PackageError(f'CMake did not produce a static library for {name}')
+            raise PackageError(f'CMake did not produce a static library for {output}')
         archive = matches[0]
         destination = cpp / 'lib' / archive.name
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -266,11 +275,50 @@ def build_cpp_library(package, name, root, required=False):
 def build_missing_cpp_library(package, name, root):
     cpp = package / 'ispatarget' / 'cpp'
     if not any(cpp.rglob('*.cpp')):
-        return None
+        return build_cpp_core(package, name, root, only_missing=True)
     library_dir = cpp / 'lib'
     if not (library_dir / f'lib{name}.a').is_file() and not (library_dir / f'{name}.lib').is_file():
         return build_cpp_library(package, name, root)
-    return None
+    return build_cpp_core(package, name, root, only_missing=True)
+
+
+def build_cpp_core(package, name, root, only_missing=False):
+    """Build the opt-in `cpp-core` directory (the core lowered to C++ for `--stdlib core`).
+
+    It needs a C++23 compiler, so a failure only skips it: the plain C++ target keeps working."""
+    core = package / 'ispatarget' / 'cpp-core'
+    if not core.is_dir() or not any(core.rglob('*.cpp')):
+        return None
+    output = f'{name}-core'
+    library_dir = core / 'lib'
+    if only_missing and ((library_dir / f'lib{output}.a').is_file() or (library_dir / f'{output}.lib').is_file()):
+        return None
+    try:
+        return build_cpp_library(package, name, root, kind='cpp-core', standard=23, output=output)
+    except (PackageError, subprocess.CalledProcessError) as error:
+        print(f'{name}: skipping the core C++ build ({error}); --stdlib core needs a C++23 compiler', file=sys.stderr)
+        return None
+
+
+def ensure_requirements(name, config, root, allow_scripts, catalog_path, active):
+    """Install the packages `requires:` names that are not installed yet, from the catalog."""
+    requires = config.get("requires", [])
+    if isinstance(requires, str):
+        requires = [requires]
+    if not isinstance(requires, list) or any(not isinstance(item, str) or not NAME.fullmatch(item) for item in requires):
+        raise PackageError("requires must be a list of package names")
+    for dependency in requires:
+        if dependency == name or dependency in active:
+            raise PackageError(f"{name}: circular requires on {dependency}")
+        if (root / dependency / ".ispa-package.json").is_file():
+            continue
+        packages = catalog(root, catalog_path).get("packages", {})
+        spec = packages.get(dependency) if isinstance(packages, dict) else None
+        if not isinstance(spec, dict):
+            raise PackageError(f"{name} requires {dependency}, which is not installed and not in the catalog")
+        print(f"{name}: installing required package {dependency}", file=sys.stderr)
+        install(dependency, dict(spec), root, allow_scripts, from_catalog=True,
+                catalog_path=catalog_path, _active=(*active, name))
 
 
 def build_rust_package(package, name, required=False):
@@ -304,7 +352,7 @@ def build_missing_rust_package(package, name):
     return None
 
 
-def install(name, spec, root, allow_scripts=False, force=False, from_catalog=False):
+def install(name, spec, root, allow_scripts=False, force=False, from_catalog=False, catalog_path=None, _active=()):
     if not NAME.fullmatch(name):
         raise PackageError(f"Invalid package name: {name}")
     root.mkdir(parents=True, exist_ok=True)
@@ -317,6 +365,7 @@ def install(name, spec, root, allow_scripts=False, force=False, from_catalog=Fal
         if "manifest" in spec and not config_file.is_file():
             raise PackageError(f"Package manifest not found: {spec['manifest']}")
         config = read_yaml(config_file.read_text(encoding="utf-8"), str(config_file)) if config_file.is_file() else {}
+        ensure_requirements(name, config, root, allow_scripts, catalog_path, _active)
         if "archive" in config:
             location = config["archive"]
             data = fetch_file(location, tree)
@@ -410,6 +459,7 @@ def install(name, spec, root, allow_scripts=False, force=False, from_catalog=Fal
                 command = ["sh", str(script_path), str(stage)]
             subprocess.run(command, cwd=config_tree, check=True)
         build_cpp_library(stage, name, root)
+        build_cpp_core(stage, name, root)
         build_rust_package(stage, name)
         marker_data = {"name": name, "source": spec, "revision": revision, "fingerprint": fingerprint,
                        "from_catalog": from_catalog}
@@ -464,18 +514,19 @@ def export_data(root):
     cpp_dirs = targets.get("cpp", [])
     # Include the target root: consumers may include headers by their relative path.
     # Also include conventional include/ directories if present.
+    core_dirs = targets.get("cpp-core", [])
     includes = list(dict.fromkeys(
-        directory for target in cpp_dirs
+        directory for target in cpp_dirs + core_dirs
         for directory in (target, target / "include")
         if directory.is_dir()
     ))
     sources = sorted({source.resolve() for target in cpp_dirs
                       for source in target.rglob("*.cpp") if source.is_file()})
-    libraries = sorted({file.resolve() for target in cpp_dirs for file in target.rglob('*')
+    libraries = sorted({file.resolve() for target in cpp_dirs + core_dirs for file in target.rglob('*')
                         if file.is_file() and (file.suffix in ('.a', '.so', '.dylib', '.lib')
                                                or '.so.' in file.name)})
     library_dirs = sorted({file.parent for file in libraries})
-    runtime_dirs = sorted({file.parent for target in cpp_dirs for file in target.rglob('*')
+    runtime_dirs = sorted({file.parent for target in cpp_dirs + core_dirs for file in target.rglob('*')
                            if file.is_file() and (file.suffix in ('.so', '.dylib', '.dll')
                                                   or '.so.' in file.name)})
     python_roots = sorted({target.parent for target in targets.get('python', [])})
@@ -787,7 +838,7 @@ def main(argv=None):
                     raise PackageError("--ref applies only to GitHub repositories")
                 spec["ref"] = args.ref
             name = args.name or (args.source if args.source in packages else Path(args.source.rstrip("/")).name.removesuffix(".git").split(".")[0])
-            install(name, spec, root, args.allow_scripts, args.force, args.source in packages)
+            install(name, spec, root, args.allow_scripts, args.force, args.source in packages, args.catalog)
         else:
             markers = list(root.glob("*/.ispa-package.json"))
             installed = {p.parent.name: json.loads(p.read_text()) for p in markers}
@@ -797,7 +848,8 @@ def main(argv=None):
                     raise PackageError(f"Package not installed: {name}")
                 packages = catalog(root, args.catalog).get("packages", {})
                 spec = packages.get(name, installed[name]["source"]) if installed[name].get("from_catalog") else installed[name]["source"]
-                install(name, spec, root, args.allow_scripts, from_catalog=installed[name].get("from_catalog", False))
+                install(name, spec, root, args.allow_scripts, from_catalog=installed[name].get("from_catalog", False),
+                        catalog_path=args.catalog)
         return 0
     except (PackageError, OSError, ValueError, subprocess.CalledProcessError, zipfile.BadZipFile, tarfile.TarError) as error:
         print(f"ispa-pkg: {error}", file=sys.stderr)

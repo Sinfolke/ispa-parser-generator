@@ -1,4 +1,6 @@
 name: rust-target
+requires:
+  - target-core
 layout:
   root: parser/stdlibs
   ispalib: {}

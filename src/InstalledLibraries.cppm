@@ -73,6 +73,65 @@ Discovery discover(const fs::path& library_root) {
     return result;
 }
 
+// A standard-library module (`--stdlib`) announces itself with ispa-stdlib.yaml in its directory:
+//   module: core          the name `--stdlib core` selects
+//   namespace: ISPA_CORE  namespace the generated parser links through (--stdlib-name overrides)
+//   include: ispa_core    include directory the generated sources use (default: the lowercased namespace)
+struct Stdlib {
+    bool found = false;
+    fs::path directory;
+    std::string module;
+    std::string ns = "ISPA_CORE";
+    std::string include;
+};
+
+Stdlib readStdlib(const fs::path& directory) {
+    Stdlib result;
+    std::ifstream file(directory / "ispa-stdlib.yaml");
+    if (!file) return result;
+    result.found = true;
+    result.directory = directory;
+    for (std::string line; std::getline(file, line);) {
+        if (const auto hash = line.find('#'); hash != std::string::npos) line.erase(hash);
+        const auto colon = line.find(':');
+        if (colon == std::string::npos) continue;
+        const auto trim = [](std::string text) {
+            const auto first = text.find_first_not_of(" \t\r");
+            if (first == std::string::npos) return std::string{};
+            return text.substr(first, text.find_last_not_of(" \t\r") - first + 1);
+        };
+        const auto key = trim(line.substr(0, colon));
+        const auto value = trim(line.substr(colon + 1));
+        if (key == "module") result.module = value;
+        else if (key == "namespace" && !value.empty()) result.ns = value;
+        else if (key == "include") result.include = value;
+    }
+    return result;
+}
+
+// `request` is a directory, or the name of an installed module.
+Stdlib stdlib(const fs::path& library_root, const std::string& request) {
+    std::error_code error;
+    if (fs::is_directory(request, error)) return readStdlib(fs::absolute(request));
+    if (!fs::is_directory(library_root, error)) return {};
+    std::vector<fs::path> packages;
+    for (const auto& entry : fs::directory_iterator(library_root))
+        if (entry.is_directory() && !entry.path().filename().string().starts_with('.'))
+            packages.push_back(entry.path());
+    std::sort(packages.begin(), packages.end());
+    for (const auto& package : packages) {
+        const auto targets = package / "ispatarget";
+        if (!fs::is_directory(targets, error)) continue;
+        std::vector<fs::path> directories;
+        for (const auto& entry : fs::directory_iterator(targets))
+            if (entry.is_directory()) directories.push_back(entry.path());
+        std::sort(directories.begin(), directories.end());
+        for (const auto& directory : directories)
+            if (auto found = readStdlib(directory); found.found && found.module == request) return found;
+    }
+    return {};
+}
+
 std::string pluginPrefix(const fs::path& executable_directory, const std::string& kind,
                          const std::string& name) {
 #ifdef _WIN32

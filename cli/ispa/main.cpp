@@ -880,9 +880,15 @@ int generate(Args args) {
     }
     if (!args.stdlib.empty()) {
         // --stdlib: link to a library with the ispastdlib interface under another namespace and include directory.
-        std::string library_namespace = args.stdlib_name.empty() ? "ISPA_CORE" : args.stdlib_name;
+        const auto library = InstalledLibraries::stdlib(
+            InstalledLibraries::root(std::filesystem::path(args.executable_dir) / "ispa"), args.stdlib);
+        if (!library.found)
+            std::cerr << "warning: --stdlib " << args.stdlib << " was not found (a directory, or a module installed with ispa-pkg);"
+                         " generating against the default namespace\n";
+        std::string library_namespace = args.stdlib_name.empty() ? library.ns : args.stdlib_name;
         std::string include_dir = library_namespace;
         std::ranges::transform(include_dir, include_dir.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (args.stdlib_name.empty() && !library.include.empty()) include_dir = library.include;
         const auto replace_all = [](std::string& text, const std::string& from, const std::string& to) {
             for (std::size_t at = text.find(from); at != std::string::npos; at = text.find(from, at + to.size()))
                 text.replace(at, from.size(), to);

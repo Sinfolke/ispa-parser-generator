@@ -1,4 +1,6 @@
 name: python-target
+requires:
+  - target-core
 layout:
   root: parser/stdlibs
   ispalib: {}

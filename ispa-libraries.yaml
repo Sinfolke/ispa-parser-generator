@@ -3,6 +3,10 @@ packages:
   std:
     github: Sinfolke/ispa-parser-generator
     ref: main
+  target-core:
+    github: Sinfolke/ispa-parser-generator
+    ref: main
+    manifest: ispa-package.target-core.yaml
   cpp-target:
     github: Sinfolke/ispa-parser-generator
     ref: main
@@ -11,3 +15,7 @@ packages:
     github: Sinfolke/ispa-parser-generator
     ref: main
     manifest: ispa-package.python-target.yaml
+  rust-target:
+    github: Sinfolke/ispa-parser-generator
+    ref: main
+    manifest: ispa-package.rust-target.yaml

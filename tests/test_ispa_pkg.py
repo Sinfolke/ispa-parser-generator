@@ -23,13 +23,18 @@ class PackageTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp, patch('ispa_pkg.cli.build_cpp_library'):
             root = Path(temp) / 'libraries'
             for name, manifest in (('std', 'ispa-package.yaml'),
+                                   ('target-core', 'ispa-package.target-core.yaml'),
                                    ('cpp-target', 'ispa-package.cpp-target.yaml'),
                                    ('python-target', 'ispa-package.python-target.yaml')):
                 install(name, {'path': str(repository), 'manifest': manifest}, root)
             self.assertTrue((root / 'std/ispalib/grammar').is_dir())
             self.assertTrue((root / 'std/ispalib/python').is_dir())
             self.assertFalse((root / 'std/ispatarget').exists())
+            self.assertTrue((root / 'target-core/ispalib/python/ispa_std/parser_ll.py').is_file())
+            self.assertFalse((root / 'target-core/ispatarget').exists())
             self.assertTrue((root / 'cpp-target/ispatarget/cpp/src/core.cpp').is_file())
+            self.assertTrue((root / 'cpp-target/ispatarget/cpp-core/ispa_core/parser_ll.hpp').is_file())
+            self.assertTrue((root / 'cpp-target/ispatarget/cpp-core/ispa-stdlib.yaml').is_file())
             self.assertFalse((root / 'cpp-target/ispalib').exists())
             self.assertTrue((root / 'python-target/ispatarget/ispa_std.py').is_file())
             self.assertTrue((root / 'python-target/ispatarget/python/parser.py').is_file())
@@ -185,6 +190,50 @@ class PackageTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             with patch.dict("os.environ", {"ISPA_PKG_ROOT": "", "ISPA_INSTALL_DIR": temp}):
                 self.assertEqual(default_root(), Path(temp) / "libraries")
+
+    def test_requires_installs_missing_packages_from_the_catalog(self):
+        repository = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as temp, patch('ispa_pkg.cli.build_cpp_library'):
+            root = Path(temp) / 'libraries'
+            catalog_file = Path(temp) / 'catalog.yaml'
+            catalog_file.write_text(
+                'packages:\n  target-core:\n    path: ' + json.dumps(str(repository)) +
+                '\n    manifest: ispa-package.target-core.yaml\n', encoding='utf-8')
+            install('python-target', {'path': str(repository), 'manifest': 'ispa-package.python-target.yaml'},
+                    root, catalog_path=catalog_file)
+            self.assertTrue((root / 'target-core/.ispa-package.json').is_file())
+            self.assertTrue((root / 'python-target/ispatarget/ispa_std.py').is_file())
+
+    def test_requires_reports_unknown_and_circular_packages(self):
+        with tempfile.TemporaryDirectory() as temp:
+            library = Path(temp) / 'library'
+            (library / 'ispalib/grammar').mkdir(parents=True)
+            (library / 'ispa-package.yaml').write_text('name: a\nrequires: [missing-package]\n', encoding='utf-8')
+            root = Path(temp) / 'libraries'
+            with self.assertRaisesRegex(PackageError, 'missing-package'):
+                install('a', {'path': str(library)}, root)
+            (library / 'ispa-package.yaml').write_text('name: a\nrequires: [a]\n', encoding='utf-8')
+            with self.assertRaisesRegex(PackageError, 'circular'):
+                install('a', {'path': str(library)}, root)
+            (library / 'ispa-package.yaml').write_text('name: a\nrequires: 3\n', encoding='utf-8')
+            with self.assertRaisesRegex(PackageError, 'requires must be'):
+                install('a', {'path': str(library)}, root)
+
+    def test_cpp_core_is_exported_for_includes_and_libraries_but_not_as_sources(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'libraries'
+            core = root / 'cpp-target/ispatarget/cpp-core'
+            (core / 'ispa_core').mkdir(parents=True)
+            (core / 'src').mkdir()
+            (core / 'src/lowered.cpp').write_text('int lowered;\n')
+            (core / 'lib').mkdir()
+            (core / 'lib/libcpp-target-core.a').write_bytes(b'!<arch>\n')
+            (root / 'cpp-target/.ispa-package.json').write_text('{}')
+            output, manifest = write_export_files(root)
+            self.assertIn(str(core.resolve()), manifest['cpp']['include_dirs'])
+            self.assertTrue(any(path.endswith('libcpp-target-core.a') for path in manifest['cpp']['libraries']))
+            self.assertFalse(any(path.endswith('lowered.cpp') for path in manifest['cpp']['sources']))
+            self.assertIn('ISPA_TARGET_CPP_CORE_DIRS', export_variables(root, output, manifest))
 
     def test_local_layout_and_revision(self):
         with tempfile.TemporaryDirectory() as temp:

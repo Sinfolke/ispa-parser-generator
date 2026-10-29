@@ -1,6 +1,10 @@
 name: cpp-target
+requires:
+  - target-core
 layout:
   root: parser/stdlibs
   ispalib: {}
   ispatarget:
     cpp: target/cpp
+    # `--stdlib core`: the core lowered to C++ plus its facade. Built best effort (C++23).
+    cpp-core: target/cpp-core

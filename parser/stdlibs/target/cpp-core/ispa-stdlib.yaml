@@ -1,0 +1,3 @@
+module: core
+namespace: ISPA_CORE
+include: ispa_core
