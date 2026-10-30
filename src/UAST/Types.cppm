@@ -38,7 +38,6 @@ struct PythonNode {
 };
 
 using __WS = ::Parser::Types::__WS;
-using advanced_rule_dep_decl_DEPENDS = ::Parser::Types::modules::rule::advanced::advanced_rule::dep_decl::DEPENDS;
 using FAIL = ::Parser::Types::modules::fail_block::fail_block::FAIL;
 using SEMICOLON = ::Parser::Types::SEMICOLON;
 using COLON = ::Parser::Types::COLON;
@@ -83,7 +82,6 @@ using expr = ::Parser::Types::modules::ispa_python::expr;
 using stmt = ::Parser::Types::modules::ispa_python::stmt;
 using rule_value_shared_counter_registration = ::Parser::Types::modules::rule::regular::value::shared_counter_registration;
 using advanced_rule_regular_match_unpack = ::Parser::Types::modules::rule::advanced::advanced_rule::regular_match::unpack;
-using forward_declaration = ::Parser::Types::modules::forward_declaration::fwd;
 using param = ::Parser::Types::modules::common::param;
 using rule_ast_abbr = ::Parser::Types::modules::rule::regular::ast::abbr;
 using rule_f_binding = ::Parser::Types::modules::rule::regular::f_binding;
@@ -94,7 +92,6 @@ using rule_ast_single_value = ::Parser::Types::modules::rule::regular::ast::sing
 using rule_value_counter_bounded = ::Parser::Types::modules::rule::regular::value::counter::bounded;
 using rule_value_dyn_dyn_expr = ::Parser::Types::modules::rule::regular::value::dyn::dyn_expr;
 using advanced_rule_regular_match = ::Parser::Types::modules::rule::advanced::advanced_rule::regular_match;
-using advanced_rule_dep_decl = ::Parser::Types::modules::rule::advanced::advanced_rule::dep_decl;
 using template_params = ::Parser::Types::modules::common::template_params;
 using call_params = ::Parser::Types::modules::common::call_params;
 using rule_params = ::Parser::Types::modules::common::rule_params;

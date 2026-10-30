@@ -103,7 +103,7 @@ namespace {
             std::fill(styles.begin() + begin, styles.begin() + end, style);
         };
         constexpr std::string_view ispaKeywords =
-            " module import from as detach feature fail depends match inline skip extern global auto ";
+            " module import from as detach feature fail match inline skip extern global auto ";
         constexpr std::string_view pythonKeywords =
             " False None True and as assert async await break class continue def del elif else except "
             " finally for from global if import in is lambda nonlocal not or pass raise return try while with yield ";

@@ -52,7 +52,7 @@ class IspaLexer : LexerBase() {
     private var state = 0
     private var nextState = 0
     private var token: IElementType? = null
-    private val keywords = setOf("module", "import", "from", "as", "detach", "feature", "fail", "depends", "match", "inline", "skip", "extern", "global", "auto")
+    private val keywords = setOf("module", "import", "from", "as", "detach", "feature", "fail", "match", "inline", "skip", "extern", "global", "auto")
     private val pythonKeywords = setOf("False", "None", "True", "and", "as", "assert", "async", "await", "break", "class", "continue", "def", "del", "elif", "else", "except", "finally", "for", "from", "global", "if", "import", "in", "is", "lambda", "match", "nonlocal", "not", "or", "pass", "raise", "return", "try", "while", "with", "yield")
     private val pythonBuiltins = setOf("abs", "all", "any", "bool", "dict", "enumerate", "filter", "float", "int", "isinstance", "len", "list", "map", "max", "min", "object", "open", "print", "range", "reversed", "set", "sorted", "str", "sum", "super", "tuple", "type", "zip")
 

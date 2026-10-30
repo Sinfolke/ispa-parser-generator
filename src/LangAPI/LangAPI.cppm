@@ -1306,6 +1306,8 @@ export namespace LangAPI {
         bool is_static = false;
         bool is_const = false;
         bool is_wrap_function = false;
+        // Declared only: the target language supplies the implementation (`raise NotImplementedError` stub in Python).
+        bool is_native = false;
         friend bool operator==(const Function &a, const Function &b);
         bool operator!=(const Function& other) const {
             return !(*this == other);

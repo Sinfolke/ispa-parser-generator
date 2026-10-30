@@ -82,6 +82,20 @@ std::string decodedString(std::string_view source, const UAST::SourcePosition& p
     }
     return result;
 }
+// A function whose whole body is `raise NotImplementedError` (after an optional docstring) is a declaration
+// whose implementation the target language supplies.
+bool nativeStub(const py::FunctionDef& function) {
+    std::size_t first = 0;
+    if (!function.body.empty() && function.body.front()) if (auto doc = function.body.front()->get<py::ExprStmt>();
+        doc && doc->value) if (auto text = doc->value->get<py::Constant>(); text && text->kind == py::ConstantKind::Str) first = 1;
+    if (function.body.size() != first + 1 || !function.body[first]) return false;
+    auto raise = function.body[first]->get<py::Raise>();
+    if (!raise || !raise->exc || raise->cause) return false;
+    auto exc = raise->exc;
+    if (auto call = exc->get<py::Call>(); call && call->func) exc = call->func;
+    auto name = exc->get<py::Name>();
+    return name && name->id == "NotImplementedError";
+}
 struct PythonConverter {
     std::set<std::string> locals;
     bool action_context = false, failure_context = false;
@@ -1532,6 +1546,11 @@ struct PythonConverter {
                 scope.local_types.insert_or_assign(p.name, type(p.annotation));
                 if (auto annotation = p.annotation ? p.annotation->template get<py::Name>() : nullptr;
                     annotation && class_names.contains(annotation->id)) scope.objects.insert(p.name);
+            }
+            if (nativeStub(*f)) {
+                // Declared in plain Python, implemented in the target language.
+                out.is_native = true;
+                return la::Declaration{out};
             }
             scope.function_body = &f->body;
             scope.return_type = out.type;

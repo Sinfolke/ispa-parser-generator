@@ -20,7 +20,7 @@ call_params:
     {@}
 ;
 rule_params:
-    '(' @ param? ')'
+    '&(' @ param? ')'
     {@}
 ;
 template_params:

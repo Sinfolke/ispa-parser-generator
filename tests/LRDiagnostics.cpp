@@ -383,7 +383,7 @@ TEST(LRResolution, ConflictFreeGrammarNeedsNoFallback) {
     EXPECT_EQ(parser.getDecisionLookaheadK(), 1u);
 }
 TEST(LRResolution, ResolvesBootstrapOrdinaryAndMultipleCaptures) {
-    const auto project = Modules::preprocess({std::string(ROOT_DIR) + "/parser/ispa/grammar"});
+    const auto project = Modules::preprocess({std::string(ROOT_DIR) + "/parser/ispa/grammar"}, {std::string(ROOT_DIR) + "/parser/ispa/entry.isc"});
     UAST::main syntax;
     std::vector<std::string> files;
     for (const auto& source : project.sources) {

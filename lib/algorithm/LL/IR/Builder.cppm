@@ -19,7 +19,8 @@ using namespace ParserIR;
         Builder(
             AST::Tree &tree,
             const AST::TreeMap &rules_to_build,
-            const std::unordered_map<std::string, Production> &cache
+            const std::unordered_map<std::string, Production> &cache,
+            const std::function<void(std::size_t, std::size_t)>& progress = {}
         );
         auto get() -> IR;
         auto getRawData() -> stdu::vector<Production>&;

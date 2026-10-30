@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Native bindings
+
+- **Native declarations in plain Python** — In a Python file brought in with `import py`, a function or method whose whole body is `raise NotImplementedError` (after an optional docstring) is a declaration only. The C++ target emits a prototype and expects you to define it; the Python target emits a stub that raises until the host assigns an implementation; the Rust target rejects it. See `docs/native-bindings.md`.
+- **`depends` removed** — The `depends` keyword and `forward_declaration` grammar were never consumed by the generator. `import py` is the only link between grammar Python code and declarations. Regenerate the bootstrapped parser (`parser/ispa/bootstrapped`) after pulling.
+
 ### Lexer
 
 - **Dynamic pattern matching** — Lexer tokens can now use dynamic patterns whose structure depends on previously captured values or parser state.

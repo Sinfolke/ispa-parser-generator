@@ -7,7 +7,7 @@ import LangRepr.Holder;
 import std;
 
 export namespace Algorithm {
-    inline constexpr std::uint32_t interface_version = 1;
+    inline constexpr std::uint32_t interface_version = 2;
 
     // Binary contents belong to the algorithm. Removing a key removes its file.
     struct Metadata {
@@ -18,6 +18,7 @@ export namespace Algorithm {
         const AST::TreeMap& changed_rules;
         bool auto_conflicts = true;
         std::size_t conflict_lookahead = 3;
+        std::function<void(std::size_t, std::size_t)> progress;
     };
     struct ConversionRequest {
         LexerBuilder& lexer;

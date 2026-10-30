@@ -439,7 +439,10 @@ void Construct::function(const LangAPI::Function& fn, bool ctor) {
         // __init__ never shares mutable default arrays or dictionaries between instances.
         // This prelude is emitted by cls(), not here.
     }
-    if (!body.empty()) {
+    if (fn.is_native) {
+        line("raise NotImplementedError");
+        emitted = true;
+    } else if (!body.empty()) {
         statements(body);
         emitted = true;
     }

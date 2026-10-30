@@ -23,7 +23,7 @@ namespace DepParser {
 namespace DepParser {
 	namespace Tokens {
 		namespace AUTO {
-			inline const std::size_t id = 7862372092536021278;
+			inline const std::size_t id = 8914139521465690601;
 		} // namespace AUTO
 	} // namespace Tokens
 } // namespace DepParser
@@ -32,6 +32,20 @@ namespace DepParser {
 		namespace AUTO {
 			inline const bool shared = true;
 		} // namespace AUTO
+	} // namespace Tokens
+} // namespace DepParser
+namespace DepParser {
+	namespace Tokens {
+		namespace AUTO_1 {
+			inline const std::size_t id = 8330377280213596342;
+		} // namespace AUTO_1
+	} // namespace Tokens
+} // namespace DepParser
+namespace DepParser {
+	namespace Tokens {
+		namespace AUTO_1 {
+			inline const bool shared = true;
+		} // namespace AUTO_1
 	} // namespace Tokens
 } // namespace DepParser
 namespace DepParser {
@@ -116,20 +130,6 @@ namespace DepParser {
 		namespace LEFT_CURLY_BRACKET {
 			inline const bool shared = true;
 		} // namespace LEFT_CURLY_BRACKET
-	} // namespace Tokens
-} // namespace DepParser
-namespace DepParser {
-	namespace Tokens {
-		namespace LEFT_PARENTHESIS {
-			inline const std::size_t id = 5180355382148188944;
-		} // namespace LEFT_PARENTHESIS
-	} // namespace Tokens
-} // namespace DepParser
-namespace DepParser {
-	namespace Tokens {
-		namespace LEFT_PARENTHESIS {
-			inline const bool shared = true;
-		} // namespace LEFT_PARENTHESIS
 	} // namespace Tokens
 } // namespace DepParser
 namespace DepParser {
@@ -765,32 +765,6 @@ namespace DepParser {
 		namespace modules {
 			namespace ispa_dep_scanner {
 				namespace parentheses {
-					namespace AUTO {
-						inline const std::size_t id = 8914139521465690601;
-					} // namespace AUTO
-				} // namespace parentheses
-			} // namespace ispa_dep_scanner
-		} // namespace modules
-	} // namespace Tokens
-} // namespace DepParser
-namespace DepParser {
-	namespace Tokens {
-		namespace modules {
-			namespace ispa_dep_scanner {
-				namespace parentheses {
-					namespace AUTO {
-						inline const bool shared = true;
-					} // namespace AUTO
-				} // namespace parentheses
-			} // namespace ispa_dep_scanner
-		} // namespace modules
-	} // namespace Tokens
-} // namespace DepParser
-namespace DepParser {
-	namespace Tokens {
-		namespace modules {
-			namespace ispa_dep_scanner {
-				namespace parentheses {
 					namespace AUTO_1 {
 						inline const std::size_t id = 946664331031053705;
 					} // namespace AUTO_1
@@ -807,6 +781,32 @@ namespace DepParser {
 					namespace AUTO_1 {
 						inline const bool shared = true;
 					} // namespace AUTO_1
+				} // namespace parentheses
+			} // namespace ispa_dep_scanner
+		} // namespace modules
+	} // namespace Tokens
+} // namespace DepParser
+namespace DepParser {
+	namespace Tokens {
+		namespace modules {
+			namespace ispa_dep_scanner {
+				namespace parentheses {
+					namespace LEFT_PARENTHESIS {
+						inline const std::size_t id = 5180355382148188944;
+					} // namespace LEFT_PARENTHESIS
+				} // namespace parentheses
+			} // namespace ispa_dep_scanner
+		} // namespace modules
+	} // namespace Tokens
+} // namespace DepParser
+namespace DepParser {
+	namespace Tokens {
+		namespace modules {
+			namespace ispa_dep_scanner {
+				namespace parentheses {
+					namespace LEFT_PARENTHESIS {
+						inline const bool shared = true;
+					} // namespace LEFT_PARENTHESIS
 				} // namespace parentheses
 			} // namespace ispa_dep_scanner
 		} // namespace modules
@@ -934,6 +934,13 @@ namespace DepParser {
 } // namespace DepParser
 namespace DepParser {
 	namespace TokensStr {
+		namespace AUTO_1 {
+			inline const char* const id = "AUTO_1";
+		} // namespace AUTO_1
+	} // namespace TokensStr
+} // namespace DepParser
+namespace DepParser {
+	namespace TokensStr {
 		namespace COLON {
 			inline const char* const id = "COLON";
 		} // namespace COLON
@@ -972,13 +979,6 @@ namespace DepParser {
 		namespace LEFT_CURLY_BRACKET {
 			inline const char* const id = "LEFT_CURLY_BRACKET";
 		} // namespace LEFT_CURLY_BRACKET
-	} // namespace TokensStr
-} // namespace DepParser
-namespace DepParser {
-	namespace TokensStr {
-		namespace LEFT_PARENTHESIS {
-			inline const char* const id = "LEFT_PARENTHESIS";
-		} // namespace LEFT_PARENTHESIS
 	} // namespace TokensStr
 } // namespace DepParser
 namespace DepParser {
@@ -1300,9 +1300,9 @@ namespace DepParser {
 		namespace modules {
 			namespace ispa_dep_scanner {
 				namespace parentheses {
-					namespace AUTO {
-						inline const char* const id = "modules.ispa_dep_scanner.parentheses.AUTO";
-					} // namespace AUTO
+					namespace AUTO_1 {
+						inline const char* const id = "modules.ispa_dep_scanner.parentheses.AUTO_1";
+					} // namespace AUTO_1
 				} // namespace parentheses
 			} // namespace ispa_dep_scanner
 		} // namespace modules
@@ -1313,9 +1313,9 @@ namespace DepParser {
 		namespace modules {
 			namespace ispa_dep_scanner {
 				namespace parentheses {
-					namespace AUTO_1 {
-						inline const char* const id = "modules.ispa_dep_scanner.parentheses.AUTO_1";
-					} // namespace AUTO_1
+					namespace LEFT_PARENTHESIS {
+						inline const char* const id = "modules.ispa_dep_scanner.parentheses.LEFT_PARENTHESIS";
+					} // namespace LEFT_PARENTHESIS
 				} // namespace parentheses
 			} // namespace ispa_dep_scanner
 		} // namespace modules
@@ -2320,25 +2320,25 @@ namespace DepParser::FlatTypes { struct modules_ispa_dep_scanner_mod_import_impo
 namespace DepParser::FlatTypes { struct modules_ispa_dep_scanner_mod_import_import_value_from_import; }
 namespace DepParser::FlatTypes { struct modules_ispa_dep_scanner_parentheses_AUTO_1; }
 namespace DepParser::FlatTypes { struct modules_ispa_dep_scanner_parentheses; }
-namespace DepParser::FlatTypes { struct modules_ispa_dep_scanner_parentheses_AUTO; }
+namespace DepParser::FlatTypes { struct AUTO; }
 namespace DepParser::FlatTypes { struct RIGHT_CURLY_BRACKET; }
 namespace DepParser::FlatTypes { struct modules_ispa_dep_scanner_fail_decl_FAIL; }
 namespace DepParser::FlatTypes { struct modules_ispa_dep_scanner_fail_decl; }
 namespace DepParser::FlatTypes { struct LEFT_CURLY_BRACKET; }
 namespace DepParser::FlatTypes { struct FULL_STOP; }
-namespace DepParser::FlatTypes { struct AUTO; }
 namespace DepParser::FlatTypes { struct modules_scanner_tokens_OTHER; }
 namespace DepParser::FlatTypes { struct modules_scanner_tokens; }
 namespace DepParser::FlatTypes { struct GREATER_THAN_SIGN; }
+namespace DepParser::FlatTypes { struct modules_ispa_dep_scanner_parentheses_LEFT_PARENTHESIS; }
 namespace DepParser::FlatTypes { struct LESS_THAN_SIGN; }
 namespace DepParser::FlatTypes { struct RIGHT_PARENTHESIS; }
-namespace DepParser::FlatTypes { struct LEFT_PARENTHESIS; }
 namespace DepParser::FlatTypes { struct modules_common_NUMBER; }
 namespace DepParser::FlatTypes { struct modules_common; }
 namespace DepParser::FlatTypes { struct COMMA; }
 namespace DepParser::FlatTypes { struct modules_scanner_tokens_STRING; }
 namespace DepParser::FlatTypes { struct FEATURE; }
 namespace DepParser::FlatTypes { struct SEMICOLON; }
+namespace DepParser::FlatTypes { struct AUTO_1; }
 namespace DepParser::FlatTypes { struct modules_scanner_tokens_COMMENT; }
 namespace DepParser::FlatTypes { struct ASTERISK; }
 namespace DepParser::FlatTypes { struct modules_ispa_dep_scanner_mod_import_external_import_EXTERN; }
@@ -2721,7 +2721,7 @@ namespace DepParser {
 	namespace FlatTypes {
 		struct modules_ispa_dep_scanner_parentheses {
 			using AUTO_1 = ::DepParser::FlatTypes::modules_ispa_dep_scanner_parentheses_AUTO_1;
-			using AUTO = ::DepParser::FlatTypes::modules_ispa_dep_scanner_parentheses_AUTO;
+			using LEFT_PARENTHESIS = ::DepParser::FlatTypes::modules_ispa_dep_scanner_parentheses_LEFT_PARENTHESIS;
 			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
@@ -2751,12 +2751,12 @@ namespace DepParser {
 } // namespace DepParser
 namespace DepParser {
 	namespace FlatTypes {
-		auto operator<<(std::ostream & os, modules_ispa_dep_scanner_parentheses_AUTO value) -> std::ostream &;
+		auto operator<<(std::ostream & os, AUTO value) -> std::ostream &;
 	} // namespace FlatTypes
 } // namespace DepParser
 namespace DepParser {
 	namespace FlatTypes {
-		struct modules_ispa_dep_scanner_parentheses_AUTO {
+		struct AUTO {
 			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
 			auto print(std::ostream& os) const -> void;
 			auto to_string() const -> std::string;
@@ -2770,17 +2770,17 @@ namespace DepParser {
 				return std::array<std::string_view, 0>{{}};
 			}
 			constexpr auto methods() {
-				return std::make_tuple(&modules_ispa_dep_scanner_parentheses_AUTO::write_to_output, &modules_ispa_dep_scanner_parentheses_AUTO::print);
+				return std::make_tuple(&AUTO::write_to_output, &AUTO::print);
 			}
 			constexpr auto methods() const {
-				return std::make_tuple(&modules_ispa_dep_scanner_parentheses_AUTO::write_to_output, &modules_ispa_dep_scanner_parentheses_AUTO::print);
+				return std::make_tuple(&AUTO::write_to_output, &AUTO::print);
 			}
 			static constexpr auto methods_str() {
 				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
 			}
 		};
-		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_parentheses_AUTO&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_parentheses_AUTO"; }
-		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_parentheses_AUTO& value, F&& field) {
+		inline std::string_view ispa_debug_type(const AUTO&) { return "DepParser.FlatTypes.AUTO"; }
+		template<class F> void ispa_debug_fields(const AUTO& value, F&& field) {
 		}
 	} // namespace FlatTypes
 } // namespace DepParser
@@ -2962,41 +2962,6 @@ namespace DepParser {
 } // namespace DepParser
 namespace DepParser {
 	namespace FlatTypes {
-		auto operator<<(std::ostream & os, AUTO value) -> std::ostream &;
-	} // namespace FlatTypes
-} // namespace DepParser
-namespace DepParser {
-	namespace FlatTypes {
-		struct AUTO {
-			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
-			auto print(std::ostream& os) const -> void;
-			auto to_string() const -> std::string;
-			constexpr auto members() {
-				return std::tie();
-			}
-			constexpr auto members() const {
-				return std::tie();
-			}
-			static constexpr auto members_str() {
-				return std::array<std::string_view, 0>{{}};
-			}
-			constexpr auto methods() {
-				return std::make_tuple(&AUTO::write_to_output, &AUTO::print);
-			}
-			constexpr auto methods() const {
-				return std::make_tuple(&AUTO::write_to_output, &AUTO::print);
-			}
-			static constexpr auto methods_str() {
-				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
-			}
-		};
-		inline std::string_view ispa_debug_type(const AUTO&) { return "DepParser.FlatTypes.AUTO"; }
-		template<class F> void ispa_debug_fields(const AUTO& value, F&& field) {
-		}
-	} // namespace FlatTypes
-} // namespace DepParser
-namespace DepParser {
-	namespace FlatTypes {
 		auto operator<<(std::ostream & os, modules_scanner_tokens_OTHER value) -> std::ostream &;
 	} // namespace FlatTypes
 } // namespace DepParser
@@ -3108,6 +3073,41 @@ namespace DepParser {
 } // namespace DepParser
 namespace DepParser {
 	namespace FlatTypes {
+		auto operator<<(std::ostream & os, modules_ispa_dep_scanner_parentheses_LEFT_PARENTHESIS value) -> std::ostream &;
+	} // namespace FlatTypes
+} // namespace DepParser
+namespace DepParser {
+	namespace FlatTypes {
+		struct modules_ispa_dep_scanner_parentheses_LEFT_PARENTHESIS {
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
+			auto print(std::ostream& os) const -> void;
+			auto to_string() const -> std::string;
+			constexpr auto members() {
+				return std::tie();
+			}
+			constexpr auto members() const {
+				return std::tie();
+			}
+			static constexpr auto members_str() {
+				return std::array<std::string_view, 0>{{}};
+			}
+			constexpr auto methods() {
+				return std::make_tuple(&modules_ispa_dep_scanner_parentheses_LEFT_PARENTHESIS::write_to_output, &modules_ispa_dep_scanner_parentheses_LEFT_PARENTHESIS::print);
+			}
+			constexpr auto methods() const {
+				return std::make_tuple(&modules_ispa_dep_scanner_parentheses_LEFT_PARENTHESIS::write_to_output, &modules_ispa_dep_scanner_parentheses_LEFT_PARENTHESIS::print);
+			}
+			static constexpr auto methods_str() {
+				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
+			}
+		};
+		inline std::string_view ispa_debug_type(const modules_ispa_dep_scanner_parentheses_LEFT_PARENTHESIS&) { return "DepParser.FlatTypes.modules_ispa_dep_scanner_parentheses_LEFT_PARENTHESIS"; }
+		template<class F> void ispa_debug_fields(const modules_ispa_dep_scanner_parentheses_LEFT_PARENTHESIS& value, F&& field) {
+		}
+	} // namespace FlatTypes
+} // namespace DepParser
+namespace DepParser {
+	namespace FlatTypes {
 		auto operator<<(std::ostream & os, LESS_THAN_SIGN value) -> std::ostream &;
 	} // namespace FlatTypes
 } // namespace DepParser
@@ -3173,41 +3173,6 @@ namespace DepParser {
 		};
 		inline std::string_view ispa_debug_type(const RIGHT_PARENTHESIS&) { return "DepParser.FlatTypes.RIGHT_PARENTHESIS"; }
 		template<class F> void ispa_debug_fields(const RIGHT_PARENTHESIS& value, F&& field) {
-		}
-	} // namespace FlatTypes
-} // namespace DepParser
-namespace DepParser {
-	namespace FlatTypes {
-		auto operator<<(std::ostream & os, LEFT_PARENTHESIS value) -> std::ostream &;
-	} // namespace FlatTypes
-} // namespace DepParser
-namespace DepParser {
-	namespace FlatTypes {
-		struct LEFT_PARENTHESIS {
-			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
-			auto print(std::ostream& os) const -> void;
-			auto to_string() const -> std::string;
-			constexpr auto members() {
-				return std::tie();
-			}
-			constexpr auto members() const {
-				return std::tie();
-			}
-			static constexpr auto members_str() {
-				return std::array<std::string_view, 0>{{}};
-			}
-			constexpr auto methods() {
-				return std::make_tuple(&LEFT_PARENTHESIS::write_to_output, &LEFT_PARENTHESIS::print);
-			}
-			constexpr auto methods() const {
-				return std::make_tuple(&LEFT_PARENTHESIS::write_to_output, &LEFT_PARENTHESIS::print);
-			}
-			static constexpr auto methods_str() {
-				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
-			}
-		};
-		inline std::string_view ispa_debug_type(const LEFT_PARENTHESIS&) { return "DepParser.FlatTypes.LEFT_PARENTHESIS"; }
-		template<class F> void ispa_debug_fields(const LEFT_PARENTHESIS& value, F&& field) {
 		}
 	} // namespace FlatTypes
 } // namespace DepParser
@@ -3434,6 +3399,41 @@ namespace DepParser {
 		};
 		inline std::string_view ispa_debug_type(const SEMICOLON&) { return "DepParser.FlatTypes.SEMICOLON"; }
 		template<class F> void ispa_debug_fields(const SEMICOLON& value, F&& field) {
+		}
+	} // namespace FlatTypes
+} // namespace DepParser
+namespace DepParser {
+	namespace FlatTypes {
+		auto operator<<(std::ostream & os, AUTO_1 value) -> std::ostream &;
+	} // namespace FlatTypes
+} // namespace DepParser
+namespace DepParser {
+	namespace FlatTypes {
+		struct AUTO_1 {
+			auto write_to_output(::ISPA_CORE::ASTPrinter<std::ostream>& printer) const -> void;
+			auto print(std::ostream& os) const -> void;
+			auto to_string() const -> std::string;
+			constexpr auto members() {
+				return std::tie();
+			}
+			constexpr auto members() const {
+				return std::tie();
+			}
+			static constexpr auto members_str() {
+				return std::array<std::string_view, 0>{{}};
+			}
+			constexpr auto methods() {
+				return std::make_tuple(&AUTO_1::write_to_output, &AUTO_1::print);
+			}
+			constexpr auto methods() const {
+				return std::make_tuple(&AUTO_1::write_to_output, &AUTO_1::print);
+			}
+			static constexpr auto methods_str() {
+				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
+			}
+		};
+		inline std::string_view ispa_debug_type(const AUTO_1&) { return "DepParser.FlatTypes.AUTO_1"; }
+		template<class F> void ispa_debug_fields(const AUTO_1& value, F&& field) {
 		}
 	} // namespace FlatTypes
 } // namespace DepParser
@@ -5103,6 +5103,11 @@ namespace DepParser {
 } // namespace DepParser
 namespace DepParser {
 	namespace Types {
+		using AUTO = ::DepParser::FlatTypes::AUTO;
+	} // namespace Types
+} // namespace DepParser
+namespace DepParser {
+	namespace Types {
 		using RIGHT_CURLY_BRACKET = ::DepParser::FlatTypes::RIGHT_CURLY_BRACKET;
 	} // namespace Types
 } // namespace DepParser
@@ -5114,11 +5119,6 @@ namespace DepParser {
 namespace DepParser {
 	namespace Types {
 		using FULL_STOP = ::DepParser::FlatTypes::FULL_STOP;
-	} // namespace Types
-} // namespace DepParser
-namespace DepParser {
-	namespace Types {
-		using AUTO = ::DepParser::FlatTypes::AUTO;
 	} // namespace Types
 } // namespace DepParser
 namespace DepParser {
@@ -5138,11 +5138,6 @@ namespace DepParser {
 } // namespace DepParser
 namespace DepParser {
 	namespace Types {
-		using LEFT_PARENTHESIS = ::DepParser::FlatTypes::LEFT_PARENTHESIS;
-	} // namespace Types
-} // namespace DepParser
-namespace DepParser {
-	namespace Types {
 		using COMMA = ::DepParser::FlatTypes::COMMA;
 	} // namespace Types
 } // namespace DepParser
@@ -5154,6 +5149,11 @@ namespace DepParser {
 namespace DepParser {
 	namespace Types {
 		using SEMICOLON = ::DepParser::FlatTypes::SEMICOLON;
+	} // namespace Types
+} // namespace DepParser
+namespace DepParser {
+	namespace Types {
+		using AUTO_1 = ::DepParser::FlatTypes::AUTO_1;
 	} // namespace Types
 } // namespace DepParser
 namespace DepParser {
@@ -5177,7 +5177,7 @@ namespace DepParser {
 	} // namespace Types
 } // namespace DepParser
 namespace DepParser {
-	using Token = ::ISPA_CORE::RawToken<Types::__WS, Types::modules::ispa_dep_scanner::mod_module::MODULE, Types::modules::ispa_dep_scanner::mod_detach::DETACH, Types::modules::ispa_dep_scanner::mod_import::IMPORT, Types::modules::ispa_dep_scanner::mod_import::import_value::module_import::AS, Types::modules::ispa_dep_scanner::mod_import::import_value::from_import::FROM, Types::modules::ispa_dep_scanner::parentheses::AUTO_1, Types::modules::ispa_dep_scanner::parentheses::AUTO, Types::RIGHT_CURLY_BRACKET, Types::modules::ispa_dep_scanner::fail_decl::FAIL, Types::LEFT_CURLY_BRACKET, Types::FULL_STOP, Types::AUTO, Types::modules::scanner_tokens::OTHER, Types::GREATER_THAN_SIGN, Types::LESS_THAN_SIGN, Types::RIGHT_PARENTHESIS, Types::LEFT_PARENTHESIS, Types::modules::common::NUMBER, Types::COMMA, Types::modules::scanner_tokens::STRING, Types::FEATURE, Types::SEMICOLON, Types::modules::scanner_tokens::COMMENT, Types::ASTERISK, Types::modules::ispa_dep_scanner::mod_import::external_import::EXTERN, Types::modules::scanner_tokens::CGROUP, Types::modules::ispa_dep_scanner::mod_import::PY, Types::COLON, Types::NUMBER_SIGN, Types::modules::common::ID>;
+	using Token = ::ISPA_CORE::RawToken<Types::__WS, Types::modules::ispa_dep_scanner::mod_module::MODULE, Types::modules::ispa_dep_scanner::mod_detach::DETACH, Types::modules::ispa_dep_scanner::mod_import::IMPORT, Types::modules::ispa_dep_scanner::mod_import::import_value::module_import::AS, Types::modules::ispa_dep_scanner::mod_import::import_value::from_import::FROM, Types::modules::ispa_dep_scanner::parentheses::AUTO_1, Types::AUTO, Types::RIGHT_CURLY_BRACKET, Types::modules::ispa_dep_scanner::fail_decl::FAIL, Types::LEFT_CURLY_BRACKET, Types::FULL_STOP, Types::modules::scanner_tokens::OTHER, Types::GREATER_THAN_SIGN, Types::modules::ispa_dep_scanner::parentheses::LEFT_PARENTHESIS, Types::LESS_THAN_SIGN, Types::RIGHT_PARENTHESIS, Types::modules::common::NUMBER, Types::COMMA, Types::modules::scanner_tokens::STRING, Types::FEATURE, Types::SEMICOLON, Types::AUTO_1, Types::modules::scanner_tokens::COMMENT, Types::ASTERISK, Types::modules::ispa_dep_scanner::mod_import::external_import::EXTERN, Types::modules::scanner_tokens::CGROUP, Types::modules::ispa_dep_scanner::mod_import::PY, Types::COLON, Types::NUMBER_SIGN, Types::modules::common::ID>;
 } // namespace DepParser
 namespace DepParser {
 	class Lexer : public ::ISPA_CORE::Lexer_base<Token> {
@@ -5307,24 +5307,24 @@ template<typename params, typename IT, class> auto DepParser::Parser::modulesCom
 		if (unwinding()) {
 			return action_result(result, pos);
 		}
-		recovery_at<::ISPA_CORE::Recovery::Tokens<Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::FULL_STOP::id, Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::COMMA::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LESS_THAN_SIGN::id, Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("modules::common::ID", "modules::common::ID", "__WS", "<group>", "__WS", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
-		value_modules_common_ID = required<Types::modules::common::ID>(pos, ::ISPA_CORE::Recovery::handler<::ISPA_CORE::Recovery::Tokens<Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::LEFT_PARENTHESIS::id, Tokens::LESS_THAN_SIGN::id, Tokens::RIGHT_CURLY_BRACKET::id, Tokens::SEMICOLON::id>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::RIGHT_CURLY_BRACKET::id, Tokens::SEMICOLON::id>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LEFT_PARENTHESIS::id, Tokens::LESS_THAN_SIGN::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Policy<true, true, true, 32>>("modules::common::name", "modules::common::ID"));
+		recovery_at<::ISPA_CORE::Recovery::Tokens<Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::FULL_STOP::id, Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::COMMA::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LESS_THAN_SIGN::id, Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::AUTO::id, Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("modules::common::ID", "modules::common::ID", "__WS", "<group>", "__WS", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
+		value_modules_common_ID = required<Types::modules::common::ID>(pos, ::ISPA_CORE::Recovery::handler<::ISPA_CORE::Recovery::Tokens<Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Tokens<Tokens::AUTO::id, Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::LESS_THAN_SIGN::id, Tokens::RIGHT_CURLY_BRACKET::id, Tokens::SEMICOLON::id>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::RIGHT_CURLY_BRACKET::id, Tokens::SEMICOLON::id>, ::ISPA_CORE::Recovery::Tokens<Tokens::AUTO::id, Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LESS_THAN_SIGN::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Policy<true, true, true, 32>>("modules::common::name", "modules::common::ID"));
 		::ISPA_CORE::assign_compatible(result.primary, value_modules_common_ID);
 		if (::ispa::debug::enabled()) ::ispa::debug::value("result", result, ::ispa::debug::active_location());
 		if (unwinding()) {
 			return action_result(result, pos);
 		}
-		recovery_at<::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::FULL_STOP::id, Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::COMMA::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LESS_THAN_SIGN::id, Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("__WS", "__WS", "<group>", "__WS", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
+		recovery_at<::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::FULL_STOP::id, Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::COMMA::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LESS_THAN_SIGN::id, Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::AUTO::id, Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("__WS", "__WS", "<group>", "__WS", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
 		skip_spaces<Types::__WS>(pos);
 		if (unwinding()) {
 			return action_result(result, pos);
 		}
-		recovery_at<::ISPA_CORE::Recovery::Tokens<Tokens::FULL_STOP::id, Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::COMMA::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LESS_THAN_SIGN::id, Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("<group>", "<group>", "__WS", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
+		recovery_at<::ISPA_CORE::Recovery::Tokens<Tokens::FULL_STOP::id, Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::COMMA::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LESS_THAN_SIGN::id, Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::AUTO::id, Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("<group>", "<group>", "__WS", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
 		// grammar ` ( FULL_STOP  __WS?; @  modules::common::ID)*;`: repeat while lookahead is in FIRST
 		while ((::ISPA_CORE::lookahead_kind(pos) == Tokens::FULL_STOP::id)) {
-			value_FULL_STOP = required<Types::FULL_STOP>(pos, ::ISPA_CORE::Recovery::handler<::ISPA_CORE::Recovery::Tokens<Tokens::FULL_STOP::id>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::LEFT_PARENTHESIS::id, Tokens::LESS_THAN_SIGN::id, Tokens::RIGHT_CURLY_BRACKET::id, Tokens::SEMICOLON::id>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::RIGHT_CURLY_BRACKET::id, Tokens::SEMICOLON::id>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LEFT_PARENTHESIS::id, Tokens::LESS_THAN_SIGN::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Policy<false, true, false, 32>>("modules::common::name", "<group>"));
+			value_FULL_STOP = required<Types::FULL_STOP>(pos, ::ISPA_CORE::Recovery::handler<::ISPA_CORE::Recovery::Tokens<Tokens::FULL_STOP::id>, ::ISPA_CORE::Recovery::Tokens<Tokens::AUTO::id, Tokens::COLON::id, Tokens::COMMA::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::LESS_THAN_SIGN::id, Tokens::RIGHT_CURLY_BRACKET::id, Tokens::SEMICOLON::id>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::RIGHT_CURLY_BRACKET::id, Tokens::SEMICOLON::id>, ::ISPA_CORE::Recovery::Tokens<Tokens::AUTO::id, Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LESS_THAN_SIGN::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Policy<false, true, false, 32>>("modules::common::name", "<group>"));
 			skip_spaces<Types::__WS>(pos);
-			value_modules_common_ID_1 = required<Types::modules::common::ID>(pos, ::ISPA_CORE::Recovery::handler<::ISPA_CORE::Recovery::Tokens<Tokens::FULL_STOP::id>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::LEFT_PARENTHESIS::id, Tokens::LESS_THAN_SIGN::id, Tokens::RIGHT_CURLY_BRACKET::id, Tokens::SEMICOLON::id>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::RIGHT_CURLY_BRACKET::id, Tokens::SEMICOLON::id>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LEFT_PARENTHESIS::id, Tokens::LESS_THAN_SIGN::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Policy<false, true, false, 32>>("modules::common::name", "<group>"));
+			value_modules_common_ID_1 = required<Types::modules::common::ID>(pos, ::ISPA_CORE::Recovery::handler<::ISPA_CORE::Recovery::Tokens<Tokens::FULL_STOP::id>, ::ISPA_CORE::Recovery::Tokens<Tokens::AUTO::id, Tokens::COLON::id, Tokens::COMMA::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::LESS_THAN_SIGN::id, Tokens::RIGHT_CURLY_BRACKET::id, Tokens::SEMICOLON::id>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::LEFT_CURLY_BRACKET::id, Tokens::RIGHT_CURLY_BRACKET::id, Tokens::SEMICOLON::id>, ::ISPA_CORE::Recovery::Tokens<Tokens::AUTO::id, Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LESS_THAN_SIGN::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Policy<false, true, false, 32>>("modules::common::name", "<group>"));
 			group0 = std::make_pair(value_FULL_STOP, value_modules_common_ID_1);
 			group_list1.push_back(group0);
 			capture_list2.push_back(value_modules_common_ID_1);
@@ -5335,24 +5335,24 @@ template<typename params, typename IT, class> auto DepParser::Parser::modulesCom
 		if (unwinding()) {
 			return action_result(result, pos);
 		}
-		recovery_at<::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::COMMA::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LESS_THAN_SIGN::id, Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("__WS", "__WS", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
+		recovery_at<::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::COMMA::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LESS_THAN_SIGN::id, Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::AUTO::id, Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("__WS", "__WS", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
 		skip_spaces<Types::__WS>(pos);
 		if (unwinding()) {
 			return action_result(result, pos);
 		}
-		recovery_at<::ISPA_CORE::Recovery::Tokens<Tokens::COMMA::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LESS_THAN_SIGN::id, Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("modules::common::template_params", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
+		recovery_at<::ISPA_CORE::Recovery::Tokens<Tokens::COMMA::id, Tokens::GREATER_THAN_SIGN::id, Tokens::LESS_THAN_SIGN::id, Tokens::modules::common::ID::id>, ::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::AUTO::id, Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("modules::common::template_params", "modules::common::template_params", "__WS", "modules::common::name::ispa_template_params");
 		value_modules_common_template_params = optional<Types::modules::common::template_params>(pos, [this](auto cursor) { return this->modulesCommonTemplate_params(cursor); });
 		::ISPA_CORE::assign_compatible(result.temp_params, value_modules_common_template_params);
 		if (::ispa::debug::enabled()) ::ispa::debug::value("result", result, ::ispa::debug::active_location());
 		if (unwinding()) {
 			return action_result(result, pos);
 		}
-		recovery_at<::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("__WS", "__WS", "modules::common::name::ispa_template_params");
+		recovery_at<::ISPA_CORE::Recovery::Tokens<>, ::ISPA_CORE::Recovery::Tokens<Tokens::AUTO::id, Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("__WS", "__WS", "modules::common::name::ispa_template_params");
 		skip_spaces<Types::__WS>(pos);
 		if (unwinding()) {
 			return action_result(result, pos);
 		}
-		recovery_at<::ISPA_CORE::Recovery::Tokens<Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::LEFT_PARENTHESIS::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("modules::common::name::ispa_template_params", "modules::common::name::ispa_template_params");
+		recovery_at<::ISPA_CORE::Recovery::Tokens<Tokens::AUTO::id, Tokens::COLON::id, Tokens::COMMA::id, Tokens::FULL_STOP::id, Tokens::RIGHT_PARENTHESIS::id, Tokens::modules::common::ID::id>>("modules::common::name::ispa_template_params", "modules::common::name::ispa_template_params");
 		value_modules_common_name_ispa_template_params = optional<params>(pos, [&](IT rule_pos) {
 return ispa_match_template(::ISPA_CORE::type_tag<params>{}, rule_pos);
 });
@@ -5360,7 +5360,7 @@ return ispa_match_template(::ISPA_CORE::type_tag<params>{}, rule_pos);
 		if (::ispa::debug::enabled()) ::ispa::debug::value("result", result, ::ispa::debug::active_location());
 		::ISPA_CORE::MatchResult<Types::modules::common::name<params>, IT> match_result;
 		match_result.status = true;
-		match_result.node.set_data(result);
+		match_result.node.set_data(std::move(result));
 		match_result.it = pos;
 		return match_result;
 	} catch (const NoMatch&) { throw;

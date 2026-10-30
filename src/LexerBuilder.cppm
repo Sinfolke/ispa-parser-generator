@@ -40,7 +40,7 @@ public:
     LexerBuilder(AST::Tree &ast, bool debug = false, bool debug_instrumentation = true)
         : ast(ast), debug(debug), debug_instrumentation(debug_instrumentation) {};
     bool hasDebugInstrumentation() const { return debug_instrumentation; }
-    void build();
+    void build(const std::function<void(std::size_t, std::size_t, const std::string&)>& progress = {});
     auto& getDFA() { return dfa; }
     auto& getDFA() const { return dfa; }
     auto& getActionTable() { return action_table; }

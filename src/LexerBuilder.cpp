@@ -43,12 +43,17 @@ bool LexerBuilder::isTopLevel(const stdu::vector<std::string> &name) {
     }
     return used_in_non_terminal;
 }
-void LexerBuilder::build() {
+void LexerBuilder::build(const std::function<void(std::size_t, std::size_t, const std::string&)>& progress) {
+    const auto report = [&](std::size_t done, const std::string& phase) {
+        if (progress) progress(done, 6, phase);
+    };
+    report(0, "Building token NFA");
     NFA::InitialNFA initial_nfa(ast);
     initial_nfa.build();
     initial_nfa.unrollGroups();
     initial_nfa.unrollQuantifiers();
     initial_nfa.unrollNestedTokens();
+    report(1, "Expanding tokens");
     // 1. Generate exhaustive test cases using AstInputGenerator
     auto test_cases = ast.generateRandomTokenInputs(2);
 
@@ -78,6 +83,7 @@ void LexerBuilder::build() {
     // build actual NFA from NFA IR
     NFA::TNFA::TNFABuilder builder(initial_nfa, debug);
     builder.build();
+    report(2, "Building token automata");
     if (dumper.shouldDump("NFA")) {
         std::ofstream dumpNFAFile(dumper.makeDumpPath("NFA"));
         if (!dumpNFAFile.is_open())
@@ -106,14 +112,18 @@ void LexerBuilder::build() {
         }
     }
     DFA::DFA dfa(&builder);
+    report(3, "Building token DFA");
     dfa.build();
+    report(4, "Minimizing token DFA");
     dfa.minimize();
+    report(5, "Classifying tokens");
     auto classified = dfa.classify();
     this->dfa = std::move(classified);
     action_table = dfa.getActionTable();
     semantic_table = dfa.getSemanticTable();
     registers_count = dfa.getRegisterCount();
     output_count = dfa.getOutputCount();
+    report(6, "Lexer complete");
 
 }
 auto LexerBuilder::getDataBlocks() const -> ParserIR::DataBlockList {

@@ -38,7 +38,7 @@ auto build(const Algorithm::BuildRequest& request, Algorithm::Metadata& metadata
         }
     }
     AST::TreeMap unchanged;
-    LLIR::Builder builder(request.tree, unchanged, cache);
+    LLIR::Builder builder(request.tree, unchanged, cache, request.progress);
     auto ir = std::make_shared<ParserIR::IR>(builder.get());
     std::ostringstream records;
     for (const auto& production : ir->getData())

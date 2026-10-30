@@ -311,6 +311,8 @@ namespace Rust {
 
     auto Construct::emitFunctionChecked(const LangAPI::Function &func, Converter::Writer &w, Converter::Writer &aux, FnKind kind,
                                  const std::string &scope, const std::vector<std::string> &bases) -> void {
+        if (func.is_native)
+            throw Error("Rust target: native declaration `{}` is not supported", func.name);
         std::string name = kind == FnKind::Constructor ? "new" : RustCore::ident(func.name);
         if (!RustCore::emit_name.empty()) { name = RustCore::emit_name; RustCore::emit_name.clear(); }
         const auto key = scope + "::" + name;
