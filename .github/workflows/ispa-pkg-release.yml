@@ -1,6 +1,26 @@
 name: Nuitka Python CLIs release
 
 on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Platform to build
+        type: choice
+        default: all
+        options:
+          - all
+          - linux-x64
+          - windows-x64
+          - macos-arm64
+          - macos-x64
+      checkout_ref:
+        description: Source branch, tag, or SHA (blank uses selected workflow ref)
+        type: string
+        required: false
+      release_tag:
+        description: Existing release to update (blank saves workflow artifacts only)
+        type: string
+        required: false
   workflow_call:
     inputs:
       platform:
@@ -50,10 +70,10 @@ jobs:
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
 
     steps:
-      - name: Checkout release tag
+      - name: Checkout CLI source
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.checkout_ref }}
+          ref: ${{ inputs.checkout_ref || github.ref }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -314,6 +334,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload to GitHub Release
+        if: inputs.release_tag != ''
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}

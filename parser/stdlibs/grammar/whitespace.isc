@@ -1,0 +1,4 @@
+module std.whitespace;
+HORIZONTAL: @ [ \t]+ {@};
+NEWLINE: @ ('\r' '\n' | '\n' | '\r') {@};
+WHITESPACE: @ [ \t\r\n\f\v]+ {@};
