@@ -196,7 +196,7 @@ auto RustCore::indexFunctions(const LangAPI::Declarations& declarations) -> void
     walk(walk, declarations);
     // classes the hand-written facade subclasses (its typed cursors, tokens and name tables): every method dispatches
     for (const auto* cls : all_classes) {
-        static const std::unordered_set<std::string> open_classes{"TokenCursor", "RawToken", "RawTokenMeta", "TokenNames"};
+        static const std::unordered_set<std::string> open_classes{"TokenCursor", "RawToken", "RawTokenMeta", "TokenNames", "LRGrammar"};
         if (!open_classes.contains(symbolKey(cls->name))) continue;
         for (const auto& [member, visibility] : cls->data)
             if (member->isFunction() && !member->getFunction().is_static && member->getFunction().name != "__init__" &&
@@ -747,7 +747,7 @@ auto RustCore::convertIspaLibSymbol(const LangAPI::IspaLibSymbol &symbol, bool e
         case LangAPI::StdlibExports::LRPack: return "::ispa_std::lr_pack";
         case LangAPI::StdlibExports::LRCaptureAssign: return "::ispa_std::lr_capture_assign";
         case LangAPI::StdlibExports::LRNode: return "::ispa_std::lr_node";
-        case LangAPI::StdlibExports::LRValue: return "::std::boxed::Box<dyn ::std::any::Any>";
+        case LangAPI::StdlibExports::LRValue: return "::ispa_std::LRValue";
         case LangAPI::StdlibExports::LRParse: return "::ispa_std::lr_parse";
         case LangAPI::StdlibExports::Parser: return "::ispa_std::LLParser" + g();
         case LangAPI::StdlibExports::LexerMakeTokenParameter:
@@ -1303,6 +1303,9 @@ auto RustCore::convertFunctionCall(const LangAPI::FunctionCall &call, bool membe
                 if (args[i].starts_with("(*") && args[i].ends_with(".get())")) { args[i] = "&" + args[i]; continue; }
                 args[i] = runtimeArgument(call.args[i], args[i]);   // a copy, or a lent reference parameter / fail context
             }
+        // `throw std::runtime_error(msg)` of generated tables: the runtime's failure value
+        if (!member && args.size() == 1 && symbolKey(symbol) == "std::runtime_error")
+            return "::ispa_std::StdError::runtime(" + args[0] + ")";
         auto callee = convertSymbol(symbol, !member);
         // a bare call that names nothing in scope is an inherited runtime method of the base class
         if (!member && !receiver.empty() && symbol.path.size() == 1 && std::holds_alternative<std::string>(symbol.path[0]) &&
@@ -1496,6 +1499,20 @@ auto RustCore::convertIspaLibFunctionCall(const LangAPI::IspaLibFunctionCall &ca
         return (lists ? std::string("::ispa_std::assign_list") : callee) + "(&mut " + place + ", " +
                convertInitializerValue(LangAPI::Type{LangAPI::ValueType::Undef}, call.args[1]) + ")";
     }
+    // LR value helpers: the value stack is lent as a slice, a capture target is written through
+    if (kind == LangAPI::StdlibExports::LRCaptureAssign && call.args.size() == 4) {
+        const auto* target = call.args[0].size() == 1 && call.args[0][0].isRvalue() ? &call.args[0][0].getRValue() : nullptr;
+        const std::string place = target && target->isStorageSymbol() ? convertStorageSymbol(target->getStorageSymbol(), true)
+                                                                       : convertExpression(call.args[0]);
+        return callee + "(&mut " + place + ", &" + asExpr(args[1]) + "[..], " + args[2] + ", " + args[3] + ")";
+    }
+    if (kind == LangAPI::StdlibExports::LRPack && call.args.size() == 6)
+        return callee + "(&" + asExpr(args[0]) + "[..], &" + args[1] + ", &" + args[2] + ", &" + args[3] + ", " + args[4] + ", " + args[5] + ")";
+    if (kind == LangAPI::StdlibExports::LRGet && call.args.size() == 2)
+        return callee + turbofish + "(&" + asExpr(args[0]) + "[..], " + args[1] + ")";
+    if ((kind == LangAPI::StdlibExports::LRParse || kind == LangAPI::StdlibExports::LRParseGeneralized) && call.args.size() == 1)
+        return std::string("::ispa_std::LRParserApi::") + (kind == LangAPI::StdlibExports::LRParse ? "lr_parse" : "lr_parse_generalized") +
+               turbofish + "(self, " + runtimeArgument(call.args[0], args[0]) + ")";
     for (std::size_t i = 0; i < args.size() && i < call.args.size(); ++i)   // runtime helpers take their arguments by value
         args[i] = runtimeArgument(call.args[i], args[i]);
     return callee + turbofish + "(" + joinStrings(args, ", ") + ")";
@@ -1722,6 +1739,10 @@ auto RustCore::convertRValue(const LangAPI::RValue &rvalue) -> std::string {
             const auto target = convertType(*rvalue.getCast().type);
             if (target.starts_with("::ispa_std::Shared<"))   // out of a type-erased value
                 return "::ispa_std::pycoll::py_cast::<_, " + target + ">(" + convertExpression(rvalue.getCast().what) + ")";
+            // an integer literal cast to an unsigned type (`size_t(-1)`) is a signed value converted, not a negative unsigned literal
+            const auto* literal = soleRValue(rvalue.getCast().what);
+            if (literal && literal->type() == LangAPI::RValueType::Int)
+                return "((" + std::to_string(literal->getInt().value) + "_i64) as " + target + ")";
             return "((" + convertExpression(rvalue.getCast().what) + ") as " + target + ")";
         }
         case LangAPI::RValueType::Instance:

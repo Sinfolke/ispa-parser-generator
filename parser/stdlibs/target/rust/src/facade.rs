@@ -56,6 +56,8 @@ impl<V: TokenVariant> RawToken<V> {
     }
     pub fn empty(&self) -> bool { self.value.variant_index() == 0 }
     pub fn index(&self) -> usize { self.value.variant_index() }
+    /// The id of the token's type.
+    pub fn kind(&self) -> usize { self.id }
     pub fn text(&self) -> String { self.source.remaining().get(..self.length as usize).unwrap_or("").to_owned() }
     pub fn column(&self) -> i64 { self.source.column() as i64 }
     /// The typed node of the token's value when it holds a `T` (an empty node otherwise).

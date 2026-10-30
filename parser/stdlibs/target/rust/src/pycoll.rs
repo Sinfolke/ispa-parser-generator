@@ -10,6 +10,12 @@ impl<K: Ord, V> PyContains<K> for BTreeMap<K, V> { fn py_contains(&self, key: &K
 impl<K: Eq + Hash> PyContains<K> for HashSet<K> { fn py_contains(&self, key: &K) -> bool { self.contains(key) } }
 impl PyContains<String> for String { fn py_contains(&self, key: &String) -> bool { self.contains(key.as_str()) } }
 
+/// `vector.at(i)` of generated tables: a copy of the checked element.
+pub trait VecAt<T> { fn at(&self, index: usize) -> T; }
+impl<T: Clone> VecAt<T> for Vec<T> {
+    fn at(&self, index: usize) -> T { self.get(index).cloned().unwrap_or_else(|| crate::fail(1, "vector::at")) }
+}
+
 pub trait PyPop<K> { type Item; fn py_pop(&mut self, key: K) -> Self::Item; }
 impl<T> PyPop<i64> for Vec<T> {
     type Item = T;

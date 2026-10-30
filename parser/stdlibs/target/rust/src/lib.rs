@@ -24,6 +24,8 @@ mod bridge;
 pub use bridge::*;
 mod parser;
 pub use parser::*;
+mod lr;
+pub use lr::*;
 mod printer;
 pub use printer::*;
 pub(crate) mod lexer;
@@ -157,14 +159,6 @@ pub fn assign_list<T: Default + AssignFrom<U>, U>(target: &mut Vec<T>, source: V
 /// `Vec<T> = Vec<U>` with a conversion for each element (groups).
 pub fn assign_list_with<T, U>(target: &mut Vec<T>, source: Vec<U>, convert: impl FnMut(U) -> T) { *target = source.into_iter().map(convert).collect(); }
 pub fn assign_compatible<T: AssignFrom<S>, S>(target: &mut T, source: S) { target.assign_from(source) }
-
-pub fn lr_get<T: Default>() -> T { T::default() }
-pub fn lr_token<T>(value: T) -> T { value }
-pub fn lr_pack<T>(value: T) -> Vec<T> { vec![value] }
-pub fn lr_node<T>(value: T) -> T { value }
-pub fn lr_capture_assign<T: Clone>(target: &mut T, value: &T) { *target = value.clone(); }
-pub fn lr_parse<T: Default>() -> T { T::default() }
-pub fn lr_parse_generalized<T: Default>() -> T { T::default() }
 
 pub mod debug {
     #[derive(Clone, Copy, Debug, Default)] pub struct Loc { pub file: &'static str, pub line: usize, pub column: usize }

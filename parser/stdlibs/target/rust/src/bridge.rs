@@ -76,6 +76,8 @@ pub fn typed_node<T: Clone + Default + 'static>(node: &Shared<CoreNode>) -> Node
 pub struct TypedRawToken {
     base_0: CoreToken,
     node: PyAny,
+    /// The typed token itself (kept only for cursors that carry tokens: the LR driver hands them to the generated tables).
+    token: PyAny,
 }
 impl Upcast<CoreToken> for TypedRawToken {
     unsafe fn up_ptr(this: *mut Self) -> *mut CoreToken { std::ptr::addr_of_mut!((*this).base_0) }
@@ -83,9 +85,9 @@ impl Upcast<CoreToken> for TypedRawToken {
 impl TypedRawToken {
     fn this(base: &mut CoreToken) -> &mut TypedRawToken { unsafe { &mut *(base as *mut CoreToken as *mut TypedRawToken) } }
 
-    fn handle(meta: Shared<RawTokenMeta>, type_id: i64, node: PyAny) -> Shared<CoreToken> {
+    fn handle(meta: Shared<RawTokenMeta>, type_id: i64, node: PyAny, typed: PyAny) -> Shared<CoreToken> {
         Shared::new_with(|owner: &WeakShared<TypedRawToken>| {
-            let mut token = TypedRawToken { base_0: CoreToken::default(), node };
+            let mut token = TypedRawToken { base_0: CoreToken::default(), node, token: typed };
             token.base_0.__bind_owner(&owner.upcast());
             token.base_0.__init__(meta, type_id);
             token.base_0.__vt_to_node = |base, _| {
@@ -99,6 +101,12 @@ impl TypedRawToken {
         }).upcast()
     }
 }
+/// The typed token a core token made by a token-carrying cursor stands for.
+pub fn typed_token<T: Clone + 'static>(raw: &Shared<CoreToken>) -> Option<T> {
+    let mut guard = raw.borrow_mut();
+    TypedRawToken::this(&mut guard).token.downcast_ref::<T>().cloned()
+}
+
 /// Token metadata whose text is the token's own, not a slice of a source string the core would have to hold.
 #[repr(C)]
 struct TypedMeta {
@@ -139,6 +147,7 @@ pub struct TypedCursor<IT: BridgeCursor> {
     base_0: TokenCursor,
     pub it: IT,
     make_node: Option<MakeNode<IT::Token>>,
+    carry: bool,
     cached: Option<(i64, Shared<CoreToken>)>,
     _target: PhantomData<IT>,
 }
@@ -151,11 +160,18 @@ impl<IT: BridgeCursor> TypedCursor<IT> {
     /// A handle to a cursor at `it`; `make_node` makes the typed node of the type being matched, if it is a token's.
     pub fn handle(it: IT, make_node: Option<MakeNode<IT::Token>>) -> Shared<TypedCursor<IT>> {
         Shared::new_with(|owner: &WeakShared<TypedCursor<IT>>| {
-            let mut cursor = TypedCursor { base_0: TokenCursor::default(), it, make_node, cached: None, _target: PhantomData };
+            let mut cursor = TypedCursor { base_0: TokenCursor::default(), it, make_node, carry: false, cached: None, _target: PhantomData };
             cursor.base_0.__bind_owner(&owner.upcast());
             cursor.install();
             cursor
         })
+    }
+
+    /// A handle to a cursor whose core tokens carry the typed token (for the LR driver).
+    pub fn carrying(it: IT) -> Shared<TypedCursor<IT>> {
+        let cursor = Self::handle(it, None);
+        cursor.borrow_mut().carry = true;
+        cursor
     }
 
     fn me(this: &mut Self) -> Shared<TokenCursor> { this.base_0.__ispa_owner.upgrade().expect("cursor handle") }
@@ -175,6 +191,7 @@ impl<IT: BridgeCursor> TypedCursor<IT> {
             let this = Self::this(base);
             let copy = Self::handle(this.it.clone(), this.make_node);
             copy.borrow_mut().cached = this.cached.clone();
+            copy.borrow_mut().carry = this.carry;
             copy.upcast()
         };
         base.__vt_assign = |base, other| {
@@ -194,6 +211,7 @@ impl<IT: BridgeCursor> TypedCursor<IT> {
         base.__vt_plus = |base, count| {
             let this = Self::this(base);
             let moved = Self::handle(this.it.clone(), this.make_node);
+            moved.borrow_mut().carry = this.carry;
             moved.borrow_mut().base_0.advance_by(count);
             moved.upcast()
         };
@@ -214,7 +232,8 @@ impl<IT: BridgeCursor> TypedCursor<IT> {
                 Some(node) => to_any(CarriedNode(node)),
                 None => PyAny::default(),
             };
-            let raw = TypedRawToken::handle(meta, token.alt_index(), node);
+            let typed = if this.carry { to_any(token.clone()) } else { PyAny::default() };
+            let raw = TypedRawToken::handle(meta, token.alt_index(), node, typed);
             this.cached = Some((distance, raw.clone()));
             raw
         };

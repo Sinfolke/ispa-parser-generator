@@ -207,14 +207,14 @@ TEST(RustEmitter, RejectsLanguageSpecificTypesAndUnresolvedOverloads) {
     EXPECT_THROW(generate({Function::createDeclaration(function), Function::createDeclaration(function)}), std::exception);
 }
 
-TEST(RustEmitter, ReportsMissingParserRuntimeContract) {
+TEST(RustEmitter, ReportsMissingLRTables) {
     Class lexer{.name = "Parser",
         .inherit_members = {{Visibility::Public, IspaLibSymbol{.exports = StdlibExports::LRParser}}}};
     try {
         generate({Class::createDeclaration(lexer)});
         FAIL() << "incomplete parser generation must be diagnosed";
     } catch (const std::exception& error) {
-        EXPECT_NE(std::string(error.what()).find("LR parsers are not implemented"), std::string::npos);
+        EXPECT_NE(std::string(error.what()).find("has no `lr_k`"), std::string::npos);
     }
 }
 

@@ -52,7 +52,7 @@ namespace Rust {
         }
         // outer attributes: the file can be `include!`d as well as be a module file
         constexpr const char *kAllow =
-            "#[allow(unused_imports)]\nuse ::ispa_std::pycoll::{PyContains, PyPop};\n";
+            "#[allow(unused_imports)]\nuse ::ispa_std::pycoll::{PyContains, PyPop, VecAt};\n";
         constexpr const char *kRootAllow =
             "#[allow(non_snake_case, non_camel_case_types, non_upper_case_globals, unused_mut, unused_variables,\n"
             "         unused_parens, unused_labels, unused_imports, unreachable_patterns, unreachable_code, dead_code,\n"
@@ -459,15 +459,6 @@ namespace Rust {
     //   constructor      -> `new`, built on Default
     //   nested types / statics were hoisted by Rust.Rewriter; anything that still shows up is emitted as a sibling
     auto Construct::emitClass(const LangAPI::Class &cls, Converter::Writer &w) -> void {
-        for (const auto& [visibility, base] : cls.inherit_members) {
-            // LL parsers and lexers run on the lowered runtime; the LR drivers are not ported yet
-            if (const auto* library = std::get_if<LangAPI::IspaLibSymbol>(&base);
-                library && (library->exports == LangAPI::StdlibExports::LRParser ||
-                            library->exports == LangAPI::StdlibExports::LRGeneralizedParser)) {
-                if (!std::getenv("ISPA_RUST_EXPERIMENTAL"))   // set to develop the Rust LR backend
-                    throw Error("Rust target: LR parsers are not implemented yet (use -a LL); the LR driver of the lowered runtime has no typed Rust facade");
-            }
-        }
         const std::string name = RustCore::convertSymbol(cls.name, false);
         const std::string generics = genericParams(cls.template_parameters);
         const std::string impl_generics = genericBounds(cls.template_parameters);
@@ -494,7 +485,8 @@ namespace Rust {
             if (const auto* library = std::get_if<LangAPI::IspaLibSymbol>(&cls.inherit_members.front().second)) {
                 if (library->exports == LangAPI::StdlibExports::Lexer)
                     RustCore::members.insert({"tokens", "errors", "line", "external_boundary", "bound"});
-                else if (library->exports == LangAPI::StdlibExports::Parser)
+                else if (library->exports == LangAPI::StdlibExports::Parser || library->exports == LangAPI::StdlibExports::LRParser ||
+                         library->exports == LangAPI::StdlibExports::LRGeneralizedParser)
                     RustCore::members.insert({"lexer", "has_lexer", "text", "has_text", "tree"});
             }
 
@@ -531,8 +523,9 @@ namespace Rust {
             if (RustCore::slot_functions.contains(&fn)) slots.push_back(&fn);
             if (RustCore::overrides.contains(&fn)) overriding.push_back(&fn);
         }
-        if ((!slots.empty() || !overriding.empty()) && (templated || bases.size() > 1))
-            throw Error("Rust target: virtual dispatch in generic or multiply-inheriting class `{}` is not supported", name);
+        // a generic class can introduce slots (hand-written subclasses fill them); overriding one needs the thunk to name the generics
+        if ((!slots.empty() || !overriding.empty()) && (bases.size() > 1 || (templated && !overriding.empty())))
+            throw Error("Rust target: virtual dispatch in a multiply-inheriting class or an overriding generic class `{}` is not supported", name);
         const auto fn_pointer_type = [&](const LangAPI::Function &fn, const std::string &receiver_type) {
             std::vector<std::string> types{std::string(fn.is_const ? "&" : "&mut ") + receiver_type};
             for (const auto &p : fn.parameters) {
@@ -560,7 +553,7 @@ namespace Rust {
         // the base part comes first: a pointer to it is a pointer to the derived object (dispatch thunks rely on it)
         for (std::size_t i = 0; i < bases.size(); ++i) emitLine(w, "pub base_" + std::to_string(i) + ": " + bases[i] + ",");
         if (cls.shared_object) emitLine(w, "pub __ispa_owner: ::ispa_std::WeakShared<Self>,");
-        for (const auto *slot : slots) emitLine(w, "pub __vt_" + RustCore::ident(slot->name) + ": " + fn_pointer_type(*slot, name) + ",");
+        for (const auto *slot : slots) emitLine(w, "pub __vt_" + RustCore::ident(slot->name) + ": " + fn_pointer_type(*slot, name + generics) + ",");
         for (const auto &f : fields) emitLine(w, "pub " + f.name + ": " + f.type + ",");
         if (templated) {
             std::vector<std::string> names;
@@ -589,7 +582,7 @@ namespace Rust {
                 emitLine(w, "base_" + std::to_string(i) + ": { let mut __base: " + bases[i] + " = Default::default(); " + registrations + "__base },");
             }
             for (const auto *slot : slots)
-                emitLine(w, "__vt_" + RustCore::ident(slot->name) + ": " + name + "::__base_" + RustCore::ident(slot->name) + ",");
+                emitLine(w, "__vt_" + RustCore::ident(slot->name) + ": Self::__base_" + RustCore::ident(slot->name) + ",");
             for (const auto &f : fields) {
                 std::string value = f.init->empty() ? std::string("Default::default()") : initializer(*f.ir_type, *f.init);
                 if (is_callable(f) && f.init->empty()) {
@@ -752,6 +745,59 @@ namespace Rust {
         w.decreaseIndentation();
         emitLine(w, "}");
 
+        // an LR parser's generated tables, as the trait the runtime drives (the C++ facade finds the same statics by name)
+        if (!cls.inherit_members.empty())
+            if (const auto* library = std::get_if<LangAPI::IspaLibSymbol>(&cls.inherit_members.front().second);
+                library && (library->exports == LangAPI::StdlibExports::LRParser ||
+                            library->exports == LangAPI::StdlibExports::LRGeneralizedParser)) {
+                std::unordered_set<std::string> present;
+                std::string token_type = "()";
+                for (const auto &[declaration, visibility] : cls.data)
+                    if (declaration->isFunction()) {
+                        present.insert(declaration->getFunction().name);
+                        if (declaration->getFunction().name == "lr_shift" && !declaration->getFunction().parameters.empty()) {
+                            token_type = RustCore::convertType(declaration->getFunction().parameters.front().first);
+                            if (token_type.starts_with("&mut ")) token_type.erase(0, 5);
+                        }
+                    }
+                if (present.contains("lr_recover") || present.contains("lr_semantic_reduce"))
+                    throw Error("Rust target: LR recovery handlers and semantic reductions are not available through the runtime yet");
+                emitLine(w, "impl ::ispa_std::LrTables for " + name + " {");
+                w.increaseIndentation();
+                emitLine(w, "type Token = " + token_type + ";");
+                struct Table { const char *name, *params, *args, *ret; bool required; };
+                static const Table tables[] = {
+                    {"lr_k", "", "", "usize", true},
+                    {"lr_action", "state: usize, window: &mut Vec<usize>", "state, window", "i64", true},
+                    {"lr_shift", "token: &mut Self::Token", "token", "::ispa_std::LRValue", true},
+                    {"lr_length", "rule: usize", "rule", "usize", true},
+                    {"lr_reduce", "rule: usize, values: &mut Vec<::ispa_std::LRValue>", "rule, values", "::ispa_std::LRValue", true},
+                    {"lr_lhs", "rule: usize", "rule", "usize", true},
+                    {"lr_goto", "state: usize, lhs: usize", "state, lhs", "usize", true},
+                    {"lr_is_space", "token: &mut Self::Token", "token", "bool", false},
+                    {"lr_space", "rule: usize, gap: usize", "rule, gap", "bool", false},
+                    {"lr_expected", "state: usize", "state", "Vec<usize>", false},
+                    {"lr_context", "state: usize", "state", "String", false},
+                    {"lr_token_name", "token: usize", "token", "String", false},
+                    {"lr_rule_label", "rule: usize", "rule", "String", false},
+                    {"lr_conflict", "state: usize, window: &mut Vec<usize>", "state, window", "Vec<i64>", false},
+                };
+                for (const auto &table : tables) {
+                    if (!present.contains(table.name)) {
+                        if (table.required) throw Error("Rust target: LR parser `{}` has no `{}`", name, table.name);
+                        continue;
+                    }
+                    if (!table.required) {
+                        std::string constant = table.name;
+                        std::transform(constant.begin() + 3, constant.end(), constant.begin() + 3, [](unsigned char c) { return std::toupper(c); });
+                        emitLine(w, "const HAS_" + constant.substr(3) + ": bool = true;");
+                    }
+                    emitLine(w, std::string("fn ") + table.name + "(" + table.params + ") -> " + table.ret + " { " + name + "::" + table.name +
+                                "(" + table.args + ") }");
+                }
+                w.decreaseIndentation();
+                emitLine(w, "}");
+            }
         if (!templated) {
             const bool prints = std::any_of(cls.data.begin(), cls.data.end(), [](const auto &entry) {
                 return entry.first->isFunction() && entry.first->getFunction().name == "write_to_output"; });
@@ -1025,6 +1071,26 @@ namespace Rust {
             emitLine(w, "}");
             w.decreaseIndentation();
             emitLine(w, "}");
+
+            // LR captures fill a variant by the first alternative they convert to (token variants hold bare token types: no)
+            const auto convertible = [](const std::string &alternative) {
+                return alternative.starts_with("::ispa_std::Node<") || alternative.starts_with("Vec<") || alternative.starts_with("(") ||
+                       alternative == "String" || alternative == "char" || alternative == "bool" || alternative == "i64";
+            };
+            if (std::all_of(def.alternatives.begin(), def.alternatives.end(), convertible)) {
+                emitLine(w, "impl ::ispa_std::LrConvert for " + def.name + " {");
+                w.increaseIndentation();
+                emitLine(w, "fn lr_convert(value: &::ispa_std::LRValue) -> Option<Self> {");
+                w.increaseIndentation();
+                for (std::size_t i = 0; i < def.alternatives.size(); ++i)
+                    emitLine(w, "if let Some(x) = <" + def.alternatives[i] + " as ::ispa_std::LrConvert>::lr_convert(value) { return Some(" +
+                                def.name + "::V" + std::to_string(i) + "(x)); }");
+                emitLine(w, "None");
+                w.decreaseIndentation();
+                emitLine(w, "}");
+                w.decreaseIndentation();
+                emitLine(w, "}");
+            }
         }
     }
 

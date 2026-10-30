@@ -63,6 +63,19 @@ class _Eval(Generic[V]):
         self.rhs = []
 
 
+class _Visit:
+    """One frame of the iterative walk over the forest: a node, the alternative and the child being visited.
+    A class (a reference), because the walk advances the frame it took from the stack in place."""
+    node: int
+    alternative: int
+    child: int
+
+    def __init__(self, node: int):
+        self.node = node
+        self.alternative = 0
+        self.child = 0
+
+
 class _Forest:
     span: _Span
     has_token: bool
@@ -228,31 +241,30 @@ class LRGeneralizedParser(LRParser):
             root = roots.items[ri]
             ri = ri + 1
             if visiting[root] != 2:
-                # frames: [node, alternative, child]
-                pending_nodes = [[root, 0, 0]]
+                pending_nodes: list[_Visit] = [_Visit(root)]
                 visiting[root] = 1
                 while len(pending_nodes) > 0 and ambiguous == ABSENT:
                     self._tick(forest, stacks)
-                    frame = pending_nodes[len(pending_nodes) - 1]
-                    node = forest[frame[0]]
-                    if frame[1] == len(node.alternatives):
-                        visiting[frame[0]] = 2
-                        order.append(frame[0])
+                    frame: _Visit = pending_nodes[len(pending_nodes) - 1]
+                    node = forest[frame.node]
+                    if frame.alternative == len(node.alternatives):
+                        visiting[frame.node] = 2
+                        order.append(frame.node)
                         pending_nodes.pop()
                     else:
-                        alt = node.alternatives[frame[1]]
-                        if frame[2] == len(alt.children):
-                            frame[1] = frame[1] + 1
-                            frame[2] = 0
+                        alt = node.alternatives[frame.alternative]
+                        if frame.child == len(alt.children):
+                            frame.alternative = frame.alternative + 1
+                            frame.child = 0
                         else:
-                            child = alt.children[frame[2]]
-                            frame[2] = frame[2] + 1
+                            child = alt.children[frame.child]
+                            frame.child = frame.child + 1
                             if visiting[child] == 1:
                                 # productive nullable cycle
                                 ambiguous = child
                             elif visiting[child] == 0:
                                 visiting[child] = 1
-                                pending_nodes.append([child, 0, 0])
+                                pending_nodes.append(_Visit(child))
         total = 0
         if ambiguous != ABSENT:
             total = 2

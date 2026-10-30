@@ -48,6 +48,19 @@ GRAMMARS = {
 }
 
 
+# LR grammars: the same corpora, parsed by an LR algorithm instead of LL
+LR_ALGORITHMS = {'lrjson': ('json', 'LALR'), 'lr0json': ('json', 'LR'), 'lrambig': ('ambig', 'LALR'), 'lrsql': ('sql', 'LALR'), 'lrpyexpr': ('pyexpr', 'LALR')}
+# an ambiguous expression grammar: conflicts are decided while parsing (the generalized driver)
+GRAMMARS['ambig'] = (HERE / 'grammars' / 'ambig', 'ambig.isc',
+                     ['1', '1+2', '1*2', '1+2*3', '1*2+3', '1+2+3', '1*2*3', '1+2*3+4*5', '1+', '+', '', '1 2', '1++2', '*1', '12+34*56'],
+                     ['1', '2', '3', '+', '*', ' ', '10'])
+for _name, (_base, _algorithm) in LR_ALGORITHMS.items():
+    GRAMMARS[_name] = GRAMMARS[_base]
+
+
+OLD_STDLIB_REFERENCE = {'lrambig', 'lrpyexpr'}
+
+
 def run(command, **kwargs):
     result = subprocess.run(command, capture_output=True, text=True, **kwargs)
     if result.returncode:
@@ -60,9 +73,11 @@ def build(ispa, work, grammar):
     gen, gen_cpp = work / 'gen_rust', work / 'gen_cpp'
     gen.mkdir(parents=True, exist_ok=True)
     gen_cpp.mkdir(parents=True, exist_ok=True)
-    common = ['-a', 'LL', '--no-incremental', '--no-ai-recovery', '--dir', str(GRAMMARS[grammar][0]), str(GRAMMARS[grammar][0] / GRAMMARS[grammar][1])]
+    common = ['-a', LR_ALGORITHMS[grammar][1] if grammar in LR_ALGORITHMS else 'LL', '--no-incremental', '--no-ai-recovery', '--dir', str(GRAMMARS[grammar][0]), str(GRAMMARS[grammar][0] / GRAMMARS[grammar][1])]
     run([ispa, '-l', 'rust', *common, '-o', str(gen / 'generated')], env=env)
-    run([ispa, '-l', 'cpp', *common, '-o', str(gen_cpp / 'generated')], env=env)
+    # the generalized LR driver has no core facade on the C++ side yet: its reference is the original C++ stdlib
+    old_stdlib = grammar in OLD_STDLIB_REFERENCE
+    run([ispa, '-l', 'cpp', *(['--stdlib', 'ispastdlib'] if old_stdlib else []), *common, '-o', str(gen_cpp / 'generated')], env=env)
     source = (gen / 'generated.rs').read_text()
     crate = work / 'crate'
     (crate / 'src' / 'bin').mkdir(parents=True, exist_ok=True)
@@ -72,7 +87,7 @@ def build(ispa, work, grammar):
     shutil.copy(HERE / 'rust' / 'run.rs', crate / 'src' / 'bin' / 'run.rs')
     run(['cargo', 'build', '--quiet', '--bin', 'run'], cwd=crate)
     shutil.copy(HERE / 'rust' / 'ref_main.cpp', work / 'ref_main.cpp')
-    reference = build_cpp(work, 'ref', [gen_cpp / 'generated.cpp', work / 'ref_main.cpp'], [gen_cpp])
+    reference = build_cpp(work, 'ref', [gen_cpp / 'generated.cpp', work / 'ref_main.cpp'], [gen_cpp], core=not old_stdlib)
     return crate / 'target' / 'debug' / 'run', reference
 
 

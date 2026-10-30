@@ -19,7 +19,6 @@ def main():
     if not args.ispa:
         sys.exit('regen.py: ispa executable not found (use --ispa)')
     env = {key: value for key, value in os.environ.items() if key != 'LD_LIBRARY_PATH'}
-    env['ISPA_RUST_EXPERIMENTAL'] = '1'
     with tempfile.TemporaryDirectory(prefix='ispa-rust-core-') as temp:
         work = Path(temp)
         entry = work / 'c.isc'

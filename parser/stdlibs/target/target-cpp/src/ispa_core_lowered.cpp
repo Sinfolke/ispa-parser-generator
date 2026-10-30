@@ -1,9 +1,9 @@
 #include "ispa_core_lowered.h"
 
-#include <ispastdlib/core.hpp>
 #include <ispastdlib/python_collections.hpp>
 #include <ispastdlib/failure.hpp>
 #include <ispastdlib/object.hpp>
+#include <ispastdlib/core.hpp>
 
 auto python::ispa_std::chars::code_of(const std::string& ch) -> long long {
 	auto code = ISPA_STD::python_char_code(ch);
@@ -3995,6 +3995,11 @@ auto python::ispa_std::lr_conflicts::_Alternative::equals(std::shared_ptr<python
 		i = ((i) + (1));
 	}
 	return true;
+}
+auto python::ispa_std::lr_conflicts::_Visit::__init__(long long node) -> void {
+	((*this)).node = node;
+	((*this)).alternative = 0;
+	((*this)).child = 0;
 }
 auto python::ispa_std::lr_conflicts::_Forest::__init__(std::shared_ptr<python::ispa_std::lr_conflicts::_Span> span, bool has_token, std::shared_ptr<python::ispa_std::lexer::TokenCursor> token) -> void {
 	((*this)).span = span;

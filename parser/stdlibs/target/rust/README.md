@@ -11,6 +11,7 @@ The runtime crate generated Rust parsers (`ispa -l rust`) are written against. I
 | `src/facade.rs` | typed `Node`, `RawToken`, `MatchResult`, `LexerBase` (dispatch slots for the generated lexer), token iterators (eager and lazy), `TokenStream`, `skip_spaces`. |
 | `src/bridge.rs` | typed cursors/tokens/metadata that are *subclasses of lowered classes* (fn-pointer slots, see below): how a typed iterator is a core `TokenCursor`, a typed token a core `RawToken`, and a typed node travels through the core inside a core `Node`. |
 | `src/parser.rs` | `LLParser<Main, Token>` (the base of generated parsers) and `LLParserApi`/`LLParserSpaced`: `required`/`optional`/`range`/`counted`... in token and rule (`_rule`) form, `recovery::handler`, `recovery_at`/`recover_choice`, fail blocks (`FailContext`, `custom_failure`), counters, entry points `parse_tokens`/`parse_text`, `diagnostics`. |
+| `src/lr.rs` | LR parsers (`-a LR` or `-a LALR`; deterministic, and generalized for ambiguous grammars): `LRParser<Main, Token>` (the base of generated parsers; `LRGeneralizedParser` is the same type), `LrTables` (the generated action/goto/reduce tables as associated functions, the way the C++ facade finds them as statics), `LRValue` (the value stack's element: a shifted token with its text, a rule's node, or packed captures) with `lr_token`/`lr_node`/`lr_pack`/`lr_capture_assign`/`lr_get` and `LrConvert` (how a capture becomes an AST field: nodes, boxed nodes, vectors, tuples, the generated variants, text), and the adapter that makes the tables a lowered `LRGrammar` (a subclass whose dispatch slots call them). The driver (shift/reduce/accept, error text, conflict resolution while parsing) is the lowered `python::ispa_std::lr` / `lr_conflicts`. |
 | `src/lexer.rs` | running a generated lexer's DFA tables through the lowered interpreter (`lookup`), `set_input`/`make_tokens`/`begin_lazy`. |
 | `src/printer.rs` | `ASTPrinter`, `PrintValue`, `ToText`/`concat` (port of ispastdlib's ast_printer/to_string). |
 
@@ -28,7 +29,7 @@ a dispatcher, and a `__thunk_<m>` it registers in its `Default`. `base_0` is alw
 
 ```
 cargo test                      # unit tests + tests/lowered.rs (the lowered runtime executing), subclass.rs, bridge.rs, parser_api.rs
-python3 tools/core-parity/rust_parity.py --grammar json|dyn|sql|pyexpr|counted|failblock [--fuzz N --seed S]
+python3 tools/core-parity/rust_parity.py --grammar json|dyn|sql|pyexpr|counted|failblock|lrjson|lr0json|lrambig [--fuzz N --seed S]
 ```
 
 `rust_parity.py` generates the parser for a grammar with `-l rust` and with `-l cpp`, and requires the same tree, the
@@ -37,5 +38,5 @@ demand. Tests are single-threaded (`.cargo/config.toml`): namespace variables ar
 
 ## Not yet
 
-LR parsers (`-a LALR|SLR|...`), `--static`, grammars whose actions embed C++ (examples/yaml), and the
-(`ISPA_RUST_EXPERIMENTAL=1` lifts the converter's refusal of LR parsers, for development.)
+`--static`, grammars whose actions embed C++ (examples/yaml), LR(*) (the generator does not implement it for any target), and
+LR recovery handlers / semantic reductions (`lr_recover`, `lr_semantic_reduce`: refused at generation, as in the C++ core facade).

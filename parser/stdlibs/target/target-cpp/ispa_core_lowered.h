@@ -4296,6 +4296,7 @@ namespace python {
 } // namespace python
 namespace python::ispa_std::lr_conflicts { struct _Span; }
 namespace python::ispa_std::lr_conflicts { struct _Alternative; }
+namespace python::ispa_std::lr_conflicts { struct _Visit; }
 namespace python::ispa_std::lr_conflicts { struct _Forest; }
 namespace python::ispa_std::lr_conflicts { struct _Stack; }
 namespace python::ispa_std::lr_conflicts { struct LRGeneralizedParser; }
@@ -4402,6 +4403,36 @@ namespace python {
 				}
 				constexpr auto methods() const {
 					return std::make_tuple(&_Eval::__init__);
+				}
+				static constexpr auto methods_str() {
+					return std::array<std::string_view, 1>{{"__init__"}};
+				}
+			};
+		} // namespace lr_conflicts
+	} // namespace ispa_std
+} // namespace python
+namespace python {
+	namespace ispa_std {
+		namespace lr_conflicts {
+			struct _Visit : public ::ISPA_STD::Object {
+				long long node;
+				long long alternative;
+				long long child;
+				auto __init__(long long node) -> void;
+				constexpr auto members() {
+					return std::tie(node, alternative, child);
+				}
+				constexpr auto members() const {
+					return std::tie(node, alternative, child);
+				}
+				static constexpr auto members_str() {
+					return std::array<std::string_view, 3>{{"node", "alternative", "child"}};
+				}
+				constexpr auto methods() {
+					return std::make_tuple(&_Visit::__init__);
+				}
+				constexpr auto methods() const {
+					return std::make_tuple(&_Visit::__init__);
 				}
 				static constexpr auto methods_str() {
 					return std::array<std::string_view, 1>{{"__init__"}};
@@ -5664,30 +5695,30 @@ template<typename V> auto python::ispa_std::lr_conflicts::LRGeneralizedParser::l
 		long long root = ((roots).items)[ri];
 		ri = ((ri) + (1));
 		if ((((visiting)[root]) != (2))) {
-			auto pending_nodes = std::vector<std::vector<long long>>{std::vector<long long>{root, 0, 0}};
+			std::vector<std::shared_ptr<python::ispa_std::lr_conflicts::_Visit>> pending_nodes = std::vector<std::shared_ptr<python::ispa_std::lr_conflicts::_Visit>>{ISPA_STD::construct<python::ispa_std::lr_conflicts::_Visit>(root)};
 			(visiting)[root] = 1;
 			while (((((pending_nodes.size()) > (0))) && (((ambiguous) == (python::ispa_std::lr::ABSENT))))) {
 				((*this))._tick(forest, stacks);
-				auto frame = (pending_nodes)[((pending_nodes.size()) - (1))];
-				auto node = (forest)[(frame)[0]];
-				if ((((frame)[1]) == (((*node)).alternatives.size()))) {
-					(visiting)[(frame)[0]] = 2;
-					(order).push_back((frame)[0]);
+				std::shared_ptr<python::ispa_std::lr_conflicts::_Visit> frame = (pending_nodes)[((pending_nodes.size()) - (1))];
+				auto node = (forest)[((*frame)).node];
+				if (((((*frame)).alternative) == (((*node)).alternatives.size()))) {
+					(visiting)[((*frame)).node] = 2;
+					(order).push_back(((*frame)).node);
 					ISPA_STD::python_pop((pending_nodes));
 				} else {
-					auto alt = (((*node)).alternatives)[(frame)[1]];
-					if ((((frame)[2]) == (((*alt)).children.size()))) {
-						(frame)[1] = (((frame)[1]) + (1));
-						(frame)[2] = 0;
+					auto alt = (((*node)).alternatives)[((*frame)).alternative];
+					if (((((*frame)).child) == (((*alt)).children.size()))) {
+						((*frame)).alternative = ((((*frame)).alternative) + (1));
+						((*frame)).child = 0;
 					} else {
-						long long child = (((*alt)).children)[(frame)[2]];
-						(frame)[2] = (((frame)[2]) + (1));
+						long long child = (((*alt)).children)[((*frame)).child];
+						((*frame)).child = ((((*frame)).child) + (1));
 						if ((((visiting)[child]) == (1))) {
 							ambiguous = child;
 						} else {
 							if ((((visiting)[child]) == (0))) {
 								(visiting)[child] = 1;
-								(pending_nodes).push_back(std::vector<long long>{child, 0, 0});
+								(pending_nodes).push_back(ISPA_STD::construct<python::ispa_std::lr_conflicts::_Visit>(child));
 							}
 						}
 					}

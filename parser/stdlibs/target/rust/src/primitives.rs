@@ -19,6 +19,11 @@ fn quiet_failures() {
     });
 }
 
+impl StdError {
+    /// `std::runtime_error(message)` of generated code (kind 7, `ErrorKind.RuntimeFailure`).
+    pub fn runtime(message: impl Into<String>) -> Self { Self { kind: 7, message: message.into() } }
+}
+
 pub fn fail(kind: i64, message: impl Into<String>) -> ! {
     quiet_failures();
     panic_any(StdError { kind, message: message.into() })
