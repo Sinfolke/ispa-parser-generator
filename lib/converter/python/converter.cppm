@@ -57,5 +57,5 @@ export namespace Python {
     };
 }
 
-extern "C" auto python_construct(const LangAPI::Declarations*, const char*, bool, bool) -> Python::Construct*;
+extern "C" auto python_construct(const LangAPI::Declarations*, const char*, bool, bool, bool text_view) -> Python::Construct*;
 extern "C" auto python_construct_finish(Python::Construct*) -> void;

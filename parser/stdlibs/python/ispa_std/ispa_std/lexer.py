@@ -420,6 +420,10 @@ class TokenCursor:
         logic_error("TokenCursor.current is abstract")
         return self.owner.empty_token()
 
+    def kind_is(self, type_id: int) -> bool:
+        """Whether the token here holds `type_id`; cursors that can answer without materialising a RawToken override it."""
+        return self.current().holds(type_id)
+
     def minus(self, other: "TokenCursor") -> int:
         return self.distance() - other.distance()
 

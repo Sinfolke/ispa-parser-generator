@@ -184,6 +184,8 @@ class CaptureState:
     regs: list[int]
     history: list[HistoryNode]
     first_line: int
+    # True while regs may hold values of a previous scan; a scan that writes no register leaves them reset.
+    dirty: bool
 
     def __init__(self, src: SourceText):
         self.src = src
@@ -191,6 +193,7 @@ class CaptureState:
         self.regs = []
         self.history = []
         self.first_line = 1
+        self.dirty = True
 
 
 class Captures:

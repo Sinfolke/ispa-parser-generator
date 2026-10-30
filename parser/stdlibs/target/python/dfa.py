@@ -8,6 +8,7 @@ transitions require additional lowering by the generator.
 from __future__ import annotations
 from dataclasses import dataclass
 from inspect import signature
+from types import FunctionType
 from typing import Any, Callable, Sequence
 from .model import Position
 
@@ -161,6 +162,19 @@ class TdfaLayout:
     outputs: int
 
 
+def _semantic_accepts_cursor(semantic: Callable) -> bool:
+    # Generated callbacks are fresh closures per token, but their parameter
+    # layout is available directly without constructing inspect.Parameter objects.
+    # Decorated functions and other callable forms keep inspect's semantics.
+    if (isinstance(semantic, FunctionType) and not hasattr(semantic, '__signature__')
+            and not hasattr(semantic, '__wrapped__')):
+        code = semantic.__code__
+        count = code.co_argcount + code.co_kwonlyargcount
+        count += bool(code.co_flags & 0x04) + bool(code.co_flags & 0x08)
+        return count >= 7
+    return len(signature(semantic).parameters) >= 7
+
+
 def run_tdfa(source: str, pos: Position, table: Sequence[Sequence[int]],
              class_table: Sequence[int], action_table: Sequence[Sequence[int]],
              layout: TdfaLayout, semantic: Callable,
@@ -184,7 +198,7 @@ def run_tdfa(source: str, pos: Position, table: Sequence[Sequence[int]],
     idle_steps = 0
     nstates = len(table)
     nactions = len(action_table)
-    semantic_accepts_cursor = len(signature(semantic).parameters) >= 7
+    semantic_accepts_cursor = _semantic_accepts_cursor(semantic)
     import ispa_debug
     tracing = ispa_debug.enabled()
     while state != NULL_STATE:

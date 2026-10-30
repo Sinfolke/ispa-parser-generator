@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.22)
-project(ispa_cpp_core LANGUAGES CXX)
+project(ispa_target_cpp LANGUAGES CXX)
 
 # ==============================================================
 # ispastdlib: the hand-written C++ runtime. ispa_core (below) is
 # the facade that bridges it to the lowered core; both live here
-# together now so cpp-core installs and builds as one self-contained
-# package (ispa-pkg install cpp-core needs nothing from elsewhere
+# together now so target-cpp installs and builds as one self-contained
+# package (ispa-pkg install target-cpp needs nothing from elsewhere
 # but target-core).
 # ==============================================================
 set(CMAKE_CXX_STANDARD 17)
@@ -51,7 +51,7 @@ if(Python3_FOUND)
             RESULT_VARIABLE ISPA_DEPS_SCAN_RESULT
     )
     if(NOT ISPA_DEPS_SCAN_RESULT EQUAL 0)
-        message(FATAL_ERROR "cpp-core: tools/ispa_deps.py failed to scan ispastdlib/ (exit ${ISPA_DEPS_SCAN_RESULT})")
+        message(FATAL_ERROR "target-cpp: tools/ispa_deps.py failed to scan ispastdlib/ (exit ${ISPA_DEPS_SCAN_RESULT})")
     endif()
     if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ispaext_deps.json")
         file(WRITE "${CMAKE_CURRENT_SOURCE_DIR}/ispaext_deps.json" "{}")
@@ -62,10 +62,10 @@ if(Python3_FOUND)
             RESULT_VARIABLE ISPA_EXT_DEPS_RESULT
     )
     if(NOT ISPA_EXT_DEPS_RESULT EQUAL 0)
-        message(FATAL_ERROR "cpp-core: tools/gen_ext_deps.py failed (exit ${ISPA_EXT_DEPS_RESULT})")
+        message(FATAL_ERROR "target-cpp: tools/gen_ext_deps.py failed (exit ${ISPA_EXT_DEPS_RESULT})")
     endif()
 elseif(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ispastdlib_deps.inc")
-    message(FATAL_ERROR "cpp-core: Python3 not found and ispastdlib_deps.inc is not generated; install Python3 to regenerate the dependency manifest")
+    message(FATAL_ERROR "target-cpp: Python3 not found and ispastdlib_deps.inc is not generated; install Python3 to regenerate the dependency manifest")
 endif()
 
 if(TARGET ispastdlib)
@@ -100,6 +100,7 @@ endif()
 # ==============================================================
 if(NOT TARGET ispa_core)
     add_library(ispa_core STATIC "${CMAKE_CURRENT_SOURCE_DIR}/src/ispa_core_lowered.cpp")
+    set_target_properties(ispa_core PROPERTIES OUTPUT_NAME "ispa-core")
     target_include_directories(ispa_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
     target_compile_features(ispa_core PUBLIC cxx_std_17)
     target_link_libraries(ispa_core PUBLIC ispastdlib::ispastdlib)

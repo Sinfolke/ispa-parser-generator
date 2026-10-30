@@ -44,8 +44,18 @@ namespace ISPA_STD {
 
         // Conversions are instantiated only when invoked, not when a recursive
         // Node<EnumT, shared_ptr<Incomplete>> is first instantiated.
-        template<typename SourceStorage>
-        void assign_converted(const Node<SourceStorage>& other) {
+        // The payload of `other`, movable when the caller passed an rvalue node (converting a temporary must not deep-copy).
+        template<typename Other>
+        static decltype(auto) payload_of(Other&& other) {
+            if constexpr (!std::is_lvalue_reference_v<Other> && !std::is_const_v<std::remove_reference_t<Other>>)
+                return std::move(other.data());
+            else
+                return (other.data());
+        }
+
+        template<typename Other>
+        void assign_converted(Other&& other) {
+            using SourceStorage = typename std::remove_cv_t<std::remove_reference_t<Other>>::data_type;
             if constexpr (is_shared_ptr<DataStorageType>::value &&
                           !is_shared_ptr<SourceStorage>::value) {
                 using Element = typename is_shared_ptr<DataStorageType>::element_type;
@@ -54,7 +64,7 @@ namespace ISPA_STD {
                 if (other.empty()) {
                     _data.reset();
                 } else {
-                    _data = std::make_shared<Element>(other.data());
+                    _data = std::make_shared<Element>(payload_of(std::forward<Other>(other)));
                 }
             } else if constexpr (!is_shared_ptr<DataStorageType>::value &&
                                  is_shared_ptr<SourceStorage>::value) {
@@ -111,6 +121,19 @@ namespace ISPA_STD {
                  std::enable_if_t<is_node_storage_conversion_allowed<DataStorageType, SourceStorage>::value, int> = 0>
         Node& operator=(const Node<SourceStorage>& other) {
             assign_converted(other);
+            return *this;
+        }
+
+        template<typename SourceStorage,
+                 std::enable_if_t<is_node_storage_conversion_allowed<DataStorageType, SourceStorage>::value, int> = 0>
+        Node(Node<SourceStorage>&& other) {
+            assign_converted(std::move(other));
+        }
+
+        template<typename SourceStorage,
+                 std::enable_if_t<is_node_storage_conversion_allowed<DataStorageType, SourceStorage>::value, int> = 0>
+        Node& operator=(Node<SourceStorage>&& other) {
+            assign_converted(std::move(other));
             return *this;
         }
 

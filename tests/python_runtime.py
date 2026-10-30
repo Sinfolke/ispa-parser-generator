@@ -11,6 +11,37 @@ from python.model import assign_attr, assign_item
 
 
 class RuntimeTests(unittest.TestCase):
+    def test_semantic_callback_arity_preserves_signature_semantics(self):
+        import functools
+        import inspect
+        from python.dfa import _semantic_accepts_cursor
+        def six(a, b, c, d, e, f): pass
+        def seven(a, b, c, d, e, f, cursor): pass
+        def variadic(a, b, c, d, e, *args, **kwargs): pass
+        def keyword(a, b, c, d, e, f, *, cursor): pass
+        class Receiver:
+            def method(self, a, b, c, d, e, f): pass
+            def __call__(self, a, b, c, d, e, f, cursor): pass
+        @functools.wraps(seven)
+        def wrapped(*args, **kwargs): pass
+        def custom(*args): pass
+        custom.__signature__ = inspect.signature(seven)
+        for callback in (six, seven, variadic, keyword, Receiver().method,
+                         Receiver(), wrapped, custom, functools.partial(seven, 1)):
+            self.assertEqual(_semantic_accepts_cursor(callback),
+                             len(inspect.signature(callback).parameters) >= 7)
+
+    def test_lexer_lookup_with_and_without_debug_tables(self):
+        for instrumented in (False, True):
+            lexer = s.Lexer('a')
+            pos = s.Position('a')
+            token = object()
+            def accept(index, captures, start, length, line, cursor):
+                return -1, token
+            args = ([], {}, pos) if instrumented else (pos,)
+            self.assertIs(lexer.lookup([[1], [2]], [0] * 256, [], s.TdfaLayout(0, 0), accept, *args), token)
+            self.assertEqual(pos.index, 1)
+
     def test_recovery_distinguishes_token_names_from_literal_text(self):
         lexer = s.Lexer('NEWLINE\n')
         lexer.tokens = [s.RawToken.create(0, lexer.source, 7, 1, 0, 'NEWLINE'),

@@ -2,24 +2,20 @@
 packages:
   std:
     github: Sinfolke/ispa-parser-generator
-    ref: main
+    ref: libraries-{generator}-latest
   target-core:
     github: Sinfolke/ispa-parser-generator
-    ref: main
+    ref: libraries-{generator}-latest
     manifest: ispa-package.target-core.yaml
-  cpp-target:
+  target-cpp:
     github: Sinfolke/ispa-parser-generator
-    ref: main
-    manifest: ispa-package.cpp-target.yaml
-  cpp-core:
-    github: Sinfolke/ispa-parser-generator
-    ref: main
-    manifest: ispa-package.cpp-core.yaml
+    ref: libraries-{generator}-latest
+    manifest: ispa-package.target-cpp.yaml
   python-target:
     github: Sinfolke/ispa-parser-generator
-    ref: main
+    ref: libraries-{generator}-latest
     manifest: ispa-package.python-target.yaml
   rust-target:
     github: Sinfolke/ispa-parser-generator
-    ref: main
+    ref: libraries-{generator}-latest
     manifest: ispa-package.rust-target.yaml

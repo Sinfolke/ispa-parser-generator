@@ -80,10 +80,10 @@ int main() {
 }
 )";
     const auto command = std::string("clang++ -std=c++23 -I\"") +
-        std::string(ROOT_DIR) + "/parser/stdlibs/target/cpp-core\" -I\"" + directory.string() +
+        std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp\" -I\"" + directory.string() +
         "\" \"" + (directory / "PluginTest.cpp").string() + "\" \"" +
         (directory / "run.cpp").string() + "\" \"" + std::string(ROOT_DIR) +
-        "/parser/stdlibs/target/cpp-core/src/core.cpp\" -o \"" + (directory / "run").string() + "\"";
+        "/parser/stdlibs/target/target-cpp/src/core.cpp\" \"" + std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp\" -o \"" + (directory / "run").string() + "\"";
     ASSERT_EQ(std::system(command.c_str()), 0);
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
 }
@@ -112,10 +112,10 @@ int main() {
 }
 )";
     const auto command = std::string("clang++ -std=c++23 -I\"") + ROOT_DIR +
-        "/parser/stdlibs/target/cpp-core\" -I\"" + directory.string() + "\" \"" +
+        "/parser/stdlibs/target/target-cpp\" -I\"" + directory.string() + "\" \"" +
         (directory / "PluginTest.cpp").string() + "\" \"" +
         (directory / "run.cpp").string() + "\" \"" + ROOT_DIR +
-        "/parser/stdlibs/target/cpp-core/src/core.cpp\" -o \"" + (directory / "run").string() + "\"";
+        "/parser/stdlibs/target/target-cpp/src/core.cpp\" \"" + std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp\" -o \"" + (directory / "run").string() + "\"";
     ASSERT_EQ(std::system(command.c_str()), 0);
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
 }
@@ -165,10 +165,10 @@ int main() {
 }
 )";
     const auto command = std::string("clang++ -std=c++23 -I\"") + ROOT_DIR +
-        "/parser/stdlibs/target/cpp-core\" -I\"" + directory.string() + "\" \"" +
+        "/parser/stdlibs/target/target-cpp\" -I\"" + directory.string() + "\" \"" +
         (directory / "PluginTest.cpp").string() + "\" \"" +
         (directory / "run.cpp").string() + "\" \"" + ROOT_DIR +
-        "/parser/stdlibs/target/cpp-core/src/core.cpp\" -o \"" + (directory / "run").string() + "\"";
+        "/parser/stdlibs/target/target-cpp/src/core.cpp\" \"" + std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp\" -o \"" + (directory / "run").string() + "\"";
     ASSERT_EQ(std::system(command.c_str()), 0);
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
 }
@@ -220,10 +220,10 @@ int main() {
 }
 )";
     const auto command = std::string("clang++ -std=c++23 -I\"") + ROOT_DIR +
-        "/parser/stdlibs/target/cpp-core\" -I\"" + directory.string() + "\" \"" +
+        "/parser/stdlibs/target/target-cpp\" -I\"" + directory.string() + "\" \"" +
         (directory / "PluginTest.cpp").string() + "\" \"" +
         (directory / "run.cpp").string() + "\" \"" + ROOT_DIR +
-        "/parser/stdlibs/target/cpp-core/src/core.cpp\" -o \"" + (directory / "run").string() + "\"";
+        "/parser/stdlibs/target/target-cpp/src/core.cpp\" \"" + std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp\" -o \"" + (directory / "run").string() + "\"";
     ASSERT_EQ(std::system(command.c_str()), 0);
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
 }
@@ -262,10 +262,10 @@ int main() {
 }
 )";
     const auto command = std::string("clang++ -std=c++23 -I\"") + ROOT_DIR +
-        "/parser/stdlibs/target/cpp-core\" -I\"" + directory.string() + "\" \"" +
+        "/parser/stdlibs/target/target-cpp\" -I\"" + directory.string() + "\" \"" +
         (directory / "PluginTest.cpp").string() + "\" \"" +
         (directory / "run.cpp").string() + "\" \"" + ROOT_DIR +
-        "/parser/stdlibs/target/cpp-core/src/core.cpp\" -o \"" + (directory / "run").string() + "\"";
+        "/parser/stdlibs/target/target-cpp/src/core.cpp\" \"" + std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp\" -o \"" + (directory / "run").string() + "\"";
     ASSERT_EQ(std::system(command.c_str()), 0);
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
 }
@@ -307,9 +307,9 @@ int main() {
 }
 )";
     const auto command = std::string("clang++ -std=c++23 -I\"") + ROOT_DIR +
-        "/parser/stdlibs/target/cpp-core\" -I\"" + directory.string() + "\" \"" +
+        "/parser/stdlibs/target/target-cpp\" -I\"" + directory.string() + "\" \"" +
         (directory / "PluginTest.cpp").string() + "\" \"" + (directory / "run.cpp").string() +
-        "\" \"" + ROOT_DIR + "/parser/stdlibs/target/cpp-core/src/core.cpp\" -o \"" +
+        "\" \"" + ROOT_DIR + "/parser/stdlibs/target/target-cpp/src/core.cpp\" \"" + std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp\" -o \"" +
         (directory / "run").string() + "\"";
     ASSERT_EQ(std::system(command.c_str()), 0);
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
@@ -348,9 +348,9 @@ int main() {
 }
 )";
     const auto command = std::string("clang++ -std=c++23 -I\"") + ROOT_DIR +
-        "/parser/stdlibs/target/cpp-core\" -I\"" + directory.string() + "\" \"" +
+        "/parser/stdlibs/target/target-cpp\" -I\"" + directory.string() + "\" \"" +
         (directory / "PluginTest.cpp").string() + "\" \"" + (directory / "run.cpp").string() +
-        "\" \"" + ROOT_DIR + "/parser/stdlibs/target/cpp-core/src/core.cpp\" -o \"" +
+        "\" \"" + ROOT_DIR + "/parser/stdlibs/target/target-cpp/src/core.cpp\" \"" + std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp\" -o \"" +
         (directory / "run").string() + "\"";
     ASSERT_EQ(std::system(command.c_str()), 0);
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
@@ -404,9 +404,9 @@ int main() {
 }
 )";
     const auto command = std::string("clang++ -std=c++23 -I\"") + ROOT_DIR +
-        "/parser/stdlibs/target/cpp-core\" -I\"" + directory.string() + "\" \"" +
+        "/parser/stdlibs/target/target-cpp\" -I\"" + directory.string() + "\" \"" +
         (directory / "PluginTest.cpp").string() + "\" \"" + (directory / "run.cpp").string() +
-        "\" \"" + ROOT_DIR + "/parser/stdlibs/target/cpp-core/src/core.cpp\" -o \"" +
+        "\" \"" + ROOT_DIR + "/parser/stdlibs/target/target-cpp/src/core.cpp\" \"" + std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp\" -o \"" +
         (directory / "run").string() + "\"";
     ASSERT_EQ(std::system(command.c_str()), 0);
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
@@ -497,10 +497,10 @@ int main() {
 }
 )";
     const auto command = std::string("clang++ -std=c++23 -I\"") + ROOT_DIR +
-        "/parser/stdlibs/target/cpp-core\" -I\"" + directory.string() + "\" \"" +
+        "/parser/stdlibs/target/target-cpp\" -I\"" + directory.string() + "\" \"" +
         (directory / "PluginTest.cpp").string() + "\" \"" +
         (directory / "run.cpp").string() + "\" \"" + ROOT_DIR +
-        "/parser/stdlibs/target/cpp-core/src/core.cpp\" -o \"" + (directory / "run").string() + "\"";
+        "/parser/stdlibs/target/target-cpp/src/core.cpp\" \"" + std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp\" -o \"" + (directory / "run").string() + "\"";
     ASSERT_EQ(std::system(command.c_str()), 0);
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
 }
@@ -537,10 +537,10 @@ int main() {
 }
 )";
     const auto command = std::string("clang++ -std=c++23 -I\"") + ROOT_DIR +
-        "/parser/stdlibs/target/cpp-core\" -I\"" + directory.string() + "\" \"" +
+        "/parser/stdlibs/target/target-cpp\" -I\"" + directory.string() + "\" \"" +
         (directory / "PluginTest.cpp").string() + "\" \"" +
         (directory / "run.cpp").string() + "\" \"" + ROOT_DIR +
-        "/parser/stdlibs/target/cpp-core/src/core.cpp\" -o \"" + (directory / "run").string() + "\"";
+        "/parser/stdlibs/target/target-cpp/src/core.cpp\" \"" + std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp\" -o \"" + (directory / "run").string() + "\"";
     ASSERT_EQ(std::system(command.c_str()), 0);
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
 }
@@ -580,9 +580,9 @@ int main() {
 }
 )";
     const auto command = std::string("clang++ -std=c++23 -I\"") + ROOT_DIR +
-        "/parser/stdlibs/target/cpp-core\" -I\"" + directory.string() + "\" \"" +
+        "/parser/stdlibs/target/target-cpp\" -I\"" + directory.string() + "\" \"" +
         (directory / "PluginTest.cpp").string() + "\" \"" + (directory / "run.cpp").string() +
-        "\" \"" + ROOT_DIR + "/parser/stdlibs/target/cpp-core/src/core.cpp\" -o \"" +
+        "\" \"" + ROOT_DIR + "/parser/stdlibs/target/target-cpp/src/core.cpp\" \"" + std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp\" -o \"" +
         (directory / "run").string() + "\"";
     ASSERT_EQ(std::system(command.c_str()), 0);
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
@@ -686,9 +686,9 @@ int main() {
 }
 )";
     const auto command = std::string("clang++ -std=c++23 -I\"") + ROOT_DIR +
-        "/parser/stdlibs/target/cpp-core\" -I\"" + directory.string() + "\" \"" + (directory / "PluginTest.cpp").string() +
+        "/parser/stdlibs/target/target-cpp\" -I\"" + directory.string() + "\" \"" + (directory / "PluginTest.cpp").string() +
         "\" \"" + (directory / "run.cpp").string() + "\" \"" + ROOT_DIR +
-        "/parser/stdlibs/target/cpp-core/src/core.cpp\" -o \"" + (directory / "run").string() + "\"";
+        "/parser/stdlibs/target/target-cpp/src/core.cpp\" \"" + std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp\" -o \"" + (directory / "run").string() + "\"";
     ASSERT_EQ(std::system(command.c_str()), 0);
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
 }
@@ -737,9 +737,9 @@ int main() {
 }
 )";
     const auto command = std::string("clang++ -std=c++23 -I\"") + ROOT_DIR +
-        "/parser/stdlibs/target/cpp-core\" -I\"" + directory.string() + "\" \"" +
+        "/parser/stdlibs/target/target-cpp\" -I\"" + directory.string() + "\" \"" +
         (directory / "PluginTest.cpp").string() + "\" \"" + (directory / "run.cpp").string() +
-        "\" \"" + ROOT_DIR + "/parser/stdlibs/target/cpp-core/src/core.cpp\" -o \"" +
+        "\" \"" + ROOT_DIR + "/parser/stdlibs/target/target-cpp/src/core.cpp\" \"" + std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp\" -o \"" +
         (directory / "run").string() + "\"";
     ASSERT_EQ(std::system(command.c_str()), 0);
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
@@ -773,9 +773,9 @@ int main() {
 }
 )";
     const auto command = std::string("clang++ -std=c++23 -I\"") + ROOT_DIR +
-        "/parser/stdlibs/target/cpp-core\" -I\"" + directory.string() + "\" \"" +
+        "/parser/stdlibs/target/target-cpp\" -I\"" + directory.string() + "\" \"" +
         (directory / "PluginTest.cpp").string() + "\" \"" + (directory / "run.cpp").string() +
-        "\" \"" + ROOT_DIR + "/parser/stdlibs/target/cpp-core/src/core.cpp\" -o \"" +
+        "\" \"" + ROOT_DIR + "/parser/stdlibs/target/target-cpp/src/core.cpp\" \"" + std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp\" -o \"" +
         (directory / "run").string() + "\"";
     ASSERT_EQ(std::system(command.c_str()), 0);
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
@@ -812,10 +812,10 @@ int main() {
 }
 )cpp";
     const auto command = std::string("clang++ -std=c++23 -I\"") + std::string(ROOT_DIR) +
-        "/parser/stdlibs/target/cpp-core\" -I\"" + directory.string() + "\" \"" +
+        "/parser/stdlibs/target/target-cpp\" -I\"" + directory.string() + "\" \"" +
         (directory / "PluginTest.cpp").string() + "\" \"" +
         (directory / "run.cpp").string() + "\" \"" + std::string(ROOT_DIR) +
-        "/parser/stdlibs/target/cpp-core/src/core.cpp\" -o \"" + (directory / "run").string() + "\"";
+        "/parser/stdlibs/target/target-cpp/src/core.cpp\" \"" + std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp\" -o \"" + (directory / "run").string() + "\"";
     ASSERT_EQ(std::system(command.c_str()), 0);
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
 }
@@ -906,10 +906,10 @@ int main() {
 }
 )cpp";
     const auto command = std::string("clang++ -std=c++23 -I\"") + std::string(ROOT_DIR) +
-        "/parser/stdlibs/target/cpp-core\" -I\"" + directory.string() + "\" \"" +
+        "/parser/stdlibs/target/target-cpp\" -I\"" + directory.string() + "\" \"" +
         (directory / "PluginTest.cpp").string() + "\" \"" +
         (directory / "run.cpp").string() + "\" \"" + std::string(ROOT_DIR) +
-        "/parser/stdlibs/target/cpp-core/src/core.cpp\" -o \"" + (directory / "run").string() + "\"";
+        "/parser/stdlibs/target/target-cpp/src/core.cpp\" \"" + std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp\" -o \"" + (directory / "run").string() + "\"";
     ASSERT_EQ(std::system(command.c_str()), 0);
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
 }
@@ -961,10 +961,10 @@ int main() {
 }
 )";
         const auto command = std::string("clang++ -std=c++23 -I\"") +
-            std::string(ROOT_DIR) + "/parser/stdlibs/target/cpp-core\" -I\"" + directory.string() +
+            std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp\" -I\"" + directory.string() +
             "\" \"" + (directory / "PluginTest.cpp").string() + "\" \"" +
             (directory / "run.cpp").string() + "\" \"" + std::string(ROOT_DIR) +
-            "/parser/stdlibs/target/cpp-core/src/core.cpp\" -o \"" + (directory / "run").string() + "\"";
+            "/parser/stdlibs/target/target-cpp/src/core.cpp\" \"" + std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp\" -o \"" + (directory / "run").string() + "\"";
         ASSERT_EQ(std::system(command.c_str()), 0);
         EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
     }
@@ -1098,7 +1098,7 @@ TEST(AlgorithmPlugin, LLGeneratedRecoveryAndRuleCallbacksCompile) {
     Algorithm::Metadata metadata;
     convert(*descriptor, tree, metadata, directory);
     const auto command = std::string("clang++ -std=c++23 -fsyntax-only -I\"") +
-        std::string(ROOT_DIR) + "/parser/stdlibs/target/cpp-core\" -I\"" + directory.string() +
+        std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp\" -I\"" + directory.string() +
         "\" \"" + (directory / "PluginTest.cpp").string() + "\"";
     EXPECT_EQ(std::system(command.c_str()), 0);
 }
@@ -1144,10 +1144,10 @@ int main() {
 }
 )";
     const auto command = std::string("clang++ -std=c++23 -I\"") +
-        std::string(ROOT_DIR) + "/parser/stdlibs/target/cpp-core\" -I\"" + directory.string() +
+        std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp\" -I\"" + directory.string() +
         "\" \"" + (directory / "PluginTest.cpp").string() + "\" \"" +
         (directory / "run.cpp").string() + "\" \"" + std::string(ROOT_DIR) +
-        "/parser/stdlibs/target/cpp-core/src/core.cpp\" -o \"" + (directory / "run").string() + "\"";
+        "/parser/stdlibs/target/target-cpp/src/core.cpp\" \"" + std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp\" -o \"" + (directory / "run").string() + "\"";
     ASSERT_EQ(std::system(command.c_str()), 0);
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
 }
@@ -1194,10 +1194,10 @@ int main() {
 
 )";
     const auto command = std::string("clang++ -std=c++23 -I\"") +
-        std::string(ROOT_DIR) + "/parser/stdlibs/target/cpp-core\" -I\"" + directory.string() +
+        std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp\" -I\"" + directory.string() +
         "\" \"" + (directory / "PluginTest.cpp").string() + "\" \"" +
         (directory / "run.cpp").string() + "\" \"" + std::string(ROOT_DIR) +
-        "/parser/stdlibs/target/cpp-core/src/core.cpp\" -o \"" + (directory / "run").string() + "\"";
+        "/parser/stdlibs/target/target-cpp/src/core.cpp\" \"" + std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp\" -o \"" + (directory / "run").string() + "\"";
     ASSERT_EQ(std::system(command.c_str()), 0);
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
 }
@@ -1228,10 +1228,10 @@ int main() {
 
 )";
     const auto command = std::string("clang++ -std=c++23 -I\"") +
-        std::string(ROOT_DIR) + "/parser/stdlibs/target/cpp-core\" -I\"" + directory.string() +
+        std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp\" -I\"" + directory.string() +
         "\" \"" + (directory / "PluginTest.cpp").string() + "\" \"" +
         (directory / "run.cpp").string() + "\" \"" + std::string(ROOT_DIR) +
-        "/parser/stdlibs/target/cpp-core/src/core.cpp\" -o \"" + (directory / "run").string() + "\"";
+        "/parser/stdlibs/target/target-cpp/src/core.cpp\" \"" + std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp\" -o \"" + (directory / "run").string() + "\"";
     ASSERT_EQ(std::system(command.c_str()), 0);
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
 }
@@ -1299,10 +1299,10 @@ int main() {
 }
 )";
     const auto command = std::string("clang++ -std=c++23 -I\"") +
-        std::string(ROOT_DIR) + "/parser/stdlibs/target/cpp-core\" -I\"" + directory.string() +
+        std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp\" -I\"" + directory.string() +
         "\" \"" + (directory / "PluginTest.cpp").string() + "\" \"" +
         (directory / "run.cpp").string() + "\" \"" + std::string(ROOT_DIR) +
-        "/parser/stdlibs/target/cpp-core/src/core.cpp\" -o \"" + (directory / "run").string() + "\"";
+        "/parser/stdlibs/target/target-cpp/src/core.cpp\" \"" + std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp\" -o \"" + (directory / "run").string() + "\"";
     ASSERT_EQ(std::system(command.c_str()), 0);
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
 }
@@ -1380,10 +1380,10 @@ int main() {
 }
 )cpp";
         const auto command = std::string("clang++ -std=c++23 -I\"") + std::string(ROOT_DIR) +
-            "/parser/stdlibs/target/cpp-core\" -I\"" + directory.string() + "\" \"" +
+            "/parser/stdlibs/target/target-cpp\" -I\"" + directory.string() + "\" \"" +
             (directory / "PluginTest.cpp").string() + "\" \"" +
             (directory / "run.cpp").string() + "\" \"" + std::string(ROOT_DIR) +
-            "/parser/stdlibs/target/cpp-core/src/core.cpp\" -o \"" + (directory / "run").string() + "\"";
+            "/parser/stdlibs/target/target-cpp/src/core.cpp\" \"" + std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp\" -o \"" + (directory / "run").string() + "\"";
         ASSERT_EQ(std::system(command.c_str()), 0);
         EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
     }
@@ -1419,10 +1419,10 @@ int main() {
 }
 )cpp";
         const auto command = std::string("clang++ -std=c++23 -I\"") + std::string(ROOT_DIR) +
-            "/parser/stdlibs/target/cpp-core\" -I\"" + directory.string() + "\" \"" +
+            "/parser/stdlibs/target/target-cpp\" -I\"" + directory.string() + "\" \"" +
             (directory / "PluginTest.cpp").string() + "\" \"" +
             (directory / "run.cpp").string() + "\" \"" + std::string(ROOT_DIR) +
-            "/parser/stdlibs/target/cpp-core/src/core.cpp\" -o \"" + (directory / "run").string() + "\"";
+            "/parser/stdlibs/target/target-cpp/src/core.cpp\" \"" + std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp\" -o \"" + (directory / "run").string() + "\"";
         ASSERT_EQ(std::system(command.c_str()), 0);
         EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
     }
@@ -1458,10 +1458,10 @@ int main() {
 }
 )";
     const auto command = std::string("clang++ -std=c++23 -I\"") + ROOT_DIR +
-        "/parser/stdlibs/target/cpp-core\" -I\"" + directory.string() + "\" \"" +
+        "/parser/stdlibs/target/target-cpp\" -I\"" + directory.string() + "\" \"" +
         (directory / "PluginTest.cpp").string() + "\" \"" +
         (directory / "run.cpp").string() + "\" \"" + ROOT_DIR +
-        "/parser/stdlibs/target/cpp-core/src/core.cpp\" -o \"" + (directory / "run").string() + "\"";
+        "/parser/stdlibs/target/target-cpp/src/core.cpp\" \"" + std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp\" -o \"" + (directory / "run").string() + "\"";
     ASSERT_EQ(std::system(command.c_str()), 0);
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
 }
@@ -1491,10 +1491,10 @@ int main() {
 }
 )";
     const auto command = std::string("clang++ -std=c++23 -I\"") + ROOT_DIR +
-        "/parser/stdlibs/target/cpp-core\" -I\"" + directory.string() + "\" \"" +
+        "/parser/stdlibs/target/target-cpp\" -I\"" + directory.string() + "\" \"" +
         (directory / "PluginTest.cpp").string() + "\" \"" +
         (directory / "run.cpp").string() + "\" \"" + ROOT_DIR +
-        "/parser/stdlibs/target/cpp-core/src/core.cpp\" -o \"" + (directory / "run").string() + "\"";
+        "/parser/stdlibs/target/target-cpp/src/core.cpp\" \"" + std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp\" -o \"" + (directory / "run").string() + "\"";
     ASSERT_EQ(std::system(command.c_str()), 0);
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
 }

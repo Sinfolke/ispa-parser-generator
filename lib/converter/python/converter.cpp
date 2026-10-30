@@ -780,7 +780,7 @@ void Construct::construct() {
 }
 
 extern "C" auto python_construct(const LangAPI::Declarations* tree, const char* module_name,
-                                 bool incremental, bool debug_instrumentation)
+                                 bool incremental, bool debug_instrumentation, bool /*text_view: C++ only*/)
     -> Python::Construct* {
     return new Python::Construct(tree, module_name, incremental, debug_instrumentation);
 }

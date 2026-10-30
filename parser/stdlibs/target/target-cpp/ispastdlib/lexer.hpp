@@ -579,6 +579,8 @@ namespace ISPA_STD {
                 throw IspaAPIExcept("can't lex because no input provided. ");
             }
             const char* pos = _in;
+            // Tokens are a few bytes each: reserving avoids moving the whole stream on every doubling (capped, untouched pages stay virtual).
+            tokens.reserve(std::min<std::size_t>(std::strlen(_in) / 3 + 16, std::size_t{1} << 24));
             while (*pos != '\0') {
                 const char* before = pos;
                 Token t = makeToken(pos);

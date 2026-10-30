@@ -70,6 +70,6 @@ namespace Rust {
     };
 }
 extern "C" auto rust_construct(const LangAPI::Declarations *tree, const char *namespace_name,
-                               bool incremental, bool debug_instrumentation)
+                               bool incremental, bool debug_instrumentation, bool text_view)
     -> Rust::Construct*;
 extern "C" auto rust_construct_finish(Rust::Construct *c) -> void;

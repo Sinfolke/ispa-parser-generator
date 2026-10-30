@@ -43,18 +43,19 @@ Install the grammar standard library, then the runtime for each output language 
 
 ```sh
 ispa-pkg install std
-ispa-pkg install cpp-target    # for C++ output
-ispa-pkg install cpp-core      # for C++ output with --stdlib core (independent of cpp-target)
+ispa-pkg install target-cpp    # for C++ output
 ispa-pkg install python-target # for Python output
 ispa-pkg --export-permanent
 ```
 
 `std` contains `.isc` grammar modules and their Python helpers. It does not
-install a generated parser runtime. `cpp-target` supplies the C++ headers and
+install a generated parser runtime. `target-cpp` supplies the C++ headers and
 library; `python-target` supplies the Python runtime modules. Install either
-target package or both, according to the code you generate. If a C++ toolchain
-is unavailable during installation, run `ispa-pkg --build cpp-target` after
-setting it up.
+target package or both, according to the code you generate. The C++ package builds
+`libispa-core.a` from the Python-derived runtime and its native interoperability layer.
+Run `ispa-pkg --build target-cpp` to regenerate and rebuild it with `ispa` on PATH.
+Use `ispa --export` to export the built library, include directories, and CMake manifest
+(`eval "$(ispa --export)"` applies shell exports to the current POSIX shell).
 
 `ispa --help` lists generation options; `ispa-pkg --help` covers package management. The [Getting Started](https://github.com/Sinfolke/ispa-parser-generator/wiki/Getting-Started) wiki page walks through the rest, including non-CMake builds.
 
@@ -161,3 +162,5 @@ With a full typed AST, ISPA was about 12x faster than ANTLR with CST constructio
 Apache-2.0
 
 Flex and Bison converter usage and limitations: [migration guide](docs/FLEX_BISON_TO_ISPA.md).
+
+See [generator-compatible library versioning](docs/LIBRARY_VERSIONING.md) for GitHub compatibility tags and `ispa-pkg doctor`.

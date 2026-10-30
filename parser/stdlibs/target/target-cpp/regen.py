@@ -15,6 +15,7 @@ MODULES = ('parser_ll', 'lr_conflicts', 'debug', 'external', 'optional', 'map', 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--ispa', default=os.environ.get('ISPA') or shutil.which('ispa'))
+    parser.add_argument('--library', type=Path, default=LIBRARY)
     args = parser.parse_args()
     if not args.ispa:
         sys.exit('regen.py: ispa executable not found (use --ispa)')
@@ -23,8 +24,8 @@ def main():
         work = Path(temp)
         entry = work / 'c.isc'
         entry.write_text(''.join(f'import py ispa_std.{name};\n' for name in MODULES) + "main: 'x';\n")
-        subprocess.run([args.ispa, '-l', 'cpp', '-a', 'LL', '--no-incremental', '--no-debug-instrumentation',
-                        '--dir', str(LIBRARY), '--dir', str(work), str(entry), '-o', str(work / 'o')],
+        subprocess.run([args.ispa, '-l', 'cpp', '-a', 'LL', '--no-incremental', '--no-debug-instrumentation', '--library-only',
+                        '--dir', str(args.library), '--dir', str(work), str(entry), '-o', str(work / 'o')],
                        check=True, env=env)
         header = (work / 'o.h').read_text().replace('"o.h"', '"ispa_core_lowered.h"')
         source = (work / 'o.cpp').read_text().replace('"o.h"', '"ispa_core_lowered.h"')

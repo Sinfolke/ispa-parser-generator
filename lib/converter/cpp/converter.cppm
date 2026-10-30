@@ -70,6 +70,7 @@ namespace Cpp {
     class Construct : protected ::Converter::ConstructBase {
         Context context;
         bool debug_instrumentation_ = true;
+        bool text_view_ = false;
         std::vector<std::pair<std::string, std::string>> writable_files;
         // declarations related
         auto determineOffloadCompatible(const LangAPI::Function &func) -> bool;
@@ -80,6 +81,8 @@ namespace Cpp {
         auto produceTypeAlias(const LangAPI::TypeAlias &alias, OutputSrc &o) -> void;
         auto produceEnum(const LangAPI::Enum &enum_, OutputSrc &o) -> void;
         auto produceVariable(const LangAPI::Variable &v, OutputSrc &o) -> void;
+        auto inAstTypes() const -> bool;
+        auto inSemanticAction() const -> bool;
         auto setVisibility(LangAPI::Visibility visibility) -> std::string;
         auto getVisibility(LangAPI::Visibility visibility) -> std::string;
         auto setDefaultClsVisibility(LangAPI::Visibility visibility) -> std::string;
@@ -100,8 +103,8 @@ namespace Cpp {
         auto convertStatements(const LangAPI::Statements &statements, Converter::Writer &o) -> void;
     public:
         Construct(const LangAPI::Declarations *source, const char *namespace_name, bool incremental,
-                  bool debug_instrumentation = true)
-            : ConstructBase(source, namespace_name, incremental), debug_instrumentation_(debug_instrumentation) {
+                  bool debug_instrumentation = true, bool text_view = false)
+            : ConstructBase(source, namespace_name, incremental), debug_instrumentation_(debug_instrumentation), text_view_(text_view) {
             Core::symbol_path = &context.symbol_path;
             Core::lambda_body = [this](const LangAPI::Statements& body) {
                 Converter::Writer writer;
@@ -116,5 +119,5 @@ namespace Cpp {
     };
 }
 extern "C" auto cpp_construct(const LangAPI::Declarations *tree, const char *namespace_name,
-                              bool incremental, bool debug_instrumentation)
+                              bool incremental, bool debug_instrumentation, bool text_view)
     -> Cpp::Construct*;

@@ -4,6 +4,7 @@
  * method run by construct() on a default-constructed object, so `self` can escape from it.
  */
 #pragma once
+#include <cstdlib>
 #include <memory>
 #include <memory_resource>
 #include <type_traits>

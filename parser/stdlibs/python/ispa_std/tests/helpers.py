@@ -15,6 +15,9 @@ class ListIt:
     def current(self):
         return self.toks[self.i]
 
+    def kind_is(self, type_id):
+        return self.current().holds(type_id)
+
     def next(self):
         self.i += 1
         return self

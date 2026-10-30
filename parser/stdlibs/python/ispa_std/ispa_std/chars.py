@@ -25,6 +25,16 @@ def char_of(code: int) -> str:
 
 
 
+def code_at(s: str, index: int) -> int:
+    """code_of(at(s, index)) without building the one-character string."""
+    if index < 0 or index >= len(s):
+        return 0
+    code = prim.char_code(s[index])
+    if code > 255:
+        return 255
+    return code
+
+
 def at(s: str, index: int) -> str:
     """s[index], or "" outside the string (the C++ NUL terminator)."""
     if index < 0 or index >= len(s):

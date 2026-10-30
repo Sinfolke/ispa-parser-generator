@@ -1,0 +1,9 @@
+# Python ispa_std lowered to C++, with the native interoperability layer.
+name: target-cpp
+requires:
+  - target-core
+layout:
+  root: parser/stdlibs
+  ispalib: {}
+  ispatarget:
+    target-cpp: target/target-cpp

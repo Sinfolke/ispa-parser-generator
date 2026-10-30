@@ -576,6 +576,38 @@ auto RustCore::convertSymbol(const LangAPI::Symbol &symbol, bool value_context) 
 }
 
 auto RustCore::convertStorageSymbol(const LangAPI::StorageSymbol &symbol, bool place) -> std::string {
+    // Consecutive indexed reads keep intermediate elements borrowed. PyIndex
+    // still owns the final result (including Python's one-byte string units).
+    const auto* root = soleRValue(symbol.what);
+    const bool nested_index = root && root->isStorageSymbol() &&
+        !root->getStorageSymbol().path.empty() &&
+        std::ranges::all_of(root->getStorageSymbol().path, [](const auto& part) {
+            return std::holds_alternative<LangAPI::StorageOffset>(part);
+        });
+    if (!place && (nested_index || symbol.path.size() > 1) && !symbol.path.empty() &&
+        std::ranges::all_of(symbol.path, [](const auto& part) {
+            return std::holds_alternative<LangAPI::StorageOffset>(part);
+        })) {
+        const auto indexed = [&](auto&& self, const LangAPI::StorageSymbol& value, bool borrow) -> std::string {
+            std::string base;
+            if (const auto* inner = soleRValue(value.what); inner && inner->isStorageSymbol()) {
+                const auto& nested = inner->getStorageSymbol();
+                if (!nested.path.empty() && std::ranges::all_of(nested.path, [](const auto& part) {
+                    return std::holds_alternative<LangAPI::StorageOffset>(part);
+                })) base = self(self, nested, true);
+            }
+            if (base.empty()) base = convertExpression(value.what);
+            for (std::size_t i = 0; i < value.path.size(); ++i) {
+                const auto offset = convertExpression(std::get<LangAPI::StorageOffset>(value.path[i]).offset);
+                const bool intermediate = borrow || i + 1 < value.path.size();
+                base = std::string(intermediate ? "::ispa_std::pycoll::PyIndexBorrow::py_index_borrow" :
+                                                 "::ispa_std::pycoll::PyIndex::py_index") +
+                       "(&(" + base + "), &(" + offset + "))";
+            }
+            return base;
+        };
+        return indexed(indexed, symbol, false);
+    }
     std::string res = convertExpression(symbol.what);
     // a local holding an object handle: members are reached through the handle
     const auto bare = res.size() > 2 && res.front() == '(' && res.back() == ')' ? res.substr(1, res.size() - 2) : res;
@@ -1145,8 +1177,13 @@ auto RustCore::convertFunctionCall(const LangAPI::FunctionCall &call, bool membe
         static constexpr const char* defaults[] = {"true", "true", "true", "64"};
         if (policy.size() > 4) throw Error("Rust Converter: invalid recovery policy length");
         for (std::size_t i = policy.size(); i < 4; ++i) policy.push_back(defaults[i]);
-        return "::ispa_std::recovery::handler(" + joinStrings(sets, ", ") + ", " +
-               joinStrings(policy, ", ") + ", " + joinStrings(args, ", ") + ")";
+        // Recovery sets, policy and labels are constants of this generated call site.
+        // Keep Rc-backed handlers thread-local; a process-wide static would share
+        // non-Send runtime objects across threads.
+        return "{ ::std::thread_local! { static HANDLER: ::ispa_std::recovery::CoreFail = "
+               "::ispa_std::recovery::handler(" + joinStrings(sets, ", ") + ", " +
+               joinStrings(policy, ", ") + ", " + joinStrings(args, ", ") +
+               "); } HANDLER.with(|handler| handler.clone()) }";
     }
     if (std::holds_alternative<std::shared_ptr<LangAPI::Symbol>>(call.name)) {
         const auto &symbol = *std::get<std::shared_ptr<LangAPI::Symbol>>(call.name);

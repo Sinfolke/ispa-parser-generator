@@ -11,7 +11,7 @@ from typing import Callable
 from ispa_std import debug
 from ispa_std.raw_token import RawToken
 from ispa_std.utility import Pair
-from ispa_std.chars import at, code_of
+from ispa_std.chars import at, code_at, code_of
 from ispa_std.dfa_api import (Action, CaptureState, Captures, SourceText, DebugIndex, DFADebug, DYNAMIC_FAIL_STATE, HistoryNode,
                               LEXER_DELETE_STATE, NULL_STATE, TdfaLayout, UNSET)
 from ispa_std.failures import internal_error, runtime_error
@@ -115,10 +115,12 @@ def run(source: SourceText, cur: Cursor, start_pos: int, tables: DfaTables, sema
     n = len(source.text)
     start = cur.pos
     start_line = cur.line
-    first = "<end of input>"
-    if start < n:
-        first = source.text[start]
-    scope = debug.MatchScope("lexer scan", first)
+    scope = debug.idle_match_scope()
+    if debug.enabled():
+        first = "<end of input>"
+        if start < n:
+            first = source.text[start]
+        scope = debug.MatchScope("lexer scan", first)
 
     table = tables.table
     class_table = tables.class_table
@@ -133,14 +135,16 @@ def run(source: SourceText, cur: Cursor, start_pos: int, tables: DfaTables, sema
     scan_state.base = start
     scan_state.first_line = start_line
     regs = scan_state.regs
-    regs.clear()
-    i = 0
     width = registers
     if width < 1:
         width = 1
-    while i < width:
-        regs.append(UNSET)
-        i = i + 1
+    if scan_state.dirty or len(regs) != width:
+        regs.clear()
+        i = 0
+        while i < width:
+            regs.append(UNSET)
+            i = i + 1
+        scan_state.dirty = False
     history = scan_state.history
     history.clear()
 
@@ -151,27 +155,26 @@ def run(source: SourceText, cur: Cursor, start_pos: int, tables: DfaTables, sema
     dead = False
 
     while state != NULL_STATE and not dead:
-        pos_ch = at(source.text, cur.pos)
-        current_ch = pos_ch
-        if immediate_action:
-            current_ch = at(source.text, cur.pos + 1)
         if trace_on:
+            current_ch = at(source.text, cur.pos)
+            if immediate_action:
+                current_ch = at(source.text, cur.pos + 1)
             _trace_step(tables, state, class_table[code_of(current_ch)], current_ch, current_ch)
         if state < nstates:
             if immediate_action:
                 immediate_action = False
-                if pos_ch == "\n":
+                if code_at(source.text, cur.pos) == 10:
                     cur.line = cur.line + 1
                 if cur.pos < n:
                     cur.pos = cur.pos + 1
-            here_ch = at(source.text, cur.pos)
-            nxt = table[state][class_table[code_of(here_ch)]]
+            here_code = code_at(source.text, cur.pos)
+            nxt = table[state][class_table[here_code]]
             if nxt == NULL_STATE:
                 dead = True
             else:
                 state = nxt
                 if nxt >= 0 and nxt < nstates and cur.pos < n:
-                    if here_ch == "\n":
+                    if here_code == 10:
                         cur.line = cur.line + 1
                     cur.pos = cur.pos + 1
                 else:
@@ -183,6 +186,7 @@ def run(source: SourceText, cur: Cursor, start_pos: int, tables: DfaTables, sema
                 scope.close()
                 runtime_error("DFA: register out of range")
             op = row[0]
+            scan_state.dirty = True
             if op == Action.SET or op == Action.SET_NEXT:
                 value = here
                 if op == Action.SET_NEXT:

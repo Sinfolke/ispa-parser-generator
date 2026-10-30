@@ -1,0 +1,47 @@
+name: Generator library tags
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      generator:
+        description: Existing generator release tag (for example v1.2.3)
+        required: true
+        type: string
+      source:
+        description: Commit or ref containing compatible libraries
+        required: true
+        default: main
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: libraries-${{ inputs.generator || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Publish latest libraries for this generator
+        env:
+          GENERATOR: ${{ inputs.generator || github.ref_name }}
+          SOURCE: ${{ inputs.source || github.sha }}
+        run: |
+          set -euo pipefail
+          git check-ref-format "refs/tags/$GENERATOR"
+          git rev-parse --verify "refs/tags/$GENERATOR^{commit}" >/dev/null
+          commit=$(git rev-parse --verify --end-of-options "$SOURCE^{commit}")
+          tag="libraries-$GENERATOR-latest"
+          # Rebuilding an old generator release must not reset a newer library fix.
+          if [[ "$GITHUB_EVENT_NAME" == push ]] && git show-ref --verify --quiet "refs/tags/$tag"; then
+            exit 0
+          fi
+          git tag --force "$tag" "$commit"
+          git push --force origin "refs/tags/$tag:refs/tags/$tag"

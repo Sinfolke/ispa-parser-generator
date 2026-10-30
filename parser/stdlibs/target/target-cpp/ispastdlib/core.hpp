@@ -200,3 +200,4 @@ namespace ISPA_STD {
         }
     };
 } // namespace ISPA_STD
+#include <ispastdlib/text.hpp>

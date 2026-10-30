@@ -490,3 +490,10 @@ class MatchScope(ScopeBase):
             _forget(self)
             lexer_result(self.expected, self.matched, self.actual, self.reason, self.loc)
 
+
+_IDLE_MATCH_SCOPE: MatchScope = MatchScope("", "")
+
+
+def idle_match_scope() -> MatchScope:
+    """Shared scope for runs without a debug sink; avoids one allocation per matched token/rule."""
+    return _IDLE_MATCH_SCOPE

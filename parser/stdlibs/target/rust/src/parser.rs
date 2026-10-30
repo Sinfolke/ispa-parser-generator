@@ -40,6 +40,84 @@ pub mod recovery {
 }
 pub use recovery::CoreFail;
 
+// Generated recovery positions repeat the same immutable claims. Hash borrowed
+// inputs on hits, and compare their contents too: a hash collision must never
+// change where error recovery resumes. Keep storage local to the parser and
+// bounded for callers that supply dynamically changing sets or labels.
+#[derive(Clone, Default)]
+struct ClaimsCache {
+    entries: HashMap<u64, Vec<CachedClaims>>,
+    count: usize,
+}
+#[derive(Clone)]
+struct CachedClaims {
+    sets: Vec<Vec<usize>>,
+    labels: Vec<String>,
+    claims: std::rc::Rc<Vec<Shared<core_recovery::ContextClaim>>>,
+}
+impl ClaimsCache {
+    const LIMIT: usize = 256;
+
+    fn get(&mut self, sets: &[&[usize]], labels: &[String]) -> std::rc::Rc<Vec<Shared<core_recovery::ContextClaim>>> {
+        use std::hash::{Hash, Hasher};
+        let mut hash = std::collections::hash_map::DefaultHasher::new();
+        sets.hash(&mut hash);
+        for i in 0..sets.len() { labels.get(i).map_or("", String::as_str).hash(&mut hash); }
+        let key = hash.finish();
+        if let Some(found) = self.entries.get(&key).and_then(|bucket| bucket.iter().find(|entry| {
+            entry.sets.len() == sets.len() && entry.sets.iter().zip(sets).all(|(a, b)| a.as_slice() == *b) &&
+                entry.labels.iter().enumerate().all(|(i, label)| label == labels.get(i).map_or("", String::as_str))
+        })) { return found.claims.clone(); }
+
+        let claims = std::rc::Rc::new(sets.iter().enumerate().map(|(i, set)| {
+            let claim = core_recovery::ContextClaim::shared_default();
+            claim.borrow_mut().__init__(labels.get(i).unwrap_or(&String::new()), recovery::token_set(set));
+            claim
+        }).collect());
+        if self.count < Self::LIMIT {
+            self.entries.entry(key).or_default().push(CachedClaims {
+                sets: sets.iter().map(|set| set.to_vec()).collect(),
+                labels: (0..sets.len()).map(|i| labels.get(i).cloned().unwrap_or_default()).collect(),
+                claims: std::rc::Rc::clone(&claims),
+            });
+            self.count += 1;
+        }
+        claims
+    }
+}
+
+#[cfg(test)]
+mod claims_cache_tests {
+    use super::*;
+
+    #[test]
+    fn repeated_claims_share_storage_but_different_contents_do_not() {
+        let mut cache = ClaimsCache::default();
+        let original = cache.get(&[&[1, 2], &[3]], &["value".into()]);
+        let repeated = cache.get(&[&[1, 2], &[3]], &["value".into(), "".into(), "ignored".into()]);
+        assert!(std::rc::Rc::ptr_eq(&original, &repeated));
+        assert_eq!(original[1].borrow().name, "");
+        let changed_label = cache.get(&[&[1, 2], &[3]], &["other".into()]);
+        let changed_set = cache.get(&[&[1], &[2, 3]], &["value".into()]);
+        assert!(!std::rc::Rc::ptr_eq(&original, &changed_label));
+        assert!(!std::rc::Rc::ptr_eq(&original, &changed_set));
+        assert_eq!(changed_label[0].borrow().name, "other");
+        assert_eq!(changed_set[1].borrow().tokens.borrow_mut().values().as_slice(), &[2, 3]);
+    }
+
+    #[test]
+    fn dynamic_claims_do_not_grow_the_cache_without_bound() {
+        let mut cache = ClaimsCache::default();
+        for i in 0..ClaimsCache::LIMIT + 10 {
+            let claims = cache.get(&[&[i]], &[]);
+            assert_eq!(claims[0].borrow().tokens.borrow_mut().values().as_slice(), &[i as i64]);
+        }
+        assert_eq!(cache.count, ClaimsCache::LIMIT);
+        let first = cache.get(&[&[0]], &[]);
+        assert!(std::rc::Rc::ptr_eq(&first, &cache.get(&[&[0]], &[])));
+    }
+}
+
 /// What stands for the failure behaviour of a required element.
 pub trait IntoFail<IT> { fn into_handler(self, core: &Shared<parser_ll::LLParser>) -> Shared<core_recovery::FailHandler>; }
 impl<IT> IntoFail<IT> for CoreFail { fn into_handler(self, _core: &Shared<parser_ll::LLParser>) -> Shared<core_recovery::FailHandler> { self.handler } }
@@ -178,6 +256,7 @@ pub struct LLParser<Main, Token> {
     pub tree: Main,
     pub errors: Vec<Error>,
     core: Option<Shared<parser_ll::LLParser>>,
+    claims_cache: ClaimsCache,
     trailing: Vec<(String, String)>,
     pub __vt_parseFromTokens: fn(&mut LLParser<Main, Token>),
     pub __vt_lazyParse: fn(&mut LLParser<Main, Token>) -> MatchResult<Main, LazyIterator<Token>>,
@@ -185,13 +264,13 @@ pub struct LLParser<Main, Token> {
 impl<Main: Clone, Token> Clone for LLParser<Main, Token> {
     fn clone(&self) -> Self {
         Self { lexer: self.lexer.clone(), text: self.text, tree: self.tree.clone(), errors: self.errors.clone(), core: self.core.clone(), trailing: self.trailing.clone(),
-               __vt_parseFromTokens: self.__vt_parseFromTokens, __vt_lazyParse: self.__vt_lazyParse }
+               claims_cache: self.claims_cache.clone(), __vt_parseFromTokens: self.__vt_parseFromTokens, __vt_lazyParse: self.__vt_lazyParse }
     }
 }
 impl<Main: Default, Token: Clone + Default + 'static> Default for LLParser<Main, Token> {
     fn default() -> Self {
         Self { lexer: Shared::default(), text: Ptr::new(""), tree: Main::default(), errors: Vec::new(), core: None, trailing: Vec::new(),
-               __vt_parseFromTokens: |_| {}, __vt_lazyParse: |_| MatchResult { status: false, node: Node::default(), it: LazyIterator::default() } }
+               claims_cache: ClaimsCache::default(), __vt_parseFromTokens: |_| {}, __vt_lazyParse: |_| MatchResult { status: false, node: Node::default(), it: LazyIterator::default() } }
     }
 }
 impl<Main, Token> LLParser<Main, Token> {
@@ -235,11 +314,7 @@ impl<Main, Token> LLParser<Main, Token> {
     }
     /// Where recovery may resume inside this rule: one claim (a label and a set of token ids) per set.
     pub fn recovery_at(&mut self, sets: &[&[usize]], expecting: impl AsRef<str>, labels: &[String]) {
-        let claims: Vec<Shared<core_recovery::ContextClaim>> = sets.iter().zip(labels.iter().chain(std::iter::repeat(&String::new()))).map(|(set, label)| {
-            let claim = core_recovery::ContextClaim::shared_default();
-            claim.borrow_mut().__init__(label, recovery::token_set(set));
-            claim
-        }).collect();
+        let claims = self.claims_cache.get(sets, labels);
         self.core().borrow_mut().recovery_at(&expecting.as_ref().to_string(), &claims);
     }
     /// Which alternative to continue in after a failed choice; the cursor ends where recovery left it.

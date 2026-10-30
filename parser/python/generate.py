@@ -13,7 +13,7 @@ def main():
     options = argparse.ArgumentParser(description=__doc__)
     options.add_argument("generator", type=Path)
     options.add_argument("--output", type=Path, default=root / "bootstrapped2")
-    options.add_argument("--stdlib", help="generate against another stdlib (a directory with ispa-stdlib.yaml, e.g. parser/stdlibs/target/cpp-core)")
+    options.add_argument("--stdlib", help="generate against another stdlib (a directory with ispa-stdlib.yaml, e.g. parser/stdlibs/target/target-cpp)")
     args = options.parse_args()
     generator = args.generator.resolve()
     output = args.output.resolve()

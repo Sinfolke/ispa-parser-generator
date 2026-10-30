@@ -75,10 +75,28 @@ impl Ptr {
     }
     pub fn starts_with(self, text: &str) -> bool { self.input.get(self.offset..).is_some_and(|s| s.starts_with(text)) }
     pub fn remaining(self) -> &'static str { self.input.get(self.offset..).unwrap_or("") }
-    pub fn line(self) -> usize { self.input.as_bytes()[..self.offset.min(self.input.len())].iter().filter(|b| **b == b'\n').count() + 1 }
-    pub fn column(self) -> usize {
-        self.input.as_bytes()[..self.offset.min(self.input.len())].iter().rev()
-            .take_while(|b| **b != b'\n').count() + 1
+    pub fn line(self) -> usize { self.position().0 }
+    pub fn column(self) -> usize { self.position().1 }
+
+    fn position(self) -> (usize, usize) {
+        // Inputs have static lifetimes, so pointer/length identifies immutable text.
+        // Index each source once: scanning its prefix for every token is quadratic
+        // for long lines, and metadata is read repeatedly while parsing.
+        thread_local! {
+            static LINES: std::cell::RefCell<std::collections::HashMap<(usize, usize), Vec<usize>>> =
+                Default::default();
+        }
+        LINES.with(|cache| {
+            let mut cache = cache.borrow_mut();
+            let starts = cache.entry((self.input.as_ptr() as usize, self.input.len())).or_insert_with(|| {
+                let mut starts = vec![0];
+                starts.extend(self.input.bytes().enumerate().filter_map(|(i, byte)| (byte == b'\n').then_some(i + 1)));
+                starts
+            });
+            let offset = self.offset.min(self.input.len());
+            let line = starts.partition_point(|start| *start <= offset) - 1;
+            (line + 1, offset - starts[line] + 1)
+        })
     }
 }
 
@@ -226,6 +244,24 @@ pub mod dfa {
 #[cfg(test)]
 mod execution_tests {
     use super::*;
+
+    #[test]
+    fn source_positions_match_byte_offsets_in_any_order() {
+        for text in ["", "abc", "\n", "é\r\nline\n\nlast\n", "different source"] {
+            for offset in (0..=text.len() + 2).rev() {
+                let prefix = &text.as_bytes()[..offset.min(text.len())];
+                let expected_line = prefix.iter().filter(|byte| **byte == b'\n').count() + 1;
+                let expected_column = prefix.iter().rev().take_while(|byte| **byte != b'\n').count() + 1;
+                let cursor = Ptr::at(text, offset);
+                assert_eq!((cursor.line(), cursor.column()), (expected_line, expected_column));
+            }
+        }
+        // Alternate sources after indexing both; offsets and byte columns must not
+        // come from the most recently visited source.
+        assert_eq!(Ptr::at("abc\ndef", 6).column(), 3);
+        assert_eq!(Ptr::at("no newline", 6).column(), 7);
+        assert_eq!(Ptr::at("abc\ndef", 6).line(), 2);
+    }
 
     #[test]
     fn cursor_classifies_each_utf8_byte() {

@@ -1137,7 +1137,7 @@ namespace Rust {
 }
 
 extern "C" auto rust_construct(const LangAPI::Declarations *tree, const char *namespace_name,
-                               bool incremental, bool debug_instrumentation) -> Rust::Construct* {
+                               bool incremental, bool debug_instrumentation, bool /*text_view: C++ only*/) -> Rust::Construct* {
     return new Rust::Construct(tree, namespace_name, incremental, debug_instrumentation);
 }
 extern "C" auto rust_construct_finish(Rust::Construct *c) -> void {

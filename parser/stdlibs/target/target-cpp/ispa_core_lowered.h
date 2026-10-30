@@ -1,516 +1,12 @@
 #pragma once
 
+#include <ispastdlib/object.hpp>
+#include <ispastdlib/failure.hpp>
+#include <ispastdlib/python_collections.hpp>
+#include <ispastdlib/span.hpp>
 #include <ispastdlib/lr_conflicts.hpp>
-#include <ispastdlib.hpp>
+#include <ispastdlib/parser_ll.hpp>
 
-namespace o {
-	namespace Tokens {
-		namespace __WS {
-			inline const std::size_t id = 2288775507628772018;
-		} // namespace __WS
-	} // namespace Tokens
-} // namespace o
-namespace o {
-	namespace Tokens {
-		namespace __WS {
-			inline const bool shared = true;
-		} // namespace __WS
-	} // namespace Tokens
-} // namespace o
-namespace o {
-	namespace Tokens {
-		namespace modules {
-			inline const std::size_t id = 2;
-		} // namespace modules
-	} // namespace Tokens
-} // namespace o
-namespace o {
-	namespace Tokens {
-		namespace modules {
-			inline const bool shared = true;
-		} // namespace modules
-	} // namespace Tokens
-} // namespace o
-namespace o {
-	namespace Tokens {
-		namespace modules {
-			namespace c {
-				inline const std::size_t id = 3;
-			} // namespace c
-		} // namespace modules
-	} // namespace Tokens
-} // namespace o
-namespace o {
-	namespace Tokens {
-		namespace modules {
-			namespace c {
-				inline const bool shared = true;
-			} // namespace c
-		} // namespace modules
-	} // namespace Tokens
-} // namespace o
-namespace o {
-	namespace Tokens {
-		namespace modules {
-			namespace c {
-				namespace main {
-					inline const std::size_t id = 4;
-				} // namespace main
-			} // namespace c
-		} // namespace modules
-	} // namespace Tokens
-} // namespace o
-namespace o {
-	namespace Tokens {
-		namespace modules {
-			namespace c {
-				namespace main {
-					inline const bool shared = true;
-				} // namespace main
-			} // namespace c
-		} // namespace modules
-	} // namespace Tokens
-} // namespace o
-namespace o {
-	namespace Tokens {
-		namespace modules {
-			namespace c {
-				namespace main {
-					namespace LATIN_SMALL_LETTER_X {
-						inline const std::size_t id = 4038058866088313642;
-					} // namespace LATIN_SMALL_LETTER_X
-				} // namespace main
-			} // namespace c
-		} // namespace modules
-	} // namespace Tokens
-} // namespace o
-namespace o {
-	namespace Tokens {
-		namespace modules {
-			namespace c {
-				namespace main {
-					namespace LATIN_SMALL_LETTER_X {
-						inline const bool shared = true;
-					} // namespace LATIN_SMALL_LETTER_X
-				} // namespace main
-			} // namespace c
-		} // namespace modules
-	} // namespace Tokens
-} // namespace o
-namespace o {
-	namespace TokensStr {
-		namespace __WS {
-			inline const char* const id = "__WS";
-		} // namespace __WS
-	} // namespace TokensStr
-} // namespace o
-namespace o {
-	namespace TokensStr {
-		namespace modules {
-			inline const char* const id = "modules";
-		} // namespace modules
-	} // namespace TokensStr
-} // namespace o
-namespace o {
-	namespace TokensStr {
-		namespace modules {
-			namespace c {
-				inline const char* const id = "modules.c";
-			} // namespace c
-		} // namespace modules
-	} // namespace TokensStr
-} // namespace o
-namespace o {
-	namespace TokensStr {
-		namespace modules {
-			namespace c {
-				namespace main {
-					inline const char* const id = "modules.c.main";
-				} // namespace main
-			} // namespace c
-		} // namespace modules
-	} // namespace TokensStr
-} // namespace o
-namespace o {
-	namespace TokensStr {
-		namespace modules {
-			namespace c {
-				namespace main {
-					namespace LATIN_SMALL_LETTER_X {
-						inline const char* const id = "modules.c.main.LATIN_SMALL_LETTER_X";
-					} // namespace LATIN_SMALL_LETTER_X
-				} // namespace main
-			} // namespace c
-		} // namespace modules
-	} // namespace TokensStr
-} // namespace o
-namespace o {
-	namespace Rules {
-		namespace main {
-			inline const std::size_t id = 0;
-		} // namespace main
-	} // namespace Rules
-} // namespace o
-namespace o {
-	namespace Rules {
-		namespace modules {
-			inline const std::size_t id = 2;
-		} // namespace modules
-	} // namespace Rules
-} // namespace o
-namespace o {
-	namespace Rules {
-		namespace modules {
-			namespace c {
-				inline const std::size_t id = 3;
-			} // namespace c
-		} // namespace modules
-	} // namespace Rules
-} // namespace o
-namespace o {
-	namespace Rules {
-		namespace modules {
-			namespace c {
-				namespace main {
-					inline const std::size_t id = 1;
-				} // namespace main
-			} // namespace c
-		} // namespace modules
-	} // namespace Rules
-} // namespace o
-namespace o {
-	namespace RulesStr {
-		namespace main {
-			inline const char* const id = "main";
-		} // namespace main
-	} // namespace RulesStr
-} // namespace o
-namespace o {
-	namespace RulesStr {
-		namespace modules {
-			inline const char* const id = "modules";
-		} // namespace modules
-	} // namespace RulesStr
-} // namespace o
-namespace o {
-	namespace RulesStr {
-		namespace modules {
-			namespace c {
-				inline const char* const id = "modules.c";
-			} // namespace c
-		} // namespace modules
-	} // namespace RulesStr
-} // namespace o
-namespace o {
-	namespace RulesStr {
-		namespace modules {
-			namespace c {
-				namespace main {
-					inline const char* const id = "modules.c.main";
-				} // namespace main
-			} // namespace c
-		} // namespace modules
-	} // namespace RulesStr
-} // namespace o
-namespace o {
-	auto TokensToString(std::size_t id) -> const char*;
-} // namespace o
-namespace o {
-	auto RulesToString(std::size_t id) -> const char*;
-} // namespace o
-namespace o::FlatTypes { struct __WS; }
-namespace o::FlatTypes { struct modules_c_main_LATIN_SMALL_LETTER_X; }
-namespace o::FlatTypes { struct modules; }
-namespace o::FlatTypes { struct modules_c; }
-namespace o::FlatTypes { struct modules_c_main; }
-namespace o::FlatTypes { struct main; }
-namespace o {
-	namespace FlatTypes {
-		auto operator<<(std::ostream & os, __WS value) -> std::ostream &;
-	} // namespace FlatTypes
-} // namespace o
-namespace o {
-	namespace FlatTypes {
-		struct __WS {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
-			auto print(std::ostream& os) const -> void;
-			auto to_string() const -> std::string;
-			constexpr auto members() {
-				return std::tie();
-			}
-			constexpr auto members() const {
-				return std::tie();
-			}
-			static constexpr auto members_str() {
-				return std::array<std::string_view, 0>{{}};
-			}
-			constexpr auto methods() {
-				return std::make_tuple(&__WS::write_to_output, &__WS::print);
-			}
-			constexpr auto methods() const {
-				return std::make_tuple(&__WS::write_to_output, &__WS::print);
-			}
-			static constexpr auto methods_str() {
-				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
-			}
-		};
-	} // namespace FlatTypes
-} // namespace o
-namespace o {
-	namespace FlatTypes {
-		auto operator<<(std::ostream & os, modules_c_main_LATIN_SMALL_LETTER_X value) -> std::ostream &;
-	} // namespace FlatTypes
-} // namespace o
-namespace o {
-	namespace FlatTypes {
-		struct modules_c_main_LATIN_SMALL_LETTER_X {
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
-			auto print(std::ostream& os) const -> void;
-			auto to_string() const -> std::string;
-			constexpr auto members() {
-				return std::tie();
-			}
-			constexpr auto members() const {
-				return std::tie();
-			}
-			static constexpr auto members_str() {
-				return std::array<std::string_view, 0>{{}};
-			}
-			constexpr auto methods() {
-				return std::make_tuple(&modules_c_main_LATIN_SMALL_LETTER_X::write_to_output, &modules_c_main_LATIN_SMALL_LETTER_X::print);
-			}
-			constexpr auto methods() const {
-				return std::make_tuple(&modules_c_main_LATIN_SMALL_LETTER_X::write_to_output, &modules_c_main_LATIN_SMALL_LETTER_X::print);
-			}
-			static constexpr auto methods_str() {
-				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
-			}
-		};
-	} // namespace FlatTypes
-} // namespace o
-namespace o {
-	namespace FlatTypes {
-		auto operator<<(std::ostream & os, modules value) -> std::ostream &;
-	} // namespace FlatTypes
-} // namespace o
-namespace o {
-	namespace FlatTypes {
-		struct modules {
-			using c = ::o::FlatTypes::modules_c;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
-			auto print(std::ostream& os) const -> void;
-			auto to_string() const -> std::string;
-			constexpr auto members() {
-				return std::tie();
-			}
-			constexpr auto members() const {
-				return std::tie();
-			}
-			static constexpr auto members_str() {
-				return std::array<std::string_view, 0>{{}};
-			}
-			constexpr auto methods() {
-				return std::make_tuple(&modules::write_to_output, &modules::print);
-			}
-			constexpr auto methods() const {
-				return std::make_tuple(&modules::write_to_output, &modules::print);
-			}
-			static constexpr auto methods_str() {
-				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
-			}
-		};
-	} // namespace FlatTypes
-} // namespace o
-namespace o {
-	namespace FlatTypes {
-		auto operator<<(std::ostream & os, modules_c value) -> std::ostream &;
-	} // namespace FlatTypes
-} // namespace o
-namespace o {
-	namespace FlatTypes {
-		struct modules_c {
-			using main = ::o::FlatTypes::modules_c_main;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
-			auto print(std::ostream& os) const -> void;
-			auto to_string() const -> std::string;
-			constexpr auto members() {
-				return std::tie();
-			}
-			constexpr auto members() const {
-				return std::tie();
-			}
-			static constexpr auto members_str() {
-				return std::array<std::string_view, 0>{{}};
-			}
-			constexpr auto methods() {
-				return std::make_tuple(&modules_c::write_to_output, &modules_c::print);
-			}
-			constexpr auto methods() const {
-				return std::make_tuple(&modules_c::write_to_output, &modules_c::print);
-			}
-			static constexpr auto methods_str() {
-				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
-			}
-		};
-	} // namespace FlatTypes
-} // namespace o
-namespace o {
-	namespace FlatTypes {
-		auto operator<<(std::ostream & os, modules_c_main value) -> std::ostream &;
-	} // namespace FlatTypes
-} // namespace o
-namespace o {
-	namespace FlatTypes {
-		struct modules_c_main {
-			using LATIN_SMALL_LETTER_X = ::o::FlatTypes::modules_c_main_LATIN_SMALL_LETTER_X;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
-			auto print(std::ostream& os) const -> void;
-			auto to_string() const -> std::string;
-			constexpr auto members() {
-				return std::tie();
-			}
-			constexpr auto members() const {
-				return std::tie();
-			}
-			static constexpr auto members_str() {
-				return std::array<std::string_view, 0>{{}};
-			}
-			constexpr auto methods() {
-				return std::make_tuple(&modules_c_main::write_to_output, &modules_c_main::print);
-			}
-			constexpr auto methods() const {
-				return std::make_tuple(&modules_c_main::write_to_output, &modules_c_main::print);
-			}
-			static constexpr auto methods_str() {
-				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
-			}
-		};
-	} // namespace FlatTypes
-} // namespace o
-namespace o {
-	namespace FlatTypes {
-		auto operator<<(std::ostream & os, main value) -> std::ostream &;
-	} // namespace FlatTypes
-} // namespace o
-namespace o {
-	namespace FlatTypes {
-		struct main {
-			::ISPA_STD::Node<::o::FlatTypes::modules_c_main> value;
-			auto write_to_output(::ISPA_STD::ASTPrinter<std::ostream>& printer) const -> void;
-			auto print(std::ostream& os) const -> void;
-			auto to_string() const -> std::string;
-			constexpr auto members() {
-				return std::tie(value);
-			}
-			constexpr auto members() const {
-				return std::tie(value);
-			}
-			static constexpr auto members_str() {
-				return std::array<std::string_view, 1>{{"value"}};
-			}
-			constexpr auto methods() {
-				return std::make_tuple(&main::write_to_output, &main::print);
-			}
-			constexpr auto methods() const {
-				return std::make_tuple(&main::write_to_output, &main::print);
-			}
-			static constexpr auto methods_str() {
-				return std::array<std::string_view, 2>{{"write_to_output", "print"}};
-			}
-		};
-	} // namespace FlatTypes
-} // namespace o
-namespace o {
-	namespace Types {
-		using __WS = ::o::FlatTypes::__WS;
-	} // namespace Types
-} // namespace o
-namespace o {
-	namespace Types {
-		using modules = ::o::FlatTypes::modules;
-	} // namespace Types
-} // namespace o
-namespace o {
-	namespace Types {
-		using main = ::o::FlatTypes::main;
-	} // namespace Types
-} // namespace o
-namespace o {
-	using Token = ::ISPA_STD::RawToken<Types::__WS, Types::modules::c::main::LATIN_SMALL_LETTER_X>;
-} // namespace o
-namespace o {
-	class Lexer : public ::ISPA_STD::Lexer_base<Token> {
-	public:
-		auto clone() const -> std::shared_ptr<::ISPA_STD::Lexer_base<Token>> override;
-	private:
-		std::vector<Token> ispa_pending_tokens;
-		bool ispa_skip_token = false;
-		auto ispa_skip_current_token() -> void;
-		auto ispa_token_error(std::string message) -> void;
-	public:
-		auto on_token(Token&& token) -> void override;
-		auto on_eof() -> void override;
-	private:
-		static ::ISPA_STD::DFA::API::CharToClass char_class_table;
-		static ::ISPA_STD::DFA::API::Table<3, 3> dfa_table;
-		static ::ISPA_STD::DFA::API::Table<0, 4> action_table;
-		auto semantic_action_exec(long long state, const ::ISPA_STD::DFA::API::Captures& captures, long long start_pos, const char* start, long long length, long long line, const char*& cursor) -> std::pair<long long, Token>;
-		bool init_done = false;
-		auto init() -> void override;
-		::ISPA_STD::DFA::API::TdfaLayout<0, 0> tdfa_registers;
-	public:
-		auto makeToken(const char*& pos) -> Token override;
-		constexpr auto members() {
-			return std::tie();
-		}
-		constexpr auto members() const {
-			return std::tie();
-		}
-		static constexpr auto members_str() {
-			return std::array<std::string_view, 0>{{}};
-		}
-		constexpr auto methods() {
-			return std::make_tuple(&Lexer::clone, &Lexer::on_token, &Lexer::on_eof, &Lexer::makeToken);
-		}
-		constexpr auto methods() const {
-			return std::make_tuple(&Lexer::clone, &Lexer::on_token, &Lexer::on_eof, &Lexer::makeToken);
-		}
-		static constexpr auto methods_str() {
-			return std::array<std::string_view, 4>{{"clone", "on_token", "on_eof", "makeToken"}};
-		}
-	};
-} // namespace o
-namespace o {
-	class Parser : public ::ISPA_STD::LLParser<Types::main, Token> {
-	protected:
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::o::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::o::Lexer::lazy_iterator>>> auto main(IT pos) -> ::ISPA_STD::MatchResult<Types::main, IT>;
-		template<typename IT, class = std::enable_if_t<std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::o::Lexer::iterator> || std::is_same_v<std::remove_const_t<std::remove_reference_t<IT>>, ::o::Lexer::lazy_iterator>>> auto modulesCMain(IT pos) -> ::ISPA_STD::MatchResult<Types::modules::c::main, IT>;
-	public:
-		auto parseFromTokens() -> void override;
-	private:
-		Lexer lazy_lexer_;
-	public:
-		auto lazyParse() -> ::ISPA_STD::MatchResult<Types::main, ::o::Lexer::lazy_iterator> override;
-		constexpr auto members() {
-			return std::tie();
-		}
-		constexpr auto members() const {
-			return std::tie();
-		}
-		static constexpr auto members_str() {
-			return std::array<std::string_view, 0>{{}};
-		}
-		constexpr auto methods() {
-			return std::make_tuple(&Parser::parseFromTokens, &Parser::lazyParse);
-		}
-		constexpr auto methods() const {
-			return std::make_tuple(&Parser::parseFromTokens, &Parser::lazyParse);
-		}
-		static constexpr auto methods_str() {
-			return std::array<std::string_view, 2>{{"parseFromTokens", "lazyParse"}};
-		}
-	};
-} // namespace o
 namespace python {
 	namespace ispa_std {
 		namespace chars {
@@ -522,6 +18,13 @@ namespace python {
 	namespace ispa_std {
 		namespace chars {
 			auto char_of(long long code) -> std::string;
+		} // namespace chars
+	} // namespace ispa_std
+} // namespace python
+namespace python {
+	namespace ispa_std {
+		namespace chars {
+			auto code_at(const std::string& s, long long index) -> long long;
 		} // namespace chars
 	} // namespace ispa_std
 } // namespace python
@@ -1337,6 +840,20 @@ namespace python {
 } // namespace python
 namespace python {
 	namespace ispa_std {
+		namespace debug {
+			inline std::shared_ptr<python::ispa_std::debug::MatchScope> _IDLE_MATCH_SCOPE = ISPA_STD::construct<python::ispa_std::debug::MatchScope>("", "");
+		} // namespace debug
+	} // namespace ispa_std
+} // namespace python
+namespace python {
+	namespace ispa_std {
+		namespace debug {
+			auto idle_match_scope() -> std::shared_ptr<python::ispa_std::debug::MatchScope>;
+		} // namespace debug
+	} // namespace ispa_std
+} // namespace python
+namespace python {
+	namespace ispa_std {
 		namespace failures {
 			auto logic_error(const std::string& message) -> void;
 		} // namespace failures
@@ -1850,15 +1367,16 @@ namespace python {
 				std::vector<long long> regs;
 				std::vector<std::shared_ptr<python::ispa_std::dfa_api::HistoryNode>> history;
 				long long first_line;
+				bool dirty;
 				auto __init__(std::shared_ptr<python::ispa_std::dfa_api::SourceText> src) -> void;
 				constexpr auto members() {
-					return std::tie(src, base, regs, history, first_line);
+					return std::tie(src, base, regs, history, first_line, dirty);
 				}
 				constexpr auto members() const {
-					return std::tie(src, base, regs, history, first_line);
+					return std::tie(src, base, regs, history, first_line, dirty);
 				}
 				static constexpr auto members_str() {
-					return std::array<std::string_view, 5>{{"src", "base", "regs", "history", "first_line"}};
+					return std::array<std::string_view, 6>{{"src", "base", "regs", "history", "first_line", "dirty"}};
 				}
 				constexpr auto methods() {
 					return std::make_tuple(&CaptureState::__init__);
@@ -2340,6 +1858,7 @@ namespace python {
 				virtual auto advance_by(long long count) -> std::shared_ptr<python::ispa_std::lexer::TokenCursor>;
 				virtual auto plus(long long count) -> std::shared_ptr<python::ispa_std::lexer::TokenCursor>;
 				virtual auto current() -> std::shared_ptr<python::ispa_std::raw_token::RawToken>;
+				virtual auto kind_is(long long type_id) -> bool;
 				virtual auto minus(std::shared_ptr<python::ispa_std::lexer::TokenCursor> other) -> long long;
 				virtual auto distance() -> long long;
 				virtual auto resumePosition() -> long long;
@@ -2354,13 +1873,13 @@ namespace python {
 					return std::array<std::string_view, 6>{{"owner", "state", "token_index", "distance_base", "owned_owner", "has_owned"}};
 				}
 				constexpr auto methods() {
-					return std::make_tuple(&TokenCursor::__init__, &TokenCursor::copy, &TokenCursor::assign, &TokenCursor::has_source, &TokenCursor::sourceOrigin, &TokenCursor::getErrors, &TokenCursor::sourcePosition, &TokenCursor::consumeExternal, &TokenCursor::isEnd, &TokenCursor::next, &TokenCursor::prev, &TokenCursor::advance_by, &TokenCursor::plus, &TokenCursor::current, &TokenCursor::minus, &TokenCursor::distance, &TokenCursor::resumePosition, &TokenCursor::advanceCharacters);
+					return std::make_tuple(&TokenCursor::__init__, &TokenCursor::copy, &TokenCursor::assign, &TokenCursor::has_source, &TokenCursor::sourceOrigin, &TokenCursor::getErrors, &TokenCursor::sourcePosition, &TokenCursor::consumeExternal, &TokenCursor::isEnd, &TokenCursor::next, &TokenCursor::prev, &TokenCursor::advance_by, &TokenCursor::plus, &TokenCursor::current, &TokenCursor::kind_is, &TokenCursor::minus, &TokenCursor::distance, &TokenCursor::resumePosition, &TokenCursor::advanceCharacters);
 				}
 				constexpr auto methods() const {
-					return std::make_tuple(&TokenCursor::__init__, &TokenCursor::copy, &TokenCursor::assign, &TokenCursor::has_source, &TokenCursor::sourceOrigin, &TokenCursor::getErrors, &TokenCursor::sourcePosition, &TokenCursor::consumeExternal, &TokenCursor::isEnd, &TokenCursor::next, &TokenCursor::prev, &TokenCursor::advance_by, &TokenCursor::plus, &TokenCursor::current, &TokenCursor::minus, &TokenCursor::distance, &TokenCursor::resumePosition, &TokenCursor::advanceCharacters);
+					return std::make_tuple(&TokenCursor::__init__, &TokenCursor::copy, &TokenCursor::assign, &TokenCursor::has_source, &TokenCursor::sourceOrigin, &TokenCursor::getErrors, &TokenCursor::sourcePosition, &TokenCursor::consumeExternal, &TokenCursor::isEnd, &TokenCursor::next, &TokenCursor::prev, &TokenCursor::advance_by, &TokenCursor::plus, &TokenCursor::current, &TokenCursor::kind_is, &TokenCursor::minus, &TokenCursor::distance, &TokenCursor::resumePosition, &TokenCursor::advanceCharacters);
 				}
 				static constexpr auto methods_str() {
-					return std::array<std::string_view, 18>{{"__init__", "copy", "assign", "has_source", "sourceOrigin", "getErrors", "sourcePosition", "consumeExternal", "isEnd", "next", "prev", "advance_by", "plus", "current", "minus", "distance", "resumePosition", "advanceCharacters"}};
+					return std::array<std::string_view, 19>{{"__init__", "copy", "assign", "has_source", "sourceOrigin", "getErrors", "sourcePosition", "consumeExternal", "isEnd", "next", "prev", "advance_by", "plus", "current", "kind_is", "minus", "distance", "resumePosition", "advanceCharacters"}};
 				}
 			};
 		} // namespace lexer
@@ -2470,6 +1989,7 @@ namespace python::ispa_std::recovery { struct RequiredStatus; }
 namespace python::ispa_std::recovery { struct RequiredResult; }
 namespace python::ispa_std::recovery { struct ContextKind; }
 namespace python::ispa_std::recovery { struct ContextClaim; }
+namespace python::ispa_std::recovery { struct ClaimSet; }
 namespace python::ispa_std::recovery { struct ContextDiagnostic; }
 namespace python {
 	namespace ispa_std {
@@ -2604,7 +2124,7 @@ namespace python {
 				long long max_total_skipped;
 				long long total_skipped;
 				std::vector<std::shared_ptr<python::ispa_std::recovery::Diagnostic>> diagnostics;
-				std::vector<std::vector<long long>> anchors;
+				std::vector<std::shared_ptr<python::ispa_std::recovery::ClaimSet>> anchors;
 				long long anchor_count;
 				auto __init__() -> void;
 				virtual auto exhausted() -> bool;
@@ -3039,6 +2559,49 @@ namespace python {
 					return std::array<std::string_view, 1>{{"__init__"}};
 				}
 			};
+		} // namespace recovery
+	} // namespace ispa_std
+} // namespace python
+namespace python {
+	namespace ispa_std {
+		namespace recovery {
+			struct ClaimSet : public ::ISPA_STD::Object {
+				std::vector<std::shared_ptr<python::ispa_std::recovery::ContextClaim>> claims;
+				std::vector<long long> tokens;
+				auto __init__(const std::vector<std::shared_ptr<python::ispa_std::recovery::ContextClaim>>& claims) -> void;
+				constexpr auto members() {
+					return std::tie(claims, tokens);
+				}
+				constexpr auto members() const {
+					return std::tie(claims, tokens);
+				}
+				static constexpr auto members_str() {
+					return std::array<std::string_view, 2>{{"claims", "tokens"}};
+				}
+				constexpr auto methods() {
+					return std::make_tuple(&ClaimSet::__init__);
+				}
+				constexpr auto methods() const {
+					return std::make_tuple(&ClaimSet::__init__);
+				}
+				static constexpr auto methods_str() {
+					return std::array<std::string_view, 1>{{"__init__"}};
+				}
+			};
+		} // namespace recovery
+	} // namespace ispa_std
+} // namespace python
+namespace python {
+	namespace ispa_std {
+		namespace recovery {
+			inline std::vector<std::shared_ptr<python::ispa_std::recovery::ClaimSet>> _NO_CLAIMS = std::vector<std::shared_ptr<python::ispa_std::recovery::ClaimSet>>{};
+		} // namespace recovery
+	} // namespace ispa_std
+} // namespace python
+namespace python {
+	namespace ispa_std {
+		namespace recovery {
+			auto empty_claim_set() -> std::shared_ptr<python::ispa_std::recovery::ClaimSet>;
 		} // namespace recovery
 	} // namespace ispa_std
 } // namespace python
@@ -4072,16 +3635,16 @@ namespace python {
 			struct Frame : public ::ISPA_STD::Object {
 				std::string rule;
 				std::string expecting;
-				std::vector<std::shared_ptr<python::ispa_std::recovery::ContextClaim>> claims;
+				std::shared_ptr<python::ispa_std::recovery::ClaimSet> claim_set;
 				auto __init__(const std::string& rule) -> void;
 				constexpr auto members() {
-					return std::tie(rule, expecting, claims);
+					return std::tie(rule, expecting, claim_set);
 				}
 				constexpr auto members() const {
-					return std::tie(rule, expecting, claims);
+					return std::tie(rule, expecting, claim_set);
 				}
 				static constexpr auto members_str() {
-					return std::array<std::string_view, 3>{{"rule", "expecting", "claims"}};
+					return std::array<std::string_view, 3>{{"rule", "expecting", "claim_set"}};
 				}
 				constexpr auto methods() {
 					return std::make_tuple(&Frame::__init__);
@@ -4253,6 +3816,9 @@ namespace python {
 				virtual auto begin_probe(std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos) -> std::shared_ptr<python::ispa_std::parser_ll::RuleProbe>;
 				virtual auto reject_absent_rule() -> void;
 				virtual auto commit_rule(std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos) -> void;
+				virtual auto fast_path_ok(std::shared_ptr<python::ispa_std::recovery::FailHandler> fail, bool allow_custom) -> bool;
+				virtual auto accept_at(long long here) -> void;
+				virtual auto commit_at(long long here) -> void;
 				virtual auto note_match() -> void;
 				virtual auto debug_actual(std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos) -> std::string;
 				virtual auto debug_recovery_mode(long long mode) -> std::string;
@@ -4260,6 +3826,7 @@ namespace python {
 				virtual auto enter_frame(const std::string& rule) -> void;
 				virtual auto leave_frame() -> void;
 				virtual auto recovery_at(const std::string& expecting, const std::vector<std::shared_ptr<python::ispa_std::recovery::ContextClaim>>& claims) -> void;
+				virtual auto recovery_at_set(const std::string& expecting, std::shared_ptr<python::ispa_std::recovery::ClaimSet> claims) -> void;
 				virtual auto unwinding() -> bool;
 				virtual auto describe_token(std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos) -> std::string;
 				virtual auto breadcrumb() -> std::string;
@@ -4272,6 +3839,8 @@ namespace python {
 				virtual auto required_recovering(std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos, long long type_id, std::shared_ptr<python::ispa_std::recovery::FailHandler> fail) -> std::shared_ptr<python::ispa_std::recovery::RequiredResult>;
 				virtual auto _attempt_rule(std::function<std::shared_ptr<python::ispa_std::match_result::MatchResult>(std::shared_ptr<python::ispa_std::lexer::TokenCursor>)> rec, std::shared_ptr<python::ispa_std::lexer::TokenCursor> attempt) -> std::shared_ptr<python::ispa_std::match_result::MatchResult>;
 				virtual auto required_rule_recovering(std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos, std::function<std::shared_ptr<python::ispa_std::match_result::MatchResult>(std::shared_ptr<python::ispa_std::lexer::TokenCursor>)> rec, std::shared_ptr<python::ispa_std::recovery::FailHandler> fail) -> std::shared_ptr<python::ispa_std::recovery::RequiredResult>;
+				virtual auto _rule_recovery(std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos, std::function<std::shared_ptr<python::ispa_std::match_result::MatchResult>(std::shared_ptr<python::ispa_std::lexer::TokenCursor>)> rec, std::shared_ptr<python::ispa_std::recovery::FailHandler> fail, std::shared_ptr<python::ispa_std::match_result::MatchResult> first, bool have_first) -> std::shared_ptr<python::ispa_std::recovery::RequiredResult>;
+				virtual auto required_rule_resume(std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos, std::function<std::shared_ptr<python::ispa_std::match_result::MatchResult>(std::shared_ptr<python::ispa_std::lexer::TokenCursor>)> rec, std::shared_ptr<python::ispa_std::recovery::FailHandler> fail, std::shared_ptr<python::ispa_std::match_result::MatchResult> first) -> std::shared_ptr<python::ispa_std::node::Node>;
 				virtual auto _required_outcome(std::shared_ptr<python::ispa_std::recovery::RequiredResult> result, std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos, std::shared_ptr<python::ispa_std::debug::MatchScope> scope, const std::string& what) -> std::shared_ptr<python::ispa_std::node::Node>;
 				virtual auto required_token(std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos, long long type_id, std::shared_ptr<python::ispa_std::recovery::FailHandler> fail) -> std::shared_ptr<python::ispa_std::node::Node>;
 				virtual auto required_rule(std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos, const std::string& rule_name, std::function<std::shared_ptr<python::ispa_std::match_result::MatchResult>(std::shared_ptr<python::ispa_std::lexer::TokenCursor>)> rec, std::shared_ptr<python::ispa_std::recovery::FailHandler> fail) -> std::shared_ptr<python::ispa_std::node::Node>;
@@ -4303,13 +3872,13 @@ namespace python {
 					return std::array<std::string_view, 14>{{"recovery_state_", "counters_", "frames_", "frame_count", "unwind_", "last_resume_pos_", "recovering_", "context_max_skip_", "context_errors_", "probes_", "token_names_", "ambiguous_id_", "space_token_", "has_space_token_"}};
 				}
 				constexpr auto methods() {
-					return std::make_tuple(&LLParser::__init__, &LLParser::set_token_names, &LLParser::set_space_token, &LLParser::getErrors, &LLParser::getContextErrors, &LLParser::reset_recovery, &LLParser::before_parse, &LLParser::parseLazy, &LLParser::counter_scope, &LLParser::bind_counter_count, &LLParser::bind_counter_list, &LLParser::bind_counter_node, &LLParser::begin_probe, &LLParser::reject_absent_rule, &LLParser::commit_rule, &LLParser::note_match, &LLParser::debug_actual, &LLParser::debug_recovery_mode, &LLParser::recovery_frame, &LLParser::enter_frame, &LLParser::leave_frame, &LLParser::recovery_at, &LLParser::unwinding, &LLParser::describe_token, &LLParser::breadcrumb, &LLParser::resolve_context, &LLParser::report_context, &LLParser::recover_at_context, &LLParser::sync_loop, &LLParser::recover_choice, &LLParser::raise_error, &LLParser::required_recovering, &LLParser::_attempt_rule, &LLParser::required_rule_recovering, &LLParser::_required_outcome, &LLParser::required_token, &LLParser::required_rule, &LLParser::optional_token, &LLParser::optional_rule, &LLParser::skip_spaces, &LLParser::skip_external_spaces, &LLParser::counted_impl, &LLParser::counted_token, &LLParser::counted_rule, &LLParser::repeat_optional, &LLParser::range_token, &LLParser::range_rule, &LLParser::range_optional_token, &LLParser::range_optional_rule, &LLParser::custom_failure_decision, &LLParser::custom_failure, &LLParser::action_result);
+					return std::make_tuple(&LLParser::__init__, &LLParser::set_token_names, &LLParser::set_space_token, &LLParser::getErrors, &LLParser::getContextErrors, &LLParser::reset_recovery, &LLParser::before_parse, &LLParser::parseLazy, &LLParser::counter_scope, &LLParser::bind_counter_count, &LLParser::bind_counter_list, &LLParser::bind_counter_node, &LLParser::begin_probe, &LLParser::reject_absent_rule, &LLParser::commit_rule, &LLParser::fast_path_ok, &LLParser::accept_at, &LLParser::commit_at, &LLParser::note_match, &LLParser::debug_actual, &LLParser::debug_recovery_mode, &LLParser::recovery_frame, &LLParser::enter_frame, &LLParser::leave_frame, &LLParser::recovery_at, &LLParser::recovery_at_set, &LLParser::unwinding, &LLParser::describe_token, &LLParser::breadcrumb, &LLParser::resolve_context, &LLParser::report_context, &LLParser::recover_at_context, &LLParser::sync_loop, &LLParser::recover_choice, &LLParser::raise_error, &LLParser::required_recovering, &LLParser::_attempt_rule, &LLParser::required_rule_recovering, &LLParser::_rule_recovery, &LLParser::required_rule_resume, &LLParser::_required_outcome, &LLParser::required_token, &LLParser::required_rule, &LLParser::optional_token, &LLParser::optional_rule, &LLParser::skip_spaces, &LLParser::skip_external_spaces, &LLParser::counted_impl, &LLParser::counted_token, &LLParser::counted_rule, &LLParser::repeat_optional, &LLParser::range_token, &LLParser::range_rule, &LLParser::range_optional_token, &LLParser::range_optional_rule, &LLParser::custom_failure_decision, &LLParser::custom_failure, &LLParser::action_result);
 				}
 				constexpr auto methods() const {
-					return std::make_tuple(&LLParser::__init__, &LLParser::set_token_names, &LLParser::set_space_token, &LLParser::getErrors, &LLParser::getContextErrors, &LLParser::reset_recovery, &LLParser::before_parse, &LLParser::parseLazy, &LLParser::counter_scope, &LLParser::bind_counter_count, &LLParser::bind_counter_list, &LLParser::bind_counter_node, &LLParser::begin_probe, &LLParser::reject_absent_rule, &LLParser::commit_rule, &LLParser::note_match, &LLParser::debug_actual, &LLParser::debug_recovery_mode, &LLParser::recovery_frame, &LLParser::enter_frame, &LLParser::leave_frame, &LLParser::recovery_at, &LLParser::unwinding, &LLParser::describe_token, &LLParser::breadcrumb, &LLParser::resolve_context, &LLParser::report_context, &LLParser::recover_at_context, &LLParser::sync_loop, &LLParser::recover_choice, &LLParser::raise_error, &LLParser::required_recovering, &LLParser::_attempt_rule, &LLParser::required_rule_recovering, &LLParser::_required_outcome, &LLParser::required_token, &LLParser::required_rule, &LLParser::optional_token, &LLParser::optional_rule, &LLParser::skip_spaces, &LLParser::skip_external_spaces, &LLParser::counted_impl, &LLParser::counted_token, &LLParser::counted_rule, &LLParser::repeat_optional, &LLParser::range_token, &LLParser::range_rule, &LLParser::range_optional_token, &LLParser::range_optional_rule, &LLParser::custom_failure_decision, &LLParser::custom_failure, &LLParser::action_result);
+					return std::make_tuple(&LLParser::__init__, &LLParser::set_token_names, &LLParser::set_space_token, &LLParser::getErrors, &LLParser::getContextErrors, &LLParser::reset_recovery, &LLParser::before_parse, &LLParser::parseLazy, &LLParser::counter_scope, &LLParser::bind_counter_count, &LLParser::bind_counter_list, &LLParser::bind_counter_node, &LLParser::begin_probe, &LLParser::reject_absent_rule, &LLParser::commit_rule, &LLParser::fast_path_ok, &LLParser::accept_at, &LLParser::commit_at, &LLParser::note_match, &LLParser::debug_actual, &LLParser::debug_recovery_mode, &LLParser::recovery_frame, &LLParser::enter_frame, &LLParser::leave_frame, &LLParser::recovery_at, &LLParser::recovery_at_set, &LLParser::unwinding, &LLParser::describe_token, &LLParser::breadcrumb, &LLParser::resolve_context, &LLParser::report_context, &LLParser::recover_at_context, &LLParser::sync_loop, &LLParser::recover_choice, &LLParser::raise_error, &LLParser::required_recovering, &LLParser::_attempt_rule, &LLParser::required_rule_recovering, &LLParser::_rule_recovery, &LLParser::required_rule_resume, &LLParser::_required_outcome, &LLParser::required_token, &LLParser::required_rule, &LLParser::optional_token, &LLParser::optional_rule, &LLParser::skip_spaces, &LLParser::skip_external_spaces, &LLParser::counted_impl, &LLParser::counted_token, &LLParser::counted_rule, &LLParser::repeat_optional, &LLParser::range_token, &LLParser::range_rule, &LLParser::range_optional_token, &LLParser::range_optional_rule, &LLParser::custom_failure_decision, &LLParser::custom_failure, &LLParser::action_result);
 				}
 				static constexpr auto methods_str() {
-					return std::array<std::string_view, 52>{{"__init__", "set_token_names", "set_space_token", "getErrors", "getContextErrors", "reset_recovery", "before_parse", "parseLazy", "counter_scope", "bind_counter_count", "bind_counter_list", "bind_counter_node", "begin_probe", "reject_absent_rule", "commit_rule", "note_match", "debug_actual", "debug_recovery_mode", "recovery_frame", "enter_frame", "leave_frame", "recovery_at", "unwinding", "describe_token", "breadcrumb", "resolve_context", "report_context", "recover_at_context", "sync_loop", "recover_choice", "raise_error", "required_recovering", "_attempt_rule", "required_rule_recovering", "_required_outcome", "required_token", "required_rule", "optional_token", "optional_rule", "skip_spaces", "skip_external_spaces", "counted_impl", "counted_token", "counted_rule", "repeat_optional", "range_token", "range_rule", "range_optional_token", "range_optional_rule", "custom_failure_decision", "custom_failure", "action_result"}};
+					return std::array<std::string_view, 58>{{"__init__", "set_token_names", "set_space_token", "getErrors", "getContextErrors", "reset_recovery", "before_parse", "parseLazy", "counter_scope", "bind_counter_count", "bind_counter_list", "bind_counter_node", "begin_probe", "reject_absent_rule", "commit_rule", "fast_path_ok", "accept_at", "commit_at", "note_match", "debug_actual", "debug_recovery_mode", "recovery_frame", "enter_frame", "leave_frame", "recovery_at", "recovery_at_set", "unwinding", "describe_token", "breadcrumb", "resolve_context", "report_context", "recover_at_context", "sync_loop", "recover_choice", "raise_error", "required_recovering", "_attempt_rule", "required_rule_recovering", "_rule_recovery", "required_rule_resume", "_required_outcome", "required_token", "required_rule", "optional_token", "optional_rule", "skip_spaces", "skip_external_spaces", "counted_impl", "counted_token", "counted_rule", "repeat_optional", "range_token", "range_rule", "range_optional_token", "range_optional_rule", "custom_failure_decision", "custom_failure", "action_result"}};
 				}
 			};
 		} // namespace parser_ll
@@ -5691,7 +5260,7 @@ template<typename T> auto python::ispa_std::algorithm::erase_if(std::vector<T>& 
 		i = ((i) + (1));
 	}
 	(arr).clear();
-	ISPA_STD::python_extend((arr), kept);
+	(arr).insert((arr).end(), kept.begin(), kept.end());
 	return ((n) - (kept.size()));
 }
 template<typename AST> auto python::ispa_std::parser_ll::LLParser::rule_context(std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos, AST ast, std::shared_ptr<python::ispa_std::lexer::TokenCursor> start, const std::string& rule) -> std::shared_ptr<python::ispa_std::parser_ll::RuleContext<AST>> {
@@ -5721,7 +5290,7 @@ template<typename V> auto python::ispa_std::lr::lr_pack(const std::vector<V>& va
 			long long c = 0;
 			std::shared_ptr<python::ispa_std::lr::LRCaptures<V>> spliced = python::ispa_std::lr::lr_captures_of(value);
 			while (((c) < (((*spliced)).columns.size()))) {
-				ISPA_STD::python_extend(((columns)[(((offsets)[i]) + (c))]), (((*spliced)).columns)[c]);
+				((columns)[(((offsets)[i]) + (c))]).insert(((columns)[(((offsets)[i]) + (c))]).end(), (((*spliced)).columns)[c].begin(), (((*spliced)).columns)[c].end());
 				c = ((c) + (1));
 			}
 		} else {
@@ -5963,7 +5532,7 @@ template<typename V> auto python::ispa_std::lr_conflicts::LRGeneralizedParser::l
 		cursor = (offset)[0];
 		auto window = ((*this))._window(g, pos);
 		std::vector<long long> pending = std::vector<long long>{};
-		ISPA_STD::python_extend((pending), ((*active)).items);
+		(pending).insert((pending).end(), ((*active)).items.begin(), ((*active)).items.end());
 		auto closure = ((*active)).copy();
 		auto shifted = ISPA_STD::construct<python::ispa_std::sortedmap::IntSet>();
 		long long nxt = 0;
@@ -6315,9 +5884,9 @@ template<typename T> auto python::ispa_std::vector::assign(std::vector<T>& arr, 
 template<typename T> auto python::ispa_std::vector::swap(std::vector<T>& a, std::vector<T>& b) -> void {
 	auto tmp = ISPA_STD::python_copy((a));
 	(a).clear();
-	ISPA_STD::python_extend((a), b);
+	(a).insert((a).end(), b.begin(), b.end());
 	(b).clear();
-	ISPA_STD::python_extend((b), tmp);
+	(b).insert((b).end(), tmp.begin(), tmp.end());
 }
 template<typename T> auto python::ispa_std::vector::lexicographical_less(const std::vector<T>& a, const std::vector<T>& b) -> bool {
 	long long i = 0;
@@ -6340,13 +5909,4 @@ template<typename T> auto python::ispa_std::to_string::list_to_string(const std:
 		i = ((i) + (1));
 	}
 	return out;
-}
-
-#include <ispastdlib/external.hpp>
-namespace o::Exports {
-struct symbol_0 : ::o::Parser {
-using node_type = ::o::Types::modules::c::main;
-static bool starts(const char* origin, const char* start);
-static ISPA_STD::ExternalResult<node_type> parse(const char* origin, const char* start);
-};
 }

@@ -11,6 +11,8 @@ Args parse_args(int argc, char** argv) {
     CLI::App app{"ISPA Parser Generator"};
     std::string algorithm;
     app.allow_extras();
+    bool export_libraries = false;
+    app.add_flag("--export", export_libraries, "Export installed built runtimes (accepts ispa-pkg export options)");
     app.add_flag("-v,--version",  args.version, "Print version");
     app.add_option("-d,--dir", args.dir, "Recursively scan a module source directory")->expected(1, -1)->allow_extra_args(false);
     app.add_option("-o", args.output, "Directory where to output generated files");
@@ -24,6 +26,8 @@ Args parse_args(int argc, char** argv) {
     app.add_option("--debug", args.debug, "Output debug logs into Logs directory");
     app.add_flag("--debug-instrumentation,!--no-debug-instrumentation", args.debug_instrumentation,
         "Emit ispadbg source checkpoints and typed parser state");
+    app.add_flag("--text-view,!--no-text-view", args.text_view,
+        "C++ only: token text is a non-owning view of the input (the input must outlive the AST) instead of a std::string copy");
     app.add_flag("--logs", args.logs, "Output logs into Logs directory");
     app.add_flag("--nfa-debug,!--no-nfa-debug", args.nfa_debug,
                  "Track TNFA provenance and trace capture boundaries through TNFA/TDFA generation");
@@ -39,7 +43,7 @@ Args parse_args(int argc, char** argv) {
     app.add_flag("--library-only", args.library_only,
         "Emit only imported helper declarations (for lowering shared runtime libraries)");
     app.add_option("--stdlib", args.stdlib,
-        "Standard library to generate against: a directory or an installed module name (target-core)");
+        "Standard library: core (default), ispastdlib, a directory, or an installed module");
     app.add_option("--stdlib-name", args.stdlib_name,
         "Namespace the generated parser links the standard library through");
     app.add_flag("--static", args.static_stdlib,

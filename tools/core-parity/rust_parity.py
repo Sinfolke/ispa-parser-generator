@@ -4,15 +4,15 @@ error recovery on malformed input.
 
     python3 rust_parity.py [--grammar json|dyn|sql|pyexpr|counted|failblock] [--ispa PATH] [--fuzz N] [--seed S]
 
-Needs cargo and clang++ (C++23); builds into ./build/rust (ignored). The trees, failure texts and diagnostics are compared
+Needs cargo, CMake and a C++23 compiler; builds into ./build/rust (ignored). The trees, failure texts and diagnostics are compared
 with the tokens made up front and with them made on demand."""
 import argparse, os, random, re, shutil, subprocess, sys
 from pathlib import Path
+from cmake_build import build_cpp
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 RUNTIME = REPO / 'parser' / 'stdlibs' / 'target' / 'rust'
-CPP_STDLIB = REPO / 'parser' / 'stdlibs' / 'target' / 'cpp'
 
 # grammar name -> (directory, entry file, fixed corpus, fuzz alphabet)
 GRAMMARS = {
@@ -71,10 +71,8 @@ def build(ispa, work, grammar):
     (crate / 'src' / 'generated.rs').write_text(source.replace('pub mod generated', 'pub mod generated', 1))
     shutil.copy(HERE / 'rust' / 'run.rs', crate / 'src' / 'bin' / 'run.rs')
     run(['cargo', 'build', '--quiet', '--bin', 'run'], cwd=crate)
-    reference = work / 'ref'
     shutil.copy(HERE / 'rust' / 'ref_main.cpp', work / 'ref_main.cpp')
-    run([os.environ.get('CXX', 'clang++'), '-std=c++23', '-O1', '-I', str(CPP_STDLIB), '-I', str(gen_cpp), str(gen_cpp / 'generated.cpp'),
-         str(work / 'ref_main.cpp'), str(CPP_STDLIB / 'src' / 'core.cpp'), '-o', str(reference)])
+    reference = build_cpp(work, 'ref', [gen_cpp / 'generated.cpp', work / 'ref_main.cpp'], [gen_cpp])
     return crate / 'target' / 'debug' / 'run', reference
 
 

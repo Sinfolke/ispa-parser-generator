@@ -957,9 +957,26 @@ namespace Cpp {
         emitLine(*o.h, "};");
     }
 
+    // --text-view: owning String fields of the AST types and the lexer's capture locals become views of the input.
+    static auto isPlainString(const LangAPI::Type &type) -> bool {
+        return type.isValueType() && type.getValueType() == LangAPI::ValueType::String;
+    }
+    auto Construct::inAstTypes() const -> bool {
+        return std::ranges::any_of(context.symbol_path, [](const std::string &part) { return part == "FlatTypes" || part == "Types"; });
+    }
+    auto Construct::inSemanticAction() const -> bool {
+        return !context.symbol_path.empty() && context.symbol_path.back() == "semantic_action_exec";
+    }
+
+    static auto replaceAll(std::string &text, const std::string &from, const std::string &to) -> void {
+        for (std::size_t at = text.find(from); at != std::string::npos; at = text.find(from, at + to.size()))
+            text.replace(at, from.size(), to);
+    }
+
     auto Construct::produceVariable(const LangAPI::Variable &v, OutputSrc &o) -> void {
         const bool in_class = o.in_class;
-        const std::string type = Core::convertType(v.type);
+        const std::string type = text_view_ && in_class && !v.is_static && isPlainString(v.type) && inAstTypes()
+            ? std::string("::ISPA_STD::Text") : Core::convertType(v.type);
         if (v.is_static) {
             // class: `static T x;` + `T Cls::x = v;`   namespace: `extern T x;` + `T ns::x = v;`
             emitLine(*o.h, std::string(in_class ? "static " : "extern ") + type + " " + v.name + ";");
@@ -1120,8 +1137,10 @@ namespace Cpp {
         emitLine(o, "}");
     }
     auto Construct::produceVariableStatement(const LangAPI::Variable &variable, Converter::Writer &o) -> void {
-        std::string line = Core::convertType(variable.type) + " " + variable.name;
-        const std::string initializer = Core::convertExpression(variable.value);
+        const bool as_view = text_view_ && inSemanticAction() && isPlainString(variable.type);
+        std::string line = (as_view ? std::string("::ISPA_STD::Text") : Core::convertType(variable.type)) + " " + variable.name;
+        std::string initializer = Core::convertExpression(variable.value);
+        if (as_view) replaceAll(initializer, "captures.text(", "captures.view(");
         if (!variable.value.empty())
             line += " = " + initializer;
         emitLine(o, line + ";");
@@ -1192,7 +1211,10 @@ namespace Cpp {
     auto Construct::convertStatement(const LangAPI::Statement &stmt, Converter::Writer &o) -> void {
         if (stmt.isExpression()) {
             // plain expression statements (calls, assignments, return/break/continue, ...) were silently dropped before
-            const std::string text = Core::convertExpression(stmt.getExpression());
+            std::string text = Core::convertExpression(stmt.getExpression());
+            if (text_view_ && inSemanticAction()) replaceAll(text, "captures.text(", "captures.view(");
+            // The rule's result is dead once it is stored in the match node: move it instead of copying its vectors.
+            if (text == "match_result.node.set_data(result)") text = "match_result.node.set_data(std::move(result))";
             if (!text.empty()) {
                 emitLine(o, text + ";");
                 if (debug_instrumentation_ && text.find("assign_compatible(result.") != std::string::npos)
@@ -1414,8 +1436,8 @@ namespace Cpp {
 }
 
 extern "C" auto cpp_construct(const LangAPI::Declarations *tree, const char *namespace_name,
-                              bool incremental, bool debug_instrumentation) -> Cpp::Construct* {
-    return new Cpp::Construct(tree, namespace_name, incremental, debug_instrumentation);
+                              bool incremental, bool debug_instrumentation, bool text_view) -> Cpp::Construct* {
+    return new Cpp::Construct(tree, namespace_name, incremental, debug_instrumentation, text_view);
 }
 extern "C" auto cpp_construct_finish(Cpp::Construct* c) -> void {
     delete c;

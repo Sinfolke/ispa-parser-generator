@@ -111,6 +111,9 @@ struct TypedCursor : lo::lexer::TokenCursor {
         else (void)end;
     }
     auto isEnd() -> bool override { return it.isEnd(); }
+    auto kind_is(long long type_id) -> bool override {
+        return !it.isEnd() && static_cast<long long>((*it).index()) == type_id;
+    }
     auto next() -> std::shared_ptr<lo::lexer::TokenCursor> override { if (!it.isEnd()) ++it; return shared_self(); }
     auto prev() -> std::shared_ptr<lo::lexer::TokenCursor> override {
         if constexpr (ISPA_STD::detail::detected_v<decrement_op, IT>) --it;
@@ -251,28 +254,31 @@ public:
     void recovery_at(std::string_view expecting, Names... names) {
         static_assert(sizeof...(Sets) == sizeof...(Names), "recovery_at: one claim name per claim set");
         // The sets are template arguments and the labels literals: build the claims once per call site.
-        struct Site { const char* expecting; const char* first_label; std::vector<std::shared_ptr<core_detail::lo::recovery::ContextClaim>> claims; };
+        struct Site { const char* expecting; const char* first_label; std::string text; std::shared_ptr<core_detail::lo::recovery::ClaimSet> set; };
         static thread_local std::vector<Site> sites;
         const std::string_view labels[] = {std::string_view(names)..., std::string_view{}};
         for (const auto& site : sites)
             if (site.expecting == expecting.data() && site.first_label == labels[0].data()) {
-                core()->recovery_at(std::string(expecting), site.claims);
+                core()->recovery_at_set(site.text, site.set);
                 return;
             }
         ISPA_STD::HeapScope heap;
         std::vector<std::shared_ptr<core_detail::lo::recovery::ContextClaim>> claims;
         std::size_t i = 0;
         (claims.push_back(ISPA_STD::construct<core_detail::lo::recovery::ContextClaim>(std::string(labels[i++]), core_detail::token_set<Sets>())), ...);
-        sites.push_back({expecting.data(), labels[0].data(), claims});
-        core()->recovery_at(std::string(expecting), std::move(claims));
+        sites.push_back({expecting.data(), labels[0].data(), std::string(expecting), ISPA_STD::construct<core_detail::lo::recovery::ClaimSet>(std::move(claims))});
+        core()->recovery_at_set(sites.back().text, sites.back().set);
     }
 
     template<typename SpaceToken, typename IT>
     void skip_spaces(IT& pos) {
         use_space_token<SpaceToken>();
-        auto cursor = bridge<SpaceToken>(pos);
-        core()->skip_spaces(cursor);
-        pos = cursor->it;
+        // A leaf call into the core: one cursor per iterator type is reused instead of allocating one per call.
+        static thread_local std::shared_ptr<core_detail::TypedCursor<IT, Token, SpaceToken>> scratch;
+        if (!scratch) { ISPA_STD::HeapScope heap; scratch = core_detail::counted<core_detail::TypedCursor<IT, Token, SpaceToken>>(pos); }
+        else { scratch->it = pos; scratch->cached_token.reset(); scratch->cached_distance = -1; }
+        core()->skip_spaces(scratch);
+        pos = scratch->it;
     }
 
     template<class... Sets, class IT>
@@ -290,6 +296,14 @@ public:
     // --- required --------------------------------------------------------------------------------------------
     template<typename NodeStruct, typename IT>
     auto required(IT& pos, const core_detail::CoreFail& fail) -> ISPA_STD::Node<NodeStruct> {
+        // Matched terminal with nothing observing the core: no cursor, raw token or core node is built.
+        if (!pos.isEnd() && (*pos).index() == static_cast<std::size_t>(core_detail::token_index_of<NodeStruct, Token>)
+            && core()->fast_path_ok(fail.handler, true)) {
+            auto node = (*pos).template to_node<NodeStruct>();
+            ++pos;
+            core()->accept_at(static_cast<long long>(pos.distance()));
+            return node;
+        }
         auto cursor = bridge<NodeStruct>(pos);
         auto node = core()->required_token(cursor, core_detail::token_index_of<NodeStruct, Token>, fail.handler);
         pos = cursor->it;
@@ -297,6 +311,28 @@ public:
     }
     template<typename NodeStruct, typename IT, typename Recursive>
     auto required(IT& pos, Recursive&& rec, const core_detail::CoreFail& fail) -> ISPA_STD::Node<NodeStruct> {
+        // Same shape as the core's required_rule when nothing observes it; only a failed first attempt enters the core.
+        if (core()->fast_path_ok(fail.handler, false)) {
+            IT attempt = pos;
+            typename std::decay_t<decltype(rec(attempt))> match;
+            try {
+                match = rec(attempt);
+            } catch (const typename Base::NoMatch&) {
+                ISPA_STD::fail(ISPA_STD::EK_NoMatch, "no match");
+            }
+            if (match.status) {
+                pos = match.it;
+                core()->accept_at(static_cast<long long>(pos.distance()));
+                return std::move(match.node);
+            }
+            namespace lo = core_detail::lo;
+            auto first = core_detail::counted<lo::match_result::MatchResult>();
+            first->__init__(false, lo::node::Node::blank(), core_detail::counted<core_detail::TypedCursor<IT, Token, NodeStruct>>(match.it));
+            auto cursor = bridge<NodeStruct>(pos);
+            auto node = core()->required_rule_resume(cursor, rule_callback<NodeStruct, IT>(rec), fail.handler, first);
+            pos = cursor->it;
+            return core_detail::take_node<NodeStruct>(node);
+        }
         auto cursor = bridge<NodeStruct>(pos);
         auto node = core()->required_rule(cursor, std::string(), rule_callback<NodeStruct, IT>(rec), fail.handler);
         pos = cursor->it;
@@ -650,6 +686,8 @@ protected:
         }
         merged.insert(merged.end(), std::make_move_iterator(diagnostics.begin()), std::make_move_iterator(diagnostics.end()));
         diagnostics = std::move(merged);
+        core()->recovery_state_->diagnostics.clear();
+        core()->context_errors_.clear();
     }
 };
 }

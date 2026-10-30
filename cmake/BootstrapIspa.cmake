@@ -1,12 +1,12 @@
 # Regenerating the self-hosted bootstrapped parsers (parser/ispa, parser/python, parser/ispa_dep_scanner)
-# and cpp-core/ispa_core_lowered.{h,cpp} needs an `ispa` binary: either one already on PATH / given via
+# and target-cpp/ispa_core_lowered.{h,cpp} needs an `ispa` binary: either one already on PATH / given via
 # -DISPA_BOOTSTRAP_BIN=..., or the latest release downloaded here so a clean checkout never needs to ship
 # those generated multi-MB sources in git.
 #
 # Opt-in: -DISPA_REGENERATE_BOOTSTRAP=ON. Off by default, so a normal configure just uses the checked-in
 # (or previously regenerated) bootstrapped/ sources, same as before this file existed.
 
-option(ISPA_REGENERATE_BOOTSTRAP "Download/locate an ispa binary and regenerate the bootstrapped parsers + cpp-core lowered sources" OFF)
+option(ISPA_REGENERATE_BOOTSTRAP "Download/locate an ispa binary and regenerate the bootstrapped parsers + target-cpp lowered sources" OFF)
 set(ISPA_BOOTSTRAP_BIN "" CACHE FILEPATH "Path to an ispa binary to use for regeneration (skips the download)")
 set(ISPA_BOOTSTRAP_VERSION "latest" CACHE STRING "Release tag to download when ISPA_BOOTSTRAP_BIN is not set (e.g. v1.2.3)")
 
@@ -87,7 +87,7 @@ function(ispa_bootstrap_resolve_binary out_var)
     set(${out_var} "${resolved_bin}" PARENT_SCOPE)
 endfunction()
 
-# Runs regen.py (cpp-core/ispa_core_lowered.{h,cpp}) and then regenerates the three bootstrapped
+# Runs regen.py (target-cpp/ispa_core_lowered.{h,cpp}) and then regenerates the three bootstrapped
 # parsers in dependency order (python's PyRawParser first; the self-parser and dep_scanner both --dep on it).
 # Each step only overwrites what it generates; a failure stops the configure (FATAL_ERROR) since a half
 # regenerated bootstrap tree is worse than the previous one.
@@ -101,8 +101,8 @@ function(ispa_bootstrap_regenerate)
     # clone, or one that deliberately gitignores it). Anything already committed/present is left alone:
     # this is also what breaks the chicken-and-egg problem (building ispa needs these, but regenerating
     # them needs a working ispa) for the normal case where they are just checked in.
-    if(EXISTS "${repo}/parser/stdlibs/target/cpp-core/ispa_core_lowered.h"
-            AND EXISTS "${repo}/parser/stdlibs/target/cpp-core/src/ispa_core_lowered.cpp"
+    if(EXISTS "${repo}/parser/stdlibs/target/target-cpp/ispa_core_lowered.h"
+            AND EXISTS "${repo}/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp"
             AND EXISTS "${repo}/parser/python/bootstrapped/PyRawParser.h"
             AND EXISTS "${repo}/parser/python/bootstrapped/PyRawParser.cpp"
             AND EXISTS "${repo}/parser/ispa/bootstrapped/Parser.h"
@@ -119,15 +119,15 @@ function(ispa_bootstrap_regenerate)
 
     set(env_cmd "${CMAKE_COMMAND}" -E env --unset=LD_LIBRARY_PATH)
 
-    # 1) cpp-core: the ispa_std runtime lowered to C++.
-    if(NOT EXISTS "${repo}/parser/stdlibs/target/cpp-core/ispa_core_lowered.h"
-            OR NOT EXISTS "${repo}/parser/stdlibs/target/cpp-core/src/ispa_core_lowered.cpp")
+    # 1) target-cpp: the ispa_std runtime lowered to C++.
+    if(NOT EXISTS "${repo}/parser/stdlibs/target/target-cpp/ispa_core_lowered.h"
+            OR NOT EXISTS "${repo}/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp")
         execute_process(
-                COMMAND ${env_cmd} "${Python3_EXECUTABLE}" "${repo}/parser/stdlibs/target/cpp-core/regen.py" --ispa "${ispa_bin}"
+                COMMAND ${env_cmd} "${Python3_EXECUTABLE}" "${repo}/parser/stdlibs/target/target-cpp/regen.py" --ispa "${ispa_bin}"
                 RESULT_VARIABLE r
         )
         if(NOT r EQUAL 0)
-            message(FATAL_ERROR "ispa bootstrap: regen.py (cpp-core) failed")
+            message(FATAL_ERROR "ispa bootstrap: regen.py (target-cpp) failed")
         endif()
     endif()
 

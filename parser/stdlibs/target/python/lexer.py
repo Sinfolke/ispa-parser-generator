@@ -40,7 +40,13 @@ class Lexer(Generic[T]):
         raise NotImplementedError('A generated lexer must implement makeToken')
 
     def lookup(self, table, class_table, action_table, layout, semantic,
-               debug_array, debug_index, pos: Position) -> T | None:
+               debug_array=(), debug_index=None, pos: Position | None = None) -> T | None:
+        # Uninstrumented generated lexers pass only the cursor after semantic.
+        # Instrumented lexers additionally pass debug_array and debug_index.
+        if pos is None and isinstance(debug_array, Position):
+            pos, debug_array = debug_array, ()
+        if pos is None:
+            raise TypeError('lookup requires a source position')
         from .dfa import TdfaLayout, run_tdfa
         import ispa_debug
         if pos.at_end():

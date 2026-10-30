@@ -8,7 +8,7 @@ option(ISPA_BUILD_DEP_PARSER "Build the dependency scanner" ON)
 option(ISPA_BUILD_PYTHON_PARSER "Build the Python grammar parser" ON)
 option(ISPA_ENABLE_PCH "Enable precompiled headers for parsers" ON)
 
-set(ISPA_PARSER_STDLIB "core" CACHE STRING "Runtime the in-tree parsers are generated against: ispastdlib (hand-written C++) or core (ispa_std lowered to C++ plus the cpp-core facade)")
+set(ISPA_PARSER_STDLIB "core" CACHE STRING "Runtime the in-tree parsers are generated against: ispastdlib (hand-written C++) or core (ispa_std lowered to C++ plus the target-cpp facade)")
 set_property(CACHE ISPA_PARSER_STDLIB PROPERTY STRINGS ispastdlib core)
 if(NOT ISPA_PARSER_STDLIB MATCHES "^(ispastdlib|core)$")
     message(FATAL_ERROR "Invalid ISPA_PARSER_STDLIB='${ISPA_PARSER_STDLIB}' (expected ispastdlib or core)")
@@ -41,10 +41,10 @@ function(ispa_apply_compile_options target)
 endfunction()
 
 # ispastdlib (the hand-written C++ runtime) and ispa_core (the lowered-core facade, parsers
-# generated with --stdlib core include <ispa_core/...>) are both built from cpp-core now: it is
-# the single self-contained package (ispa-pkg install cpp-core needs nothing from elsewhere but
+# generated with --stdlib core include <ispa_core/...>) are both built from target-cpp now: it is
+# the single self-contained package (ispa-pkg install target-cpp needs nothing from elsewhere but
 # target-core).
-set(STDLIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/stdlibs/target/cpp-core")
+set(STDLIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/stdlibs/target/target-cpp")
 if(NOT TARGET ispastdlib::ispastdlib)
     add_subdirectory("${STDLIB_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/ispastdlib_build")
 endif()

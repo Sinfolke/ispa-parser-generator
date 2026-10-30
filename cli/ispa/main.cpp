@@ -1,6 +1,12 @@
 #include <ispa/parser.h>
 #include <yaml-cpp/yaml.h>
 #ifdef _WIN32
+#include <process.h>
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
+#ifdef _WIN32
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -42,6 +48,52 @@ import InstalledLibraries;
 
 namespace {
     namespace diagnostics = ISPA::Diagnostics;
+
+    class GenerationProgress {
+        bool enabled;
+        bool terminal =
+#ifdef _WIN32
+            _isatty(2);
+#else
+            isatty(2);
+#endif
+    public:
+        explicit GenerationProgress(bool enabled) : enabled(enabled) {}
+        ~GenerationProgress() { if (enabled && terminal) std::cerr << '\n'; }
+        void update(int percent, const std::string& phase) const {
+            if (!enabled) return;
+            std::cerr << (terminal ? "\r" : "") << "[" << std::string(percent / 5, '=')
+                      << std::string(20 - percent / 5, ' ') << "] "
+                      << percent << "% " << phase << "        ";
+            if (!terminal || percent == 100) std::cerr << '\n';
+            std::cerr.flush();
+        }
+    };
+
+    std::filesystem::path executablePath(const char* argv0);
+
+    int exportLibraries(int argc, char** argv) {
+        const auto executable = executablePath(argv[0]);
+        auto package_tool = executable.parent_path() /
+#ifdef _WIN32
+            "ispa-pkg.exe";
+#else
+            "ispa-pkg";
+#endif
+        std::string command = std::filesystem::is_regular_file(package_tool)
+            ? package_tool.string() : "ispa-pkg";
+        std::vector<const char*> arguments{command.c_str()};
+        for (int i = 1; i < argc; ++i) arguments.push_back(argv[i]);
+        arguments.push_back(nullptr);
+#ifdef _WIN32
+        const auto result = _spawnvp(_P_WAIT, command.c_str(), arguments.data());
+        if (result != -1) return static_cast<int>(result);
+#else
+        execvp(command.c_str(), const_cast<char* const*>(arguments.data()));
+#endif
+        throw std::runtime_error("ispa --export requires ispa-pkg beside ispa or on PATH");
+    }
+
 
     void removeDebugStatements(LangAPI::Statements& statements) {
         std::erase_if(statements, [](const LangAPI::Statement& statement) {
@@ -627,6 +679,8 @@ void generateDependencies(Args& args) {
 }
 
 int generate(Args args) {
+    GenerationProgress progress(!args.check_only);
+    progress.update(0, "Scanning modules");
     UAST::main modules;
     std::vector<std::string> source_files;
     if (args.no_dep && !args.check_only) generateDependencies(args);
@@ -663,6 +717,7 @@ int generate(Args args) {
         if (!printGrammarDiagnosticAfterScanFailure(error)) printExceptionDiagnostic("P000", error);
         return 1;
     }
+    progress.update(15, "Parsing modules");
     diagnostics::Reporter parse_diagnostics;
     for (const auto& source : module_project.sources) {
         parse_diagnostics.source(source.file, sourceSnapshot(source));
@@ -707,6 +762,7 @@ int generate(Args args) {
     if (dumper.shouldDump("DFA"))
         std::ofstream(dumper.makeDumpPath("DFA"), std::ios::trunc);
 
+    progress.update(30, "Building syntax tree");
     AST::Builder ast_builder(modules);
     ast_builder.setSourceFiles(std::move(source_files));
     ast_builder.setModules(module_project);
@@ -781,6 +837,7 @@ int generate(Args args) {
             if (member) registerMemberActions(info, *member);
         semantic_checker.addRule(std::move(info));
     }
+    progress.update(45, "Checking semantics");
     semantic_checker.check();
     if (args.check_only) {
         printCheckJson(semantic_checker.diagnostics());
@@ -800,6 +857,13 @@ int generate(Args args) {
     }
 
     std::filesystem::path output_path = args.output;
+    progress.update(55, "Building lexer");
+    if (args.text_view && args.language != Args::Language::Cpp)
+        throw std::runtime_error("--text-view is only supported for the C++ target");
+    if (args.text_view && args.debug_instrumentation) {
+        cpuf::printf("--text-view: debug instrumentation cannot print views of the input; disabling it\n");
+        args.debug_instrumentation = false;
+    }
     LexerBuilder lexer_data(ast, args.nfa_debug, args.debug_instrumentation);
     lexer_data.build();
 
@@ -849,6 +913,7 @@ int generate(Args args) {
     cpuf::printf("{} of {} rules changed since last run\n", changed_rules.size(), tree_map.size());
     const Algorithm::BuildRequest build_request{ast, changed_rules,
         args.auto_conflicts, args.conflict_lookahead};
+    progress.update(70, "Building parser");
     auto built = algorithm->build(build_request, metadata);
     if (!built.output || !built.to_lang_repr)
         throw std::runtime_error("Algorithm returned no LangRepr converter: " + algorithm_name);
@@ -864,8 +929,9 @@ int generate(Args args) {
     // (e.g. the extern "C" cpp_construct in converter.cpp) internally.
     LangRepr::Converter converter(holder, to_string(args.language), name, args.incremental,
         args.debug_instrumentation,
-        InstalledLibraries::pluginPrefix(args.executable_dir, "converter", to_string(args.language)));
+        InstalledLibraries::pluginPrefix(args.executable_dir, "converter", to_string(args.language)), args.text_view);
     converter.init();
+    progress.update(85, "Generating target code");
     converter.construct();
 
     const auto manifest_path = dir_path / (".codegen-manifest." + name);
@@ -881,8 +947,13 @@ int generate(Args args) {
     }
     if (!args.stdlib.empty()) {
         // --stdlib: link to a library with the ispastdlib interface under another namespace and include directory.
-        const auto library = InstalledLibraries::stdlib(
+        auto library = InstalledLibraries::stdlib(
             InstalledLibraries::root(std::filesystem::path(args.executable_dir) / "ispa"), args.stdlib, to_string(args.language));
+        if (!library.found && args.stdlib == "core") {
+            library.found = true;
+            library.ns = "ISPA_CORE";
+            library.include = "ispa_core";
+        }
         if (!library.found)
             std::cerr << "warning: --stdlib " << args.stdlib << " was not found (a directory, or a module installed with ispa-pkg);"
                          " generating against the default namespace\n";
@@ -908,18 +979,22 @@ int generate(Args args) {
             }
         }
     }
+    progress.update(95, "Writing generated files");
     const auto result = writeGeneratedFiles(dir_path, generated, previous_hashes);
 
     saveKeyHashMap(manifest_path, result.hashes);
     Algorithm::saveMetadata(cache_dir / "data", metadata);
     saveKeyHashMap(rule_manifest_path, new_rule_hashes);
 
+    progress.update(100, "Generation complete");
     std::cout << "Updated " << result.updated << " file(s)\n";
     return 0;
 }
 
 int main(int argc, char** argv) {
     try {
+        for (int i = 1; i < argc; ++i)
+            if (std::string_view(argv[i]) == "--export") return exportLibraries(argc, argv);
         auto args = init(argc, argv);
         if (args.logs || args.debug) logger.includeAll();
         else logger.excludeAll();
@@ -946,6 +1021,9 @@ int main(int argc, char** argv) {
             for (const auto& [name, prefix] : args.dependencies) explicit_names.insert(name);
             for (const auto& [name, prefix] : libraries.dependencies)
                 if (!explicit_names.contains(name)) args.dependencies.emplace_back(name, prefix);
+        }
+        if (args.language == Args::Language::Cpp && args.stdlib.empty() && !args.library_only) {
+            args.stdlib = "core";
         }
         return generate(std::move(args));
     }

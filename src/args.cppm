@@ -29,6 +29,8 @@ export struct Args {
     bool library_only = false;
     bool debug = false;
     bool debug_instrumentation = true;
+    // C++ only: token text fields are non-owning views of the input (ISPA_STD::Text) instead of std::string copies.
+    bool text_view = false;
     bool logs = false;
     bool version = false;
     bool nfa_debug = false;

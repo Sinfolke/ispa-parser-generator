@@ -118,7 +118,17 @@ Token core_dfa_run_typed(const char*& pos, long long start_pos, long long& scann
         result_pair->second = carrier;
         return result_pair;
     };
-    lo::dfa_run::run(source, cursor, start_pos, tables, adapter, carrier);
+    // The adapter captures a dozen references: handing it to the core's std::function would heap-allocate it for every
+    // token. A one-pointer forwarder stays inside std::function's inline storage.
+    using AdapterResult = std::shared_ptr<lo::utility::Pair<long long, std::shared_ptr<lo::raw_token::RawToken>>>;
+    auto* const adapter_ptr = &adapter;
+    std::function<AdapterResult(long long, std::shared_ptr<lo::dfa_api::Captures>, long long, long long, long long,
+                                std::shared_ptr<lo::refs::Cursor>)>
+        forward = [adapter_ptr](long long index, std::shared_ptr<lo::dfa_api::Captures> captures, long long first_pos,
+                                long long length, long long start_line, std::shared_ptr<lo::refs::Cursor> cur) {
+            return (*adapter_ptr)(index, std::move(captures), first_pos, length, start_line, std::move(cur));
+        };
+    lo::dfa_run::run(source, cursor, start_pos, tables, forward, carrier);
     pos = base + cursor->pos;
     scanning_line = cursor->line;
     return accepted ? std::move(*accepted) : Token{};

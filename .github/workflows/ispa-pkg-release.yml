@@ -76,7 +76,7 @@ jobs:
       - name: Test Python CLI
         shell: bash
         run: |
-          python -m unittest tests/test_ispa_pkg.py -v
+          python -m unittest tests/test_ispa_pkg.py tests/test_ispa_pkg_versioning.py -v
           python -m unittest tests/test_antlr_to_ispa.py -v
           python -m unittest tests/test_antlr_companions.py -v
           python cli/ispadbg.py --help

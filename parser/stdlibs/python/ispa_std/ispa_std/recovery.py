@@ -79,7 +79,7 @@ class State:
     total_skipped: int
     diagnostics: list[Diagnostic]
     # Active call-site suffixes, including terminals inside nested productions.
-    anchors: list[list[int]]
+    anchors: "list[ClaimSet]"
     anchor_count: int
 
     def __init__(self):
@@ -265,7 +265,7 @@ def _anchor(plan: Plan, state: State, id: int) -> bool:
         return True
     i = 0
     while i < state.anchor_count:
-        if contains(state.anchors[i], id):
+        if contains(state.anchors[i].tokens, id):
             return True
         i = i + 1
     return False
@@ -453,6 +453,30 @@ class ContextClaim:
     def __init__(self, name: str, tokens: TokenSet):
         self.name = name
         self.tokens = tokens
+
+
+class ClaimSet:
+    """The claims of one recovery site plus their flattened token ids; immutable, shared by every visit of the site."""
+    claims: list[ContextClaim]
+    tokens: list[int]
+
+    def __init__(self, claims: list[ContextClaim]):
+        self.claims = claims
+        self.tokens = []
+        i = 0
+        while i < len(claims):
+            self.tokens.extend(claims[i].tokens.values())
+            i = i + 1
+
+
+_NO_CLAIMS: list[ClaimSet] = []
+
+
+def empty_claim_set() -> ClaimSet:
+    if len(_NO_CLAIMS) == 0:
+        none: list[ContextClaim] = []
+        _NO_CLAIMS.append(ClaimSet(none))
+    return _NO_CLAIMS[0]
 
 
 class ContextDiagnostic:

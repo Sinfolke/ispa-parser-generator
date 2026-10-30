@@ -21,16 +21,14 @@ import yaml
 
 CATALOG_URL = "https://raw.githubusercontent.com/Sinfolke/ispa-parser-generator/main/ispa-libraries.yaml"
 DEFAULT_CATALOG = {"packages": {
-    "std": {"github": "Sinfolke/ispa-parser-generator", "ref": "main"},
-    "target-core": {"github": "Sinfolke/ispa-parser-generator", "ref": "main",
+    "std": {"github": "Sinfolke/ispa-parser-generator", "ref": "libraries-{generator}-latest"},
+    "target-core": {"github": "Sinfolke/ispa-parser-generator", "ref": "libraries-{generator}-latest",
                     "manifest": "ispa-package.target-core.yaml"},
-    "cpp-target": {"github": "Sinfolke/ispa-parser-generator", "ref": "main",
-                   "manifest": "ispa-package.cpp-target.yaml"},
-    "cpp-core": {"github": "Sinfolke/ispa-parser-generator", "ref": "main",
-                 "manifest": "ispa-package.cpp-core.yaml"},
-    "python-target": {"github": "Sinfolke/ispa-parser-generator", "ref": "main",
+    "target-cpp": {"github": "Sinfolke/ispa-parser-generator", "ref": "libraries-{generator}-latest",
+                   "manifest": "ispa-package.target-cpp.yaml"},
+    "python-target": {"github": "Sinfolke/ispa-parser-generator", "ref": "libraries-{generator}-latest",
                       "manifest": "ispa-package.python-target.yaml"},
-    "rust-target": {"github": "Sinfolke/ispa-parser-generator", "ref": "main",
+    "rust-target": {"github": "Sinfolke/ispa-parser-generator", "ref": "libraries-{generator}-latest",
                     "manifest": "ispa-package.rust-target.yaml"},
 }}
 FOLDERS = ("ispalib", "ispatarget", "ispaalgorithm")
@@ -93,11 +91,18 @@ def run_build_step(command, cwd=None):
     if STATUS.verbose:
         subprocess.run(command, check=True, cwd=cwd, stdout=sys.stderr)
         return
-    result = subprocess.run(command, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    if result.returncode != 0:
+    output = []
+    with subprocess.Popen(command, cwd=cwd, stdout=subprocess.PIPE,
+                          stderr=subprocess.STDOUT, text=True) as process:
+        for line in process.stdout:
+            output.append(line)
+            if STATUS.tty:
+                STATUS.update(line.strip())
+        code = process.wait()
+    if code != 0:
         STATUS.done()
-        sys.stderr.write(result.stdout)
-        raise subprocess.CalledProcessError(result.returncode, command)
+        sys.stderr.write(''.join(output))
+        raise subprocess.CalledProcessError(code, command)
 
 
 def read_yaml(data, label):
@@ -211,6 +216,39 @@ def source_tree(spec, workspace):
     raise PackageError("Package source must have github, archive, or path")
 
 
+def generator_version(required=False):
+    """Read the generator actually used for package builds, including ISPA overrides."""
+    executable = os.environ.get("ISPA") or shutil.which("ispa")
+    if executable:
+        try:
+            result = subprocess.run([executable, "--version"], check=True,
+                                    capture_output=True, text=True, timeout=30)
+            version = result.stdout.splitlines()[0].strip().rstrip(";").strip()
+            if NAME.fullmatch(version):
+                return version
+        except (OSError, subprocess.SubprocessError, IndexError):
+            pass
+    if required:
+        raise PackageError("Cannot determine generator version; set ISPA or put ispa on PATH")
+    return "unknown"
+
+
+def resolved_source(spec, version):
+    spec = dict(spec)
+    if "github" in spec and "{generator}" in spec.get("ref", ""):
+        if version == "unknown":
+            raise PackageError("A generator-specific package requires ispa; set ISPA or put ispa on PATH")
+        # Development generators consume the development libraries.
+        spec["ref"] = "main" if version == "dev" else spec["ref"].replace("{generator}", version)
+    return spec
+
+
+def installed_source(name, data, root, catalog_path):
+    if data.get("from_catalog"):
+        return catalog(root, catalog_path).get("packages", {}).get(name, data["source"])
+    return data["source"]
+
+
 def layout_entries(config):
     layout = config.get("layout", {})
     if not isinstance(layout, dict):
@@ -246,6 +284,15 @@ def build_cpp_library(package, name, root, required=False, kind='cpp', standard=
 
     `kind` is the ispatarget directory to build; `output` names the archive (default: the package name)."""
     cpp = package / 'ispatarget' / kind
+    if kind == 'target-cpp':
+        generator = os.environ.get('ISPA') or shutil.which('ispa')
+        library = root / 'target-core' / 'ispalib' / 'python'
+        if generator and (cpp / 'regen.py').is_file() and library.is_dir():
+            STATUS.update(f'{name}: generating C++ runtime from Python ispa_std')
+            run_build_step([sys.executable, str(cpp / 'regen.py'), '--ispa', generator,
+                            '--library', str(library)])
+        elif not (cpp / 'ispa_core_lowered.h').is_file():
+            raise PackageError(f'{name}: generating the runtime requires ispa and target-core')
     output = output or name
     sources = sorted(source for source in cpp.rglob('*.cpp') if source.is_file())
     if not sources:
@@ -347,22 +394,17 @@ def regenerate_cpp_core_deps(core, name):
 
 
 def build_cpp_core(package, name, root, only_missing=False):
-    """Build the opt-in `cpp-core` directory (the core lowered to C++ for `--stdlib core`).
-
-    A failure only skips it: the plain C++ target keeps working."""
-    core = package / 'ispatarget' / 'cpp-core'
+    """Build the Python-derived C++ runtime and its native interoperability layer."""
+    core = package / 'ispatarget' / 'target-cpp'
     if not core.is_dir() or not any(core.rglob('*.cpp')):
         return None
     regenerate_cpp_core_deps(core, name)
-    output = name if name.endswith('-core') else f'{name}-core'   # package `cpp-core` -> libcpp-core.a
+    output = 'ispa-core'
     library_dir = core / 'lib'
     if only_missing and ((library_dir / f'lib{output}.a').is_file() or (library_dir / f'{output}.lib').is_file()):
         return None
-    try:
-        return build_cpp_library(package, name, root, kind='cpp-core', standard=17, output=output)
-    except (PackageError, subprocess.CalledProcessError) as error:
-        STATUS.update(f'{name}: skipping the core C++ build ({error})')
-        return None
+    return build_cpp_library(package, name, root, required=True,
+                             kind='target-cpp', standard=17, output=output)
 
 
 def ensure_requirements(name, config, root, allow_scripts, catalog_path, active):
@@ -375,7 +417,14 @@ def ensure_requirements(name, config, root, allow_scripts, catalog_path, active)
     for dependency in requires:
         if dependency == name or dependency in active:
             raise PackageError(f"{name}: circular requires on {dependency}")
-        if (root / dependency / ".ispa-package.json").is_file():
+        marker = root / dependency / ".ispa-package.json"
+        if marker.is_file():
+            data = json.loads(marker.read_text())
+            if data.get("generator_version") == generator_version():
+                continue
+            install(dependency, installed_source(dependency, data, root, catalog_path), root,
+                    allow_scripts, from_catalog=data.get("from_catalog", False),
+                    catalog_path=catalog_path, _active=(*active, name))
             continue
         packages = catalog(root, catalog_path).get("packages", {})
         spec = packages.get(dependency) if isinstance(packages, dict) else None
@@ -419,6 +468,9 @@ def build_missing_rust_package(package, name):
 def install(name, spec, root, allow_scripts=False, force=False, from_catalog=False, catalog_path=None, _active=()):
     if not NAME.fullmatch(name):
         raise PackageError(f"Invalid package name: {name}")
+    version = generator_version()
+    requested_spec = dict(spec)
+    spec = resolved_source(spec, version)
     root.mkdir(parents=True, exist_ok=True)
     target = root / name
     with tempfile.TemporaryDirectory(prefix=".ispa-pkg-", dir=root) as temp:
@@ -476,7 +528,7 @@ def install(name, spec, root, allow_scripts=False, force=False, from_catalog=Fal
                     digest.update(file.read_bytes())
             revision = digest.hexdigest()
         fingerprint = hashlib.sha256(json.dumps({"spec": spec, "revision": revision, "config": config,
-                                                "from_catalog": from_catalog}, sort_keys=True).encode()).hexdigest()
+                                                "from_catalog": from_catalog, "generator_version": version}, sort_keys=True).encode()).hexdigest()
         marker = target / ".ispa-package.json"
         if marker.is_file() and not force:
             try:
@@ -526,8 +578,9 @@ def install(name, spec, root, allow_scripts=False, force=False, from_catalog=Fal
         build_cpp_library(stage, name, root)
         build_cpp_core(stage, name, root)
         build_rust_package(stage, name)
-        marker_data = {"name": name, "source": spec, "revision": revision, "fingerprint": fingerprint,
-                       "from_catalog": from_catalog}
+        marker_data = {"name": name, "source": requested_spec, "resolved_source": spec,
+                       "revision": revision, "fingerprint": fingerprint,
+                       "generator_version": version, "from_catalog": from_catalog}
         (stage / ".ispa-package.json").write_text(json.dumps(marker_data, indent=2) + "\n")
         backup = work / "previous"
         if target.exists():
@@ -544,8 +597,19 @@ def install(name, spec, root, allow_scripts=False, force=False, from_catalog=Fal
 
 
 def catalog(root, path=None):
-    path = Path(path) if path else root / "catalog.yaml"
-    return read_yaml(path.read_text(encoding="utf-8"), str(path)) if path.is_file() else DEFAULT_CATALOG
+    custom = path is not None
+    path = Path(path) if custom else root / "catalog.yaml"
+    data = read_yaml(path.read_text(encoding="utf-8"), str(path)) if path.is_file() else DEFAULT_CATALOG
+    if not custom and isinstance(data.get("packages"), dict):
+        # Upgrade cached copies of the old official catalog. Explicit custom catalogs
+        # and refs other than the old default retain their requested source.
+        for name, spec in data["packages"].items():
+            default = DEFAULT_CATALOG["packages"].get(name)
+            if (default and isinstance(spec, dict) and spec.get("ref") == "main"
+                    and spec.get("github") == default["github"]
+                    and spec.get("manifest") == default.get("manifest")):
+                spec["ref"] = default["ref"]
+    return data
 
 
 def parse_source(value):
@@ -580,7 +644,7 @@ def export_data(root):
     cpp_dirs = targets.get("cpp", [])
     # Include the target root: consumers may include headers by their relative path.
     # Also include conventional include/ directories if present.
-    core_dirs = targets.get("cpp-core", [])
+    core_dirs = targets.get("target-cpp", [])
     includes = list(dict.fromkeys(
         directory for target in cpp_dirs + core_dirs
         for directory in (target, target / "include")
@@ -625,8 +689,8 @@ def write_export_files(root):
                 'library_dirs': [str(path) for path in library_dirs],
                 'runtime_dirs': [str(path) for path in runtime_dirs],
                 'libraries': [str(path) for path in libraries],
-                # the `--stdlib core` archives (ispatarget/cpp-core/lib), also part of `libraries`
-                'core_libraries': [str(path) for path in libraries if 'cpp-core' in path.parts]},
+                # the `--stdlib core` archives (ispatarget/target-cpp/lib), also part of `libraries`
+                'core_libraries': [str(path) for path in libraries if 'target-cpp' in path.parts]},
         'python': {'interpreter_dirs': [str(path) for path in python_dirs]},
     }
     (output / 'targets.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
@@ -859,6 +923,8 @@ def main(argv=None):
     update = sub.add_parser("update", help="Update installed packages")
     update.add_argument("names", nargs="*")
     update.add_argument("--allow-scripts", action="store_true")
+    doctor = sub.add_parser("doctor", help="Reinstall libraries built for a different generator version")
+    doctor.add_argument("--allow-scripts", action="store_true")
     sub.add_parser("list", help="List installed packages")
     catalog_cmd = sub.add_parser("catalog", help="Manage the YAML catalog")
     catalog_cmd.add_argument("action", choices=["update", "list"])
@@ -937,6 +1003,20 @@ def main(argv=None):
             else:
                 for name in catalog(root, args.catalog).get("packages", {}):
                     print(name)
+        elif args.command == "doctor":
+            version = generator_version(required=True)
+            # Dependencies are repaired by install before their dependents are built.
+            for marker in sorted(root.glob("*/.ispa-package.json")):
+                data = json.loads(marker.read_text())
+                name = marker.parent.name
+                if data.get("generator_version") == version:
+                    print(f"{name}: compatible with generator {version}")
+                    continue
+                print(f"{name}: reinstalling for generator {version} "
+                      f"(was {data.get('generator_version', 'unversioned')})")
+                install(name, installed_source(name, data, root, args.catalog), root,
+                        args.allow_scripts, force=True, from_catalog=data.get("from_catalog", False),
+                        catalog_path=args.catalog)
         elif args.command == "list":
             for marker in sorted(root.glob("*/.ispa-package.json")):
                 data = json.loads(marker.read_text())
@@ -950,7 +1030,7 @@ def main(argv=None):
                     raise PackageError("--ref applies only to GitHub repositories")
                 spec["ref"] = args.ref
             name = args.name or (args.source if args.source in packages else Path(args.source.rstrip("/")).name.removesuffix(".git").split(".")[0])
-            install(name, spec, root, args.allow_scripts, args.force, args.source in packages, args.catalog)
+            install(name, spec, root, args.allow_scripts, args.force, args.source in packages and not args.ref, args.catalog)
         else:
             markers = list(root.glob("*/.ispa-package.json"))
             installed = {p.parent.name: json.loads(p.read_text()) for p in markers}
@@ -958,8 +1038,7 @@ def main(argv=None):
             for name in names:
                 if name not in installed:
                     raise PackageError(f"Package not installed: {name}")
-                packages = catalog(root, args.catalog).get("packages", {})
-                spec = packages.get(name, installed[name]["source"]) if installed[name].get("from_catalog") else installed[name]["source"]
+                spec = installed_source(name, installed[name], root, args.catalog)
                 install(name, spec, root, args.allow_scripts, from_catalog=installed[name].get("from_catalog", False),
                         catalog_path=args.catalog)
         return 0

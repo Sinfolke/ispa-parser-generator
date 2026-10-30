@@ -115,3 +115,32 @@ impl<I, V, C: PySetIndex<I, V> + ?Sized> PySetIndex<I, V> for &mut C {
 /// A container the frontend saw only being handed on (so it was passed `const&`) that the callee mutates.
 #[allow(clippy::mut_from_ref, invalid_reference_casting)]
 pub fn unshare<T: ?Sized>(shared: &T) -> &mut T { unsafe { &mut *(shared as *const T as *mut T) } }
+
+/// Intermediate indexing borrows containers; a string unit remains an owned
+/// Latin-1 string because it need not be a UTF-8 slice of the source.
+pub trait PyIndexBorrow<I: ?Sized> {
+    type Borrowed<'a> where Self: 'a;
+    fn py_index_borrow<'a>(&'a self, index: &I) -> Self::Borrowed<'a>;
+}
+impl<T> PyIndexBorrow<i64> for Vec<T> {
+    type Borrowed<'a> = &'a T where T: 'a;
+    fn py_index_borrow<'a>(&'a self, index: &i64) -> &'a T { &self[py_position(*index, self.len())] }
+}
+impl<K: Eq + Hash, V> PyIndexBorrow<K> for HashMap<K, V> {
+    type Borrowed<'a> = &'a V where Self: 'a;
+    fn py_index_borrow<'a>(&'a self, key: &K) -> &'a V {
+        self.get(key).unwrap_or_else(|| crate::fail(5, "key not found"))
+    }
+}
+impl PyIndexBorrow<i64> for String {
+    type Borrowed<'a> = String;
+    fn py_index_borrow<'a>(&'a self, index: &i64) -> String { self.py_index(index) }
+}
+impl<I: ?Sized, T: PyIndexBorrow<I> + ?Sized> PyIndexBorrow<I> for &T {
+    type Borrowed<'a> = T::Borrowed<'a> where Self: 'a;
+    fn py_index_borrow<'a>(&'a self, index: &I) -> Self::Borrowed<'a> { (**self).py_index_borrow(index) }
+}
+impl<I: ?Sized, T: PyIndexBorrow<I> + ?Sized> PyIndexBorrow<I> for &mut T {
+    type Borrowed<'a> = T::Borrowed<'a> where Self: 'a;
+    fn py_index_borrow<'a>(&'a self, index: &I) -> Self::Borrowed<'a> { (**self).py_index_borrow(index) }
+}

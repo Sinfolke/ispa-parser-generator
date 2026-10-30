@@ -134,6 +134,28 @@ namespace ISPA_STD {
             );
         }
     }
+    // Rvalue source: vectors and nodes are moved element by element instead of copied; every other shape takes the copying path.
+    template<typename To, typename From,
+             std::enable_if_t<!std::is_lvalue_reference_v<From> && !std::is_const_v<std::remove_reference_t<From>>, int> = 0>
+    void assign_compatible(To& target, From&& source) {
+        using Source = std::remove_cv_t<std::remove_reference_t<From>>;
+        if constexpr (is_vector_v<To> && is_vector_v<Source>) {
+            target.clear();
+            target.reserve(source.size());
+            for (auto& item : source) {
+                typename To::value_type converted{};
+                assign_compatible(converted, std::move(item));
+                target.push_back(std::move(converted));
+            }
+        } else if constexpr (is_node_v<Source> && is_node_v<To> && std::is_assignable_v<To&, Source&&>) {
+            if (source.empty()) return;
+            target = std::move(source);
+        } else if constexpr (std::is_same_v<To, Source>) {
+            target = std::move(source);
+        } else {
+            assign_compatible(target, static_cast<const Source&>(source));
+        }
+    }
     template<typename To, typename From, std::size_t I>
     bool assign_variant_alternative(To& target, const From& source) {
         if constexpr (I == 0) {

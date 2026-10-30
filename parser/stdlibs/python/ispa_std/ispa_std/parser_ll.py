@@ -534,12 +534,12 @@ class Frame:
     """One rule invocation's recovery frame."""
     rule: str
     expecting: str
-    claims: list[recovery.ContextClaim]
+    claim_set: recovery.ClaimSet
 
     def __init__(self, rule: str):
         self.rule = rule
         self.expecting = ""
-        self.claims = []
+        self.claim_set = recovery.empty_claim_set()
 
 
 class FrameGuard:
@@ -742,7 +742,21 @@ class LLParser(Parser_base):
             no_match()
 
     def commit_rule(self, pos: TokenCursor) -> None:
-        here = cursor_position(pos)
+        self.commit_at(cursor_position(pos))
+
+    def fast_path_ok(self, fail: recovery.FailHandler, allow_custom: bool) -> bool:
+        """Whether a native caller may take a matched terminal/rule without the debug scope, RequiredResult and
+        recovery objects (then it reports the match with accept_at). The one place that decides; native fast paths
+        must not re-derive these conditions."""
+        return (not self.unwinding()) and (not debug.enabled()) and fail.is_recovering() \
+            and (allow_custom or not fail.is_custom())
+
+    def accept_at(self, here: int) -> None:
+        """A required terminal was consumed by a native fast path (cursor now at `here`)."""
+        self.commit_at(here)
+        self.note_match()
+
+    def commit_at(self, here: int) -> None:
         k = len(self.probes_) - 1
         while k >= 0:
             if here != self.probes_[k].start:
@@ -794,15 +808,15 @@ class LLParser(Parser_base):
             frame = self.frames_[self.frame_count]
             frame.rule = rule
             frame.expecting = ""
-            frame.claims.clear()
+            frame.claim_set = recovery.empty_claim_set()
         else:
             self.frames_.append(Frame(rule))
         self.frame_count = self.frame_count + 1
         state = self.recovery_state_
         if state.anchor_count < len(state.anchors):
-            state.anchors[state.anchor_count].clear()
+            state.anchors[state.anchor_count] = recovery.empty_claim_set()
         else:
-            state.anchors.append([])
+            state.anchors.append(recovery.empty_claim_set())
         state.anchor_count = state.anchor_count + 1
 
     def leave_frame(self) -> None:
@@ -817,17 +831,16 @@ class LLParser(Parser_base):
         """Emitted before each child member: the claims of this frame here (the
         member itself if repeated, plus the suffix up to the first required
         member). `claims` is a list of recovery.ContextClaim."""
+        self.recovery_at_set(expecting, recovery.ClaimSet(claims))
+
+    def recovery_at_set(self, expecting: str, claims: recovery.ClaimSet) -> None:
+        """recovery_at with the claims prepared once per site (shared, never copied per visit)."""
         if self.frame_count == 0:
             return
         frame = self.frames_[self.frame_count - 1]
         frame.expecting = expecting
-        frame.claims = claims
-        anchors = self.recovery_state_.anchors[self.recovery_state_.anchor_count - 1]
-        anchors.clear()
-        i = 0
-        while i < len(claims):
-            anchors.extend(claims[i].tokens.values())
-            i = i + 1
+        frame.claim_set = claims
+        self.recovery_state_.anchors[self.recovery_state_.anchor_count - 1] = claims
 
     def unwinding(self) -> bool:
         return self.unwind_ != 0
@@ -867,7 +880,7 @@ class LLParser(Parser_base):
             while f > 0:
                 f = f - 1
                 if not (k == 0 and repeat_spot and f + 1 == self.frame_count):
-                    claims = self.frames_[f].claims
+                    claims = self.frames_[f].claim_set.claims
                     c = 0
                     while c < len(claims):
                         if claims[c].tokens.matches(token):
@@ -970,7 +983,7 @@ class LLParser(Parser_base):
         any_claims = False
         i = 0
         while i < self.frame_count:
-            claims = self.frames_[i].claims
+            claims = self.frames_[i].claim_set.claims
             c = 0
             while c < len(claims):
                 any_claims = True
@@ -1037,7 +1050,7 @@ class LLParser(Parser_base):
                     boundary = False
                     a = 0
                     while a < self.recovery_state_.anchor_count:
-                        if recovery.contains(self.recovery_state_.anchors[a], ident):
+                        if recovery.contains(self.recovery_state_.anchors[a].tokens, ident):
                             boundary = True
                         a = a + 1
                     if boundary or skipped >= self.context_max_skip_ \
@@ -1082,7 +1095,7 @@ class LLParser(Parser_base):
             return recovery.RequiredResult.boundary_only()
         retries = 0
         while True:
-            if pos.current().holds(type_id):
+            if pos.kind_is(type_id):
                 node = pos.current().to_node(type_id)
                 pos.next()
                 self.commit_rule(pos)
@@ -1127,18 +1140,25 @@ class LLParser(Parser_base):
         return MatchResult.failed(attempt)
 
     def required_rule_recovering(self, pos: TokenCursor, rec: Callable[[TokenCursor], MatchResult], fail: recovery.FailHandler) -> recovery.RequiredResult:
-        if self.unwinding():
+        return self._rule_recovery(pos, rec, fail, MatchResult.failed(pos), False)
+
+    def _rule_recovery(self, pos: TokenCursor, rec: Callable[[TokenCursor], MatchResult], fail: recovery.FailHandler,
+                       first: MatchResult, have_first: bool) -> recovery.RequiredResult:
+        if (not have_first) and self.unwinding():
             return recovery.RequiredResult.boundary_only()
         retries = 0
         while True:
             # Recursive alternatives may advance their input argument before
             # failing. Never let a failed probe mutate pos.
-            attempt = pos.copy()
-            match: MatchResult = MatchResult.failed(attempt)
-            if fail.is_custom():
-                match = self._attempt_rule(rec, attempt)
+            match: MatchResult = first
+            if have_first:
+                have_first = False
             else:
-                match = rec(attempt)
+                attempt = pos.copy()
+                if fail.is_custom():
+                    match = self._attempt_rule(rec, attempt)
+                else:
+                    match = rec(attempt)
             if match.status:
                 pos.assign(match.it)
                 self.commit_rule(pos)
@@ -1168,6 +1188,12 @@ class LLParser(Parser_base):
                     status = recovery.RequiredStatus.Missing
                 return recovery.RequiredResult(status, False, Node.blank(), decision)
 
+    def required_rule_resume(self, pos: TokenCursor, rec: Callable[[TokenCursor], MatchResult], fail: recovery.FailHandler,
+                             first: MatchResult) -> Node:
+        """Continue a required rule whose first attempt (made by a native fast path) failed."""
+        result = self._rule_recovery(pos, rec, fail, first, True)
+        return self._required_outcome(result, pos, debug.idle_match_scope(), "required rule")
+
     def _required_outcome(self, result: recovery.RequiredResult, pos: TokenCursor, scope: debug.MatchScope,
                           what: str) -> Node:
         """Shared tail of required_token / required_rule: a repaired or unwound
@@ -1192,11 +1218,21 @@ class LLParser(Parser_base):
         return Node.blank()
 
     def required_token(self, pos: TokenCursor, type_id: int, fail: recovery.FailHandler) -> Node:
-        scope = debug.MatchScope(self.token_names_.lookup(type_id), self.debug_actual(pos))
+        scope = debug.idle_match_scope()
+        if debug.enabled():
+            scope = debug.MatchScope(self.token_names_.lookup(type_id), self.debug_actual(pos))
         if fail.is_recovering():
+            if (not self.unwinding()) and pos.kind_is(type_id):
+                node = pos.current().to_node(type_id)
+                pos.next()
+                self.commit_rule(pos)
+                self.note_match()
+                scope.success()
+                scope.close()
+                return node
             result = self.required_recovering(pos, type_id, fail)
             return self._required_outcome(result, pos, scope, "required token")
-        if pos.current().holds(type_id):
+        if pos.kind_is(type_id):
             node = pos.current().to_node(type_id)
             pos.next()
             self.commit_rule(pos)
@@ -1214,8 +1250,21 @@ class LLParser(Parser_base):
         return Node.blank()
 
     def required_rule(self, pos: TokenCursor, rule_name: str, rec: Callable[[TokenCursor], MatchResult], fail: recovery.FailHandler) -> Node:
-        scope = debug.MatchScope(rule_name, self.debug_actual(pos))
+        scope = debug.idle_match_scope()
+        if debug.enabled():
+            scope = debug.MatchScope(rule_name, self.debug_actual(pos))
         if fail.is_recovering():
+            if (not self.unwinding()) and (not fail.is_custom()):
+                first = rec(pos.copy())
+                if first.status:
+                    pos.assign(first.it)
+                    self.commit_rule(pos)
+                    self.note_match()
+                    scope.success()
+                    scope.close()
+                    return first.node
+                result = self._rule_recovery(pos, rec, fail, first, True)
+                return self._required_outcome(result, pos, scope, "required rule")
             result = self.required_rule_recovering(pos, rec, fail)
             return self._required_outcome(result, pos, scope, "required rule")
         match = rec(pos)
@@ -1237,8 +1286,10 @@ class LLParser(Parser_base):
 
     # --- optional ------------------------------------------------------------
     def optional_token(self, pos: TokenCursor, type_id: int) -> Node:
-        scope = debug.MatchScope(self.token_names_.lookup(type_id), self.debug_actual(pos))
-        if pos.current().holds(type_id):
+        scope = debug.idle_match_scope()
+        if debug.enabled():
+            scope = debug.MatchScope(self.token_names_.lookup(type_id), self.debug_actual(pos))
+        if pos.kind_is(type_id):
             node = pos.current().to_node(type_id)
             pos.next()
             self.commit_rule(pos)
@@ -1280,7 +1331,7 @@ class LLParser(Parser_base):
     def skip_spaces(self, pos: TokenCursor) -> None:
         if not self.has_space_token_:
             return
-        if pos.current().holds(self.space_token_):
+        if pos.kind_is(self.space_token_):
             pos.next()
 
     def skip_external_spaces(self, pos: TokenCursor) -> None:

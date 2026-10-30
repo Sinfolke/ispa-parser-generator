@@ -34,7 +34,7 @@ template<class T> concept HasMembers = requires(const T& t) { t.members(); T::me
 template<class T> void dump(std::ostream& os, const T& v) {
     if constexpr (std::is_same_v<T, bool>) os << (v ? "True" : "False");
     else if constexpr (std::is_integral_v<T> || std::is_floating_point_v<T>) os << v;
-    else if constexpr (std::is_same_v<T, std::string>) {
+    else if constexpr (std::is_same_v<T, std::string> || std::is_same_v<T, ISPA_STD::Text>) {
         os << "'";
         for (char c : v) {
             switch (c) { case '\\': os << "\\\\"; break; case '\'': os << "\\'"; break; case '\n': os << "\\n"; break;
