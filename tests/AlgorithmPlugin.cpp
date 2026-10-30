@@ -88,7 +88,7 @@ int main() {
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
 }
 
-TEST(AlgorithmPlugin, RootTestIscAccumulatesCapturedLexerText) {
+TEST(AlgorithmPlugin, CapturedLexerTextAccumulatesInsideParameterizedToken) {
     dlib library("libispa-algorithm-LL");
     const auto* descriptor = library.load<Algorithm::EntryFn*>("ispa_algorithm_v1")();
     const auto directory = std::filesystem::temp_directory_path() /
@@ -97,10 +97,21 @@ TEST(AlgorithmPlugin, RootTestIscAccumulatesCapturedLexerText) {
         std::filesystem::path path;
         ~Cleanup() { std::filesystem::remove_all(path); }
     } cleanup{directory};
-    std::ifstream grammar(std::string(ROOT_DIR) + "/test.isc");
-    ASSERT_TRUE(grammar);
-    const std::string source{std::istreambuf_iterator<char>(grammar), {}};
-    auto tree = pluginGrammar(source.c_str());
+    auto tree = pluginGrammar(R"isc(
+STRING<quote>:
+    &q ${quote} @ !([\n\r] | $q)* $q
+
+    {@}
+;
+
+QUOTE_1: '"';
+QUOTE_2: '\'';
+main:
+    @ STRING<QUOTE_1>
+
+    @{str1}
+;
+)isc");
     Algorithm::Metadata metadata;
     convert(*descriptor, tree, metadata, directory);
     std::ofstream(directory / "run.cpp") << R"(

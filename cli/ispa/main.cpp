@@ -5,6 +5,7 @@
 #include <io.h>
 #else
 #include <unistd.h>
+#include <sys/ioctl.h>
 #endif
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -50,23 +51,84 @@ namespace {
     namespace diagnostics = ISPA::Diagnostics;
 
     class GenerationProgress {
-        bool enabled;
+        bool allowed, active = false;
+        int last_plain_percent = -1;
+        std::string last_plain_phase;
+        int rows = 0, columns = 80, percent = 0;
+        std::size_t rules = 0, tokens = 0;
         bool terminal =
 #ifdef _WIN32
             _isatty(2);
 #else
             isatty(2);
 #endif
+        void dimensions() {
+            int height = 24, width = 80;
+#ifdef _WIN32
+            CONSOLE_SCREEN_BUFFER_INFO info{};
+            if (GetConsoleScreenBufferInfo(GetStdHandle(STD_ERROR_HANDLE), &info)) {
+                height = info.srWindow.Bottom - info.srWindow.Top + 1;
+                width = info.srWindow.Right - info.srWindow.Left + 1;
+            }
+#else
+            winsize size{};
+            if (ioctl(2, TIOCGWINSZ, &size) == 0) {
+                height = size.ws_row; width = size.ws_col;
+            }
+#endif
+            columns = std::max(1, width);
+            if (height >= 3 && rows != height) {
+                rows = height;
+                // Reserve the final row; ordinary output scrolls above it.
+                std::cerr << "\033[1;" << rows - 1 << "r\033[" << rows - 1 << ";1H";
+            }
+        }
     public:
-        explicit GenerationProgress(bool enabled) : enabled(enabled) {}
-        ~GenerationProgress() { if (enabled && terminal) std::cerr << '\n'; }
-        void update(int percent, const std::string& phase) const {
-            if (!enabled) return;
-            std::cerr << (terminal ? "\r" : "") << "[" << std::string(percent / 5, '=')
-                      << std::string(20 - percent / 5, ' ') << "] "
-                      << percent << "% " << phase << "        ";
-            if (!terminal || percent == 100) std::cerr << '\n';
-            std::cerr.flush();
+        explicit GenerationProgress(bool enabled) : allowed(enabled) {
+#ifdef _WIN32
+            DWORD mode{};
+            const auto handle = GetStdHandle(STD_ERROR_HANDLE);
+            terminal = terminal && GetConsoleMode(handle, &mode) &&
+                SetConsoleMode(handle, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+#endif
+            terminal = terminal && (!std::getenv("TERM") || std::string(std::getenv("TERM")) != "dumb");
+        }
+        ~GenerationProgress() {
+            if (active && terminal && rows) {
+                std::cerr << "\0337\033[" << rows << ";1H\033[2K\033[r\0338" << std::flush;
+            }
+        }
+        void workload(std::size_t rule_count, std::size_t token_count) {
+            rules = rule_count; tokens = token_count;
+            active = allowed && rules + tokens >= 80;
+        }
+        void update(int value, const std::string& phase) {
+            if (!active) return;
+            percent = std::max(percent, std::clamp(value, 0, 100));
+            if (!terminal) {
+                // IDE consoles and redirected stderr cannot reserve a screen row.
+                // Keep large builds observable without emitting terminal controls.
+                const auto category = phase.substr(0, phase.find_first_of("0123456789"));
+                if (percent != last_plain_percent || category != last_plain_phase) {
+                    std::cerr << "[" << percent << "%] " << phase << " | "
+                              << rules << " rules, " << tokens << " tokens\n";
+                    last_plain_percent = percent;
+                    last_plain_phase = category;
+                }
+                return;
+            }
+            dimensions();
+            if (!rows) return;
+            const char* color = percent < 35 ? "\033[91m" : percent < 80 ? "\033[93m" : "\033[92m";
+            std::string line = "[" + std::string(percent / 5, '=') +
+                std::string(20 - percent / 5, ' ') + "] " + std::to_string(percent) +
+                "% " + phase + " | " + std::to_string(rules) + " rules, " + std::to_string(tokens) + " tokens";
+            line.resize(std::min(line.size(), static_cast<std::size_t>(columns - 1)));
+            std::cerr << "\0337\033[" << rows << ";1H\033[2K" << color << line << "\033[0m\0338" << std::flush;
+        }
+        void items(int begin, int end, std::size_t done, std::size_t total, const std::string& phase) {
+            update(begin + (end - begin) * std::min(done, total) / std::max<std::size_t>(1, total),
+                phase + " " + std::to_string(done) + "/" + std::to_string(total));
         }
     };
 
@@ -717,6 +779,13 @@ int generate(Args args) {
         if (!printGrammarDiagnosticAfterScanFailure(error)) printExceptionDiagnostic("P000", error);
         return 1;
     }
+    std::size_t declared_rules = 0, declared_tokens = 0;
+    for (const auto& source : module_project.sources)
+        for (const auto& [name, declaration] : source.declarations)
+            if (!name.empty() && corelib::text::isUpper(name.back())) ++declared_tokens;
+            else ++declared_rules;
+    progress.workload(declared_rules, declared_tokens);
+    std::size_t parsed_declarations = 0;
     progress.update(15, "Parsing modules");
     diagnostics::Reporter parse_diagnostics;
     for (const auto& source : module_project.sources) {
@@ -755,6 +824,8 @@ int generate(Args args) {
         }
         modules.value.insert(modules.value.end(), syntax->value.begin(), syntax->value.end());
         source_files.insert(source_files.end(), syntax->value.size(), source.file);
+        parsed_declarations += source.declarations.size();
+        progress.items(15, 30, parsed_declarations, declared_rules + declared_tokens, "Parsing declarations");
     }
 
     if (dumper.shouldDump("NFA"))
@@ -865,7 +936,10 @@ int generate(Args args) {
         args.debug_instrumentation = false;
     }
     LexerBuilder lexer_data(ast, args.nfa_debug, args.debug_instrumentation);
-    lexer_data.build();
+    const int lexer_end = 55 + 30 * declared_tokens / std::max<std::size_t>(1, declared_rules + declared_tokens);
+    lexer_data.build([&](std::size_t done, std::size_t total, const std::string& phase) {
+        progress.items(55, lexer_end, done, total, phase);
+    });
 
     std::string name;
     if (!ast.getName().empty() && !args.dependency_build) {
@@ -912,8 +986,11 @@ int generate(Args args) {
     }
     cpuf::printf("{} of {} rules changed since last run\n", changed_rules.size(), tree_map.size());
     const Algorithm::BuildRequest build_request{ast, changed_rules,
-        args.auto_conflicts, args.conflict_lookahead};
-    progress.update(70, "Building parser");
+        args.auto_conflicts, args.conflict_lookahead,
+        [&](std::size_t done, std::size_t total) {
+            progress.items(lexer_end, 85, done, total, "Building parser rules");
+        }};
+    progress.update(lexer_end, "Building parser");
     auto built = algorithm->build(build_request, metadata);
     if (!built.output || !built.to_lang_repr)
         throw std::runtime_error("Algorithm returned no LangRepr converter: " + algorithm_name);

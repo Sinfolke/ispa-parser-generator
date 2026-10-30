@@ -5,7 +5,7 @@ import corelib;
 import std;
 
 auto CppParser::generate() -> int {
-    return utils::command("{} -a LL --lang cpp {} --ddall --dd TestDumps --no-incremental -o {}", std::filesystem::path(BINARY_DIR) / "ispa", File::getGrammarFile(name), temp_directory / "Parser");
+    return utils::command("{} -a LL --lang cpp {} --ddall --dd {} --no-incremental -o {}", std::filesystem::path(BINARY_DIR) / "ispa", File::getGrammarFile(name), temp_directory / "ispa-test-dumps", temp_directory / "Parser");
 }
 auto CppParser::compile(std::string bootloader_name, std::string clang) -> int {
     return utils::command("{} {} {} -I {} -I {} -ferror-limit=1 -o {} -g -Wno-switch -L {} -lispa-core -lispastdlib",

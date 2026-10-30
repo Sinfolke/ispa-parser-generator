@@ -358,7 +358,7 @@ TEST(Modules, PythonImportsAreErasedWithoutChangingSourcePositions) {
     ASSERT_EQ(py_imports.size(), 1u);
     EXPECT_EQ(py_imports.front().source, (Modules::Path{"package", "helpers"}));
     EXPECT_EQ(py_imports.front().alias, "h");
-    EXPECT_TRUE(source.imports.empty());
+    EXPECT_EQ(source.imports.size(), py_imports.size());
     EXPECT_EQ(source.grammar.size(), text.size());
     EXPECT_EQ(source.grammar.find("main:"), text.find("main:"));
     EXPECT_EQ(source.declarations.at({"main"}).line, 2u);
@@ -585,10 +585,10 @@ int main() {
 )cpp");
     const auto generated = files.root / "generated";
     const auto command = std::string("clang++ -std=c++23 -I\"") + ROOT_DIR +
-        "/parser/stdlibs/target\" -I\"" + generated.string() + "\" \"" +
+        "/parser/stdlibs/target/target-cpp\" -I\"" + generated.string() + "\" \"" +
         (generated / "PythonRuntime.cpp").string() + "\" \"" +
         (generated / "run.cpp").string() + "\" \"" + ROOT_DIR +
-        "/parser/stdlibs/target/src/core.cpp\" -o \"" + (generated / "run").string() + "\"";
+        "/parser/stdlibs/target/target-cpp/src/core.cpp\" -o \"" + (generated / "run").string() + "\"";
     ASSERT_EQ(std::system(command.c_str()), 0);
     EXPECT_EQ(std::system(('"' + (generated / "run").string() + '"').c_str()), 0);
 }
@@ -642,10 +642,10 @@ int main() {
 )driver");
     const auto generated = files.root / "generated";
     const auto command = std::string("clang++ -std=c++23 -I\"") + ROOT_DIR +
-        "/parser/stdlibs/target\" -I\"" + generated.string() + "\" \"" +
+        "/parser/stdlibs/target/target-cpp\" -I\"" + generated.string() + "\" \"" +
         (generated / "ModuleRuntime.cpp").string() + "\" \"" +
         (generated / "run.cpp").string() + "\" \"" + ROOT_DIR +
-        "/parser/stdlibs/target/src/core.cpp\" -o \"" + (generated / "run").string() + "\"";
+        "/parser/stdlibs/target/target-cpp/src/core.cpp\" -o \"" + (generated / "run").string() + "\"";
     ASSERT_EQ(std::system(command.c_str()), 0);
     EXPECT_EQ(std::system(('"' + (generated / "run").string() + '"').c_str()), 0);
 }
@@ -683,7 +683,7 @@ TEST(Modules, GeneratedDependencyParserCollectsNestedDeclarationsAndSpans) {
     const std::string text = R"isc(module /* header */ app.front -> main;
 feature optional { main.nested };
 // import missing;
-#[inline] main>(arg): (';' | [;#{}]) @{arg}
+#[inline] main&(arg): (';' | [;#{}]) @{arg}
     #nested: 'x';
 ;
 action { value = {"text": "import absent; #nested: ';';"}

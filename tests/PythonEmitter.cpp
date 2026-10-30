@@ -14,6 +14,7 @@ TEST(PythonEmitter, ArithmeticControlFlowAndDebugExecute) {
         return left;
     };
     Declarations declarations;
+    declarations.push_back(Function::createDeclaration(Function{.type = ValueType::Int, .name = "native_stub", .is_native = true}));
     for (const auto& [name, operation] : {
         std::pair{"divide", ExpressionElement::Divide}, {"modulo", ExpressionElement::Modulo}}) {
         Function function{.type = ValueType::Undef, .name = name,
@@ -81,6 +82,13 @@ TEST(PythonEmitter, ArithmeticControlFlowAndDebugExecute) {
     for (const auto& [name, source] : converter.get()) std::ofstream(directory / name) << source;
     std::ofstream(directory / "run.py") << R"py(
 import Emitter as e
+try:
+    e.native_stub()
+    raise AssertionError("native stub did not raise")
+except NotImplementedError:
+    pass
+e.native_stub = lambda: 42
+assert e.native_stub() == 42
 assert e.divide(5.0, 2.0) == 2.5
 assert e.divide(-5, 2) == -2
 assert e.divide(5, -2) == -2

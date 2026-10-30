@@ -187,12 +187,19 @@ struct ActionFields {
 Builder::Builder(AST::Tree& tree, int) : Builder(tree, AST::TreeMap{}, {}) {}
 
 Builder::Builder(AST::Tree& tree, const AST::TreeMap& changed,
-                 const std::unordered_map<std::string, Production>& cache) {
+                 const std::unordered_map<std::string, Production>& cache,
+                 const std::function<void(std::size_t, std::size_t)>& progress) {
     Parser::Ctx ctx{};
     RuleLower lower(ctx, tree);
+    const auto total = std::ranges::count_if(tree.getTreeMap(), [](const auto& item) {
+        return !item.second.isTemplatePlaceholder && !item.second.isTemplateDefinition && !corelib::text::isUpper(item.first.back());
+    });
+    std::size_t completed = 0;
     for (const auto& [name, rule] : tree) {
+        if (progress) progress(completed, total);
         if (rule.isTemplatePlaceholder || rule.isTemplateDefinition) continue;
         if (corelib::text::isUpper(name.back())) continue;
+        ++completed;
         if (rule.external) {
             Production production;
             production.name = name;
@@ -276,6 +283,7 @@ Builder::Builder(AST::Tree& tree, const AST::TreeMap& changed,
         }
         data.push_back(std::move(production));
     }
+    if (progress) progress(completed, total);
 }
 auto Builder::get() -> IR { return IR{std::move(data), false, std::move(dfas)}; }
 auto Builder::getRawData() -> stdu::vector<Production>& { return data; }

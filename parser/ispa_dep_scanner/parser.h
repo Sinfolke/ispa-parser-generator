@@ -66,6 +66,9 @@ public:
         // brace is opaque to dependency discovery, including direct Python.
         if (*pos == '{' && !directive_braces) opaque_end = IspaSyntax::scanBracedPython(pos) - 1;
         auto token = DepParser::Lexer::makeToken(pos);
+        // Feed the opening and closing braces to the grammar, while the shared
+        // Python scanner owns everything between them (comments included).
+        if (opaque_end && !token.empty()) pos = opaque_end;
         if (token.empty() || pos == _in + offset)
             throw std::runtime_error("unterminated or unrecognized token in ISPA source");
         // COMMENT may live in scanner_tokens or in the legacy scanner module.
@@ -87,7 +90,7 @@ class IspaDepParser : public DepParser::Parser {
         auto result = main(begin);
         auto end = result.it;
         while (!end.isEnd() && (*end).template holds<DepParser::Types::__WS>()) ++end;
-        if (!result.status || !end.isEnd()) {
+        if (!result.status || !end.isEnd() || !getErrors().empty() || !getContextErrors().empty()) {
             offset = end.isEnd() ? (text ? std::strlen(text) : 0) : (*end).meta().startpos();
             throw std::runtime_error("invalid ISPA dependency syntax");
         }
@@ -115,6 +118,6 @@ public:
         comments.clear();
         offset = 0;
         if (const auto* source = dynamic_cast<const IspaDepLexer*>(lexer)) comments = source->comments;
-        parseSource(DepParser::Lexer::iterator(lexer));
+        tree = parseSource(DepParser::Lexer::iterator(lexer)).node.data();
     }
 };

@@ -10,10 +10,10 @@ except for balanced delimiters and nested rule boundaries.
 trivia. `Modules::preprocess` consumes the generated tree for discovery and symbol
 resolution; it does not tokenize or parse source text.
 
-Regenerate the checked-in LALR parser from the repository root:
+Regenerate the checked-in LL parser from the repository root:
 
 ```sh
-cmake-build-debug/ispa -l cpp -a LALR --debug false --no-nfa-debug \
+cmake-build-debug/ispa -l cpp -a LL --debug false --no-nfa-debug \
   -o parser/ispa_dep_scanner/bootstrapped/DepParser \
   --dir parser/ispa_dep_scanner/grammar --dir parser/ispa/grammar \
   --dep python parser/python/bootstrapped/PyRawParser \
