@@ -324,6 +324,28 @@ def build_missing_cpp_library(package, name, root):
     return build_cpp_core(package, name, root, only_missing=True)
 
 
+def regenerate_cpp_core_deps(core, name):
+    """Refresh ispastdlib_deps.json/.inc and ispaext_deps.inc from the installed headers.
+
+    They are a scan of ispastdlib/ (tools/ispa_deps.py), not source, so ispa-pkg regenerates them
+    on every install instead of trusting whatever the package happened to ship."""
+    deps_script = core / 'tools' / 'ispa_deps.py'
+    if not deps_script.is_file():
+        return
+    try:
+        subprocess.run([sys.executable, str(deps_script), '--root', str(core),
+                         '--out', str(core / 'ispastdlib_deps.json'),
+                         '--emit-inc', str(core / 'ispastdlib_deps.inc')],
+                       check=True, cwd=core)
+        ext_script = core / 'tools' / 'gen_ext_deps.py'
+        if ext_script.is_file():
+            if not (core / 'ispaext_deps.json').is_file():
+                (core / 'ispaext_deps.json').write_text('{}')
+            subprocess.run([sys.executable, str(ext_script)], check=True, cwd=core)
+    except subprocess.CalledProcessError as error:
+        STATUS.update(f'{name}: skipping dependency manifest regeneration ({error})')
+
+
 def build_cpp_core(package, name, root, only_missing=False):
     """Build the opt-in `cpp-core` directory (the core lowered to C++ for `--stdlib core`).
 
@@ -331,6 +353,7 @@ def build_cpp_core(package, name, root, only_missing=False):
     core = package / 'ispatarget' / 'cpp-core'
     if not core.is_dir() or not any(core.rglob('*.cpp')):
         return None
+    regenerate_cpp_core_deps(core, name)
     output = name if name.endswith('-core') else f'{name}-core'   # package `cpp-core` -> libcpp-core.a
     library_dir = core / 'lib'
     if only_missing and ((library_dir / f'lib{output}.a').is_file() or (library_dir / f'{output}.lib').is_file()):
@@ -823,7 +846,7 @@ def main(argv=None):
                          help="Print each install/build step on its own line instead of a single status line")
     sub = parser.add_subparsers(dest="command")
     tool = sub.add_parser("tool", help="Install a compiled ISPA tool")
-    tool.add_argument("name", choices=("antlr-to-ispa", "cpp-to-ispa"))
+    tool.add_argument("name", choices=("antlr-to-ispa", "flex-to-ispa", "bison-to-ispa"))
     tool.add_argument("--version", help="Release tag (default: latest)")
     tool.add_argument("--bin-dir", type=Path, help="Executable destination (default: ROOT/../bin)")
     tool.add_argument("--force", action="store_true", help="Replace an installed executable")

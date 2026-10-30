@@ -340,6 +340,21 @@ jobs:
           "$LLVM_PREFIX/bin/clang-scan-deps" --version
           "$LLVM_PREFIX/bin/llvm-config" --version
 
+          # llvmdev/clangdev pull in conda-forge's icu package as a transitive
+          # dependency, which drops ICU headers (and a differently-versioned
+          # one at that, e.g. 78 vs vcpkg's 74) into "$LLVM_PREFIX/include/unicode".
+          # clang searches its own install prefix's include directory by
+          # default, so those headers can shadow vcpkg's ICU and get compiled
+          # into object files while the linker only has vcpkg's (differently
+          # ABI-versioned, e.g. "_u_charName_78" vs "_u_charName_74") library,
+          # producing "symbol(s) not found for architecture x86_64" at link time.
+          # Remove them so the compiler can only ever see vcpkg's ICU headers.
+          rm -rf "$LLVM_PREFIX/include/unicode" "$LLVM_PREFIX/lib/pkgconfig/icu"*
+          if [[ -f "$LLVM_PREFIX/include/unicode/uvernum.h" ]]; then
+            echo "::error::Failed to remove conda's ICU headers from LLVM_PREFIX"
+            exit 1
+          fi
+
       - name: Install libc++ module resources (macOS)
         if: runner.os == 'macOS'
         shell: bash -l {0}

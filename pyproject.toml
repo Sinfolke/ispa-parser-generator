@@ -17,11 +17,12 @@ ispa-pkg = "ispa_pkg.cli:main"
 ispa-lsp = "ispa_pkg.lsp:main"
 ispa-ai = "ispa_pkg.ai:main"
 antlr-to-ispa = "antlr_to_ispa.cli:main"
-cpp-to-ispa = "antlr_to_ispa.cpp_cli:main"
+flex-to-ispa = "lex_yacc_to_ispa.flex_cli:main"
+bison-to-ispa = "lex_yacc_to_ispa.bison_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["cli/pkg"]
-include = ["ispa_pkg*", "antlr_to_ispa*"]
+include = ["ispa_pkg*", "antlr_to_ispa*", "lex_yacc_to_ispa*"]
 
 [tool.setuptools.package-data]
 antlr_to_ispa = ["grammar/*.isc"]

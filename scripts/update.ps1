@@ -120,7 +120,7 @@ try {
         Write-Host "Added $bin to user PATH. Open a new terminal."
     }
     # Optional converters: never fail the installation if they are unavailable.
-    foreach ($optional in @('antlr-to-ispa', 'cpp-to-ispa')) {
+    foreach ($optional in @('antlr-to-ispa', 'flex-to-ispa', 'bison-to-ispa')) {
       try {
         & (Join-Path (Join-Path $versions $latest) 'ispa-pkg.exe') tool $optional --version $latest --bin-dir $bin --force *> $null
         if ($LASTEXITCODE -ne 0) { throw 'not available' }

@@ -89,6 +89,9 @@ find_package(yaml-cpp CONFIG REQUIRED)
 find_package(CLI11 CONFIG REQUIRED)
 find_package(ICU REQUIRED COMPONENTS uc)
 
+include(cmake/BootstrapIspa.cmake)
+ispa_bootstrap_regenerate()
+
 add_subdirectory(parser)
 
 # =============================================

@@ -8,8 +8,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, '..', '..'))
 BUILD = os.path.join(HERE, 'build')
 ISPA = os.environ.get('ISPA') or os.path.join(REPO, 'cmake-build-release', 'ispa')
-CORE = REPO + '/parser/stdlibs/target/cpp'
-FACADE = CORE + '-core'
+FACADE = REPO + '/parser/stdlibs/target/cpp-core'
+CORE = FACADE  # ispastdlib now lives inside cpp-core (merged); kept as an alias for the -I/src/core.cpp uses below
 CXX = os.environ.get('CXX') or 'clang++'
 ENV = {k: v for k, v in os.environ.items() if k != 'LD_LIBRARY_PATH'}
 

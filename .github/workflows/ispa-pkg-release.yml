@@ -128,16 +128,17 @@ jobs:
           python -m nuitka \
             --mode=onefile \
             --assume-yes-for-downloads \
-            --include-package=antlr_to_ispa \
-            --include-package=tree_sitter_language_pack \
-            --include-package-data=tree_sitter_language_pack \
-            --include-package=tree_sitter \
-            --include-package=tree_sitter_c_sharp \
-            --include-package=tree_sitter_embedded_template \
-            --include-package=tree_sitter_yaml \
+            --include-package=lex_yacc_to_ispa \
             --output-dir=dist \
-            --output-filename=cpp-to-ispa \
-            cli/pkg/cpp_to_ispa_entry.py
+            --output-filename=flex-to-ispa \
+            cli/pkg/flex_to_ispa_entry.py
+          python -m nuitka \
+            --mode=onefile \
+            --assume-yes-for-downloads \
+            --include-package=lex_yacc_to_ispa \
+            --output-dir=dist \
+            --output-filename=bison-to-ispa \
+            cli/pkg/bison_to_ispa_entry.py
 
       - name: Compile Windows onefile executable
         if: runner.os == 'Windows'
@@ -190,16 +191,18 @@ jobs:
             --mode=onefile `
             --msvc=latest `
             --assume-yes-for-downloads `
-            --include-package=antlr_to_ispa `
-            --include-package=tree_sitter_language_pack `
-            --include-package-data=tree_sitter_language_pack `
-            --include-package=tree_sitter `
-            --include-package=tree_sitter_c_sharp `
-            --include-package=tree_sitter_embedded_template `
-            --include-package=tree_sitter_yaml `
+            --include-package=lex_yacc_to_ispa `
             --output-dir=dist `
-            --output-filename=cpp-to-ispa.exe `
-            cli/pkg/cpp_to_ispa_entry.py
+            --output-filename=flex-to-ispa.exe `
+            cli/pkg/flex_to_ispa_entry.py
+          python -m nuitka `
+            --mode=onefile `
+            --msvc=latest `
+            --assume-yes-for-downloads `
+            --include-package=lex_yacc_to_ispa `
+            --output-dir=dist `
+            --output-filename=bison-to-ispa.exe `
+            cli/pkg/bison_to_ispa_entry.py
 
       - name: Smoke test compiled CLI
         shell: bash
@@ -220,9 +223,12 @@ jobs:
           if [ "$RUNNER_OS" = Windows ]; then CONVERTER="$CONVERTER.exe"; fi
           "$CONVERTER" --help
           python tests/antlr_compiled_smoke.py "$CONVERTER"
-          CPP_CONVERTER=dist/cpp-to-ispa
-          if [ "$RUNNER_OS" = Windows ]; then CPP_CONVERTER="$CPP_CONVERTER.exe"; fi
-          "$CPP_CONVERTER" --help
+          for name in flex bison; do
+            TOOL="dist/$name-to-ispa"
+            if [ "$RUNNER_OS" = Windows ]; then TOOL="$TOOL.exe"; fi
+            "$TOOL" --help
+            python tests/lex_yacc_compiled_smoke.py "$name" "$TOOL"
+          done
 
       - name: Package executable
         shell: bash
@@ -249,8 +255,10 @@ jobs:
               (os.environ['AI'], os.environ['AI_ARCHIVE']),
               ('antlr-to-ispa' + ('.exe' if os.environ['RUNNER_OS'] == 'Windows' else ''),
                'antlr-to-ispa-' + os.environ['PLATFORM'] + ('.zip' if os.environ['RUNNER_OS'] == 'Windows' else '.tar.gz')),
-              ('cpp-to-ispa' + ('.exe' if os.environ['RUNNER_OS'] == 'Windows' else ''),
-               'cpp-to-ispa-' + os.environ['PLATFORM'] + ('.zip' if os.environ['RUNNER_OS'] == 'Windows' else '.tar.gz')),
+              ('flex-to-ispa' + ('.exe' if os.environ['RUNNER_OS'] == 'Windows' else ''),
+               'flex-to-ispa-' + os.environ['PLATFORM'] + ('.zip' if os.environ['RUNNER_OS'] == 'Windows' else '.tar.gz')),
+              ('bison-to-ispa' + ('.exe' if os.environ['RUNNER_OS'] == 'Windows' else ''),
+               'bison-to-ispa-' + os.environ['PLATFORM'] + ('.zip' if os.environ['RUNNER_OS'] == 'Windows' else '.tar.gz')),
           ):
               executable = Path('dist') / executable_name
               archive = Path('packages') / archive_name
@@ -291,11 +299,18 @@ jobs:
           path: packages/antlr-to-ispa-*
           if-no-files-found: error
 
-      - name: Save C++ converter workflow artifact
+      - name: Save Flex converter workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cpp-to-ispa-${{ matrix.platform }}
-          path: packages/cpp-to-ispa-*
+          name: flex-to-ispa-${{ matrix.platform }}
+          path: packages/flex-to-ispa-*
+          if-no-files-found: error
+
+      - name: Save Bison converter workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bison-to-ispa-${{ matrix.platform }}
+          path: packages/bison-to-ispa-*
           if-no-files-found: error
 
       - name: Upload to GitHub Release
@@ -309,4 +324,4 @@ jobs:
           AI_ARCHIVE: ${{ matrix.ai_archive }}
         run: |
           set -euo pipefail
-          gh release upload "$TAG" "packages/$ARCHIVE" "packages/$DEBUGGER_ARCHIVE" "packages/$AI_ARCHIVE" packages/antlr-to-ispa-* packages/cpp-to-ispa-* --clobber
+          gh release upload "$TAG" "packages/$ARCHIVE" "packages/$DEBUGGER_ARCHIVE" "packages/$AI_ARCHIVE" packages/antlr-to-ispa-* packages/flex-to-ispa-* packages/bison-to-ispa-* --clobber

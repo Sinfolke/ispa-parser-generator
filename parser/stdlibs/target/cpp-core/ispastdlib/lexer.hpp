@@ -138,7 +138,9 @@ namespace ISPA_STD {
             SemanticFunc semantic,
             const char* &pos
         ) {
-            static constexpr DFA::API::DFADebugTable<0> no_debug{};
+            // MSVC's zero-size std::array still stores a dummy DFADebug, whose
+            // std::string members are not literal types in C++17.
+            static const DFA::API::DFADebugTable<0> no_debug{};
             static const DFA::API::DebugIndex no_debug_index{};
             return lookup(table, class_table, action_table, layout, semantic,
                           no_debug, no_debug_index, pos);

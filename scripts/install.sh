@@ -131,7 +131,7 @@ EOF
 chmod 755 "$BIN_DIR/ispa-update"
 
 # Optional converters: never fail the installation if they are unavailable.
-for optional in antlr-to-ispa cpp-to-ispa; do
+for optional in antlr-to-ispa flex-to-ispa bison-to-ispa; do
   "$BIN_DIR/ispa-pkg" tool "$optional" --version "$tag" --bin-dir "$BIN_DIR" --force >/dev/null 2>&1 \
     || printf 'Optional tool %s was not installed (not available for this release/platform).\n' "$optional" >&2
 done

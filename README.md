@@ -24,7 +24,7 @@ The shape of a `.isc` file will feel familiar — rules, terminals, productions 
 See [Performance](#performance) below for a measured comparison against ANTLR's C++ target.
 
 Use `ispa-pkg tool antlr-to-ispa` to install the compiled ANTLR 4 migration tool, and
-`ispa-pkg tool cpp-to-ispa` for the C++ source converter. The install scripts try both and skip
+`ispa-pkg tool flex-to-ispa` and `ispa-pkg tool bison-to-ispa` for Flex and Bison grammars. The install scripts try all three and skip
 them silently if no matching release asset exists.
 It preserves left recursion and emits a report of required manual changes.
 See [ANTLR conversion](docs/ANTLR_TO_ISPA.md) for usage and translation limits.
@@ -159,3 +159,5 @@ With a full typed AST, ISPA was about 12x faster than ANTLR with CST constructio
 ## License
 
 Apache-2.0
+
+Flex and Bison converter usage and limitations: [migration guide](docs/FLEX_BISON_TO_ISPA.md).

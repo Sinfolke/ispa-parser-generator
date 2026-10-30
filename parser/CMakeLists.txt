@@ -40,21 +40,18 @@ function(ispa_apply_compile_options target)
     endif()
 endfunction()
 
-set(STDLIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/stdlibs/target/cpp")
+# ispastdlib (the hand-written C++ runtime) and ispa_core (the lowered-core facade, parsers
+# generated with --stdlib core include <ispa_core/...>) are both built from cpp-core now: it is
+# the single self-contained package (ispa-pkg install cpp-core needs nothing from elsewhere but
+# target-core).
+set(STDLIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/stdlibs/target/cpp-core")
 if(NOT TARGET ispastdlib::ispastdlib)
     add_subdirectory("${STDLIB_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/ispastdlib_build")
 endif()
 
 set(ISPA_STDLIB_TARGET ispastdlib::ispastdlib)
 if(ISPA_PARSER_STDLIB STREQUAL "core")
-    # The lowered core is compiled once; parsers generated with --stdlib core include <ispa_core/...>.
-    set(CORE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/stdlibs/target/cpp-core")
-    if(NOT TARGET ispa_core)
-        add_library(ispa_core STATIC "${CORE_DIR}/src/ispa_core_lowered.cpp")
-        target_include_directories(ispa_core PUBLIC "${CORE_DIR}")
-        target_compile_features(ispa_core PUBLIC cxx_std_17)
-        target_link_libraries(ispa_core PUBLIC ispastdlib::ispastdlib)
-    endif()
+    # ispa_core is declared by the add_subdirectory() above (it always builds both targets).
     set(ISPA_STDLIB_TARGET ispa_core)
 endif()
 
