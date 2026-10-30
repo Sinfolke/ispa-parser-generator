@@ -2,16 +2,11 @@ module rule.advanced -> advanced_rule;
 
 import {name, ID} from common;
 import {stmt} from ispa_python;
-import forward_declaration;
 import rule.regular;
 advanced_rule:
-    '{' @ dep_decl* @ (regular_match | stmt)* '}'
+    '{' @ (regular_match | stmt)* '}'
 
-    @{dep, body}
-    #dep_decl:
-        'depends' @ forward_declaration
-        {@}
-    ;
+    @{body}
     #regular_match:
         'match' @ source? @ rule.regular.value+ @ unpack? ';'
         @{stream, patterns, assign_names}

@@ -614,7 +614,8 @@ std::string Imports::module(const Modules::Path& source_path, const std::string&
                 walk(a->value, bind);
             } else continue;
             auto declaration = Parser::ParserBase::convertPythonDeclaration(*statement, classes, typevars, &signatures, "python." + name + ".");
-            if (declaration.isFunction() && declaration.getFunction().statements.empty()) {
+            if (declaration.isFunction() && declaration.getFunction().statements.empty() &&
+                !declaration.getFunction().is_native) {
                 auto& function = declaration.getFunction();
                 if (function.type != LangAPI::ValueType::Void)
                     fail(statement->pos, "a non-None function requires an executable body");

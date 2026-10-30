@@ -314,7 +314,7 @@ def scan(root):
                 continue
             end = heads[index+1].start() if index+1 < len(heads) else len(source)
             body = source[head.end():end]
-            if "match " in body[:100] or "depends " in body[:100]:
+            if "match " in body[:100]:
                 continue
             i = head.end()
             angle_depth = 0
@@ -372,7 +372,7 @@ def scan(root):
                     start, i = m.start(), m.end()
                     spelling = m.group()
                     kind = "token" if spelling.isupper() else "rule"
-                    if spelling in {"fail", "module", "import", "feature", "match", "depends"}:
+                    if spelling in {"fail", "module", "import", "feature", "match"}:
                         continue
                 if angle_depth:
                     continue
