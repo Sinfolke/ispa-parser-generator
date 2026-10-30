@@ -57,6 +57,21 @@ class PackageError(Exception):
     pass
 
 
+def python_command():
+    """Use a real interpreter for helpers, including in frozen CLI releases."""
+    if not globals().get('__compiled__') and not getattr(sys, 'frozen', False):
+        return [sys.executable]
+    for name in ('python3', 'python'):
+        executable = shutil.which(name)
+        if executable:
+            return [executable]
+    if os.name == 'nt':
+        launcher = shutil.which('py')
+        if launcher:
+            return [launcher, '-3']
+    raise PackageError('Python 3 is required to build this package; install Python 3 and add it to PATH.')
+
+
 class Status:
     """A single progress line for install/build steps.
 
@@ -289,7 +304,7 @@ def build_cpp_library(package, name, root, required=False, kind='cpp', standard=
         library = root / 'target-core' / 'ispalib' / 'python'
         if generator and (cpp / 'regen.py').is_file() and library.is_dir():
             STATUS.update(f'{name}: generating C++ runtime from Python ispa_std')
-            run_build_step([sys.executable, str(cpp / 'regen.py'), '--ispa', generator,
+            run_build_step(python_command() + [str(cpp / 'regen.py'), '--ispa', generator,
                             '--library', str(library)])
         elif not (cpp / 'ispa_core_lowered.h').is_file():
             raise PackageError(f'{name}: generating the runtime requires ispa and target-core')
@@ -380,7 +395,7 @@ def regenerate_cpp_core_deps(core, name):
     if not deps_script.is_file():
         return
     try:
-        subprocess.run([sys.executable, str(deps_script), '--root', str(core),
+        subprocess.run(python_command() + [str(deps_script), '--root', str(core),
                          '--out', str(core / 'ispastdlib_deps.json'),
                          '--emit-inc', str(core / 'ispastdlib_deps.inc')],
                        check=True, cwd=core)
@@ -388,7 +403,7 @@ def regenerate_cpp_core_deps(core, name):
         if ext_script.is_file():
             if not (core / 'ispaext_deps.json').is_file():
                 (core / 'ispaext_deps.json').write_text('{}')
-            subprocess.run([sys.executable, str(ext_script)], check=True, cwd=core)
+            subprocess.run(python_command() + [str(ext_script)], check=True, cwd=core)
     except subprocess.CalledProcessError as error:
         STATUS.update(f'{name}: skipping dependency manifest regeneration ({error})')
 
@@ -569,7 +584,7 @@ def install(name, spec, root, allow_scripts=False, force=False, from_catalog=Fal
             if not script_path.is_file() or script_path.is_symlink():
                 raise PackageError(f"Install script not found: {script}")
             if script_path.suffix == ".py":
-                command = [sys.executable, str(script_path), str(stage)]
+                command = python_command() + [str(script_path), str(stage)]
             elif os.name == "nt":
                 raise PackageError("Shell install scripts require a POSIX shell")
             else:
