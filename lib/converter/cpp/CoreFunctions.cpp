@@ -234,6 +234,7 @@ auto Core::convertStorageSymbol(const LangAPI::StorageSymbol &symbol) -> std::st
             res += std::get<std::string>(part);
         } else if (std::holds_alternative<LangAPI::ArrayMethodCall>(part)) {
             const auto &method_call = std::get<LangAPI::ArrayMethodCall>(part);
+            bool close_size_cast = false;
             switch (method_call.method) {
                 case LangAPI::ArrayMethods::Push:
                     res += method_call.args.empty() ? "emplace_back" : "push_back";
@@ -242,7 +243,11 @@ auto Core::convertStorageSymbol(const LangAPI::StorageSymbol &symbol) -> std::st
                     res += "pop_back";
                     break;
                 case LangAPI::ArrayMethods::Size:
-                    res += "size";
+                    // Python's len() is signed: `len(x) - 1` must be -1 for an empty x, not
+                    // SIZE_MAX (which is also not -1 once widened where size_t is 32-bit).
+                    res.pop_back();
+                    res = "static_cast<long long>(" + res + ".size";
+                    close_size_cast = true;
                     break;
                 case LangAPI::ArrayMethods::Clear:
                     res += "clear";
@@ -258,6 +263,7 @@ auto Core::convertStorageSymbol(const LangAPI::StorageSymbol &symbol) -> std::st
                 first = false;
             }
             res += ")";
+            if (close_size_cast) res += ")";
         } else if (std::holds_alternative<LangAPI::StorageOffset>(part)) {
             res += "[" + convertExpression(std::get<LangAPI::StorageOffset>(part).offset) + "]";
         } else if (std::holds_alternative<LangAPI::Property>(part)) {

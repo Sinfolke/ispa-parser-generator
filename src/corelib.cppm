@@ -1,5 +1,9 @@
 module;
+#ifdef __EMSCRIPTEN__
+#include "ispa_icu_shim.h"
+#else
 #include <unicode/umachine.h>
+#endif
 export module corelib;
 import dstd;
 import std;

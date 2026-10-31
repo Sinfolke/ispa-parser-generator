@@ -16,6 +16,12 @@ endif()
 
 project(ISPA LANGUAGES CXX)
 
+if(EMSCRIPTEN)
+    # Emscripten disables C++ exceptions by default; ISPA relies on them.
+    add_compile_options(-fwasm-exceptions)
+    add_link_options(-fwasm-exceptions)
+endif()
+
 set(PROGRAM_VERSION "dev" CACHE STRING "Version shown by the program")
 
 if(MSVC)
@@ -87,7 +93,9 @@ endfunction()
 find_package(Boost REQUIRED)
 find_package(yaml-cpp CONFIG REQUIRED)
 find_package(CLI11 CONFIG REQUIRED)
-find_package(ICU REQUIRED COMPONENTS uc)
+if(NOT EMSCRIPTEN)
+    find_package(ICU REQUIRED COMPONENTS uc)
+endif()
 
 include(cmake/BootstrapIspa.cmake)
 ispa_bootstrap_regenerate()
@@ -98,8 +106,13 @@ add_subdirectory(parser)
 # ISPA Modules Library
 # =============================================
 add_library(ispacore STATIC)
+if(EMSCRIPTEN)
+    set(ISPA_PIC OFF)  # one static executable: PIC would change the wasm feature set per target
+else()
+    set(ISPA_PIC ON)
+endif()
 set_target_properties(ispacore PROPERTIES
-    POSITION_INDEPENDENT_CODE ON
+    POSITION_INDEPENDENT_CODE ${ISPA_PIC}
     WINDOWS_EXPORT_ALL_SYMBOLS ON
     BUILD_RPATH "${CMAKE_CURRENT_BINARY_DIR}"
 )
@@ -133,7 +146,10 @@ target_include_directories(ispacore PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/parser/python/bootstrapped
 )
 
-target_link_libraries(ispacore PUBLIC Boost::boost CLI11::CLI11 ICU::uc ISPA::Parser ISPA::DepScanner)
+target_link_libraries(ispacore PUBLIC Boost::boost CLI11::CLI11 ISPA::Parser ISPA::DepScanner)
+if(NOT EMSCRIPTEN)
+    target_link_libraries(ispacore PUBLIC ICU::uc)
+endif()
 set_target_properties(ispacore PROPERTIES
         DISABLE_PRECOMPILE_HEADERS ON
 )
@@ -171,7 +187,13 @@ function(add_ispa_lib type lib)
 
     set(target_name "ispa-${type}-${lib}")
 
-    add_library(${target_name} SHARED)
+    if(EMSCRIPTEN)
+        # No dlopen in the browser: plugins are linked into ispa and src/wasm_plugins.cpp
+        # answers the loader's dlopen/dlsym calls.
+        add_library(${target_name} STATIC)
+    else()
+        add_library(${target_name} SHARED)
+    endif()
 
     target_sources(${target_name}
             PUBLIC
@@ -192,7 +214,9 @@ function(add_ispa_lib type lib)
     )
 
     # Algorithms are loaded through their descriptor, never linked into the host.
-    if(type STREQUAL "algorithm")
+    if(EMSCRIPTEN)
+        target_link_libraries(ispa PRIVATE "$<LINK_LIBRARY:WHOLE_ARCHIVE,${target_name}>")
+    elseif(type STREQUAL "algorithm")
         add_dependencies(ispa ${target_name})
     else()
         target_link_libraries(ispa PRIVATE ${target_name})
@@ -206,9 +230,13 @@ function(add_converter language)
     add_ispa_lib(converter ${language})
 endfunction()
 
-add_converter(cpp)
-add_converter(python)
-add_converter(rust)
+if(EMSCRIPTEN)
+    add_converter(python)
+else()
+    add_converter(cpp)
+    add_converter(python)
+    add_converter(rust)
+endif()
 # =============================================
 # Algorithms Shared Library
 # =============================================
@@ -223,9 +251,21 @@ function(add_algorithm alg)
 endfunction()
 
 add_algorithm(LL)
-add_algorithm(LR)
-add_algorithm(LALR LR)
-add_algorithm(LR_STAR LR)
+if(NOT EMSCRIPTEN)
+    add_algorithm(LR)
+    add_algorithm(LALR LR)
+    add_algorithm(LR_STAR LR)
+endif()
+if(EMSCRIPTEN)
+    target_link_options(ispa PRIVATE
+        "-Wl,--wrap=dlopen" "-Wl,--wrap=dlsym" "-Wl,--wrap=dlclose"
+        "-sALLOW_MEMORY_GROWTH=1" "-sSTACK_SIZE=5MB"
+        "$<$<BOOL:${ISPA_WASM_SIZE_OPT}>:-Oz>"
+        "-sMODULARIZE=1" "-sEXPORT_ES6=1" "-sEXIT_RUNTIME=0"
+        "-sEXPORTED_RUNTIME_METHODS=['FS','callMain']")
+    set_target_properties(ispa PROPERTIES SUFFIX ".mjs")
+    return()
+endif()
 # =============================================
 # Testing
 # =============================================

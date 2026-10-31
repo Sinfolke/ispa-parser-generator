@@ -98,11 +98,18 @@ Token core_dfa_run_typed(const char*& pos, long long start_pos, long long& scann
         // The registers live in the scan state shared by every token: read them in place.
         auto& scan_state = *captures->_state;
         std::vector<ISPA_STD::DFA::API::HistoryNode> history;  // empty unless the token has list captures
-        for (const auto& node : scan_state.history) history.push_back({node->pos, node->prev});
+        for (const auto& node : scan_state.history)
+            history.push_back({static_cast<std::ptrdiff_t>(node->pos), static_cast<std::ptrdiff_t>(node->prev)});
         const char* const start = base + scan_state.base;
-        static_assert(sizeof(long long) == sizeof(std::ptrdiff_t));
-        ISPA_STD::DFA::API::Captures typed(start, reinterpret_cast<const std::ptrdiff_t*>(scan_state.regs.data()),
-                                           history.data(), start_line);
+        const std::ptrdiff_t* regs;
+        std::vector<std::ptrdiff_t> narrowed_regs;  // only where ptrdiff_t is narrower than long long (wasm32)
+        if constexpr (sizeof(long long) == sizeof(std::ptrdiff_t)) {
+            regs = reinterpret_cast<const std::ptrdiff_t*>(scan_state.regs.data());
+        } else {
+            narrowed_regs.assign(scan_state.regs.begin(), scan_state.regs.end());
+            regs = narrowed_regs.data();
+        }
+        ISPA_STD::DFA::API::Captures typed(start, regs, history.data(), start_line);
         const char* at = base + cur->pos;
         auto result = [&] {
             if constexpr (std::is_invocable_v<SemanticFunc, std::size_t, const ISPA_STD::DFA::API::Captures&,

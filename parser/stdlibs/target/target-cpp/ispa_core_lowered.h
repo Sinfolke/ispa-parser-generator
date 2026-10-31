@@ -3334,8 +3334,8 @@ namespace python {
 					if (((*((*this)).pos)).has_source()) {
 						long long begin = ((*((*this)).pos)).sourcePosition();
 						std::string origin = ((*((*this)).pos)).sourceOrigin();
-						auto scanned = python::ispa_std::scan::scan_balanced(origin, begin, std::vector<std::string>{"}"}, ((origin.size()) - (begin)));
-						if (((((((*scanned)).exhausted) || (((((*scanned)).end) >= (origin.size()))))) || (((std::string(1, (origin)[((*scanned)).end])) != ("}"))))) {
+						auto scanned = python::ispa_std::scan::scan_balanced(origin, begin, std::vector<std::string>{"}"}, ((static_cast<long long>(origin.size())) - (begin)));
+						if (((((((*scanned)).exhausted) || (((((*scanned)).end) >= (static_cast<long long>(origin.size())))))) || (((std::string(1, (origin)[((*scanned)).end])) != ("}"))))) {
 							python::ispa_std::failures::runtime_error("unterminated braced region in parser action");
 						}
 						while ((((!(((*((*this)).pos)).isEnd()))) && (((((*((*this)).pos)).sourcePosition()) < (((*scanned)).end))))) {
@@ -3434,7 +3434,7 @@ namespace python {
 						if (((p) >= (0))) {
 							((*diagnostic)).offset = p;
 							((*diagnostic)).length = 0;
-							if (((p) < (((*((*this)).pos)).sourceOrigin().size()))) {
+							if (((p) < (static_cast<long long>(((*((*this)).pos)).sourceOrigin().size())))) {
 								((*diagnostic)).length = 1;
 							}
 						}
@@ -3445,14 +3445,14 @@ namespace python {
 							((*diagnostic)).length = ((*((*((*((*this)).pos)).current())).meta())).length();
 						} else {
 							if (((*this)).has_source_text) {
-								((*diagnostic)).offset = ((*this)).source.size();
+								((*diagnostic)).offset = static_cast<long long>(((*this)).source.size());
 							}
 						}
 					}
 					if (((source_offset) >= (0))) {
 						long long input_length = 0;
 						if (((*this)).has_source_text) {
-							input_length = ((*this)).source.size();
+							input_length = static_cast<long long>(((*this)).source.size());
 						}
 						if (((((source_offset) > (input_length))) || (((source_length) > (((input_length) - (source_offset))))))) {
 							python::ispa_std::failures::out_of_range("ctx.error source span is outside parser input");
@@ -3463,14 +3463,14 @@ namespace python {
 					(((*((*this)).recovery_state)).diagnostics).push_back(diagnostic);
 				}
 				virtual auto note(const std::string& message) -> void {
-					if (((((*((*this)).recovery_state)).diagnostics.size()) <= (((*this)).diagnostic_begin))) {
+					if (((static_cast<long long>(((*((*this)).recovery_state)).diagnostics.size())) <= (((*this)).diagnostic_begin))) {
 						python::ispa_std::failures::logic_error("ctx.note requires a preceding ctx.error in this fail block");
 					}
-					(((*(((*((*this)).recovery_state)).diagnostics)[((((*((*this)).recovery_state)).diagnostics.size()) - (1))])).notes).push_back(message);
+					(((*(((*((*this)).recovery_state)).diagnostics)[((static_cast<long long>(((*((*this)).recovery_state)).diagnostics.size())) - (1))])).notes).push_back(message);
 				}
 				virtual auto sync(const std::vector<std::string>& boundaries) -> void {
 					"Skip source text to one of `boundaries` (Strings). Lazy cursors only.";
-					if (((boundaries.size()) == (0))) {
+					if (((static_cast<long long>(boundaries.size())) == (0))) {
 						python::ispa_std::failures::logic_error("ctx.sync requires at least one boundary");
 					}
 					if (((((*((*this)).recovery_state)).exhausted()) || (((((*this)).has_request) && (((((*this)).requested) == (python::ispa_std::recovery::Mode::Abort))))))) {
@@ -3478,8 +3478,8 @@ namespace python {
 						return ;
 					}
 					long long i = 0;
-					while (((i) < (boundaries.size()))) {
-						if ((((boundaries)[i].size()) == (0))) {
+					while (((i) < (static_cast<long long>(boundaries.size())))) {
+						if (((static_cast<long long>((boundaries)[i].size())) == (0))) {
 							python::ispa_std::failures::invalid_argument("ctx.sync requires nonempty boundaries");
 						}
 						i = ((i) + (1));
@@ -3504,12 +3504,12 @@ namespace python {
 				}
 				virtual auto sync_tokens(const std::vector<std::shared_ptr<python::ispa_std::parser_ll::TokenBoundary>>& boundaries) -> void {
 					"Skip whole tokens to one of `boundaries` (TokenBoundary), preserving\n        token-stream structure (including synthetic indentation).";
-					if (((boundaries.size()) == (0))) {
+					if (((static_cast<long long>(boundaries.size())) == (0))) {
 						python::ispa_std::failures::logic_error("ctx.sync_tokens requires at least one boundary");
 					}
 					long long i = 0;
-					while (((i) < (boundaries.size()))) {
-						if (((((*(boundaries)[i])).value.size()) == (0))) {
+					while (((i) < (static_cast<long long>(boundaries.size())))) {
+						if (((static_cast<long long>(((*(boundaries)[i])).value.size())) == (0))) {
 							python::ispa_std::failures::invalid_argument("ctx.sync_tokens requires nonempty boundaries");
 						}
 						i = ((i) + (1));
@@ -3523,7 +3523,7 @@ namespace python {
 							return ;
 						}
 						long long j = 0;
-						while (((j) < (boundaries.size()))) {
+						while (((j) < (static_cast<long long>(boundaries.size())))) {
 							auto stop = (boundaries)[j];
 							if (((*stop)).token_name) {
 								if (((*this)).at_token(((*stop)).value, 0)) {
@@ -3599,7 +3599,7 @@ namespace python {
 					}
 					((*decision)).skipped = python::ispa_std::utility::maximum(moved, ((*this)).skipped);
 					long long i = ((*this)).diagnostic_begin;
-					while (((i) < (((*((*this)).recovery_state)).diagnostics.size()))) {
+					while (((i) < (static_cast<long long>(((*((*this)).recovery_state)).diagnostics.size())))) {
 						auto diagnostic = (((*((*this)).recovery_state)).diagnostics)[i];
 						((*diagnostic)).decision = ((*decision)).copy();
 						((*((*diagnostic)).decision)).unexpected = ((*diagnostic)).unexpected;
@@ -4201,8 +4201,8 @@ namespace python {
 				}
 				virtual auto is_empty() -> bool {
 					long long i = 0;
-					while (((i) < (((*this)).columns.size()))) {
-						if ((((((*this)).columns)[i].size()) > (0))) {
+					while (((i) < (static_cast<long long>(((*this)).columns.size())))) {
+						if (((static_cast<long long>((((*this)).columns)[i].size())) > (0))) {
 							return false;
 						}
 						i = ((i) + (1));
@@ -4656,16 +4656,16 @@ namespace python {
 					return ISPA_STD::construct<python::ispa_std::optional::Optional<T>>();
 				}
 				virtual auto has_value() -> bool {
-					return ((((*this))._items.size()) == (1));
+					return ((static_cast<long long>(((*this))._items.size())) == (1));
 				}
 				virtual auto value() -> T {
-					if (((((*this))._items.size()) == (0))) {
+					if (((static_cast<long long>(((*this))._items.size())) == (0))) {
 						::ISPA_STD::fail(python::ispa_std::errors::ErrorKind::BadOptionalAccess, "Optional.value: no value");
 					}
 					return (((*this))._items)[0];
 				}
 				virtual auto value_or(T fallback) -> T {
-					if (((((*this))._items.size()) == (1))) {
+					if (((static_cast<long long>(((*this))._items.size())) == (1))) {
 						return (((*this))._items)[0];
 					}
 					return fallback;
@@ -4678,7 +4678,7 @@ namespace python {
 					(((*this))._items).push_back(value);
 				}
 				template<typename U> auto transform(std::function<U(T)> fn) -> std::shared_ptr<python::ispa_std::optional::Optional<U>> {
-					if (((((*this))._items.size()) == (1))) {
+					if (((static_cast<long long>(((*this))._items.size())) == (1))) {
 						auto result = ISPA_STD::construct<python::ispa_std::optional::Optional<U>>();
 						((result)._items).push_back(fn((((*this))._items)[0]));
 						return result;
@@ -4686,22 +4686,22 @@ namespace python {
 					return ISPA_STD::construct<python::ispa_std::optional::Optional<U>>();
 				}
 				template<typename U> auto and_then(std::function<std::shared_ptr<python::ispa_std::optional::Optional<U>>(T)> fn) -> std::shared_ptr<python::ispa_std::optional::Optional<U>> {
-					if (((((*this))._items.size()) == (1))) {
+					if (((static_cast<long long>(((*this))._items.size())) == (1))) {
 						return fn((((*this))._items)[0]);
 					}
 					return ISPA_STD::construct<python::ispa_std::optional::Optional<U>>();
 				}
 				virtual auto or_else(std::function<std::shared_ptr<python::ispa_std::optional::Optional<T>>()> fn) -> std::shared_ptr<python::ispa_std::optional::Optional<T>> {
-					if (((((*this))._items.size()) == (1))) {
+					if (((static_cast<long long>(((*this))._items.size())) == (1))) {
 						return ::ISPA_STD::self_ptr(this);
 					}
 					return fn();
 				}
 				virtual auto __eq__(std::shared_ptr<python::ispa_std::optional::Optional<T>> other) -> bool {
-					if (((((*this))._items.size()) != (((*other))._items.size()))) {
+					if (((static_cast<long long>(((*this))._items.size())) != (static_cast<long long>(((*other))._items.size())))) {
 						return false;
 					}
-					if (((((*this))._items.size()) == (0))) {
+					if (((static_cast<long long>(((*this))._items.size())) == (0))) {
 						return true;
 					}
 					return (((((*this))._items)[0]) == ((((*other))._items)[0]));
@@ -4779,7 +4779,7 @@ namespace python {
 				long long _begin;
 				long long _end;
 				auto __init__(const std::vector<T>& arr, long long begin, long long end) -> void {
-					if (((((((begin) < (0))) || (((end) < (begin))))) || (((end) > (arr.size()))))) {
+					if (((((((begin) < (0))) || (((end) < (begin))))) || (((end) > (static_cast<long long>(arr.size())))))) {
 						::ISPA_STD::fail(python::ispa_std::errors::ErrorKind::OutOfRange, "Span: window outside array");
 					}
 					((*this))._arr = arr;
@@ -5026,7 +5026,7 @@ template<typename T> auto python::ispa_std::utility::clamp(T value, T low, T hig
 	return value;
 }
 template<typename T> auto python::ispa_std::algorithm::_check(const std::vector<T>& arr, long long first, long long last) -> void {
-	if (((((((first) < (0))) || (((last) < (first))))) || (((last) > (arr.size()))))) {
+	if (((((((first) < (0))) || (((last) < (first))))) || (((last) > (static_cast<long long>(arr.size())))))) {
 		::ISPA_STD::fail(python::ispa_std::errors::ErrorKind::OutOfRange, "algorithm: range outside array");
 	}
 }
@@ -5281,7 +5281,7 @@ return ((a) < (b));
 });
 }
 template<typename T> auto python::ispa_std::algorithm::erase_if(std::vector<T>& arr, std::function<bool(T)> pred) -> long long {
-	long long n = arr.size();
+	long long n = static_cast<long long>(arr.size());
 	std::vector<T> kept = std::vector<T>{};
 	long long i = 0;
 	while (((i) < (n))) {
@@ -5292,13 +5292,13 @@ template<typename T> auto python::ispa_std::algorithm::erase_if(std::vector<T>& 
 	}
 	(arr).clear();
 	(arr).insert((arr).end(), kept.begin(), kept.end());
-	return ((n) - (kept.size()));
+	return ((n) - (static_cast<long long>(kept.size())));
 }
 template<typename AST> auto python::ispa_std::parser_ll::LLParser::rule_context(std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos, AST ast, std::shared_ptr<python::ispa_std::lexer::TokenCursor> start, const std::string& rule) -> std::shared_ptr<python::ispa_std::parser_ll::RuleContext<AST>> {
 	return ISPA_STD::construct<python::ispa_std::parser_ll::RuleContext<AST>>(pos, ast, start, rule, ((*this)).token_names_, ((*this)).ambiguous_id_);
 }
 template<typename AST> auto python::ispa_std::parser_ll::LLParser::fail_context(std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos, AST ast, std::shared_ptr<python::ispa_std::lexer::TokenCursor> start, const std::string& rule, const std::string& failed_rule) -> std::shared_ptr<python::ispa_std::parser_ll::FailContext<AST>> {
-	return ISPA_STD::construct<python::ispa_std::parser_ll::FailContext<AST>>(pos, ast, start, rule, failed_rule, ((*this)).recovery_state_, ((*this)).text, ((*this)).has_text, ((*((*this)).recovery_state_)).diagnostics.size(), ((*this)).token_names_, ((*this)).ambiguous_id_);
+	return ISPA_STD::construct<python::ispa_std::parser_ll::FailContext<AST>>(pos, ast, start, rule, failed_rule, ((*this)).recovery_state_, ((*this)).text, ((*this)).has_text, static_cast<long long>(((*((*this)).recovery_state_)).diagnostics.size()), ((*this)).token_names_, ((*this)).ambiguous_id_);
 }
 template<typename AST> auto python::ispa_std::parser_ll::LLParser::custom_failure_decision_ctx(std::shared_ptr<python::ispa_std::lexer::TokenCursor> before, std::shared_ptr<python::ispa_std::parser_ll::FailContext<AST>> ctx) -> std::shared_ptr<python::ispa_std::recovery::Decision> {
 	return ((*ctx)).finish(before);
@@ -5315,12 +5315,12 @@ template<typename V> auto python::ispa_std::lr::lr_pack(const std::vector<V>& va
 		i = ((i) + (1));
 	}
 	i = 0;
-	while (((i) < (indices.size()))) {
+	while (((i) < (static_cast<long long>(indices.size())))) {
 		auto value = (values)[(indices)[i]];
 		if ((((splice)[i]) != (0))) {
 			long long c = 0;
 			std::shared_ptr<python::ispa_std::lr::LRCaptures<V>> spliced = python::ispa_std::lr::lr_captures_of(value);
-			while (((c) < (((*spliced)).columns.size()))) {
+			while (((c) < (static_cast<long long>(((*spliced)).columns.size())))) {
 				((columns)[(((offsets)[i]) + (c))]).insert(((columns)[(((offsets)[i]) + (c))]).end(), (((*spliced)).columns)[c].begin(), (((*spliced)).columns)[c].end());
 				c = ((c) + (1));
 			}
@@ -5338,7 +5338,7 @@ template<typename V> auto python::ispa_std::lr::LRParser::_skip(std::shared_ptr<
 	if (((*g)).has_is_space()) {
 		while ((((!(((*it)).isEnd()))) && (((*g)).lr_is_space(((*it)).current())))) {
 			((*it)).next();
-			if (((offset.size()) > (0))) {
+			if (((static_cast<long long>(offset.size())) > (0))) {
 				(offset)[0] = (((offset)[0]) + (1));
 			}
 		}
@@ -5372,10 +5372,10 @@ template<typename V> auto python::ispa_std::lr::LRParser::_unexpected(std::share
 	auto d = ISPA_STD::construct<python::ispa_std::recovery::Diagnostic>();
 	((*d)).unexpected = (window)[0];
 	if (((*g)).has_expected()) {
-		((*d)).expected = ((*g)).lr_expected((states)[((states.size()) - (1))]);
+		((*d)).expected = ((*g)).lr_expected((states)[((static_cast<long long>(states.size())) - (1))]);
 	}
 	if (((*g)).has_context()) {
-		((*d)).rule = ((*g)).lr_context((states)[((states.size()) - (1))]);
+		((*d)).rule = ((*g)).lr_context((states)[((static_cast<long long>(states.size())) - (1))]);
 	} else {
 		((*d)).rule = "<rule>";
 	}
@@ -5393,10 +5393,10 @@ template<typename V> auto python::ispa_std::lr::LRParser::_unexpected(std::share
 		message = ((((message) + (" at offset "))) + (python::ispa_std::format::int_to_string(((*d)).offset)));
 	}
 	message = ((((message) + (" in rule "))) + (((*d)).rule));
-	if (((((*d)).expected.size()) > (0))) {
+	if (((static_cast<long long>(((*d)).expected.size())) > (0))) {
 		message = ((message) + ("; expected "));
 		long long i = 0;
-		while (((i) < (((*d)).expected.size()))) {
+		while (((i) < (static_cast<long long>(((*d)).expected.size())))) {
 			if (((i) > (0))) {
 				message = ((message) + (", "));
 			}
@@ -5456,43 +5456,43 @@ template<typename V> auto python::ispa_std::lr::LRParser::lr_parse(std::shared_p
 		((*this))._skip(g, position, offset);
 		((*region)).cursor = (offset)[0];
 		auto window = ((*this))._window(g, position);
-		long long action = ((*g)).lr_action((states)[((states.size()) - (1))], window);
+		long long action = ((*g)).lr_action((states)[((static_cast<long long>(states.size())) - (1))], window);
 		if (((action) == (python::ispa_std::lr::LR_INVALID))) {
 			(((*this)).errors_).push_back(((*this))._unexpected(g, states, window, position));
 			bool recovered = false;
 			if (((*g)).has_recover()) {
 				((*control)).phase = python::ispa_std::lr::LRControlPhase::Recover;
 				long long old_cursor = ((*region)).cursor;
-				long long old_size = states.size();
-				long long old_state = (states)[((states.size()) - (1))];
-				if (((*g)).lr_recover(region, (((*this)).errors_)[((((*this)).errors_.size()) - (1))])) {
-					if (((((((((*region)).cursor) == (old_cursor))) && (((states.size()) == (old_size))))) && ((((states)[((states.size()) - (1))]) == (old_state))))) {
+				long long old_size = static_cast<long long>(states.size());
+				long long old_state = (states)[((static_cast<long long>(states.size())) - (1))];
+				if (((*g)).lr_recover(region, (((*this)).errors_)[((static_cast<long long>(((*this)).errors_.size())) - (1))])) {
+					if (((((((((*region)).cursor) == (old_cursor))) && (((static_cast<long long>(states.size())) == (old_size))))) && ((((states)[((static_cast<long long>(states.size())) - (1))]) == (old_state))))) {
 						python::ispa_std::failures::runtime_error("LR recovery handler made no progress");
 					}
 					if (((((*region)).cursor) != (old_cursor))) {
-						if (((spans.size()) == (0))) {
+						if (((static_cast<long long>(spans.size())) == (0))) {
 							((*region)).recovered_prefix = true;
 						} else {
-							((*(spans)[((spans.size()) - (1))])).trailing = true;
+							((*(spans)[((static_cast<long long>(spans.size())) - (1))])).trailing = true;
 						}
 					}
 					recovered = true;
 				}
 			}
 			if ((!(recovered))) {
-				python::ispa_std::failures::runtime_error(((*(((*this)).errors_)[((((*this)).errors_.size()) - (1))])).message);
+				python::ispa_std::failures::runtime_error(((*(((*this)).errors_)[((static_cast<long long>(((*this)).errors_.size())) - (1))])).message);
 			}
 		} else {
 			if (((action) == (0))) {
 				((*control)).phase = python::ispa_std::lr::LRControlPhase::Accept;
-				if (((((values.size()) != (1))) || ((!(((*position)).isEnd()))))) {
+				if (((((static_cast<long long>(values.size())) != (1))) || ((!(((*position)).isEnd()))))) {
 					python::ispa_std::failures::runtime_error("Invalid LR accept stack");
 				}
-				auto last = (spans)[((spans.size()) - (1))];
+				auto last = (spans)[((static_cast<long long>(spans.size())) - (1))];
 				if (((((((((((*last)).begin) != (0))) && ((!(((*last)).leading))))) && ((!(((*region)).recovered_prefix))))) || (((((((*region)).cursor) > (((*last)).end))) && ((!(((*last)).trailing))))))) {
 					python::ispa_std::failures::runtime_error("Whitespace is not allowed at the input boundary");
 				}
-				return ISPA_STD::construct<python::ispa_std::match_result::MatchResult>(true, python::ispa_std::lr::lr_node((values)[((values.size()) - (1))]), position);
+				return ISPA_STD::construct<python::ispa_std::match_result::MatchResult>(true, python::ispa_std::lr::lr_node((values)[((static_cast<long long>(values.size())) - (1))]), position);
 			} else {
 				if (((action) > (0))) {
 					((*control)).phase = python::ispa_std::lr::LRControlPhase::Shift;
@@ -5509,13 +5509,13 @@ template<typename V> auto python::ispa_std::lr::LRParser::lr_parse(std::shared_p
 					((*control)).phase = python::ispa_std::lr::LRControlPhase::Reduce;
 					((*control)).production = rule;
 					long long count = ((*g)).lr_length(rule);
-					if (((count) > (values.size()))) {
+					if (((count) > (static_cast<long long>(values.size())))) {
 						python::ispa_std::failures::runtime_error("LR stack underflow");
 					}
-					long long begin = ((values.size()) - (count));
+					long long begin = ((static_cast<long long>(values.size())) - (count));
 					std::vector<V> rhs = std::vector<V>{};
 					long long i = begin;
-					while (((i) < (values.size()))) {
+					while (((i) < (static_cast<long long>(values.size())))) {
 						(rhs).push_back((values)[i]);
 						i = ((i) + (1));
 					}
@@ -5527,16 +5527,16 @@ template<typename V> auto python::ispa_std::lr::LRParser::lr_parse(std::shared_p
 					} else {
 						value = ((*g)).lr_reduce(rule, rhs);
 					}
-					while (((values.size()) > (begin))) {
+					while (((static_cast<long long>(values.size())) > (begin))) {
 						ISPA_STD::python_pop((values));
 					}
-					while (((spans.size()) > (begin))) {
+					while (((static_cast<long long>(spans.size())) > (begin))) {
 						ISPA_STD::python_pop((spans));
 					}
-					while (((states.size()) > (((begin) + (1))))) {
+					while (((static_cast<long long>(states.size())) > (((begin) + (1))))) {
 						ISPA_STD::python_pop((states));
 					}
-					long long nxt = ((*g)).lr_goto((states)[((states.size()) - (1))], ((*g)).lr_lhs(rule));
+					long long nxt = ((*g)).lr_goto((states)[((static_cast<long long>(states.size())) - (1))], ((*g)).lr_lhs(rule));
 					(values).push_back(value);
 					(spans).push_back(span);
 					(states).push_back(nxt);
@@ -5567,7 +5567,7 @@ template<typename V> auto python::ispa_std::lr_conflicts::LRGeneralizedParser::l
 		auto closure = ((*active)).copy();
 		auto shifted = ISPA_STD::construct<python::ispa_std::sortedmap::IntSet>();
 		long long nxt = 0;
-		while (((nxt) < (pending.size()))) {
+		while (((nxt) < (static_cast<long long>(pending.size())))) {
 			((*this))._tick(forest, stacks);
 			long long top_id = (pending)[nxt];
 			nxt = ((nxt) + (1));
@@ -5582,7 +5582,7 @@ template<typename V> auto python::ispa_std::lr_conflicts::LRGeneralizedParser::l
 				}
 			}
 			long long ai = 0;
-			while (((ai) < (actions.size()))) {
+			while (((ai) < (static_cast<long long>(actions.size())))) {
 				long long action = (actions)[ai];
 				ai = ((ai) + (1));
 				((*this))._tick(forest, stacks);
@@ -5611,13 +5611,13 @@ template<typename V> auto python::ispa_std::lr_conflicts::LRGeneralizedParser::l
 							base = ((*(stacks)[base])).previous;
 							i = ((i) + (1));
 						}
-						if (((children.size()) == (count))) {
+						if (((static_cast<long long>(children.size())) == (count))) {
 							ISPA_STD::python_reverse((children));
 							auto span = ISPA_STD::construct<python::ispa_std::lr_conflicts::_Span>(cursor, cursor, false, false, true);
 							bool allowed = ((*this))._gap(g, rule, 0);
 							bool valid = true;
 							i = 0;
-							while (((i) < (children.size()))) {
+							while (((i) < (static_cast<long long>(children.size())))) {
 								auto child = ((*(forest)[(children)[i]])).span;
 								if (((*child)).empty) {
 									allowed = ((((allowed) || (((*child)).leading))) || (((*child)).trailing));
@@ -5647,7 +5647,7 @@ template<typename V> auto python::ispa_std::lr_conflicts::LRGeneralizedParser::l
 								auto alternative = ISPA_STD::construct<python::ispa_std::lr_conflicts::_Alternative>(rule, children);
 								bool known = false;
 								long long k = 0;
-								while (((k) < (((*(forest)[value])).alternatives.size()))) {
+								while (((k) < (static_cast<long long>(((*(forest)[value])).alternatives.size())))) {
 									if (((*(((*(forest)[value])).alternatives)[k])).equals(alternative)) {
 										known = true;
 									}
@@ -5683,7 +5683,7 @@ template<typename V> auto python::ispa_std::lr_conflicts::LRGeneralizedParser::l
 	std::vector<long long> visiting = std::vector<long long>{};
 	std::vector<long long> ways = std::vector<long long>{};
 	i = 0;
-	while (((i) < (forest.size()))) {
+	while (((i) < (static_cast<long long>(forest.size())))) {
 		(visiting).push_back(0);
 		(ways).push_back(0);
 		i = ((i) + (1));
@@ -5691,23 +5691,23 @@ template<typename V> auto python::ispa_std::lr_conflicts::LRGeneralizedParser::l
 	auto ambiguous = python::ispa_std::lr::ABSENT;
 	std::vector<long long> order = std::vector<long long>{};
 	long long ri = 0;
-	while (((((ri) < ((roots).items.size()))) && (((ambiguous) == (python::ispa_std::lr::ABSENT))))) {
+	while (((((ri) < (static_cast<long long>((roots).items.size())))) && (((ambiguous) == (python::ispa_std::lr::ABSENT))))) {
 		long long root = ((roots).items)[ri];
 		ri = ((ri) + (1));
 		if ((((visiting)[root]) != (2))) {
 			std::vector<std::shared_ptr<python::ispa_std::lr_conflicts::_Visit>> pending_nodes = std::vector<std::shared_ptr<python::ispa_std::lr_conflicts::_Visit>>{ISPA_STD::construct<python::ispa_std::lr_conflicts::_Visit>(root)};
 			(visiting)[root] = 1;
-			while (((((pending_nodes.size()) > (0))) && (((ambiguous) == (python::ispa_std::lr::ABSENT))))) {
+			while (((((static_cast<long long>(pending_nodes.size())) > (0))) && (((ambiguous) == (python::ispa_std::lr::ABSENT))))) {
 				((*this))._tick(forest, stacks);
-				std::shared_ptr<python::ispa_std::lr_conflicts::_Visit> frame = (pending_nodes)[((pending_nodes.size()) - (1))];
+				std::shared_ptr<python::ispa_std::lr_conflicts::_Visit> frame = (pending_nodes)[((static_cast<long long>(pending_nodes.size())) - (1))];
 				auto node = (forest)[((*frame)).node];
-				if (((((*frame)).alternative) == (((*node)).alternatives.size()))) {
+				if (((((*frame)).alternative) == (static_cast<long long>(((*node)).alternatives.size())))) {
 					(visiting)[((*frame)).node] = 2;
 					(order).push_back(((*frame)).node);
 					ISPA_STD::python_pop((pending_nodes));
 				} else {
 					auto alt = (((*node)).alternatives)[((*frame)).alternative];
-					if (((((*frame)).child) == (((*alt)).children.size()))) {
+					if (((((*frame)).child) == (static_cast<long long>(((*alt)).children.size())))) {
 						((*frame)).alternative = ((((*frame)).alternative) + (1));
 						((*frame)).child = 0;
 					} else {
@@ -5731,7 +5731,7 @@ template<typename V> auto python::ispa_std::lr_conflicts::LRGeneralizedParser::l
 		total = 2;
 	} else {
 		long long oi = 0;
-		while (((oi) < (order.size()))) {
+		while (((oi) < (static_cast<long long>(order.size())))) {
 			long long ident = (order)[oi];
 			oi = ((oi) + (1));
 			long long n = 0;
@@ -5739,11 +5739,11 @@ template<typename V> auto python::ispa_std::lr_conflicts::LRGeneralizedParser::l
 				n = 1;
 			}
 			long long ai = 0;
-			while (((ai) < (((*(forest)[ident])).alternatives.size()))) {
+			while (((ai) < (static_cast<long long>(((*(forest)[ident])).alternatives.size())))) {
 				long long product = 1;
 				long long ci = 0;
 				auto children = ((*(((*(forest)[ident])).alternatives)[ai])).children;
-				while (((ci) < (children.size()))) {
+				while (((ci) < (static_cast<long long>(children.size())))) {
 					product = python::ispa_std::lr_conflicts::min2(2, ((product) * ((ways)[(children)[ci]])));
 					ci = ((ci) + (1));
 				}
@@ -5756,7 +5756,7 @@ template<typename V> auto python::ispa_std::lr_conflicts::LRGeneralizedParser::l
 			}
 		}
 		ri = 0;
-		while (((ri) < ((roots).items.size()))) {
+		while (((ri) < (static_cast<long long>((roots).items.size())))) {
 			total = python::ispa_std::lr_conflicts::min2(2, ((total) + ((ways)[((roots).items)[ri]])));
 			ri = ((ri) + (1));
 		}
@@ -5767,7 +5767,7 @@ template<typename V> auto python::ispa_std::lr_conflicts::LRGeneralizedParser::l
 			auto node = (forest)[ambiguous];
 			message = ((((((((message) + (" at tokens "))) + (python::ispa_std::format::int_to_string(((*((*node)).span)).begin)))) + (".."))) + (python::ispa_std::format::int_to_string(((*((*node)).span)).end)));
 			long long ai = 0;
-			while (((ai) < (((*node)).alternatives.size()))) {
+			while (((ai) < (static_cast<long long>(((*node)).alternatives.size())))) {
 				long long rule = ((*(((*node)).alternatives)[ai])).rule;
 				if (((*g)).has_rule_label()) {
 					message = ((((message) + ("\n  "))) + (((*g)).lr_rule_label(rule)));
@@ -5781,11 +5781,11 @@ template<typename V> auto python::ispa_std::lr_conflicts::LRGeneralizedParser::l
 	}
 	std::vector<std::shared_ptr<python::ispa_std::lr_conflicts::_Eval<V>>> evaluating = std::vector<std::shared_ptr<python::ispa_std::lr_conflicts::_Eval<V>>>{ISPA_STD::construct<python::ispa_std::lr_conflicts::_Eval<V>>((roots).smallest())};
 	V result;
-	while (((evaluating.size()) > (0))) {
+	while (((static_cast<long long>(evaluating.size())) > (0))) {
 		((*this))._tick(forest, stacks);
-		std::shared_ptr<python::ispa_std::lr_conflicts::_Eval<V>> frame = (evaluating)[((evaluating.size()) - (1))];
+		std::shared_ptr<python::ispa_std::lr_conflicts::_Eval<V>> frame = (evaluating)[((static_cast<long long>(evaluating.size())) - (1))];
 		auto node = (forest)[((*frame)).node];
-		if ((((!(((*node)).has_token))) && (((((*frame)).child) < (((*(((*node)).alternatives)[0])).children.size()))))) {
+		if ((((!(((*node)).has_token))) && (((((*frame)).child) < (static_cast<long long>(((*(((*node)).alternatives)[0])).children.size())))))) {
 			long long child = (((*(((*node)).alternatives)[0])).children)[((*frame)).child];
 			((*frame)).child = ((((*frame)).child) + (1));
 			(evaluating).push_back(ISPA_STD::construct<python::ispa_std::lr_conflicts::_Eval<V>>(child));
@@ -5797,10 +5797,10 @@ template<typename V> auto python::ispa_std::lr_conflicts::LRGeneralizedParser::l
 				produced = ((*g)).lr_reduce(((*(((*node)).alternatives)[0])).rule, ((*frame)).rhs);
 			}
 			ISPA_STD::python_pop((evaluating));
-			if (((evaluating.size()) == (0))) {
+			if (((static_cast<long long>(evaluating.size())) == (0))) {
 				result = produced;
 			} else {
-				(((*(evaluating)[((evaluating.size()) - (1))])).rhs).push_back(produced);
+				(((*(evaluating)[((static_cast<long long>(evaluating.size())) - (1))])).rhs).push_back(produced);
 			}
 		}
 	}
@@ -5847,43 +5847,43 @@ template<typename T> auto python::ispa_std::vector::filled(long long count, T va
 	return result;
 }
 template<typename T> auto python::ispa_std::vector::at(const std::vector<T>& arr, long long index) -> T {
-	if (((((index) < (0))) || (((index) >= (arr.size()))))) {
+	if (((((index) < (0))) || (((index) >= (static_cast<long long>(arr.size())))))) {
 		::ISPA_STD::fail(python::ispa_std::errors::ErrorKind::OutOfRange, "vector.at: index out of range");
 	}
 	return (arr)[index];
 }
 template<typename T> auto python::ispa_std::vector::front(const std::vector<T>& arr) -> T {
-	if (((arr.size()) == (0))) {
+	if (((static_cast<long long>(arr.size())) == (0))) {
 		::ISPA_STD::fail(python::ispa_std::errors::ErrorKind::OutOfRange, "vector.front: empty");
 	}
 	return (arr)[0];
 }
 template<typename T> auto python::ispa_std::vector::back(const std::vector<T>& arr) -> T {
-	if (((arr.size()) == (0))) {
+	if (((static_cast<long long>(arr.size())) == (0))) {
 		::ISPA_STD::fail(python::ispa_std::errors::ErrorKind::OutOfRange, "vector.back: empty");
 	}
-	return (arr)[((arr.size()) - (1))];
+	return (arr)[((static_cast<long long>(arr.size())) - (1))];
 }
 template<typename T> auto python::ispa_std::vector::pop_back(std::vector<T>& arr) -> void {
-	if (((arr.size()) == (0))) {
+	if (((static_cast<long long>(arr.size())) == (0))) {
 		::ISPA_STD::fail(python::ispa_std::errors::ErrorKind::OutOfRange, "vector.pop_back: empty");
 	}
 	ISPA_STD::python_pop((arr));
 }
 template<typename T> auto python::ispa_std::vector::insert_at(std::vector<T>& arr, long long index, T value) -> void {
-	if (((((index) < (0))) || (((index) > (arr.size()))))) {
+	if (((((index) < (0))) || (((index) > (static_cast<long long>(arr.size())))))) {
 		::ISPA_STD::fail(python::ispa_std::errors::ErrorKind::OutOfRange, "vector.insert_at: index out of range");
 	}
 	ISPA_STD::python_insert((arr), index, value);
 }
 template<typename T> auto python::ispa_std::vector::erase_at(std::vector<T>& arr, long long index) -> void {
-	if (((((index) < (0))) || (((index) >= (arr.size()))))) {
+	if (((((index) < (0))) || (((index) >= (static_cast<long long>(arr.size())))))) {
 		::ISPA_STD::fail(python::ispa_std::errors::ErrorKind::OutOfRange, "vector.erase_at: index out of range");
 	}
 	ISPA_STD::python_pop((arr), index);
 }
 template<typename T> auto python::ispa_std::vector::erase_range(std::vector<T>& arr, long long first, long long last) -> void {
-	long long n = arr.size();
+	long long n = static_cast<long long>(arr.size());
 	if (((((((first) < (0))) || (((last) < (first))))) || (((last) > (n))))) {
 		::ISPA_STD::fail(python::ispa_std::errors::ErrorKind::OutOfRange, "vector.erase_range: bad range");
 	}
@@ -5901,10 +5901,10 @@ template<typename T> auto python::ispa_std::vector::resize(std::vector<T>& arr, 
 	if (((count) < (0))) {
 		::ISPA_STD::fail(python::ispa_std::errors::ErrorKind::LengthError, "vector.resize: negative size");
 	}
-	while (((arr.size()) > (count))) {
+	while (((static_cast<long long>(arr.size())) > (count))) {
 		ISPA_STD::python_pop((arr));
 	}
-	while (((arr.size()) < (count))) {
+	while (((static_cast<long long>(arr.size())) < (count))) {
 		(arr).push_back(fill);
 	}
 }
@@ -5921,7 +5921,7 @@ template<typename T> auto python::ispa_std::vector::swap(std::vector<T>& a, std:
 }
 template<typename T> auto python::ispa_std::vector::lexicographical_less(const std::vector<T>& a, const std::vector<T>& b) -> bool {
 	long long i = 0;
-	while (((((i) < (a.size()))) && (((i) < (b.size()))))) {
+	while (((((i) < (static_cast<long long>(a.size())))) && (((i) < (static_cast<long long>(b.size())))))) {
 		if ((((a)[i]) < ((b)[i]))) {
 			return true;
 		}
@@ -5930,12 +5930,12 @@ template<typename T> auto python::ispa_std::vector::lexicographical_less(const s
 		}
 		i = ((i) + (1));
 	}
-	return ((a.size()) < (b.size()));
+	return ((static_cast<long long>(a.size())) < (static_cast<long long>(b.size())));
 }
 template<typename T> auto python::ispa_std::to_string::list_to_string(const std::vector<T>& items, std::function<std::string(T)> element_to_string) -> std::string {
 	std::string out = "";
 	long long i = 0;
-	while (((i) < (items.size()))) {
+	while (((i) < (static_cast<long long>(items.size())))) {
 		out = ((out) + (element_to_string((items)[i])));
 		i = ((i) + (1));
 	}

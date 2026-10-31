@@ -1,6 +1,10 @@
 module;
+#ifdef __EMSCRIPTEN__
+#include "ispa_icu_shim.h"
+#else
 #include <unicode/uchar.h>
 #include <unicode/utf8.h>
+#endif
 module corelib;
 import logging;
 import cpuf.printf;
@@ -240,6 +244,13 @@ namespace corelib::text {
     }
     std::string characterName(UChar32 cp) {
         char buffer[256]{};
+#ifdef __EMSCRIPTEN__
+        const char *name = ispa_icu_shim::asciiName(cp);
+        if (!name)
+            throw std::runtime_error("Unicode character name unavailable");
+        std::int32_t length = static_cast<std::int32_t>(std::strlen(name));
+        std::memcpy(buffer, name, length);
+#else
         UErrorCode error = U_ZERO_ERROR;
 
         int32_t length = u_charName(
@@ -252,6 +263,7 @@ namespace corelib::text {
 
         if (U_FAILURE(error) || length == 0)
             throw std::runtime_error("Unicode character name unavailable");
+#endif
 
         std::string result;
         for (char c : std::string_view(buffer, length)) {

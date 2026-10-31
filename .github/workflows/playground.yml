@@ -1,0 +1,103 @@
+name: Playground
+
+# Rebuilds the browser (WebAssembly) generator and redeploys the GitHub Pages playground
+# whenever anything that can change the generator, its Python runtime or the page itself changes.
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "src/**"
+      - "lib/**"
+      - "cli/ispa/**"
+      - "parser/**"
+      - "external/**"
+      - "include/**"
+      - "cmake/**"
+      - "CMakeLists.txt"
+      - "scripts/build-wasm.sh"
+      - "scripts/package-playground.py"
+      - "playground/**"
+      - ".github/workflows/playground.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+env:
+  CMAKE_VERSION: "4.5.0-rc1"
+  EMSDK_VERSION: "6.0.13"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Install CMake
+        run: |
+          set -euo pipefail
+          archive="cmake-${CMAKE_VERSION}-linux-x86_64.sh"
+          curl -fL "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/${archive}" -o cmake-install.sh
+          mkdir -p "$RUNNER_TEMP/cmake"
+          sh cmake-install.sh --skip-license --prefix="$RUNNER_TEMP/cmake" --exclude-subdir
+          echo "$RUNNER_TEMP/cmake/bin" >> "$GITHUB_PATH"
+
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - name: Install Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: ${{ env.EMSDK_VERSION }}
+          actions-cache-folder: emsdk-cache
+
+      - name: Set up vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg "$RUNNER_TEMP/vcpkg"
+          "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg" >> "$GITHUB_ENV"
+
+      - name: Cache vcpkg binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/vcpkg
+          key: vcpkg-wasm-${{ hashFiles('cmake/wasm/vcpkg.json', 'cmake/triplets/wasm32-emscripten-ispa.cmake') }}
+
+      - name: Build the WebAssembly generator
+        run: JOBS=4 bash scripts/build-wasm.sh "$GITHUB_WORKSPACE/build-wasm"
+
+      - name: Smoke test the generator
+        run: node scripts/test-wasm.mjs playground
+
+      - name: Test the page in headless Chrome
+        run: node scripts/test-playground.mjs playground google-chrome
+
+      - name: Collect the site
+        run: |
+          mkdir site
+          cp -r playground/. site/
+          rm -rf site/__pycache__ site/README.md site/.gitignore
+          touch site/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

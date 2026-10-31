@@ -40,6 +40,8 @@ namespace ISPA_STD {
         }
 
         SymCleanup(process);
+#elif defined(__EMSCRIPTEN__)
+        return "Stack trace unavailable";
 #else
         void* frames[64];
         int count = backtrace(frames, 64);

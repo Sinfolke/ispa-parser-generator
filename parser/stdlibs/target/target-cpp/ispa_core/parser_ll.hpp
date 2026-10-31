@@ -19,7 +19,11 @@ constexpr std::size_t alternative_index(const ISPA_STD::RawToken<Ts...>*) {
     return static_cast<std::size_t>(-1);
 }
 template<class T, class Token>
-constexpr long long token_index_of = static_cast<long long>(alternative_index<T>(static_cast<const Token*>(nullptr)));
+constexpr long long token_index_of = [] {
+    // size_t(-1) is not -1 as a long long where size_t is 32-bit (wasm32): map the not-found sentinel explicitly.
+    constexpr auto index = alternative_index<T>(static_cast<const Token*>(nullptr));
+    return index == static_cast<std::size_t>(-1) ? -1LL : static_cast<long long>(index);
+}();
 
 // A core Node that carries the typed node: how a typed AST value passes through the core combinators.
 // The core's contexts are generic over the AST they carry; the facade keeps its AST native.

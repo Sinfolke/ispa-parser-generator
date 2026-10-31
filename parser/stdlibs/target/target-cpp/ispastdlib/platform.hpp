@@ -8,7 +8,7 @@
 #include <windows.h>
 #include <dbghelp.h>
 #pragma comment(lib, "dbghelp.lib")
-#else
+#elif !defined(__EMSCRIPTEN__)
 #include <execinfo.h>
 #include <cstdlib>
 #endif

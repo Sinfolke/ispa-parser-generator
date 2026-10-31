@@ -1,0 +1,19 @@
+{
+    "name": "ispa-wasm",
+    "version": "0.1.0",
+    "description": "Dependencies of the WebAssembly build of the ISPA generator (no ICU, no gtest).",
+    "dependencies": [
+        "boost-dynamic-bitset",
+        "boost-container",
+        "tsl-ordered-map",
+        "yaml-cpp",
+        "cli11"
+    ],
+    "overrides": [
+        {
+            "name": "tsl-ordered-map",
+            "version": "1.2.0"
+        }
+    ],
+    "builtin-baseline": "0c102a84b69c2c923c28a97f756d5ecd9a90c48a"
+}

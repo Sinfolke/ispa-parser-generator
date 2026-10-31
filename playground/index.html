@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ISPA Playground</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css">
+<header>
+  <div class="brand"><b>ISPA</b><span>Playground</span></div>
+  <div class="actions">
+    <button id="stop" hidden>Stop</button>
+    <button id="run" disabled>Generate &amp; parse <kbd>Ctrl ↵</kbd></button>
+  </div>
+</header>
+<main>
+  <section class="grammar">
+    <div class="heading"><div><small>01 / DEFINE</small><h1>Your grammar</h1></div><button id="add">+ New file</button></div>
+    <nav id="files" aria-label="Files"></nav>
+    <label class="sr" for="source">Editor</label><textarea id="source" spellcheck="false"></textarea>
+    <footer id="hint">Changes saved in this browser</footer>
+  </section>
+  <section>
+    <div class="heading"><div><small>02 / TRY</small><h2>Test input</h2></div></div>
+    <label class="sr" for="input">Text to parse</label><textarea id="input" spellcheck="false">123</textarea>
+    <div class="heading"><div><small>03 / EXPLORE</small><h2>Result</h2></div><button id="copy">Copy</button></div>
+    <nav id="tabs" role="tablist" aria-label="Output">
+      <button role="tab" data-tab="ast" aria-selected="true">Syntax tree</button>
+      <button role="tab" data-tab="generated" aria-selected="false">Generated Python</button>
+      <button role="tab" data-tab="console" aria-selected="false">Console</button>
+    </nav>
+    <p id="status" role="status"><i class="dot"></i><span>Loading…</span></p>
+    <pre id="ast">Generate your parser to explore its AST here.</pre>
+    <pre id="generated" hidden></pre>
+    <pre id="console" hidden></pre>
+  </section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<script type="module" src="app.js"></script>
+</html>

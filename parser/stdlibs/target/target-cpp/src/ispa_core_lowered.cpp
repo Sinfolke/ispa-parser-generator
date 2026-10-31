@@ -20,7 +20,7 @@ auto python::ispa_std::chars::char_of(long long code) -> std::string {
 }
 auto python::ispa_std::chars::code_at(const std::string& s, long long index) -> long long {
 	"code_of(at(s, index)) without building the one-character string.";
-	if (((((index) < (0))) || (((index) >= (s.size()))))) {
+	if (((((index) < (0))) || (((index) >= (static_cast<long long>(s.size())))))) {
 		return 0;
 	}
 	auto code = ISPA_STD::python_char_code(std::string(1, (s)[index]));
@@ -31,19 +31,19 @@ auto python::ispa_std::chars::code_at(const std::string& s, long long index) -> 
 }
 auto python::ispa_std::chars::at(const std::string& s, long long index) -> std::string {
 	"s[index], or \"\" outside the string (the C++ NUL terminator).";
-	if (((((index) < (0))) || (((index) >= (s.size()))))) {
+	if (((((index) < (0))) || (((index) >= (static_cast<long long>(s.size())))))) {
 		return "";
 	}
 	return std::string(1, (s)[index]);
 }
 auto python::ispa_std::chars::is_space(const std::string& ch) -> bool {
-	if (((ch.size()) == (0))) {
+	if (((static_cast<long long>(ch.size())) == (0))) {
 		return false;
 	}
 	return ((((((((((((ch) == (" "))) || (((ch) == ("\t"))))) || (((ch) == ("\n"))))) || (((ch) == ("\r"))))) || (((ch) == ("\v"))))) || (((ch) == ("\f"))));
 }
 auto python::ispa_std::chars::is_digit(const std::string& ch) -> bool {
-	if (((ch.size()) == (0))) {
+	if (((static_cast<long long>(ch.size())) == (0))) {
 		return false;
 	}
 	return ((((ch) >= ("0"))) && (((ch) <= ("9"))));
@@ -60,7 +60,7 @@ long long python::ispa_std::errors::ErrorKind::ApiError = 9;
 long long python::ispa_std::errors::ErrorKind::NoMatch = 10;
 long long python::ispa_std::errors::ErrorKind::ExternalParse = 11;
 auto python::ispa_std::string::substr(const std::string& s, long long pos, long long count) -> std::string {
-	long long n = s.size();
+	long long n = static_cast<long long>(s.size());
 	if (((((pos) < (0))) || (((pos) > (n))))) {
 		::ISPA_STD::fail(python::ispa_std::errors::ErrorKind::OutOfRange, "string.substr: pos out of range");
 	}
@@ -78,7 +78,7 @@ auto python::ispa_std::string::substr(const std::string& s, long long pos, long 
 }
 auto python::ispa_std::string::compare(const std::string& a, const std::string& b) -> long long {
 	long long i = 0;
-	while (((((i) < (a.size()))) && (((i) < (b.size()))))) {
+	while (((((i) < (static_cast<long long>(a.size())))) && (((i) < (static_cast<long long>(b.size())))))) {
 		if (((std::string(1, (a)[i])) < (std::string(1, (b)[i])))) {
 			return ( - (1));
 		}
@@ -87,20 +87,20 @@ auto python::ispa_std::string::compare(const std::string& a, const std::string& 
 		}
 		i = ((i) + (1));
 	}
-	if (((a.size()) < (b.size()))) {
+	if (((static_cast<long long>(a.size())) < (static_cast<long long>(b.size())))) {
 		return ( - (1));
 	}
-	if (((b.size()) < (a.size()))) {
+	if (((static_cast<long long>(b.size())) < (static_cast<long long>(a.size())))) {
 		return 1;
 	}
 	return 0;
 }
 auto python::ispa_std::string::matches_at(const std::string& s, const std::string& needle, long long pos) -> bool {
-	if (((((pos) < (0))) || (((((pos) + (needle.size()))) > (s.size()))))) {
+	if (((((pos) < (0))) || (((((pos) + (static_cast<long long>(needle.size())))) > (static_cast<long long>(s.size())))))) {
 		return false;
 	}
 	long long i = 0;
-	while (((i) < (needle.size()))) {
+	while (((i) < (static_cast<long long>(needle.size())))) {
 		if (((std::string(1, (s)[((pos) + (i))])) != (std::string(1, (needle)[i])))) {
 			return false;
 		}
@@ -112,14 +112,14 @@ auto python::ispa_std::string::starts_with(const std::string& s, const std::stri
 	return python::ispa_std::string::matches_at(s, prefix, 0);
 }
 auto python::ispa_std::string::ends_with(const std::string& s, const std::string& suffix) -> bool {
-	return python::ispa_std::string::matches_at(s, suffix, ((s.size()) - (suffix.size())));
+	return python::ispa_std::string::matches_at(s, suffix, ((static_cast<long long>(s.size())) - (static_cast<long long>(suffix.size()))));
 }
 auto python::ispa_std::string::find(const std::string& s, const std::string& needle, long long start) -> long long {
-	if (((((start) < (0))) || (((start) > (s.size()))))) {
+	if (((((start) < (0))) || (((start) > (static_cast<long long>(s.size())))))) {
 		return python::ispa_std::string::NPOS;
 	}
 	long long pos = start;
-	while (((((pos) + (needle.size()))) <= (s.size()))) {
+	while (((((pos) + (static_cast<long long>(needle.size())))) <= (static_cast<long long>(s.size())))) {
 		if (python::ispa_std::string::matches_at(s, needle, pos)) {
 			return pos;
 		}
@@ -128,7 +128,7 @@ auto python::ispa_std::string::find(const std::string& s, const std::string& nee
 	return python::ispa_std::string::NPOS;
 }
 auto python::ispa_std::string::rfind(const std::string& s, const std::string& needle) -> long long {
-	long long pos = ((s.size()) - (needle.size()));
+	long long pos = ((static_cast<long long>(s.size())) - (static_cast<long long>(needle.size())));
 	while (((pos) >= (0))) {
 		if (python::ispa_std::string::matches_at(s, needle, pos)) {
 			return pos;
@@ -169,31 +169,31 @@ auto python::ispa_std::format::fmt(const std::string& format_text, const std::ve
 	std::string res = format_text;
 	long long cursor = 0;
 	long long i = 0;
-	while (((i) < (args.size()))) {
+	while (((i) < (static_cast<long long>(args.size())))) {
 		long long pos = python::ispa_std::string::find(res, "{}", cursor);
 		if (((pos) != (( - (1))))) {
 			std::string value = (args)[i];
 			res = ((((python::ispa_std::string::substr(res, 0, pos)) + (value))) + (python::ispa_std::string::substr(res, ((pos) + (2)), ( - (1)))));
-			cursor = ((pos) + (value.size()));
+			cursor = ((pos) + (static_cast<long long>(value.size())));
 		}
 		i = ((i) + (1));
 	}
 	return res;
 }
 auto python::ispa_std::format::replace_all(const std::string& s, const std::string& needle, const std::string& replacement) -> std::string {
-	if (((needle.size()) == (0))) {
+	if (((static_cast<long long>(needle.size())) == (0))) {
 		return s;
 	}
 	std::string out = "";
 	long long i = 0;
-	while (((i) < (s.size()))) {
+	while (((i) < (static_cast<long long>(s.size())))) {
 		long long pos = python::ispa_std::string::find(s, needle, i);
 		if (((pos) == (( - (1))))) {
 			out = ((out) + (python::ispa_std::string::substr(s, i, ( - (1)))));
-			i = s.size();
+			i = static_cast<long long>(s.size());
 		} else {
 			out = ((((out) + (python::ispa_std::string::substr(s, i, ((pos) - (i)))))) + (replacement));
-			i = ((pos) + (needle.size()));
+			i = ((pos) + (static_cast<long long>(needle.size())));
 		}
 	}
 	return out;
@@ -210,7 +210,7 @@ auto python::ispa_std::format::repeat(const std::string& s, long long count) -> 
 auto python::ispa_std::format::join(const std::vector<std::string>& items, const std::string& separator) -> std::string {
 	std::string out = "";
 	long long i = 0;
-	while (((i) < (items.size()))) {
+	while (((i) < (static_cast<long long>(items.size())))) {
 		if (((i) > (0))) {
 			out = ((out) + (separator));
 		}
@@ -305,7 +305,7 @@ auto python::ispa_std::debug::active_location() -> std::shared_ptr<python::ispa_
 	return ((*python::ispa_std::debug::_S)).location;
 }
 auto python::ispa_std::debug::frame(long long kind, const std::string& payload) -> std::string {
-	long long n = payload.size();
+	long long n = static_cast<long long>(payload.size());
 	std::string header = (((((((("ISDB") + (python::ispa_std::chars::char_of(2)))) + (python::ispa_std::chars::char_of(kind)))) + (python::ispa_std::chars::char_of(0)))) + (python::ispa_std::chars::char_of(0)));
 	header = ((header) + (python::ispa_std::chars::char_of(((n) - (((((n) / (256))) * (256)))))));
 	long long n1 = ((n) / (256));
@@ -317,7 +317,7 @@ auto python::ispa_std::debug::frame(long long kind, const std::string& payload) 
 	return ((header) + (payload));
 }
 auto python::ispa_std::debug::emit(long long kind, const std::string& payload) -> bool {
-	if ((((!(((*python::ispa_std::debug::_S)).has_sink))) || (((payload.size()) > (python::ispa_std::debug::MAX_PAYLOAD))))) {
+	if ((((!(((*python::ispa_std::debug::_S)).has_sink))) || (((static_cast<long long>(payload.size())) > (python::ispa_std::debug::MAX_PAYLOAD))))) {
 		return false;
 	}
 	return ((*((*python::ispa_std::debug::_S)).sink)).write(python::ispa_std::debug::frame(kind, payload));
@@ -326,7 +326,7 @@ auto python::ispa_std::debug::quote(const std::string& s) -> std::string {
 	std::string out = "\"";
 	std::string hexd = "0123456789abcdef";
 	long long i = 0;
-	while (((i) < (s.size()))) {
+	while (((i) < (static_cast<long long>(s.size())))) {
 		std::string c = std::string(1, (s)[i]);
 		long long code = python::ispa_std::chars::code_of(c);
 		if (((c) == ("\""))) {
@@ -366,7 +366,7 @@ auto python::ispa_std::debug::location_json(std::shared_ptr<python::ispa_std::de
 }
 auto python::ispa_std::debug::event(long long kind, std::shared_ptr<python::ispa_std::debug::Location> loc, const std::string& name, const std::string& extra) -> bool {
 	std::string body = (((((("{") + (python::ispa_std::debug::location_json(loc)))) + (",\"name\":"))) + (python::ispa_std::debug::quote(name)));
-	if (((extra.size()) > (0))) {
+	if (((static_cast<long long>(extra.size())) > (0))) {
 		body = ((((body) + (","))) + (extra));
 	}
 	return python::ispa_std::debug::emit(kind, ((body) + ("}")));
@@ -449,7 +449,7 @@ auto python::ispa_std::debug::command() -> bool {
 		if (((c) == ("b"))) {
 			std::string text = "";
 			bool reading = true;
-			while (((reading) && (((text.size()) < (8192))))) {
+			while (((reading) && (((static_cast<long long>(text.size())) < (8192))))) {
 				long long nb = ((*((*python::ispa_std::debug::_S)).control)).read_byte();
 				if (((((nb) < (0))) || (((python::ispa_std::chars::char_of(nb)) == ("\n"))))) {
 					reading = false;
@@ -458,7 +458,7 @@ auto python::ispa_std::debug::command() -> bool {
 				}
 			}
 			long long split = ( - (1));
-			long long j = ((text.size()) - (1));
+			long long j = ((static_cast<long long>(text.size())) - (1));
 			while (((((j) >= (0))) && (((split) == (( - (1))))))) {
 				if (((std::string(1, (text)[j])) == (":"))) {
 					split = j;
@@ -468,9 +468,9 @@ auto python::ispa_std::debug::command() -> bool {
 			if (((split) != (( - (1))))) {
 				std::string digits = python::ispa_std::string::substr(text, ((split) + (1)), ( - (1)));
 				long long number = 0;
-				bool valid = ((digits.size()) > (0));
+				bool valid = ((static_cast<long long>(digits.size())) > (0));
 				long long k = 0;
-				while (((k) < (digits.size()))) {
+				while (((k) < (static_cast<long long>(digits.size())))) {
 					long long d = ((python::ispa_std::chars::code_of(std::string(1, (digits)[k]))) - (48));
 					if (((((d) < (0))) || (((d) > (9))))) {
 						valid = false;
@@ -492,7 +492,7 @@ auto python::ispa_std::debug::line(std::shared_ptr<python::ispa_std::debug::Loca
 	((*python::ispa_std::debug::_S)).failure_seen = false;
 	bool hit = ((((*python::ispa_std::debug::_S)).stepping) && (((((((*python::ispa_std::debug::_S)).target_depth) < (0))) || (((((*python::ispa_std::debug::_S)).frame_depth) <= (((*python::ispa_std::debug::_S)).target_depth))))));
 	long long i = 0;
-	while (((i) < (((*python::ispa_std::debug::_S)).break_files.size()))) {
+	while (((i) < (static_cast<long long>(((*python::ispa_std::debug::_S)).break_files.size())))) {
 		if ((((((((*python::ispa_std::debug::_S)).break_files)[i]) == (((*loc)).file))) && ((((((*python::ispa_std::debug::_S)).break_lines)[i]) == (((*loc)).line))))) {
 			hit = true;
 		}
@@ -534,12 +534,12 @@ auto python::ispa_std::debug::breakpoint(const std::string& label) -> void {
 	}
 }
 auto python::ispa_std::debug::scope_depth() -> long long {
-	return ((*python::ispa_std::debug::_S)).scopes.size();
+	return static_cast<long long>(((*python::ispa_std::debug::_S)).scopes.size());
 }
 auto python::ispa_std::debug::unwind_to(long long depth) -> void {
 	"Close scopes opened after `depth`, innermost first (what C++ destructors\n    do while an exception propagates).";
-	while (((((*python::ispa_std::debug::_S)).scopes.size()) > (depth))) {
-		((*(((*python::ispa_std::debug::_S)).scopes)[((((*python::ispa_std::debug::_S)).scopes.size()) - (1))])).close();
+	while (((static_cast<long long>(((*python::ispa_std::debug::_S)).scopes.size())) > (depth))) {
+		((*(((*python::ispa_std::debug::_S)).scopes)[((static_cast<long long>(((*python::ispa_std::debug::_S)).scopes.size())) - (1))])).close();
 	}
 }
 auto python::ispa_std::debug::_next_serial() -> long long {
@@ -547,7 +547,7 @@ auto python::ispa_std::debug::_next_serial() -> long long {
 	return ((*python::ispa_std::debug::_S)).serial;
 }
 auto python::ispa_std::debug::_forget(std::shared_ptr<python::ispa_std::debug::ScopeBase> scope) -> void {
-	long long i = ((((*python::ispa_std::debug::_S)).scopes.size()) - (1));
+	long long i = ((static_cast<long long>(((*python::ispa_std::debug::_S)).scopes.size())) - (1));
 	while (((i) >= (0))) {
 		if (((((*(((*python::ispa_std::debug::_S)).scopes)[i])).serial) == (((*scope)).serial))) {
 			ISPA_STD::python_pop((((*python::ispa_std::debug::_S)).scopes), i);
@@ -881,7 +881,7 @@ auto python::ispa_std::dfa_api::TdfaLayout::__init__(long long registers, long l
 }
 auto python::ispa_std::dfa_api::dynamic_match(const std::string& src, long long cursor, const std::vector<std::string>& alternatives, bool negative, const std::string& quantifier) -> long long {
 	"A semantic transition tests the whole runtime string. Returns the new\n    cursor, or -1 when the match failed. Negation consumes one character, or a\n    run when the quantifier is \"*\".";
-	long long n = src.size();
+	long long n = static_cast<long long>(src.size());
 	if (negative) {
 		if (((quantifier) == ("*"))) {
 			long long p = cursor;
@@ -896,21 +896,21 @@ auto python::ispa_std::dfa_api::dynamic_match(const std::string& src, long long 
 		return ((cursor) + (1));
 	}
 	long long i = 0;
-	while (((i) < (alternatives.size()))) {
+	while (((i) < (static_cast<long long>(alternatives.size())))) {
 		std::string value = (alternatives)[i];
-		if (((((value.size()) > (0))) && (python::ispa_std::dfa_api::_starts_at(src, cursor, value)))) {
-			return ((cursor) + (value.size()));
+		if (((((static_cast<long long>(value.size())) > (0))) && (python::ispa_std::dfa_api::_starts_at(src, cursor, value)))) {
+			return ((cursor) + (static_cast<long long>(value.size())));
 		}
 		i = ((i) + (1));
 	}
 	return ( - (1));
 }
 auto python::ispa_std::dfa_api::_starts_at(const std::string& src, long long p, const std::string& value) -> bool {
-	if (((((p) + (value.size()))) > (src.size()))) {
+	if (((((p) + (static_cast<long long>(value.size())))) > (static_cast<long long>(src.size())))) {
 		return false;
 	}
 	long long i = 0;
-	while (((i) < (value.size()))) {
+	while (((i) < (static_cast<long long>(value.size())))) {
 		if (((std::string(1, (src)[((p) + (i))])) != (std::string(1, (value)[i])))) {
 			return false;
 		}
@@ -920,7 +920,7 @@ auto python::ispa_std::dfa_api::_starts_at(const std::string& src, long long p, 
 }
 auto python::ispa_std::dfa_api::_excluded(const std::string& src, long long p, const std::vector<std::string>& alternatives) -> bool {
 	long long i = 0;
-	while (((i) < (alternatives.size()))) {
+	while (((i) < (static_cast<long long>(alternatives.size())))) {
 		if (python::ispa_std::dfa_api::_starts_at(src, p, (alternatives)[i])) {
 			return true;
 		}
@@ -946,7 +946,7 @@ auto python::ispa_std::dfa_api::DebugIndex::__init__() -> void {
 auto python::ispa_std::dfa_api::DebugIndex::put(long long state, long long cls, long long index) -> void {
 	long long key = ((((state) * (256))) + (cls));
 	long long lo = 0;
-	long long hi = ((*this))._keys.size();
+	long long hi = static_cast<long long>(((*this))._keys.size());
 	while (((lo) < (hi))) {
 		long long mid = ((lo) + (((((hi) - (lo))) / (2))));
 		if ((((((*this))._keys)[mid]) < (key))) {
@@ -955,7 +955,7 @@ auto python::ispa_std::dfa_api::DebugIndex::put(long long state, long long cls, 
 			hi = mid;
 		}
 	}
-	if (((((lo) < (((*this))._keys.size()))) && ((((((*this))._keys)[lo]) == (key))))) {
+	if (((((lo) < (static_cast<long long>(((*this))._keys.size())))) && ((((((*this))._keys)[lo]) == (key))))) {
 		(((*this))._values)[lo] = index;
 	} else {
 		ISPA_STD::python_insert((((*this))._keys), lo, key);
@@ -965,7 +965,7 @@ auto python::ispa_std::dfa_api::DebugIndex::put(long long state, long long cls, 
 auto python::ispa_std::dfa_api::DebugIndex::find(long long state, long long cls) -> long long {
 	long long key = ((((state) * (256))) + (cls));
 	long long lo = 0;
-	long long hi = ((*this))._keys.size();
+	long long hi = static_cast<long long>(((*this))._keys.size());
 	while (((lo) < (hi))) {
 		long long mid = ((lo) + (((((hi) - (lo))) / (2))));
 		if ((((((*this))._keys)[mid]) < (key))) {
@@ -974,7 +974,7 @@ auto python::ispa_std::dfa_api::DebugIndex::find(long long state, long long cls)
 			hi = mid;
 		}
 	}
-	if (((((lo) < (((*this))._keys.size()))) && ((((((*this))._keys)[lo]) == (key))))) {
+	if (((((lo) < (static_cast<long long>(((*this))._keys.size())))) && ((((((*this))._keys)[lo]) == (key))))) {
 		return (((*this))._values)[lo];
 	}
 	return ( - (1));
@@ -1041,7 +1041,7 @@ auto python::ispa_std::dfa_api::Captures::list_texts(long long k) -> std::vector
 	auto positions = ((*this)).list_positions(k);
 	std::vector<std::string> out = std::vector<std::string>{};
 	long long i = 0;
-	while (((((i) + (1))) < (positions.size()))) {
+	while (((((i) + (1))) < (static_cast<long long>(positions.size())))) {
 		(out).push_back(python::ispa_std::string::substr(((*((*((*this))._state)).src)).text, ((((*((*this))._state)).base) + ((positions)[i])), (((positions)[((i) + (1))]) - ((positions)[i]))));
 		i = ((i) + (2));
 	}
@@ -1051,8 +1051,8 @@ auto python::ispa_std::dfa_api::Captures::list_chars(long long k) -> std::vector
 	auto texts = ((*this)).list_texts(k);
 	std::vector<std::string> out = std::vector<std::string>{};
 	long long i = 0;
-	while (((i) < (texts.size()))) {
-		if ((((texts)[i].size()) == (0))) {
+	while (((i) < (static_cast<long long>(texts.size())))) {
+		if (((static_cast<long long>((texts)[i].size())) == (0))) {
 			(out).push_back("");
 		} else {
 			(out).push_back(std::string(1, ((texts)[i])[0]));
@@ -1065,7 +1065,7 @@ auto python::ispa_std::dfa_api::Captures::line(long long k) -> long long {
 	long long count = 0;
 	long long i = ((*((*this))._state)).base;
 	long long stop = ((*this)).begin(k);
-	while (((((i) < (stop))) && (((i) < (((*((*((*this))._state)).src)).text.size()))))) {
+	while (((((i) < (stop))) && (((i) < (static_cast<long long>(((*((*((*this))._state)).src)).text.size())))))) {
 		if (((std::string(1, (((*((*((*this))._state)).src)).text)[i])) == ("\n"))) {
 			count = ((count) + (1));
 		}
@@ -1124,7 +1124,7 @@ auto python::ispa_std::dfa_run::_trace_step(std::shared_ptr<python::ispa_std::df
 	}
 	auto sink = (python::ispa_std::dfa_run::_TRACE)[0];
 	long long index = ( - (1));
-	if (((((*tables)).debug_array.size()) > (0))) {
+	if (((static_cast<long long>(((*tables)).debug_array.size())) > (0))) {
 		index = ((*((*tables)).debug_index)).find(state, cls);
 	}
 	if (((index) >= (0))) {
@@ -1139,13 +1139,13 @@ auto python::ispa_std::dfa_run::_trace_step(std::shared_ptr<python::ispa_std::df
 		}
 		line = ((((((((((line) + ("; "))) + (python::ispa_std::format::int_to_string(((((*d)).offset) + (1)))))) + ("/"))) + (python::ispa_std::format::int_to_string(((*d)).length)))) + (";\n"));
 		((*sink)).write(line);
-		std::string pad = python::ispa_std::format::repeat(" ", ((head.size()) + (((*d)).offset)));
+		std::string pad = python::ispa_std::format::repeat(" ", ((static_cast<long long>(head.size())) + (((*d)).offset)));
 		std::string mem = ((*d)).member;
 		bool marked = false;
-		if (((((mem.size()) >= (2))) && (((std::string(1, (mem)[0])) == ("["))))) {
+		if (((((static_cast<long long>(mem.size())) >= (2))) && (((std::string(1, (mem)[0])) == ("["))))) {
 			bool escaped = false;
 			long long i = 1;
-			while (((((i) < (mem.size()))) && ((!(marked))))) {
+			while (((((i) < (static_cast<long long>(mem.size())))) && ((!(marked))))) {
 				std::string c = std::string(1, (mem)[i]);
 				if (escaped) {
 					escaped = false;
@@ -1161,7 +1161,7 @@ auto python::ispa_std::dfa_run::_trace_step(std::shared_ptr<python::ispa_std::df
 							((*sink)).write(((((pad) + (python::ispa_std::format::repeat(" ", i)))) + ("^\n")));
 							marked = true;
 						} else {
-							if (((((((((c) == ("-"))) && (((i) > (1))))) && (((((i) + (1))) < (mem.size()))))) && (((std::string(1, (mem)[((i) + (1))])) != ("]"))))) {
+							if (((((((((c) == ("-"))) && (((i) > (1))))) && (((((i) + (1))) < (static_cast<long long>(mem.size())))))) && (((std::string(1, (mem)[((i) + (1))])) != ("]"))))) {
 								if (((((current_ch) >= (std::string(1, (mem)[((i) - (1))])))) && (((current_ch) <= (std::string(1, (mem)[((i) + (1))])))))) {
 									((*sink)).write(((((pad) + (python::ispa_std::format::repeat(" ", ((i) - (1)))))) + ("^ ^\n")));
 									marked = true;
@@ -1181,7 +1181,7 @@ auto python::ispa_std::dfa_run::_trace_step(std::shared_ptr<python::ispa_std::df
 }
 auto python::ispa_std::dfa_run::run(std::shared_ptr<python::ispa_std::dfa_api::SourceText> source, std::shared_ptr<python::ispa_std::refs::Cursor> cur, long long start_pos, std::shared_ptr<python::ispa_std::dfa_run::DfaTables> tables, std::function<std::shared_ptr<python::ispa_std::utility::Pair<long long, std::shared_ptr<python::ispa_std::raw_token::RawToken>>>(long long, std::shared_ptr<python::ispa_std::dfa_api::Captures>, long long, long long, long long, std::shared_ptr<python::ispa_std::refs::Cursor>)> semantic, std::shared_ptr<python::ispa_std::raw_token::RawToken> empty_token) -> std::shared_ptr<python::ispa_std::raw_token::RawToken> {
 	"Scan one token starting at cur.pos. Returns the accepted token, or\n    `empty_token` when nothing matched (cur is then left where the walk died,\n    which the caller treats as no progress).";
-	long long n = ((*source)).text.size();
+	long long n = static_cast<long long>(((*source)).text.size());
 	long long start = ((*cur)).pos;
 	long long start_line = ((*cur)).line;
 	auto scope = python::ispa_std::debug::idle_match_scope();
@@ -1196,9 +1196,9 @@ auto python::ispa_std::dfa_run::run(std::shared_ptr<python::ispa_std::dfa_api::S
 	std::vector<long long>& class_table = ((*tables)).class_table;
 	std::vector<std::vector<long long>>& action_table = ((*tables)).action_table;
 	long long registers = ((*((*tables)).layout)).registers;
-	long long nstates = table.size();
-	long long nactions = action_table.size();
-	bool trace_on = ((((((*tables)).debug_array.size()) > (1))) || (((((((*tables)).debug_array.size()) == (1))) && (((((*(((*tables)).debug_array)[0])).member) != ("<Undefined>"))))));
+	long long nstates = static_cast<long long>(table.size());
+	long long nactions = static_cast<long long>(action_table.size());
+	bool trace_on = ((((static_cast<long long>(((*tables)).debug_array.size())) > (1))) || (((((static_cast<long long>(((*tables)).debug_array.size())) == (1))) && (((((*(((*tables)).debug_array)[0])).member) != ("<Undefined>"))))));
 	auto scan_state = ((*tables)).state;
 	((*scan_state)).src = source;
 	((*scan_state)).base = start;
@@ -1208,7 +1208,7 @@ auto python::ispa_std::dfa_run::run(std::shared_ptr<python::ispa_std::dfa_api::S
 	if (((width) < (1))) {
 		width = 1;
 	}
-	if (((((*scan_state)).dirty) || (((regs.size()) != (width))))) {
+	if (((((*scan_state)).dirty) || (((static_cast<long long>(regs.size())) != (width))))) {
 		(regs).clear();
 		long long i = 0;
 		while (((i) < (width))) {
@@ -1287,7 +1287,7 @@ auto python::ispa_std::dfa_run::run(std::shared_ptr<python::ispa_std::dfa_api::S
 								prev = (regs)[(row)[2]];
 							}
 							(history).push_back(ISPA_STD::construct<python::ispa_std::dfa_api::HistoryNode>(mark, prev));
-							(regs)[(row)[1]] = ((history.size()) - (1));
+							(regs)[(row)[1]] = ((static_cast<long long>(history.size())) - (1));
 						} else {
 							((*scope)).close();
 							python::ispa_std::failures::runtime_error("DFA: unknown action; Report this error to github");
@@ -1365,7 +1365,7 @@ auto python::ispa_std::lexer::LexerFailureContext::at(const std::string& value, 
 	"Is the unit `offset` positions ahead exactly `value` (\"\" = end)?";
 	long long p = ((*this)).cursor;
 	long long left = offset;
-	while (((((left) > (0))) && (((p) < (((*this)).src.size()))))) {
+	while (((((left) > (0))) && (((p) < (static_cast<long long>(((*this)).src.size())))))) {
 		p = ((p) + (1));
 		left = ((left) - (1));
 	}
@@ -1455,7 +1455,7 @@ auto python::ispa_std::lexer::Lexer_base::append_token(std::shared_ptr<python::i
 	(((*this)).tokens).push_back(token);
 }
 auto python::ispa_std::lexer::Lexer_base::has_buffered_tokens() -> bool {
-	return ((((*this)).tokens.size()) > (0));
+	return ((static_cast<long long>(((*this)).tokens.size())) > (0));
 }
 auto python::ispa_std::lexer::Lexer_base::pop_buffered_token() -> std::shared_ptr<python::ispa_std::raw_token::RawToken> {
 	return ISPA_STD::python_pop((((*this)).tokens), 0);
@@ -1472,7 +1472,7 @@ auto python::ispa_std::lexer::Lexer_base::hasInput() -> bool {
 	return ((*this))._has_input;
 }
 auto python::ispa_std::lexer::Lexer_base::hasTokens() -> bool {
-	return ((((*this)).tokens.size()) > (0));
+	return ((static_cast<long long>(((*this)).tokens.size())) > (0));
 }
 auto python::ispa_std::lexer::Lexer_base::source() -> std::string {
 	return ((*((*this))._src)).text;
@@ -1514,11 +1514,11 @@ auto python::ispa_std::lexer::Lexer_base::assign_from(std::shared_ptr<python::is
 	((*this))._has_input = ((*other))._has_input;
 }
 auto python::ispa_std::lexer::Lexer_base::equals(std::shared_ptr<python::ispa_std::lexer::Lexer_base> other) -> bool {
-	if (((((*this)).tokens.size()) != (((*other)).tokens.size()))) {
+	if (((static_cast<long long>(((*this)).tokens.size())) != (static_cast<long long>(((*other)).tokens.size())))) {
 		return false;
 	}
 	long long i = 0;
-	while (((i) < (((*this)).tokens.size()))) {
+	while (((i) < (static_cast<long long>(((*this)).tokens.size())))) {
 		if ((!(python::ispa_std::lexer::_token_equal((((*this)).tokens)[i], (((*other)).tokens)[i])))) {
 			return false;
 		}
@@ -1540,7 +1540,7 @@ auto python::ispa_std::lexer::Lexer_base::line_at(long long pos) -> long long {
 	if ((((!(((*this))._has_input))) || (((pos) < (0))))) {
 		python::ispa_std::failures::logic_error("Lexer line lookup has no source position");
 	}
-	if (((pos) > (((*((*this))._src)).text.size()))) {
+	if (((pos) > (static_cast<long long>(((*((*this))._src)).text.size())))) {
 		python::ispa_std::failures::out_of_range("Lexer line lookup exceeds source input");
 	}
 	long long count = 1;
@@ -1557,7 +1557,7 @@ auto python::ispa_std::lexer::Lexer_base::column_at(long long pos) -> long long 
 	if ((((!(((*this))._has_input))) || (((pos) < (0))))) {
 		python::ispa_std::failures::logic_error("Lexer column lookup has no source position");
 	}
-	if (((pos) > (((*((*this))._src)).text.size()))) {
+	if (((pos) > (static_cast<long long>(((*((*this))._src)).text.size())))) {
 		python::ispa_std::failures::out_of_range("Lexer column lookup exceeds source input");
 	}
 	long long count = 1;
@@ -1589,7 +1589,7 @@ auto python::ispa_std::lexer::Lexer_base::next_char(long long pos) -> std::strin
 	return python::ispa_std::chars::at(((*((*this))._src)).text, pos);
 }
 auto python::ispa_std::lexer::Lexer_base::panic_mode(std::shared_ptr<python::ispa_std::refs::Cursor> cur) -> void {
-	if (((((*cur)).pos) < (((*((*this))._src)).text.size()))) {
+	if (((((*cur)).pos) < (static_cast<long long>(((*((*this))._src)).text.size())))) {
 		((*cur)).pos = ((((*cur)).pos) + (1));
 	}
 }
@@ -1604,16 +1604,16 @@ auto python::ispa_std::lexer::Lexer_base::lexer_failure_result(std::shared_ptr<p
 	if (((((*ctx)).decision) == (python::ispa_std::lexer::LexerDecision::INSERT))) {
 		return ISPA_STD::construct<python::ispa_std::utility::Pair<long long, std::shared_ptr<python::ispa_std::raw_token::RawToken>>>(python::ispa_std::dfa_api::NULL_STATE, inserted);
 	}
-	if (((((*this)).errors.size()) == (0))) {
+	if (((static_cast<long long>(((*this)).errors.size())) == (0))) {
 		python::ispa_std::failures::runtime_error("unmatched lexer input");
 	} else {
-		python::ispa_std::failures::runtime_error((((*this)).errors)[((((*this)).errors.size()) - (1))]);
+		python::ispa_std::failures::runtime_error((((*this)).errors)[((static_cast<long long>(((*this)).errors.size())) - (1))]);
 	}
 	return ISPA_STD::construct<python::ispa_std::utility::Pair<long long, std::shared_ptr<python::ispa_std::raw_token::RawToken>>>(python::ispa_std::dfa_api::NULL_STATE, inserted);
 }
 auto python::ispa_std::lexer::Lexer_base::lookup(std::shared_ptr<python::ispa_std::dfa_run::DfaTables> tables, std::function<std::shared_ptr<python::ispa_std::utility::Pair<long long, std::shared_ptr<python::ispa_std::raw_token::RawToken>>>(long long, std::shared_ptr<python::ispa_std::dfa_api::Captures>, long long, long long, long long, std::shared_ptr<python::ispa_std::refs::Cursor>)> semantic, std::shared_ptr<python::ispa_std::refs::Cursor> cur) -> std::shared_ptr<python::ispa_std::raw_token::RawToken> {
 	"Run the DFA for one token at cur (empty token at end of input).";
-	if (((((*cur)).pos) >= (((*((*this))._src)).text.size()))) {
+	if (((((*cur)).pos) >= (static_cast<long long>(((*((*this))._src)).text.size())))) {
 		return ((*this)).empty_token();
 	}
 	auto scan = ISPA_STD::construct<python::ispa_std::refs::Cursor>(((*cur)).pos, ((*this)).line);
@@ -1631,7 +1631,7 @@ auto python::ispa_std::lexer::Lexer_base::makeTokens() -> std::vector<std::share
 		python::ispa_std::failures::api_error("can\'t lex because no input provided. ", {});
 	}
 	python::ispa_std::refs::Cursor cur = ISPA_STD::make_value<python::ispa_std::refs::Cursor>(0, ((*this)).line);
-	long long n = ((*((*this))._src)).text.size();
+	long long n = static_cast<long long>(((*((*this))._src)).text.size());
 	while ((((cur).pos) < (n))) {
 		long long before = (cur).pos;
 		auto token = ((*this)).makeToken(ISPA_STD::borrow(cur));
@@ -1768,14 +1768,14 @@ auto python::ispa_std::lexer::LazyIterator::ensure_token() -> void {
 	auto owner = ((*this)).owner;
 	auto state = ((*this)).state;
 	bool running = true;
-	while (((running) && (((((*owner)).tokens.size()) <= (((*this)).token_index))))) {
+	while (((running) && (((static_cast<long long>(((*owner)).tokens.size())) <= (((*this)).token_index))))) {
 		if (((*state)).eof_processed) {
 			running = false;
 		} else {
 			if ((!(((*owner)).hasInput()))) {
 				python::ispa_std::failures::logic_error("Lazy lexer has no source input");
 			}
-			if (((((*state)).pos) >= (((*owner)).source().size()))) {
+			if (((((*state)).pos) >= (static_cast<long long>(((*owner)).source().size())))) {
 				((*state)).eof_processed = true;
 				((*owner)).push_eof();
 				running = false;
@@ -1804,7 +1804,7 @@ auto python::ispa_std::lexer::LazyIterator::ensure_token() -> void {
 					if ((!(python::ispa_std::lexer::is_token_end(raw)))) {
 						((*owner)).push(raw);
 					}
-					while (((((*state)).checkpoints.size()) < (((*owner)).tokens.size()))) {
+					while (((static_cast<long long>(((*state)).checkpoints.size())) < (static_cast<long long>(((*owner)).tokens.size())))) {
 						(((*state)).checkpoints).push_back(checkpoint);
 					}
 				}
@@ -1819,7 +1819,7 @@ auto python::ispa_std::lexer::LazyIterator::getErrors() -> std::vector<std::stri
 	return ((*((*this)).owner)).getErrors();
 }
 auto python::ispa_std::lexer::LazyIterator::sourcePosition() -> long long {
-	if (((((*this)).token_index) < (((*((*this)).owner)).tokens.size()))) {
+	if (((((*this)).token_index) < (static_cast<long long>(((*((*this)).owner)).tokens.size())))) {
 		auto token = (((*((*this)).owner)).tokens)[((*this)).token_index];
 		if ((((!(python::ispa_std::lexer::is_token_end(token)))) && (((*((*token)).meta())).has_source()))) {
 			return ((*((*token)).meta())).startpos();
@@ -1830,11 +1830,11 @@ auto python::ispa_std::lexer::LazyIterator::sourcePosition() -> long long {
 auto python::ispa_std::lexer::LazyIterator::consumeExternal(long long end) -> void {
 	long long begin = ((*this)).sourcePosition();
 	std::string origin = ((*((*this)).owner)).source();
-	if (((((end) < (begin))) || (((end) > (origin.size()))))) {
+	if (((((end) < (begin))) || (((end) > (static_cast<long long>(origin.size())))))) {
 		python::ispa_std::failures::logic_error("External parser returned an invalid source cursor");
 	}
 	auto branch = ((*((*this)).owner)).clone();
-	if (((((*this)).token_index) < (((*((*this)).state)).checkpoints.size()))) {
+	if (((((*this)).token_index) < (static_cast<long long>(((*((*this)).state)).checkpoints.size())))) {
 		((*branch)).restoreCheckpoint((((*((*this)).state)).checkpoints)[((*this)).token_index]);
 	}
 	(((*branch)).tokens).clear();
@@ -1855,7 +1855,7 @@ auto python::ispa_std::lexer::LazyIterator::consumeExternal(long long end) -> vo
 }
 auto python::ispa_std::lexer::LazyIterator::isEnd() -> bool {
 	((*this)).ensure_token();
-	if (((((*this)).token_index) >= (((*((*this)).owner)).tokens.size()))) {
+	if (((((*this)).token_index) >= (static_cast<long long>(((*((*this)).owner)).tokens.size())))) {
 		return true;
 	}
 	return python::ispa_std::lexer::is_token_end((((*((*this)).owner)).tokens)[((*this)).token_index]);
@@ -1886,7 +1886,7 @@ auto python::ispa_std::lexer::LazyIterator::advance_by(long long count) -> std::
 auto python::ispa_std::lexer::LazyIterator::current() -> std::shared_ptr<python::ispa_std::raw_token::RawToken> {
 	"operator* / operator->";
 	((*this)).ensure_token();
-	if (((((*this)).token_index) >= (((*((*this)).owner)).tokens.size()))) {
+	if (((((*this)).token_index) >= (static_cast<long long>(((*((*this)).owner)).tokens.size())))) {
 		python::ispa_std::failures::out_of_range("lazy_iterator: dereference beyond EOF");
 	}
 	return (((*((*this)).owner)).tokens)[((*this)).token_index];
@@ -1894,7 +1894,7 @@ auto python::ispa_std::lexer::LazyIterator::current() -> std::shared_ptr<python:
 auto python::ispa_std::lexer::LazyIterator::resumePosition() -> long long {
 	"Source position just after the current token (-1 when unknown).";
 	((*this)).ensure_token();
-	if (((((*this)).token_index) >= (((*((*this)).owner)).tokens.size()))) {
+	if (((((*this)).token_index) >= (static_cast<long long>(((*((*this)).owner)).tokens.size())))) {
 		return ((*((*this)).state)).pos;
 	}
 	auto token = (((*((*this)).owner)).tokens)[((*this)).token_index];
@@ -1906,7 +1906,7 @@ auto python::ispa_std::lexer::LazyIterator::resumePosition() -> long long {
 auto python::ispa_std::lexer::LazyIterator::advanceCharacters(long long count) -> bool {
 	"Resume lexing `count` source units after the current token\'s start,\n        invalidating cached tokens from here on (for external parsers).";
 	((*this)).ensure_token();
-	if (((((*this)).token_index) >= (((*((*this)).owner)).tokens.size()))) {
+	if (((((*this)).token_index) >= (static_cast<long long>(((*((*this)).owner)).tokens.size())))) {
 		return false;
 	}
 	auto current = (((*((*this)).owner)).tokens)[((*this)).token_index];
@@ -1914,7 +1914,7 @@ auto python::ispa_std::lexer::LazyIterator::advanceCharacters(long long count) -
 		return false;
 	}
 	long long target = ((*((*current)).meta())).startpos();
-	long long n = ((*((*this)).owner)).source().size();
+	long long n = static_cast<long long>(((*((*this)).owner)).source().size());
 	long long i = 0;
 	while (((i) < (count))) {
 		if (((target) >= (n))) {
@@ -1923,7 +1923,7 @@ auto python::ispa_std::lexer::LazyIterator::advanceCharacters(long long count) -
 		target = ((target) + (1));
 		i = ((i) + (1));
 	}
-	while (((((*((*this)).owner)).tokens.size()) > (((*this)).token_index))) {
+	while (((static_cast<long long>(((*((*this)).owner)).tokens.size())) > (((*this)).token_index))) {
 		ISPA_STD::python_pop((((*((*this)).owner)).tokens));
 	}
 	((*((*this)).state)).pos = target;
@@ -1960,20 +1960,20 @@ auto python::ispa_std::lexer::TokenIterator::advance_by(long long count) -> std:
 	return ::ISPA_STD::self_ptr(this);
 }
 auto python::ispa_std::lexer::TokenIterator::isEnd() -> bool {
-	if (((((*this)).token_index) >= (((*((*this)).owner)).tokens.size()))) {
+	if (((((*this)).token_index) >= (static_cast<long long>(((*((*this)).owner)).tokens.size())))) {
 		return true;
 	}
 	return python::ispa_std::lexer::is_token_end((((*((*this)).owner)).tokens)[((*this)).token_index]);
 }
 auto python::ispa_std::lexer::TokenIterator::current() -> std::shared_ptr<python::ispa_std::raw_token::RawToken> {
-	if (((((*this)).token_index) >= (((*((*this)).owner)).tokens.size()))) {
+	if (((((*this)).token_index) >= (static_cast<long long>(((*((*this)).owner)).tokens.size())))) {
 		python::ispa_std::failures::out_of_range("token iterator: dereference beyond the token list");
 	}
 	return (((*((*this)).owner)).tokens)[((*this)).token_index];
 }
 auto python::ispa_std::lexer::TokenIterator::resumePosition() -> long long {
 	"Source position after the current token, -1 when it has none.\n        (The C++ body referenced members that do not exist and was never\n        instantiated; this is its documented intent.)";
-	if (((((*this)).token_index) >= (((*((*this)).owner)).tokens.size()))) {
+	if (((((*this)).token_index) >= (static_cast<long long>(((*((*this)).owner)).tokens.size())))) {
 		return ( - (1));
 	}
 	auto token = (((*((*this)).owner)).tokens)[((*this)).token_index];
@@ -2023,7 +2023,7 @@ auto python::ispa_std::recovery::State::__init__() -> void {
 	((*this)).anchor_count = 0;
 }
 auto python::ispa_std::recovery::State::exhausted() -> bool {
-	return ((((((*this)).diagnostics.size()) >= (((*this)).max_errors))) || (((((*this)).total_skipped) >= (((*this)).max_total_skipped))));
+	return ((((static_cast<long long>(((*this)).diagnostics.size())) >= (((*this)).max_errors))) || (((((*this)).total_skipped) >= (((*this)).max_total_skipped))));
 }
 auto python::ispa_std::recovery::Plan::__init__(const std::string& rule, const std::vector<long long>& expected, const std::vector<long long>& continuation, const std::vector<long long>& follow, const std::vector<long long>& explicit_sync, bool allow_insertion, bool allow_deletion, bool allow_replacement, long long max_skip) -> void {
 	((*this)).rule = rule;
@@ -2038,7 +2038,7 @@ auto python::ispa_std::recovery::Plan::__init__(const std::string& rule, const s
 }
 auto python::ispa_std::recovery::contains(const std::vector<long long>& tokens, long long id) -> bool {
 	long long i = 0;
-	while (((i) < (tokens.size()))) {
+	while (((i) < (static_cast<long long>(tokens.size())))) {
 		if ((((tokens)[i]) == (id))) {
 			return true;
 		}
@@ -2050,7 +2050,7 @@ auto python::ispa_std::recovery::decode(const std::string& encoded) -> std::vect
 	"Comma/space separated unsigned decimal token ids (LangAPI fail wrappers).";
 	std::vector<long long> result = std::vector<long long>{};
 	long long i = 0;
-	long long n = encoded.size();
+	long long n = static_cast<long long>(encoded.size());
 	while (((i) < (n))) {
 		while (((((i) < (n))) && (((((std::string(1, (encoded)[i])) == (","))) || (((std::string(1, (encoded)[i])) == (" "))))))) {
 			i = ((i) + (1));
@@ -2122,7 +2122,7 @@ auto python::ispa_std::recovery::recover(std::shared_ptr<python::ispa_std::lexer
 					nxt = token_kind(((*lookahead)).current());
 				}
 			}
-			bool expected_one = ((((*plan)).expected.size()) == (1));
+			bool expected_one = ((static_cast<long long>(((*plan)).expected.size())) == (1));
 			bool protected_token = ((python::ispa_std::recovery::contains(((*plan)).follow, at)) || (python::ispa_std::recovery::_anchor(plan, state, at)));
 			if (((((((((*plan)).allow_deletion) && ((!(protected_token))))) && (((at) != (python::ispa_std::recovery::EOF_TOKEN))))) && (python::ispa_std::recovery::contains(((*plan)).expected, nxt)))) {
 				((*pos)).next();
@@ -2189,7 +2189,7 @@ auto python::ispa_std::recovery::recover(std::shared_ptr<python::ispa_std::lexer
 	((*entry)).length = length;
 	((*entry)).message = (((((("unexpected ") + (actual))) + (" in "))) + (((*plan)).rule));
 	(((*state)).diagnostics).push_back(entry);
-	if (((((((*state)).diagnostics.size()) >= (((*state)).max_errors))) || (((((*state)).total_skipped) >= (((*state)).max_total_skipped))))) {
+	if (((((static_cast<long long>(((*state)).diagnostics.size())) >= (((*state)).max_errors))) || (((((*state)).total_skipped) >= (((*state)).max_total_skipped))))) {
 		((*decision)).mode = python::ispa_std::recovery::Mode::Abort;
 	}
 	((*entry)).decision = ((*decision)).copy();
@@ -2261,8 +2261,8 @@ auto python::ispa_std::recovery::Handler::__init__(const std::string& rule, cons
 auto python::ispa_std::recovery::Handler::run(std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos, std::shared_ptr<python::ispa_std::recovery::State> state) -> std::shared_ptr<python::ispa_std::recovery::Decision> {
 	python::ispa_std::recovery::Plan plan = ISPA_STD::make_value<python::ispa_std::recovery::Plan>(((*this)).rule, ((*((*this)).expected)).values(), ((*((*this)).continuation)).values(), ((*((*this)).follow)).values(), ((*((*this)).synchronization)).values(), ((*((*this)).policy)).allow_insertion, ((*((*this)).policy)).allow_deletion, ((*((*this)).policy)).allow_replacement, ((*((*this)).policy)).max_skip);
 	auto decision = python::ispa_std::recovery::recover_default(pos, state, ISPA_STD::borrow(plan));
-	if (((((*state)).diagnostics.size()) > (0))) {
-		auto diagnostic = (((*state)).diagnostics)[((((*state)).diagnostics.size()) - (1))];
+	if (((static_cast<long long>(((*state)).diagnostics.size())) > (0))) {
+		auto diagnostic = (((*state)).diagnostics)[((static_cast<long long>(((*state)).diagnostics.size())) - (1))];
 		((*diagnostic)).expected_text = ((*this)).expected_text;
 		((*diagnostic)).message = ((((((*diagnostic)).message) + ("; expected "))) + (((*this)).expected_text));
 		if (((((*decision)).mode) == (python::ispa_std::recovery::Mode::Insert))) {
@@ -2330,13 +2330,13 @@ auto python::ispa_std::recovery::ClaimSet::__init__(const std::vector<std::share
 	((*this)).claims = claims;
 	((*this)).tokens = {};
 	long long i = 0;
-	while (((i) < (claims.size()))) {
+	while (((i) < (static_cast<long long>(claims.size())))) {
 		(((*this)).tokens).insert((((*this)).tokens).end(), ((*((*(claims)[i])).tokens)).values().begin(), ((*((*(claims)[i])).tokens)).values().end());
 		i = ((i) + (1));
 	}
 }
 auto python::ispa_std::recovery::empty_claim_set() -> std::shared_ptr<python::ispa_std::recovery::ClaimSet> {
-	if (((python::ispa_std::recovery::_NO_CLAIMS.size()) == (0))) {
+	if (((static_cast<long long>(python::ispa_std::recovery::_NO_CLAIMS.size())) == (0))) {
 		std::vector<std::shared_ptr<python::ispa_std::recovery::ContextClaim>> none = std::vector<std::shared_ptr<python::ispa_std::recovery::ContextClaim>>{};
 		(python::ispa_std::recovery::_NO_CLAIMS).push_back(ISPA_STD::construct<python::ispa_std::recovery::ClaimSet>(none));
 	}
@@ -2356,7 +2356,7 @@ auto python::ispa_std::recovery::ContextDiagnostic::__init__() -> void {
 auto python::ispa_std::recovery::describe_ids(const std::vector<long long>& ids) -> std::string {
 	std::vector<std::string> parts = std::vector<std::string>{};
 	long long i = 0;
-	while (((i) < (ids.size()))) {
+	while (((i) < (static_cast<long long>(ids.size())))) {
 		(parts).push_back(python::ispa_std::format::int_to_string((ids)[i]));
 		i = ((i) + (1));
 	}
@@ -2463,9 +2463,9 @@ auto python::ispa_std::scan::ScanResult::__init__(long long end, bool exhausted)
 }
 auto python::ispa_std::scan::_boundary_at(const std::string& src, long long p, const std::string& boundary) -> bool {
 	long long i = 0;
-	while (((i) < (boundary.size()))) {
+	while (((i) < (static_cast<long long>(boundary.size())))) {
 		std::string c = python::ispa_std::chars::at(src, ((p) + (i)));
-		if (((((c.size()) == (0))) || (((c) != (std::string(1, (boundary)[i])))))) {
+		if (((((static_cast<long long>(c.size())) == (0))) || (((c) != (std::string(1, (boundary)[i])))))) {
 			return false;
 		}
 		i = ((i) + (1));
@@ -2475,7 +2475,7 @@ auto python::ispa_std::scan::_boundary_at(const std::string& src, long long p, c
 auto python::ispa_std::scan::scan_balanced(const std::string& src, long long begin, const std::vector<std::string>& boundaries, long long budget) -> std::shared_ptr<python::ispa_std::scan::ScanResult> {
 	"Scan forward from `begin`. The budget is in source units, including\n    strings and comments. Stops at the first boundary outside brackets (a \";\"\n    boundary also stops inside brackets), or at an unmatched closer.";
 	long long p = begin;
-	long long n = src.size();
+	long long n = static_cast<long long>(src.size());
 	std::vector<std::string> closers = std::vector<std::string>{};
 	std::string quote = "";
 	bool triple = false;
@@ -2491,8 +2491,8 @@ auto python::ispa_std::scan::scan_balanced(const std::string& src, long long beg
 				comment = false;
 			}
 		} else {
-			if (((quote.size()) > (0))) {
-				if (((((c) == ("\\"))) && (((python::ispa_std::chars::at(src, ((p) + (1))).size()) > (0))))) {
+			if (((static_cast<long long>(quote.size())) > (0))) {
+				if (((((c) == ("\\"))) && (((static_cast<long long>(python::ispa_std::chars::at(src, ((p) + (1))).size())) > (0))))) {
 					if (((2) > (((budget) - (((p) - (begin))))))) {
 						return ISPA_STD::construct<python::ispa_std::scan::ScanResult>(p, true);
 					}
@@ -2518,15 +2518,15 @@ auto python::ispa_std::scan::scan_balanced(const std::string& src, long long beg
 				}
 			} else {
 				long long i = 0;
-				while (((i) < (boundaries.size()))) {
+				while (((i) < (static_cast<long long>(boundaries.size())))) {
 					std::string boundary = (boundaries)[i];
-					if (((((((closers.size()) == (0))) || (((boundary) == (";"))))) && (python::ispa_std::scan::_boundary_at(src, p, boundary)))) {
+					if (((((((static_cast<long long>(closers.size())) == (0))) || (((boundary) == (";"))))) && (python::ispa_std::scan::_boundary_at(src, p, boundary)))) {
 						return ISPA_STD::construct<python::ispa_std::scan::ScanResult>(p, false);
 					}
 					i = ((i) + (1));
 				}
 				if (((((((c) == (")"))) || (((c) == ("]"))))) || (((c) == ("}"))))) {
-					if (((((closers.size()) == (0))) || ((((closers)[((closers.size()) - (1))]) != (c))))) {
+					if (((((static_cast<long long>(closers.size())) == (0))) || ((((closers)[((static_cast<long long>(closers.size())) - (1))]) != (c))))) {
 						return ISPA_STD::construct<python::ispa_std::scan::ScanResult>(p, false);
 					}
 					ISPA_STD::python_pop((closers));
@@ -2570,7 +2570,7 @@ auto python::ispa_std::scan::scan_balanced(const std::string& src, long long beg
 			p = ((p) + (1));
 		}
 	}
-	return ISPA_STD::construct<python::ispa_std::scan::ScanResult>(p, ((quote.size()) > (0)));
+	return ISPA_STD::construct<python::ispa_std::scan::ScanResult>(p, ((static_cast<long long>(quote.size())) > (0)));
 }
 auto python::ispa_std::scan::text_between(const std::string& src, long long begin, long long end) -> std::string {
 	return python::ispa_std::string::substr(src, begin, ((end) - (begin)));
@@ -2580,8 +2580,8 @@ auto python::ispa_std::sortedmap::StrIntMap::__init__() -> void {
 	((*this)).values = {};
 }
 auto python::ispa_std::sortedmap::StrIntMap::find(const std::string& key) -> long long {
-	long long pos = python::ispa_std::algorithm::lower_bound(((*this)).keys, 0, ((*this)).keys.size(), key);
-	if (((((pos) < (((*this)).keys.size()))) && ((((((*this)).keys)[pos]) == (key))))) {
+	long long pos = python::ispa_std::algorithm::lower_bound(((*this)).keys, 0, static_cast<long long>(((*this)).keys.size()), key);
+	if (((((pos) < (static_cast<long long>(((*this)).keys.size())))) && ((((((*this)).keys)[pos]) == (key))))) {
 		return pos;
 	}
 	return ( - (1));
@@ -2593,8 +2593,8 @@ auto python::ispa_std::sortedmap::StrIntMap::get(const std::string& key) -> long
 	return (((*this)).values)[((*this)).find(key)];
 }
 auto python::ispa_std::sortedmap::StrIntMap::set(const std::string& key, long long value) -> void {
-	long long pos = python::ispa_std::algorithm::lower_bound(((*this)).keys, 0, ((*this)).keys.size(), key);
-	if (((((pos) < (((*this)).keys.size()))) && ((((((*this)).keys)[pos]) == (key))))) {
+	long long pos = python::ispa_std::algorithm::lower_bound(((*this)).keys, 0, static_cast<long long>(((*this)).keys.size()), key);
+	if (((((pos) < (static_cast<long long>(((*this)).keys.size())))) && ((((((*this)).keys)[pos]) == (key))))) {
 		(((*this)).values)[pos] = value;
 	} else {
 		ISPA_STD::python_insert((((*this)).keys), pos, key);
@@ -2630,22 +2630,22 @@ auto python::ispa_std::sortedmap::IntSet::__init__() -> void {
 }
 auto python::ispa_std::sortedmap::IntSet::add(long long value) -> bool {
 	"True when the value was not present (std::set::insert().second).";
-	long long pos = python::ispa_std::algorithm::lower_bound(((*this)).items, 0, ((*this)).items.size(), value);
-	if (((((pos) < (((*this)).items.size()))) && ((((((*this)).items)[pos]) == (value))))) {
+	long long pos = python::ispa_std::algorithm::lower_bound(((*this)).items, 0, static_cast<long long>(((*this)).items.size()), value);
+	if (((((pos) < (static_cast<long long>(((*this)).items.size())))) && ((((((*this)).items)[pos]) == (value))))) {
 		return false;
 	}
 	ISPA_STD::python_insert((((*this)).items), pos, value);
 	return true;
 }
 auto python::ispa_std::sortedmap::IntSet::contains(long long value) -> bool {
-	long long pos = python::ispa_std::algorithm::lower_bound(((*this)).items, 0, ((*this)).items.size(), value);
-	return ((((pos) < (((*this)).items.size()))) && ((((((*this)).items)[pos]) == (value))));
+	long long pos = python::ispa_std::algorithm::lower_bound(((*this)).items, 0, static_cast<long long>(((*this)).items.size()), value);
+	return ((((pos) < (static_cast<long long>(((*this)).items.size())))) && ((((((*this)).items)[pos]) == (value))));
 }
 auto python::ispa_std::sortedmap::IntSet::size() -> long long {
-	return ((*this)).items.size();
+	return static_cast<long long>(((*this)).items.size());
 }
 auto python::ispa_std::sortedmap::IntSet::empty() -> bool {
-	return ((((*this)).items.size()) == (0));
+	return ((static_cast<long long>(((*this)).items.size())) == (0));
 }
 auto python::ispa_std::sortedmap::IntSet::smallest() -> long long {
 	return (((*this)).items)[0];
@@ -2668,7 +2668,7 @@ auto python::ispa_std::parser_ll::cursor_position(std::shared_ptr<python::ispa_s
 auto python::ispa_std::parser_ll::parse_token_stream(std::shared_ptr<python::ispa_std::lexer::Lexer_base> lexer, const std::vector<std::shared_ptr<python::ispa_std::raw_token::RawToken>>& tokens, std::function<std::shared_ptr<python::ispa_std::match_result::MatchResult>(std::shared_ptr<python::ispa_std::lexer::TokenCursor>)> rule) -> std::shared_ptr<python::ispa_std::node::Node> {
 	"Run a generated rule against a separate token stream. The returned node\n    owns its data; the temporary cursor never escapes with the result.";
 	long long i = 0;
-	while (((i) < (tokens.size()))) {
+	while (((i) < (static_cast<long long>(tokens.size())))) {
 		((*lexer)).append_token((tokens)[i]);
 		i = ((i) + (1));
 	}
@@ -2682,11 +2682,11 @@ auto python::ispa_std::parser_ll::parse_token_stream(std::shared_ptr<python::isp
 }
 auto python::ispa_std::parser_ll::parse_source_span(std::shared_ptr<python::ispa_std::lexer::Lexer_base> lexer, const std::vector<std::shared_ptr<python::ispa_std::raw_token::RawToken>>& tokens, std::function<std::shared_ptr<python::ispa_std::match_result::MatchResult>(std::shared_ptr<python::ispa_std::lexer::TokenCursor>)> rule) -> std::shared_ptr<python::ispa_std::node::Node> {
 	"External rules need the original source bytes. Tokens collected from a\n    contiguous source region provide its bounds while retaining the source\n    positions in the returned AST.";
-	if (((tokens.size()) == (0))) {
+	if (((static_cast<long long>(tokens.size())) == (0))) {
 		return python::ispa_std::node::Node::blank();
 	}
 	auto first = ((*(tokens)[0])).meta();
-	auto last = ((*(tokens)[((tokens.size()) - (1))])).meta();
+	auto last = ((*(tokens)[((static_cast<long long>(tokens.size())) - (1))])).meta();
 	if ((((((!(((*first)).has_source()))) || ((!(((*last)).has_source()))))) || (((((*last)).end_pos()) < (((*first)).startpos()))))) {
 		python::ispa_std::failures::invalid_argument("source stream requires tokens with source spans");
 	}
@@ -2721,7 +2721,7 @@ auto python::ispa_std::parser_ll::ActionToken::matches_name(const std::string& e
 	if (((((*this)).name) == (normalized))) {
 		return true;
 	}
-	return ((((((((*this)).name.size()) > (normalized.size()))) && (python::ispa_std::string::ends_with(((*this)).name, normalized)))) && (((std::string(1, (((*this)).name)[((((((*this)).name.size()) - (normalized.size()))) - (1))])) == ("."))));
+	return ((((((static_cast<long long>(((*this)).name.size())) > (static_cast<long long>(normalized.size())))) && (python::ispa_std::string::ends_with(((*this)).name, normalized)))) && (((std::string(1, (((*this)).name)[((((static_cast<long long>(((*this)).name.size())) - (static_cast<long long>(normalized.size())))) - (1))])) == ("."))));
 }
 auto python::ispa_std::parser_ll::TokenBoundary::__init__(const std::string& value, bool token_name) -> void {
 	((*this)).value = value;
@@ -2737,7 +2737,7 @@ auto python::ispa_std::parser_ll::TokenNames::__init__(const std::vector<std::st
 	((*this)).names = names;
 }
 auto python::ispa_std::parser_ll::TokenNames::lookup(long long id) -> std::string {
-	if (((((id) < (0))) || (((id) >= (((*this)).names.size()))))) {
+	if (((((id) < (0))) || (((id) >= (static_cast<long long>(((*this)).names.size())))))) {
 		return "";
 	}
 	return (((*this)).names)[id];
@@ -2817,7 +2817,7 @@ auto python::ispa_std::parser_ll::context_at(std::shared_ptr<python::ispa_std::l
 	if (((actual) == (name))) {
 		return true;
 	}
-	return ((((((actual.size()) > (name.size()))) && (python::ispa_std::string::ends_with(actual, name)))) && (((std::string(1, (actual)[((((actual.size()) - (name.size()))) - (1))])) == ("."))));
+	return ((((((static_cast<long long>(actual.size())) > (static_cast<long long>(name.size())))) && (python::ispa_std::string::ends_with(actual, name)))) && (((std::string(1, (actual)[((((static_cast<long long>(actual.size())) - (static_cast<long long>(name.size())))) - (1))])) == ("."))));
 }
 auto python::ispa_std::parser_ll::ActionCheckpoint::__init__(std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos) -> void {
 	((*this)).pos = pos;
@@ -2825,17 +2825,17 @@ auto python::ispa_std::parser_ll::ActionCheckpoint::__init__(std::shared_ptr<pyt
 	((*this)).saved = {};
 }
 auto python::ispa_std::parser_ll::ActionCheckpoint::mark(const std::string& name) -> void {
-	if (((name.size()) == (0))) {
+	if (((static_cast<long long>(name.size())) == (0))) {
 		python::ispa_std::failures::invalid_argument("checkpoint name cannot be empty");
 	}
-	if (((((*this)).names.size()) >= (python::ispa_std::parser_ll::MAX_ACTION_CHECKPOINTS))) {
+	if (((static_cast<long long>(((*this)).names.size())) >= (python::ispa_std::parser_ll::MAX_ACTION_CHECKPOINTS))) {
 		python::ispa_std::failures::length_error("action checkpoint limit (32) exceeded");
 	}
 	(((*this)).names).push_back(name);
 	(((*this)).saved).push_back(((*((*this)).pos)).copy());
 }
 auto python::ispa_std::parser_ll::ActionCheckpoint::_find_last(const std::string& name) -> long long {
-	long long i = ((((*this)).names.size()) - (1));
+	long long i = ((static_cast<long long>(((*this)).names.size())) - (1));
 	while (((i) >= (0))) {
 		if ((((((*this)).names)[i]) == (name))) {
 			return i;
@@ -2850,7 +2850,7 @@ auto python::ispa_std::parser_ll::ActionCheckpoint::restore(const std::string& n
 		python::ispa_std::failures::logic_error((((("unknown action checkpoint \'") + (name))) + ("\'")));
 	}
 	((*((*this)).pos)).assign((((*this)).saved)[index]);
-	while (((((*this)).names.size()) > (((index) + (1))))) {
+	while (((static_cast<long long>(((*this)).names.size())) > (((index) + (1))))) {
 		ISPA_STD::python_pop((((*this)).names));
 		ISPA_STD::python_pop((((*this)).saved));
 	}
@@ -2860,7 +2860,7 @@ auto python::ispa_std::parser_ll::ActionCheckpoint::commit(const std::string& na
 	if (((index) == (( - (1))))) {
 		python::ispa_std::failures::logic_error((((("unknown action checkpoint \'") + (name))) + ("\'")));
 	}
-	while (((((*this)).names.size()) > (index))) {
+	while (((static_cast<long long>(((*this)).names.size())) > (index))) {
 		ISPA_STD::python_pop((((*this)).names));
 		ISPA_STD::python_pop((((*this)).saved));
 	}
@@ -2994,7 +2994,7 @@ auto python::ispa_std::parser_ll::LLParser::parseLazy() -> std::any {
 	bool at_end = ((*((*result)).it)).isEnd();
 	auto messages = ((*((*result)).it)).getErrors();
 	long long i = 0;
-	while (((i) < (messages.size()))) {
+	while (((i) < (static_cast<long long>(messages.size())))) {
 		auto diagnostic = ISPA_STD::construct<python::ispa_std::recovery::Diagnostic>();
 		((*diagnostic)).rule = "lexer";
 		((*diagnostic)).message = (messages)[i];
@@ -3014,7 +3014,7 @@ auto python::ispa_std::parser_ll::LLParser::parseLazy() -> std::any {
 			((*diagnostic)).offset = ((*((*token)).meta())).startpos();
 			((*diagnostic)).length = ((*((*token)).meta())).length();
 		} else {
-			((*diagnostic)).offset = ((*this)).text.size();
+			((*diagnostic)).offset = static_cast<long long>(((*this)).text.size());
 		}
 		(((*((*this)).recovery_state_)).diagnostics).push_back(diagnostic);
 	}
@@ -3034,7 +3034,7 @@ auto python::ispa_std::parser_ll::LLParser::bind_counter_count(const std::string
 	}
 }
 auto python::ispa_std::parser_ll::LLParser::bind_counter_list(const std::string& name, const std::vector<std::shared_ptr<python::ispa_std::node::Node>>& values) -> void {
-	((*this)).bind_counter_count(name, values.size());
+	((*this)).bind_counter_count(name, static_cast<long long>(values.size()));
 }
 auto python::ispa_std::parser_ll::LLParser::bind_counter_node(const std::string& name, std::shared_ptr<python::ispa_std::node::Node> node) -> void {
 	long long count = 0;
@@ -3048,7 +3048,7 @@ auto python::ispa_std::parser_ll::LLParser::begin_probe(std::shared_ptr<python::
 }
 auto python::ispa_std::parser_ll::LLParser::reject_absent_rule() -> void {
 	"Raise NoMatch when we are inside an uncommitted probe: the rule never\n        started, so the caller\'s `optional` should simply not match.";
-	if (((((((*this)).probes_.size()) > (0))) && ((!(((*(((*this)).probes_)[((((*this)).probes_.size()) - (1))])).committed))))) {
+	if (((((static_cast<long long>(((*this)).probes_.size())) > (0))) && ((!(((*(((*this)).probes_)[((static_cast<long long>(((*this)).probes_.size())) - (1))])).committed))))) {
 		python::ispa_std::failures::no_match();
 	}
 }
@@ -3065,7 +3065,7 @@ auto python::ispa_std::parser_ll::LLParser::accept_at(long long here) -> void {
 	((*this)).note_match();
 }
 auto python::ispa_std::parser_ll::LLParser::commit_at(long long here) -> void {
-	long long k = ((((*this)).probes_.size()) - (1));
+	long long k = ((static_cast<long long>(((*this)).probes_.size())) - (1));
 	while (((k) >= (0))) {
 		if (((here) != (((*(((*this)).probes_)[k])).start))) {
 			((*(((*this)).probes_)[k])).committed = true;
@@ -3123,7 +3123,7 @@ auto python::ispa_std::parser_ll::LLParser::recovery_frame(const std::string& ru
 }
 auto python::ispa_std::parser_ll::LLParser::enter_frame(const std::string& rule) -> void {
 	"Open the recovery frame of a rule invocation, reusing a pooled frame when there is one.";
-	if (((((*this)).frame_count) < (((*this)).frames_.size()))) {
+	if (((((*this)).frame_count) < (static_cast<long long>(((*this)).frames_.size())))) {
 		auto frame = (((*this)).frames_)[((*this)).frame_count];
 		((*frame)).rule = rule;
 		((*frame)).expecting = "";
@@ -3133,7 +3133,7 @@ auto python::ispa_std::parser_ll::LLParser::enter_frame(const std::string& rule)
 	}
 	((*this)).frame_count = ((((*this)).frame_count) + (1));
 	auto state = ((*this)).recovery_state_;
-	if (((((*state)).anchor_count) < (((*state)).anchors.size()))) {
+	if (((((*state)).anchor_count) < (static_cast<long long>(((*state)).anchors.size())))) {
 		(((*state)).anchors)[((*state)).anchor_count] = python::ispa_std::recovery::empty_claim_set();
 	} else {
 		(((*state)).anchors).push_back(python::ispa_std::recovery::empty_claim_set());
@@ -3171,7 +3171,7 @@ auto python::ispa_std::parser_ll::LLParser::describe_token(std::shared_ptr<pytho
 	auto meta = ((*((*pos)).current())).meta();
 	if (((((*pos)).has_source()) && (((((*meta)).startpos()) != (python::ispa_std::parser_ll::NPOS))))) {
 		std::string origin = ((*pos)).sourceOrigin();
-		if (((((((*meta)).startpos()) <= (origin.size()))) && (((((*meta)).length()) <= (((origin.size()) - (((*meta)).startpos()))))))) {
+		if (((((((*meta)).startpos()) <= (static_cast<long long>(origin.size())))) && (((((*meta)).length()) <= (((static_cast<long long>(origin.size())) - (((*meta)).startpos()))))))) {
 			return (((("\'") + (python::ispa_std::string::substr(origin, ((*meta)).startpos(), ((*meta)).length())))) + ("\'"));
 		}
 	}
@@ -3181,7 +3181,7 @@ auto python::ispa_std::parser_ll::LLParser::breadcrumb() -> std::string {
 	std::string out = "";
 	long long i = 0;
 	while (((i) < (((*this)).frame_count))) {
-		if (((out.size()) > (0))) {
+		if (((static_cast<long long>(out.size())) > (0))) {
 			out = ((out) + (" > "));
 		}
 		out = ((out) + (((*(((*this)).frames_)[i])).rule));
@@ -3202,7 +3202,7 @@ auto python::ispa_std::parser_ll::LLParser::resolve_context(std::shared_ptr<pyth
 			if ((!(((((((k) == (0))) && (repeat_spot))) && (((((f) + (1))) == (((*this)).frame_count))))))) {
 				std::vector<std::shared_ptr<python::ispa_std::recovery::ContextClaim>>& claims = ((*((*(((*this)).frames_)[f])).claim_set)).claims;
 				long long c = 0;
-				while (((c) < (claims.size()))) {
+				while (((c) < (static_cast<long long>(claims.size())))) {
 					if (((*((*(claims)[c])).tokens)).matches(token)) {
 						return ISPA_STD::construct<python::ispa_std::parser_ll::Resume>(k, f, (claims)[c], true);
 					}
@@ -3229,7 +3229,7 @@ auto python::ispa_std::parser_ll::LLParser::report_context(std::shared_ptr<pytho
 		if (((at) >= (0))) {
 			((*d)).offset = at;
 			((*d)).length = 0;
-			if (((at) < (((*pos)).sourceOrigin().size()))) {
+			if (((at) < (static_cast<long long>(((*pos)).sourceOrigin().size())))) {
 				((*d)).length = 1;
 			}
 		}
@@ -3240,7 +3240,7 @@ auto python::ispa_std::parser_ll::LLParser::report_context(std::shared_ptr<pytho
 		}
 	}
 	if (((((((((*d)).offset) == (python::ispa_std::recovery::NO_OFFSET))) && (((*pos)).isEnd()))) && (((*this)).has_text))) {
-		((*d)).offset = ((*this)).text.size();
+		((*d)).offset = static_cast<long long>(((*this)).text.size());
 	}
 	((*d)).skipped = ((*r)).skip;
 	((*d)).rule = ((*inner)).rule;
@@ -3251,7 +3251,7 @@ auto python::ispa_std::parser_ll::LLParser::report_context(std::shared_ptr<pytho
 	std::string tok = ((*this)).describe_token(pos);
 	std::string where = ((*this)).breadcrumb();
 	std::string expected = "";
-	if (((((*inner)).expecting.size()) > (0))) {
+	if (((static_cast<long long>(((*inner)).expecting.size())) > (0))) {
 		expected = (("; expected ") + (((*inner)).expecting));
 	}
 	if (((kind) == (python::ispa_std::recovery::ContextKind::Misplaced))) {
@@ -3327,7 +3327,7 @@ auto python::ispa_std::parser_ll::LLParser::sync_loop(std::shared_ptr<python::is
 	while (((i) < (((*this)).frame_count))) {
 		std::vector<std::shared_ptr<python::ispa_std::recovery::ContextClaim>>& claims = ((*((*(((*this)).frames_)[i])).claim_set)).claims;
 		long long c = 0;
-		while (((c) < (claims.size()))) {
+		while (((c) < (static_cast<long long>(claims.size())))) {
 			any_claims = true;
 			if (((*((*(claims)[c])).tokens)).matches(token)) {
 				return ;
@@ -3345,7 +3345,7 @@ auto python::ispa_std::parser_ll::LLParser::sync_loop(std::shared_ptr<python::is
 auto python::ispa_std::parser_ll::LLParser::recover_choice(std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos, const std::string& rule, const std::string& expected, const std::vector<std::shared_ptr<python::ispa_std::recovery::TokenSet>>& first_sets, const std::vector<std::shared_ptr<python::ispa_std::recovery::TokenSet>>& inner_sets) -> long long {
 	"Called only after normal LL(k) selection failed. Prefer an\n        unambiguous FIRST token, then an unambiguous terminal inside an\n        alternative (shared interior terminals do not identify a branch).\n        `first_sets[i]` / `inner_sets[i]` are the two sets of alternative i\n        (the C++ even/odd template pack). Returns the alternative, or -1.";
 	((*this)).reject_absent_rule();
-	if (((first_sets.size()) != (inner_sets.size()))) {
+	if (((static_cast<long long>(first_sets.size())) != (static_cast<long long>(inner_sets.size())))) {
 		python::ispa_std::failures::logic_error("recover_choice: one FIRST set and one interior set per alternative");
 	}
 	auto diagnostic = ISPA_STD::construct<python::ispa_std::recovery::Diagnostic>();
@@ -3358,7 +3358,7 @@ auto python::ispa_std::parser_ll::LLParser::recover_choice(std::shared_ptr<pytho
 		((*diagnostic)).length = ((*((*((*pos)).current())).meta())).length();
 	}
 	long long i = 0;
-	while (((i) < (first_sets.size()))) {
+	while (((i) < (static_cast<long long>(first_sets.size())))) {
 		(((*diagnostic)).expected).insert((((*diagnostic)).expected).end(), ((*(first_sets)[i])).values().begin(), ((*(first_sets)[i])).values().end());
 		i = ((i) + (1));
 	}
@@ -3377,7 +3377,7 @@ auto python::ispa_std::parser_ll::LLParser::recover_choice(std::shared_ptr<pytho
 				long long candidate = ( - (1));
 				bool ambiguous = false;
 				long long j = 0;
-				while (((j) < (sets.size()))) {
+				while (((j) < (static_cast<long long>(sets.size())))) {
 					if (python::ispa_std::recovery::contains(((*(sets)[j])).values(), ident)) {
 						if (((candidate) != (( - (1))))) {
 							ambiguous = true;
@@ -3427,7 +3427,7 @@ auto python::ispa_std::parser_ll::LLParser::recover_choice(std::shared_ptr<pytho
 	}
 	(((*((*this)).recovery_state_)).diagnostics).push_back(diagnostic);
 	if (((*((*this)).recovery_state_)).exhausted()) {
-		auto last = (((*((*this)).recovery_state_)).diagnostics)[((((*((*this)).recovery_state_)).diagnostics.size()) - (1))];
+		auto last = (((*((*this)).recovery_state_)).diagnostics)[((static_cast<long long>(((*((*this)).recovery_state_)).diagnostics.size())) - (1))];
 		((*((*last)).decision)).mode = python::ispa_std::recovery::Mode::Abort;
 		((*last)).message = ((((*last)).message) + ("; recovery limit reached"));
 		return ( - (1));
@@ -3582,10 +3582,10 @@ auto python::ispa_std::parser_ll::LLParser::_required_outcome(std::shared_ptr<py
 		}
 	}
 	python::ispa_std::debug::breakpoint(((what) + (" failed")));
-	if (((((*((*this)).recovery_state_)).diagnostics.size()) == (0))) {
+	if (((static_cast<long long>(((*((*this)).recovery_state_)).diagnostics.size())) == (0))) {
 		python::ispa_std::failures::logic_error((((("ISPA required(): ") + (what))) + (" could not be recovered")));
 	} else {
-		python::ispa_std::failures::logic_error(((*(((*((*this)).recovery_state_)).diagnostics)[((((*((*this)).recovery_state_)).diagnostics.size()) - (1))])).message);
+		python::ispa_std::failures::logic_error(((*(((*((*this)).recovery_state_)).diagnostics)[((static_cast<long long>(((*((*this)).recovery_state_)).diagnostics.size())) - (1))])).message);
 	}
 	return python::ispa_std::node::Node::blank();
 }
@@ -3619,10 +3619,10 @@ auto python::ispa_std::parser_ll::LLParser::required_token(std::shared_ptr<pytho
 	((*fail)).run(pos, ((*this)).recovery_state_);
 	((*scope)).close();
 	python::ispa_std::debug::breakpoint("required token failed");
-	if (((((*((*this)).recovery_state_)).diagnostics.size()) == (0))) {
+	if (((static_cast<long long>(((*((*this)).recovery_state_)).diagnostics.size())) == (0))) {
 		python::ispa_std::failures::logic_error("ISPA required(): required token could not be recovered");
 	} else {
-		python::ispa_std::failures::logic_error(((*(((*((*this)).recovery_state_)).diagnostics)[((((*((*this)).recovery_state_)).diagnostics.size()) - (1))])).message);
+		python::ispa_std::failures::logic_error(((*(((*((*this)).recovery_state_)).diagnostics)[((static_cast<long long>(((*((*this)).recovery_state_)).diagnostics.size())) - (1))])).message);
 	}
 	return python::ispa_std::node::Node::blank();
 }
@@ -3661,10 +3661,10 @@ auto python::ispa_std::parser_ll::LLParser::required_rule(std::shared_ptr<python
 	((*fail)).run(pos, ((*this)).recovery_state_);
 	((*scope)).close();
 	python::ispa_std::debug::breakpoint("required rule failed");
-	if (((((*((*this)).recovery_state_)).diagnostics.size()) == (0))) {
+	if (((static_cast<long long>(((*((*this)).recovery_state_)).diagnostics.size())) == (0))) {
 		python::ispa_std::failures::logic_error("ISPA required(): required rule could not be recovered");
 	} else {
-		python::ispa_std::failures::logic_error(((*(((*((*this)).recovery_state_)).diagnostics)[((((*((*this)).recovery_state_)).diagnostics.size()) - (1))])).message);
+		python::ispa_std::failures::logic_error(((*(((*((*this)).recovery_state_)).diagnostics)[((static_cast<long long>(((*((*this)).recovery_state_)).diagnostics.size())) - (1))])).message);
 	}
 	return python::ispa_std::node::Node::blank();
 }
@@ -3741,7 +3741,7 @@ auto python::ispa_std::parser_ll::LLParser::skip_external_spaces(std::shared_ptr
 auto python::ispa_std::parser_ll::LLParser::counted_impl(std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos, std::shared_ptr<python::ispa_std::counter::CountSpec> spec, std::function<std::shared_ptr<python::ispa_std::node::Node>(std::shared_ptr<python::ispa_std::lexer::TokenCursor>)> match) -> std::vector<std::shared_ptr<python::ispa_std::node::Node>> {
 	bool has_limit = ((*spec)).has_count;
 	long long limit = ((*spec)).count;
-	if (((((*spec)).name.size()) > (0))) {
+	if (((static_cast<long long>(((*spec)).name.size())) > (0))) {
 		if (((*((*this)).counters_)).contains(((*spec)).name)) {
 			limit = ((*((*this)).counters_)).get(((*spec)).name);
 			has_limit = true;
@@ -3750,9 +3750,9 @@ auto python::ispa_std::parser_ll::LLParser::counted_impl(std::shared_ptr<python:
 	std::vector<std::shared_ptr<python::ispa_std::node::Node>> nodes = std::vector<std::shared_ptr<python::ispa_std::node::Node>>{};
 	auto cursor = ((*pos)).copy();
 	bool matching = true;
-	while (((matching) && ((((!(has_limit))) || (((nodes.size()) < (limit))))))) {
+	while (((matching) && ((((!(has_limit))) || (((static_cast<long long>(nodes.size())) < (limit))))))) {
 		auto attempt = ((*cursor)).copy();
-		if (((((*this)).has_space_token_) && (((nodes.size()) > (0))))) {
+		if (((((*this)).has_space_token_) && (((static_cast<long long>(nodes.size())) > (0))))) {
 			((*this)).skip_spaces(attempt);
 		}
 		long long before = python::ispa_std::parser_ll::cursor_position(attempt);
@@ -3767,7 +3767,7 @@ auto python::ispa_std::parser_ll::LLParser::counted_impl(std::shared_ptr<python:
 			((*cursor)).assign(attempt);
 		}
 	}
-	if (((((has_limit) && (((nodes.size()) != (limit))))) || (((nodes.size()) < (((*spec)).minimum))))) {
+	if (((((has_limit) && (((static_cast<long long>(nodes.size())) != (limit))))) || (((static_cast<long long>(nodes.size())) < (((*spec)).minimum))))) {
 		((*this)).reject_absent_rule();
 		auto diagnostic = ISPA_STD::construct<python::ispa_std::recovery::Diagnostic>();
 		if (((((*this)).frame_count) == (0))) {
@@ -3780,10 +3780,10 @@ auto python::ispa_std::parser_ll::LLParser::counted_impl(std::shared_ptr<python:
 			wanted = python::ispa_std::utility::maximum(limit, ((*spec)).minimum);
 		}
 		std::string label = "";
-		if (((((*spec)).name.size()) > (0))) {
+		if (((static_cast<long long>(((*spec)).name.size())) > (0))) {
 			label = ((((" \'") + (((*spec)).name))) + ("\'"));
 		}
-		((*diagnostic)).message = (((((((((("Counted repetition") + (label))) + (" expected "))) + (python::ispa_std::format::int_to_string(wanted)))) + (" matches, got "))) + (python::ispa_std::format::int_to_string(nodes.size())));
+		((*diagnostic)).message = (((((((((("Counted repetition") + (label))) + (" expected "))) + (python::ispa_std::format::int_to_string(wanted)))) + (" matches, got "))) + (python::ispa_std::format::int_to_string(static_cast<long long>(nodes.size()))));
 		if ((!(((*cursor)).isEnd()))) {
 			((*diagnostic)).unexpected = python::ispa_std::recovery::token_id(((*cursor)).current());
 			((*diagnostic)).offset = ((*((*((*cursor)).current())).meta())).startpos();
@@ -3792,8 +3792,8 @@ auto python::ispa_std::parser_ll::LLParser::counted_impl(std::shared_ptr<python:
 		(((*((*this)).recovery_state_)).diagnostics).push_back(diagnostic);
 		python::ispa_std::failures::logic_error(message);
 	}
-	if (((((*spec)).name.size()) > (0))) {
-		((*((*this)).counters_)).try_emplace(((*spec)).name, nodes.size());
+	if (((static_cast<long long>(((*spec)).name.size())) > (0))) {
+		((*((*this)).counters_)).try_emplace(((*spec)).name, static_cast<long long>(nodes.size()));
 	}
 	((*pos)).assign(cursor);
 	((*this)).commit_rule(pos);
@@ -3886,7 +3886,7 @@ auto python::ispa_std::parser_ll::LLParser::range_optional_token(std::shared_ptr
 	while (((((repeating) && ((!(((*pos)).isEnd()))))) && ((!(((*this)).unwinding()))))) {
 		auto node = ((*this)).repeat_optional(pos, [&](auto attempt) {
 return ((*this)).optional_token(attempt, type_id);
-}, ((result.size()) > (0)));
+}, ((static_cast<long long>(result.size())) > (0)));
 		if (((*node)).empty()) {
 			repeating = false;
 		} else {
@@ -3902,7 +3902,7 @@ auto python::ispa_std::parser_ll::LLParser::range_optional_rule(std::shared_ptr<
 	while (((((repeating) && ((!(((*pos)).isEnd()))))) && ((!(((*this)).unwinding()))))) {
 		auto node = ((*this)).repeat_optional(pos, [&](auto attempt) {
 return ((*this)).optional_rule(attempt, rec);
-}, ((result.size()) > (0)));
+}, ((static_cast<long long>(result.size())) > (0)));
 		if (((*node)).empty()) {
 			repeating = false;
 		} else {
@@ -3984,11 +3984,11 @@ auto python::ispa_std::lr_conflicts::_Alternative::__init__(long long rule, cons
 	((*this)).children = children;
 }
 auto python::ispa_std::lr_conflicts::_Alternative::equals(std::shared_ptr<python::ispa_std::lr_conflicts::_Alternative> other) -> bool {
-	if (((((((*this)).rule) != (((*other)).rule))) || (((((*this)).children.size()) != (((*other)).children.size()))))) {
+	if (((((((*this)).rule) != (((*other)).rule))) || (((static_cast<long long>(((*this)).children.size())) != (static_cast<long long>(((*other)).children.size())))))) {
 		return false;
 	}
 	long long i = 0;
-	while (((i) < (((*this)).children.size()))) {
+	while (((i) < (static_cast<long long>(((*this)).children.size())))) {
 		if ((((((*this)).children)[i]) != ((((*other)).children)[i]))) {
 			return false;
 		}
@@ -4024,14 +4024,14 @@ auto python::ispa_std::lr_conflicts::LRGeneralizedParser::__init__() -> void {
 }
 auto python::ispa_std::lr_conflicts::LRGeneralizedParser::_tick(const std::vector<std::shared_ptr<python::ispa_std::lr_conflicts::_Forest>>& forest, const std::vector<std::shared_ptr<python::ispa_std::lr_conflicts::_Stack>>& stacks) -> void {
 	((*this)).work = ((((*this)).work) + (1));
-	if (((((((*this)).work) > (python::ispa_std::lr_conflicts::WORK_LIMIT))) || (((((forest.size()) + (stacks.size()))) > (python::ispa_std::lr_conflicts::NODE_LIMIT))))) {
+	if (((((((*this)).work) > (python::ispa_std::lr_conflicts::WORK_LIMIT))) || (((((static_cast<long long>(forest.size())) + (static_cast<long long>(stacks.size())))) > (python::ispa_std::lr_conflicts::NODE_LIMIT))))) {
 		python::ispa_std::failures::runtime_error("LR automatic conflict resolution resource limit exceeded");
 	}
 }
 auto python::ispa_std::lr_conflicts::LRGeneralizedParser::_key(const std::vector<std::string>& parts) -> std::string {
 	std::vector<std::string> out = std::vector<std::string>{};
 	long long i = 0;
-	while (((i) < (parts.size()))) {
+	while (((i) < (static_cast<long long>(parts.size())))) {
 		(out).push_back((parts)[i]);
 		i = ((i) + (1));
 	}
@@ -4040,7 +4040,7 @@ auto python::ispa_std::lr_conflicts::LRGeneralizedParser::_key(const std::vector
 auto python::ispa_std::lr_conflicts::LRGeneralizedParser::_intern(std::vector<std::shared_ptr<python::ispa_std::lr_conflicts::_Forest>>& forest, std::shared_ptr<python::ispa_std::sortedmap::StrIntMap> index, bool terminal, long long symbol, std::shared_ptr<python::ispa_std::lr_conflicts::_Span> span, bool has_token, std::shared_ptr<python::ispa_std::lexer::TokenCursor> token) -> long long {
 	((*this))._tick(forest, {});
 	std::string key = ((*this))._key(std::vector<std::string>{python::ispa_std::lr_conflicts::_b(terminal), python::ispa_std::format::int_to_string(symbol), python::ispa_std::format::int_to_string(((*span)).begin), python::ispa_std::format::int_to_string(((*span)).end), python::ispa_std::lr_conflicts::_b(((*span)).leading), python::ispa_std::lr_conflicts::_b(((*span)).trailing), python::ispa_std::lr_conflicts::_b(((*span)).empty)});
-	if (((*index)).try_emplace(key, forest.size())) {
+	if (((*index)).try_emplace(key, static_cast<long long>(forest.size()))) {
 		(forest).push_back(ISPA_STD::construct<python::ispa_std::lr_conflicts::_Forest>(span, has_token, token));
 	}
 	return ((*index)).get(key);
@@ -4048,7 +4048,7 @@ auto python::ispa_std::lr_conflicts::LRGeneralizedParser::_intern(std::vector<st
 auto python::ispa_std::lr_conflicts::LRGeneralizedParser::_push(std::vector<std::shared_ptr<python::ispa_std::lr_conflicts::_Stack>>& stacks, std::shared_ptr<python::ispa_std::sortedmap::StrIntMap> index, long long previous, long long state, long long value) -> long long {
 	((*this))._tick({}, stacks);
 	std::string key = ((*this))._key(std::vector<std::string>{python::ispa_std::format::int_to_string(previous), python::ispa_std::format::int_to_string(state), python::ispa_std::format::int_to_string(value)});
-	if (((*index)).try_emplace(key, stacks.size())) {
+	if (((*index)).try_emplace(key, static_cast<long long>(stacks.size()))) {
 		(stacks).push_back(ISPA_STD::construct<python::ispa_std::lr_conflicts::_Stack>(previous, state, value));
 	}
 	return ((*index)).get(key);
@@ -4080,7 +4080,7 @@ auto python::ispa_std::external::external_node(const std::string& origin, long l
 	}
 	long long line = 1;
 	long long i = 0;
-	while (((((i) < (start))) && (((i) < (origin.size()))))) {
+	while (((((i) < (start))) && (((i) < (static_cast<long long>(origin.size())))))) {
 		if (((std::string(1, (origin)[i])) == ("\n"))) {
 			line = ((line) + (1));
 		}
@@ -4140,12 +4140,12 @@ auto python::ispa_std::ast_printer::ASTPrinter::up(bool has_more_siblings) -> vo
 	(((*this))._branches).push_back(has_more_siblings);
 }
 auto python::ispa_std::ast_printer::ASTPrinter::down() -> void {
-	if (((((*this))._branches.size()) > (0))) {
+	if (((static_cast<long long>(((*this))._branches.size())) > (0))) {
 		ISPA_STD::python_pop((((*this))._branches));
 	}
 }
 auto python::ispa_std::ast_printer::ASTPrinter::_prefix(bool last) -> void {
-	long long depth = ((*this))._branches.size();
+	long long depth = static_cast<long long>(((*this))._branches.size());
 	if (((depth) == (0))) {
 		return ;
 	}

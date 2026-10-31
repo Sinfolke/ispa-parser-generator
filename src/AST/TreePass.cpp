@@ -1,6 +1,10 @@
 module;
+#ifdef __EMSCRIPTEN__
+#include "ispa_icu_shim.h"
+#else
 #include <unicode/utf8.h>
 #include <unicode/uchar.h>
+#endif
 module AST.Pass;
 import corelib;
 import AST.Tree;
