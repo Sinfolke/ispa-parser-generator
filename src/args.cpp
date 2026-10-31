@@ -71,6 +71,11 @@ Args parse_args(int argc, char** argv) {
         std::exit(1);
     }
 
+    if (args.version) {
+        std::cout << PROGRAM_VERSION << std::endl;
+        std::exit(0);
+    }
+
     if (args.conflict_lookahead < 1 || args.conflict_lookahead > 8)
         throw Error("--lr-conflict-lookahead must be between 1 and 8");
     if (!args.stdlib_name.empty() && args.stdlib.empty())

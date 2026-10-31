@@ -235,20 +235,39 @@ def source_tree(spec, workspace):
     raise PackageError("Package source must have github, archive, or path")
 
 
+_generator_problem = ""
+
+
+def _generator_failure(executable, detail):
+    global _generator_problem
+    _generator_problem = f"'{executable} --version' failed: {detail}"
+    return _generator_problem
+
+
 def generator_version(required=False):
     """Read the generator actually used for package builds, including ISPA overrides."""
+    global _generator_problem
+    _generator_problem = ""
     executable = os.environ.get("ISPA") or shutil.which("ispa")
-    if executable:
+    if not executable:
+        _generator_problem = "ispa was not found (set ISPA or put ispa on PATH)"
+    else:
         try:
-            result = subprocess.run([executable, "--version"], check=True,
-                                    capture_output=True, text=True, timeout=30)
-            version = result.stdout.splitlines()[0].strip().rstrip(";").strip()
-            if NAME.fullmatch(version):
-                return version
-        except (OSError, subprocess.SubprocessError, IndexError):
-            pass
+            result = subprocess.run([executable, "--version"], capture_output=True, text=True, timeout=30)
+            if result.returncode != 0:
+                lines = (result.stderr or result.stdout).strip().splitlines()
+                _generator_failure(executable, f"exit {result.returncode}"
+                                   + (f": {lines[0]}" if lines else "")
+                                   + " (this ispa may predate --version support)")
+            else:
+                version = result.stdout.splitlines()[0].strip().rstrip(";").strip() if result.stdout.strip() else ""
+                if NAME.fullmatch(version):
+                    return version
+                _generator_failure(executable, f"unexpected output {version!r}")
+        except (OSError, subprocess.SubprocessError) as exc:
+            _generator_failure(executable, exc)
     if required:
-        raise PackageError("Cannot determine generator version; set ISPA or put ispa on PATH")
+        raise PackageError(f"Cannot determine generator version: {_generator_problem}")
     return "unknown"
 
 
@@ -256,7 +275,8 @@ def resolved_source(spec, version):
     spec = dict(spec)
     if "github" in spec and "{generator}" in spec.get("ref", ""):
         if version == "unknown":
-            raise PackageError("A generator-specific package requires ispa; set ISPA or put ispa on PATH")
+            raise PackageError("A generator-specific package requires a working ispa: "
+                               + (_generator_problem or "set ISPA or put ispa on PATH"))
         # Development generators consume the development libraries.
         spec["ref"] = "main" if version == "dev" else spec["ref"].replace("{generator}", version)
     return spec
