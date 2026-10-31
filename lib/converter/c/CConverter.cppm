@@ -1,0 +1,45 @@
+export module C.Init;
+
+import Converter.Writer;
+import Converter.Construct;
+import LangAPI;
+import std;
+
+// C backend. Lowered classes become structs whose first member is the base struct (so a derived pointer is a valid
+// base pointer), virtual methods become function-pointer slots in the introducing class, and every class X gets
+//     <ns>_get_X_handler(ispa_arena*, ...)   allocate + initialise (constructor)
+//     <ns>_free_X_handler(X*)                 release the handle (arena-owned memory is reclaimed with the arena)
+// Namespaces are flattened into name prefixes. Generics are monomorphized (see the design notes in
+// parser/stdlibs/target/c/README.md).
+namespace C {
+    struct Instance { std::string c_name; };
+
+    class Construct : protected ::Converter::ConstructBase {
+        std::vector<std::pair<std::string, std::string>> writable_files;
+        std::vector<std::string> scope;                          // enclosing namespaces
+        std::vector<std::string> diagnostics;                    // survey: constructs that could not be emitted
+        std::size_t emitted_functions = 0, skipped_functions = 0;
+        std::unordered_set<std::string> defined;                 // C names of every class/enum/alias, filled before emission
+        std::unordered_set<std::string> generic_classes;         // classes with type parameters (instantiated on demand)
+
+        auto collect(const LangAPI::Declarations &decls) -> void;
+        auto resolve(const LangAPI::Symbol &symbol, std::vector<std::string> &diag) const -> std::string;
+        auto typeName(const LangAPI::Type &type, std::vector<std::string> &diag) const -> std::string;
+
+        auto emitDeclarations(const LangAPI::Declarations &decls, ::Converter::Writer &types, ::Converter::Writer &protos,
+                              ::Converter::Writer &impls) -> void;
+        auto emitClass(const LangAPI::Class &cls, ::Converter::Writer &types, ::Converter::Writer &protos,
+                       ::Converter::Writer &impls) -> void;
+        auto emitFunction(const LangAPI::Function &fn, const std::string &owner, ::Converter::Writer &protos,
+                          ::Converter::Writer &impls) -> void;
+        auto prefix() const -> std::string;
+    public:
+        Construct(const LangAPI::Declarations *source, const char *namespace_name, bool incremental)
+            : ConstructBase(source, namespace_name, incremental) {}
+        auto get_files() -> const std::vector<std::pair<std::string, std::string>>& override { return writable_files; }
+        auto construct() -> void override;
+    };
+}
+extern "C" auto c_construct(const LangAPI::Declarations *tree, const char *namespace_name, bool incremental,
+                            bool debug_instrumentation, bool text_view) -> C::Construct*;
+extern "C" auto c_construct_finish(C::Construct *c) -> void;
