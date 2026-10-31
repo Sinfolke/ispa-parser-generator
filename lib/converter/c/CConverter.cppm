@@ -22,6 +22,28 @@ namespace C {
         std::unordered_set<std::string> defined;                 // C names of every class/enum/alias, filled before emission
         std::unordered_set<std::string> generic_classes;         // classes with type parameters (instantiated on demand)
 
+        struct ClassInfo {
+            std::string c_name;
+            std::vector<std::pair<std::string, std::string>> bases;          // (C name of base, member name)
+            std::unordered_map<std::string, const LangAPI::Function *> methods;
+            std::unordered_set<std::string> fields;
+        };
+        std::unordered_map<std::string, ClassInfo> classes;                  // by C name
+        std::unordered_set<std::string> functions;                           // C names of free functions
+        // state of the body being emitted
+        std::string cur_class;                                               // C name of the class owning `self`, or empty
+        std::vector<std::unordered_set<std::string>> locals;
+        const LangAPI::Type *cur_return = nullptr;
+        std::map<std::string, std::size_t> reasons;                          // survey: why a body stayed a placeholder
+
+        auto convertStatements(const LangAPI::Statements &st, ::Converter::Writer &o) -> void;
+        auto convertStatement(const LangAPI::Statement &st, ::Converter::Writer &o) -> void;
+        auto convertExpr(const LangAPI::Expression &e) -> std::string;
+        auto convertRValue(const LangAPI::RValue &r) -> std::string;
+        auto convertSymbolValue(const LangAPI::Symbol &s) -> std::string;
+        auto convertCall(const LangAPI::FunctionCall &c) -> std::string;
+        auto memberPath(const std::string &cls, const std::string &name) const -> std::optional<std::string>;
+        auto isLocal(const std::string &n) const -> bool;
         auto collect(const LangAPI::Declarations &decls) -> void;
         auto resolve(const LangAPI::Symbol &symbol, std::vector<std::string> &diag) const -> std::string;
         auto typeName(const LangAPI::Type &type, std::vector<std::string> &diag) const -> std::string;

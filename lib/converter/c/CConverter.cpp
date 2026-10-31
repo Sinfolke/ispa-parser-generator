@@ -5,6 +5,7 @@ import logging;
 import std;
 
 namespace C {
+    struct Unsupported { std::string why; };
     namespace {
         auto joined(const std::vector<std::string> &items, const std::string &sep) -> std::string {
             std::string out;
@@ -48,6 +49,14 @@ namespace C {
                 const auto n = prefix() + "_" + symbolName(d.getClass().name);
                 defined.insert(n);
                 if (!d.getClass().template_parameters.empty()) generic_classes.insert(n);
+                ClassInfo info; info.c_name = n;
+                for (const auto &[vis, base] : d.getClass().inherit_members)
+                    if (const auto *bs = std::get_if<LangAPI::Symbol>(&base)) { info.bases.emplace_back(symbolName(*bs), symbolName(*bs)); }
+                for (const auto &[decl, vis] : d.getClass().data) {
+                    if (decl->isVariable()) info.fields.insert(cIdent(decl->getVariable().name));
+                    else if (decl->isFunction()) info.methods[decl->getFunction().name] = &decl->getFunction();
+                }
+                classes[n] = std::move(info);
             } else if (d.isEnum()) defined.insert(prefix() + "_" + cIdent(d.getEnum().name));
             else if (d.isTypeAlias()) defined.insert(prefix() + "_" + cIdent(d.getTypeAlias().name));
         }
@@ -113,6 +122,244 @@ namespace C {
         return "void*";
     }
 
+
+    // ---------------------------------------------------------------- bodies
+    auto Construct::isLocal(const std::string &n) const -> bool {
+        return std::ranges::any_of(locals, [&](const auto &f) { return f.contains(n); });
+    }
+    // `self->base_X.field` for a field of the class or of one of its (embedded) bases
+    auto Construct::memberPath(const std::string &cls, const std::string &name) const -> std::optional<std::string> {
+        const auto it = classes.find(cls);
+        if (it == classes.end()) return std::nullopt;
+        if (it->second.fields.contains(cIdent(name))) return cIdent(name);
+        for (const auto &[base_c, member] : it->second.bases) {
+            // bases are recorded by bare name: find the resolved class in the same scope
+            std::vector<std::string> d;
+            const auto b = resolve(LangAPI::Symbol(base_c), d);
+            if (const auto r = memberPath(b, name)) return "base_" + member + "." + *r;
+        }
+        return std::nullopt;
+    }
+
+    static auto cString(const std::string &raw) -> std::string {
+        std::string out = "\"";
+        for (const unsigned char c : raw) {
+            switch (c) {
+                case '\\': out += "\\\\"; break;
+                case '"': out += "\\\""; break;
+                case '\n': out += "\\n"; break;
+                case '\r': out += "\\r"; break;
+                case '\t': out += "\\t"; break;
+                default:
+                    if (c < 32 || c >= 127) { char b[8]; std::snprintf(b, sizeof b, "\\x%02x\"\"", c); out += b; }
+                    else out += static_cast<char>(c);
+            }
+        }
+        return out + "\"";
+    }
+
+    auto Construct::convertSymbolValue(const LangAPI::Symbol &sym) -> std::string {
+        std::vector<std::string> parts;
+        for (const auto &p : sym.path) {
+            const auto *str = std::get_if<std::string>(&p);
+            if (!str) throw Unsupported{"symbol with a call/library path part"};
+            parts.push_back(*str);
+        }
+        if (parts.size() == 1) {
+            const auto &n = parts[0];
+            if (isLocal(n)) return cIdent(n);
+            if (n == "self") return "self";
+            if (!cur_class.empty())
+                if (const auto m = memberPath(cur_class, n)) return "self->" + *m;
+            if (n == "None") return "NULL";
+            if (n == "True") return "true";
+            if (n == "False") return "false";
+        }
+        std::vector<std::string> diag;
+        if (const auto q = resolve(LangAPI::Symbol(sym.path), diag); defined.contains(q) || functions.contains(q)) return q;
+        // qualified function / global: try the scope chain
+        const auto joinedName = joined([&] { std::vector<std::string> v; for (auto &x : parts) v.push_back(cIdent(x)); return v; }(), "_");
+        for (std::size_t k = scope.size() + 1; k-- > 0;) {
+            std::vector<std::string> cand;
+            for (std::size_t i = 0; i < k; ++i) cand.push_back(cIdent(scope[i]));
+            cand.push_back(joinedName);
+            if (const auto n = joined(cand, "_"); functions.contains(n)) return n;
+        }
+        throw Unsupported{"unresolved name " + joined(parts, "::")};
+    }
+
+    auto Construct::convertCall(const LangAPI::FunctionCall &call) -> std::string {
+        if (!call.template_parameters.empty()) throw Unsupported{"call with template arguments"};
+        const auto *sym = std::get_if<std::shared_ptr<LangAPI::Symbol>>(&call.name);
+        if (!sym || !*sym) throw Unsupported{"library function call"};
+        std::vector<std::string> args;
+        for (const auto &a : call.args) args.push_back(convertExpr(a));
+        const auto &path = (*sym)->path;
+        if (path.size() == 1 && std::holds_alternative<std::string>(path[0]) && !cur_class.empty()) {
+            // implicit-self method call
+            const auto &m = std::get<std::string>(path[0]);
+            for (auto cls = cur_class; ;) {
+                const auto it = classes.find(cls);
+                if (it == classes.end() || !it->second.methods.contains(m)) break;
+                std::string recv = "self";
+                if (cls != cur_class) throw Unsupported{"call of inherited method " + m};
+                args.insert(args.begin(), recv);
+                return cls + "_" + cIdent(m) + "(" + joined(args, ", ") + ")";
+            }
+        }
+        const auto fn = convertSymbolValue(**sym);
+        return fn + "(" + joined(args, ", ") + ")";
+    }
+
+    auto Construct::convertRValue(const LangAPI::RValue &r) -> std::string {
+        if (r.isInt()) return "INT64_C(" + std::to_string(r.getInt().value) + ")";
+        if (r.isBool()) return r.getBool().value ? "true" : "false";
+        if (r.isFloat()) return std::to_string(r.getFloat().value);
+        if (r.isChar()) {
+            const char c = r.getChar().value;
+            if (c == '\'') return "'\\''";
+            if (c == '\\') return "'\\\\'";
+            if (c == '\n') return "'\\n'";
+            if (c == '\t') return "'\\t'";
+            if (c == '\r') return "'\\r'";
+            if (c == 0) return "'\\0'";
+            return std::string("'") + c + "'";
+        }
+        if (r.isString()) return "ISPA_STR(" + cString(r.getString().value) + ")";
+        if (r.isSymbol()) return convertSymbolValue(r.getSymbol());
+        if (r.isStorageSymbol()) {
+            const auto &ss = r.getStorageSymbol();
+            std::string out = ss.what.empty() ? std::string() : convertExpr(ss.what);
+            std::string recvClass = ss.what.size() == 1 && ss.what[0].isRvalue() && ss.what[0].getRValue().isSymbol() &&
+                                        ss.what[0].getRValue().getSymbol().path.size() == 1 && out == "self" ? cur_class : std::string();
+            for (const auto &part : ss.path) {
+                std::string field;
+                if (const auto *prop = std::get_if<LangAPI::Property>(&part)) field = prop->name;
+                else if (const auto *str = std::get_if<std::string>(&part)) field = *str;
+                else throw Unsupported{"storage path with index/call"};
+                if (!recvClass.empty()) {
+                    const auto m = memberPath(recvClass, field);
+                    if (!m) throw Unsupported{"unknown member " + field + " of " + recvClass};
+                    out += "->" + *m; recvClass.clear();
+                } else out += "->" + cIdent(field);
+            }
+            return out;
+        }
+        if (r.type() == LangAPI::RValueType::Instance) {
+            if (cur_class.empty()) throw Unsupported{"instance outside a method"};
+            return "self";
+        }
+        // Box<class> is already the object handle; a Box of a plain value will need a dereference once locals are typed
+        if (r.type() == LangAPI::RValueType::GetFromBox) return convertExpr(r.getGetFromBox().what);
+        throw Unsupported{"rvalue kind " + std::to_string(static_cast<int>(r.type()))};
+    }
+
+    auto Construct::convertExpr(const LangAPI::Expression &e) -> std::string {
+        using EE = LangAPI::ExpressionElement;
+        std::string out;
+        for (const auto &v : e) {
+            switch (v.type()) {
+                case LangAPI::ExpressionValueType::Empty: break;
+                case LangAPI::ExpressionValueType::RValue: out += convertRValue(v.getRValue()); break;
+                case LangAPI::ExpressionValueType::FunctionCall: out += convertCall(v.getFunctionCall()); break;
+                case LangAPI::ExpressionValueType::Break: out += "break"; break;
+                case LangAPI::ExpressionValueType::Continue: out += "continue"; break;
+                case LangAPI::ExpressionValueType::Return: {
+                    const auto value = convertExpr(v.getReturn().value);
+                    out += "return" + (value.empty() ? std::string() : " " + value);
+                    break;
+                }
+                case LangAPI::ExpressionValueType::VariableAssignment: {
+                    const auto &a = v.getVariableAssignment();
+                    const char *op = "=";
+                    switch (a.type) {
+                        case LangAPI::OperatorType::Assign: op = "="; break;
+                        case LangAPI::OperatorType::Add: op = "+="; break;
+                        case LangAPI::OperatorType::Minus: op = "-="; break;
+                        case LangAPI::OperatorType::Multiply: op = "*="; break;
+                        case LangAPI::OperatorType::Divide: op = "/="; break;
+                        case LangAPI::OperatorType::Modulo: op = "%="; break;
+                    }
+                    const auto lhs = std::holds_alternative<LangAPI::Symbol>(a.name)
+                        ? convertSymbolValue(std::get<LangAPI::Symbol>(a.name))
+                        : convertRValue(LangAPI::RValue(std::get<LangAPI::StorageSymbol>(a.name)));
+                    out += lhs + " " + op + " " + convertExpr(a.value);
+                    break;
+                }
+                case LangAPI::ExpressionValueType::ExpressionElement: {
+                    switch (v.getExpressionElement()) {
+                        case EE::GroupOpen: out += "("; break;
+                        case EE::GroupClose: out += ")"; break;
+                        case EE::And: out += " && "; break;
+                        case EE::Or: out += " || "; break;
+                        case EE::Not: out += "!"; break;
+                        case EE::Equal: out += " == "; break;
+                        case EE::NotEqual: out += " != "; break;
+                        case EE::Higher: out += " > "; break;
+                        case EE::Lower: out += " < "; break;
+                        case EE::HigherOrEqual: out += " >= "; break;
+                        case EE::LowerOrEqual: out += " <= "; break;
+                        case EE::Add: out += " + "; break;
+                        case EE::Minus: out += " - "; break;
+                        case EE::Multiply: out += " * "; break;
+                        case EE::Divide: out += " / "; break;
+                        case EE::Modulo: out += " % "; break;
+                        case EE::PlusPlus: out += "++"; break;
+                        case EE::MinusMinus: out += "--"; break;
+                        default: throw Unsupported{"expression element"};
+                    }
+                    break;
+                }
+                default: throw Unsupported{"expression value kind " + std::to_string(static_cast<int>(v.type()))};
+            }
+        }
+        return out;
+    }
+
+    auto Construct::convertStatements(const LangAPI::Statements &st, Converter::Writer &o) -> void {
+        locals.emplace_back();
+        for (const auto &s : st) convertStatement(s, o);
+        locals.pop_back();
+    }
+
+    auto Construct::convertStatement(const LangAPI::Statement &st, Converter::Writer &o) -> void {
+        if (st.isVariable()) {
+            const auto &v = st.getVariable();
+            std::vector<std::string> d;
+            if (v.type.isValueType() && v.type.getValueType() == LangAPI::ValueType::Undef) throw Unsupported{"local without a declared type"};
+            const auto t = typeName(v.type, d);
+            if (!d.empty()) throw Unsupported{"local type: " + d.front()};
+            locals.back().insert(v.name);
+            if (v.value.empty()) o.writeln("{} {} = {0};", t, cIdent(v.name));
+            else o.writeln("{} {} = {};", t, cIdent(v.name), convertExpr(v.value));
+        } else if (st.isIf()) {
+            const auto &i = st.getIf();
+            o.writeln("if ({}) {", convertExpr(i.expr));
+            o.increaseIndentation(); convertStatements(i.stmt, o); o.decreaseIndentation();
+            if (!i.else_stmt.empty()) {
+                o.writeln("} else {");
+                o.increaseIndentation(); convertStatements(i.else_stmt, o); o.decreaseIndentation();
+            }
+            o.writeln("}");
+        } else if (st.isWhile()) {
+            const auto &w = st.getWhile();
+            o.writeln("while ({}) {", convertExpr(w.expr));
+            o.increaseIndentation(); convertStatements(w.stmt, o); o.decreaseIndentation();
+            o.writeln("}");
+        } else if (st.isDoWhile()) {
+            const auto &w = st.getDoWhile();
+            o.writeln("do {");
+            o.increaseIndentation(); convertStatements(w.stmt, o); o.decreaseIndentation();
+            o.writeln("} while ({});", convertExpr(w.expr));
+        } else if (st.isExpression()) {
+            o.writeln("{};", convertExpr(st.getExpression()));
+        } else if (st.isComment()) {
+            o.writeln("/* comment */");
+        } else {
+            throw Unsupported{st.isSwitch() ? "switch statement" : st.isThrow() ? "throw (error model pending)" : "statement kind"};
+        }
+    }
+
     auto Construct::emitFunction(const LangAPI::Function &fn, const std::string &owner, Converter::Writer &protos,
                                  Converter::Writer &impls) -> void {
         const auto pfx = prefix();
@@ -129,13 +376,30 @@ namespace C {
         sig += ")";
         protos.writeln("{};", sig);
         if (fn.is_native) { ++skipped_functions; return; }
+        cur_class = owner.empty() ? std::string() : pfx + "_" + owner;
+        locals.clear();
+        locals.emplace_back();
+        for (const auto &[t, n] : fn.parameters) locals.back().insert(n);
+        cur_return = &fn.type;
+        Converter::Writer body;
+        std::string why;
+        try {
+            body.increaseIndentation();
+            convertStatements(fn.statements, body);
+        } catch (const Unsupported &u) { why = u.why; }
         impls.writeln("{} {", sig);
-        impls.increaseIndentation();
-        impls.writeln("/* ISPA-C-TODO: body not lowered yet ({} statements) */", fn.statements.size());
-        impls.writeln("ISPA_UNIMPLEMENTED(\"{}\");", pfx + "." + fn.name);
-        impls.decreaseIndentation();
+        if (why.empty()) {
+            impls.dwrite("{}", body.get());
+            ++emitted_functions;
+        } else {
+            impls.increaseIndentation();
+            impls.writeln("/* ISPA-C-TODO: {} */", why);
+            impls.writeln("ISPA_UNIMPLEMENTED(\"{}\");", pfx + "." + fn.name);
+            impls.decreaseIndentation();
+            ++skipped_functions;
+            ++reasons[why];
+        }
         impls.writeln("}");
-        ++skipped_functions;
         for (auto &d : diag) diagnostics.push_back(pfx + "." + fn.name + ": " + d);
     }
 
@@ -218,6 +482,9 @@ namespace C {
     auto Construct::construct() -> void {
         scope.clear();
         defined.clear();
+        classes.clear();
+        functions.clear();
+        reasons.clear();
         generic_classes.clear();
         diagnostics.clear();
         collect(*source);
@@ -235,7 +502,13 @@ namespace C {
         writable_files.clear();
         writable_files.emplace_back(stem + ".h", std::move(header));
         writable_files.emplace_back(stem + ".c", std::move(source_text));
-        std::cerr << "C backend: " << skipped_functions << " function bodies pending, " << diagnostics.size() << " warnings\n";
+        std::cerr << "C backend: " << emitted_functions << " function bodies emitted, " << skipped_functions << " pending, " << diagnostics.size() << " warnings\n";
+        if (std::getenv("ISPA_C_SURVEY")) {
+            std::vector<std::pair<std::size_t, std::string>> sorted;
+            for (auto &[k, v] : reasons) sorted.emplace_back(v, k);
+            std::ranges::sort(sorted, std::greater<>());
+            for (auto &[n, k] : sorted) std::cerr << "SURVEY " << n << "  " << k << "\n";
+        }
     }
 }
 
