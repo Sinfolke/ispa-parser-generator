@@ -2,3 +2,5 @@ module std.whitespace;
 HORIZONTAL: @ [ \t]+ {@};
 NEWLINE: @ ('\r' '\n' | '\n' | '\r') {@};
 WHITESPACE: @ [ \t\r\n\f\v]+ {@};
+// Conventional name of the skipped-whitespace token.
+__WS: @ [ \t\r\n\f\v]+ {@};

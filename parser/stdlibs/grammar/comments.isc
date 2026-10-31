@@ -1,8 +1,9 @@
 module std.comments;
+// BLOCK_COMMENT nests and its body may not contain a bare `*`.
 
 LINE_COMMENT<begin>:
-    begin [^\n]?
+    begin [^\n]*
 ;
 BLOCK_COMMENT<begin, end>:
-    begin (BLOCK_COMMENT | [^*])* end
+    begin (BLOCK_COMMENT<begin, end> | [^*])* end
 ;

@@ -21,7 +21,7 @@ Args parse_args(int argc, char** argv) {
     app.add_flag("--check-only", args.check_only, "Run parsing and semantic checks without generating output");
     app.add_option("--ai-recovery", args.ai_recovery_file, "Load AI recovery messages from this JSON file");
     app.add_flag("--no-ai-recovery", args.no_ai_recovery, "Do not load AI recovery messages");
-    app.add_option("-l,--lang", args.language_str, "Set build language")->required();
+    app.add_option("-l,--lang", args.language_str, "Set build language");
     app.add_option("-a,--algorithm", algorithm, "Set one of algorithms: LL, LR(0), LR(1), LALR, LR(*)");
     app.add_option("--debug", args.debug, "Output debug logs into Logs directory");
     app.add_flag("--debug-instrumentation,!--no-debug-instrumentation", args.debug_instrumentation,
@@ -40,6 +40,8 @@ Args parse_args(int argc, char** argv) {
         "Resolve LR conflicts with extra lookahead and deferred runtime branching");
     app.add_option("--lr-conflict-lookahead", args.conflict_lookahead,
         "Maximum automatic compile-time LR lookahead before runtime fallback (1..8)");
+    app.add_option("--precompile", args.precompile,
+        "Bundle the .isc modules of a library directory into <dir>/library.ispac and exit");
     app.add_flag("--library-only", args.library_only,
         "Emit only imported helper declarations (for lowering shared runtime libraries)");
     app.add_option("--stdlib", args.stdlib,
@@ -73,6 +75,7 @@ Args parse_args(int argc, char** argv) {
         throw Error("--lr-conflict-lookahead must be between 1 and 8");
     if (!args.stdlib_name.empty() && args.stdlib.empty())
         throw Error("--stdlib-name requires --stdlib");
+    if (args.language_str.empty() && args.precompile.empty()) throw Error("Argument --lang is required");
     if ((!args.stdlib.empty() || args.static_stdlib) && args.language_str != "cpp")
         throw Error("--stdlib and --static are only available for -l cpp so far");
     if (args.static_stdlib)

@@ -52,7 +52,7 @@ namespace Rust {
         }
         // outer attributes: the file can be `include!`d as well as be a module file
         constexpr const char *kAllow =
-            "#[allow(unused_imports)]\nuse ::ispa_std::pycoll::{PyContains, PyPop, VecAt, VecSize};\n";
+            "#[allow(unused_imports)]\nuse ::ispa_std::pycoll::{PyContains, PyPop, StrSubstr, VecAt, VecPushBack, VecSize};\n";
         constexpr const char *kRootAllow =
             "#[allow(non_snake_case, non_camel_case_types, non_upper_case_globals, unused_mut, unused_variables,\n"
             "         unused_parens, unused_labels, unused_imports, unreachable_patterns, unreachable_code, dead_code,\n"

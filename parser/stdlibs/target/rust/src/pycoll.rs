@@ -11,8 +11,23 @@ impl<K: Eq + Hash> PyContains<K> for HashSet<K> { fn py_contains(&self, key: &K)
 impl PyContains<String> for String { fn py_contains(&self, key: &String) -> bool { self.contains(key.as_str()) } }
 
 /// `vector.at(i)` of generated tables: a copy of the checked element.
-pub trait VecSize { fn size(&self) -> usize; }
-impl<T> VecSize for Vec<T> { fn size(&self) -> usize { self.len() } }
+/// A list's size is a C++ `size_t`; a str's is a Python int (the lowered token actions do arithmetic with it).
+pub trait VecSize { type Len; fn size(&self) -> Self::Len; }
+impl<T> VecSize for Vec<T> { type Len = usize; fn size(&self) -> usize { self.len() } }
+impl VecSize for String { type Len = i64; fn size(&self) -> i64 { self.len() as i64 } }
+/// `list.append` spelled the C++ way.
+pub trait VecPushBack<T> { fn push_back(&mut self, value: T); }
+impl<T> VecPushBack<T> for Vec<T> { fn push_back(&mut self, value: T) { self.push(value) } }
+/// `str.substr(position, count)` over the 8-bit units of the source.
+pub trait StrSubstr { fn substr(&self, position: i64, count: i64) -> String; }
+impl StrSubstr for String {
+    fn substr(&self, position: i64, count: i64) -> String {
+        let bytes = self.as_bytes();
+        let from = (position.max(0) as usize).min(bytes.len());
+        let to = from.saturating_add(count.max(0) as usize).min(bytes.len());
+        bytes[from..to].iter().map(|b| *b as char).collect()
+    }
+}
 pub trait VecAt<T> { fn at(&self, index: usize) -> T; }
 impl<T: Clone> VecAt<T> for Vec<T> {
     fn at(&self, index: usize) -> T { self.get(index).cloned().unwrap_or_else(|| crate::fail(1, "vector::at")) }
@@ -60,14 +75,19 @@ fn py_position(index: i64, len: usize) -> usize {
     if at < 0 || at >= len as i64 { crate::fail(1, "index out of range"); }
     at as usize
 }
-impl<T: Clone> PyIndex<i64> for Vec<T> {
+/// Any integer type indexes (sizes are `usize`, Python ints `i64`; `i32` keeps an untyped literal inferable).
+pub trait PyIdx: Copy { fn idx(self) -> i64; }
+impl PyIdx for i64 { fn idx(self) -> i64 { self } }
+impl PyIdx for i32 { fn idx(self) -> i64 { self as i64 } }
+impl PyIdx for usize { fn idx(self) -> i64 { self as i64 } }
+impl<T: Clone, I: PyIdx> PyIndex<I> for Vec<T> {
     type Output = T;
-    fn py_index(&self, index: &i64) -> T { self[py_position(*index, self.len())].clone() }
+    fn py_index(&self, index: &I) -> T { self[py_position(index.idx(), self.len())].clone() }
 }
 /// A str is a sequence of 8-bit units (source bytes); unit `i` is the Latin-1 character of byte `i`.
-impl PyIndex<i64> for String {
+impl<I: PyIdx> PyIndex<I> for String {
     type Output = String;
-    fn py_index(&self, index: &i64) -> String { (self.as_bytes()[py_position(*index, self.len())] as char).to_string() }
+    fn py_index(&self, index: &I) -> String { (self.as_bytes()[py_position(index.idx(), self.len())] as char).to_string() }
 }
 impl<K: Eq + Hash, V: Clone> PyIndex<K> for HashMap<K, V> {
     type Output = V;

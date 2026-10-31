@@ -173,6 +173,18 @@ function(add_cli dir)
 endfunction()
 add_cli(ispa)
 target_link_libraries(ispa PRIVATE yaml-cpp::yaml-cpp)
+# Ship the standard library beside the binary so `import std.*` works without ispa-pkg.
+add_custom_command(TARGET ispa POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                ${CMAKE_CURRENT_SOURCE_DIR}/parser/stdlibs/grammar $<TARGET_FILE_DIR:ispa>/libraries/std/ispalib/grammar
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                ${CMAKE_CURRENT_SOURCE_DIR}/parser/stdlibs/python $<TARGET_FILE_DIR:ispa>/libraries/std/ispalib/python
+        COMMAND ${CMAKE_COMMAND} -E env --unset=LD_LIBRARY_PATH
+                $<TARGET_FILE:ispa> --precompile $<TARGET_FILE_DIR:ispa>/libraries/std/ispalib)
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/parser/stdlibs/grammar
+        DESTINATION share/ispa/libraries/std/ispalib)
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/parser/stdlibs/python
+        DESTINATION share/ispa/libraries/std/ispalib)
 # =============================================
 # ISPA ALGORITHMS/CONVERTERS FUNCTIONS
 # =============================================

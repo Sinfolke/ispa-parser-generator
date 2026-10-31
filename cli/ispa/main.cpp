@@ -893,6 +893,15 @@ int generate(Args args) {
                     throw std::runtime_error("ambiguous Python module: " + module_name);
                 resolved = std::move(candidate);
             }
+            if (resolved.empty()) {
+                // Not on disk: a precompiled library may carry the module.
+                for (auto key : {relative.generic_string() + ".py", (relative / "__init__.py").generic_string()})
+                    if (const auto found = module_project.python_sources.find(key);
+                        found != module_project.python_sources.end()) {
+                        semantic_checker.addPythonSource(module_name, found->second.file.string(), found->second.text);
+                        break;
+                    }
+            }
             if (!resolved.empty()) {
                 std::ifstream input(resolved, std::ios::binary);
                 if (input) semantic_checker.addPythonSource(module_name, resolved.string(),
@@ -1088,11 +1097,16 @@ int main(int argc, char** argv) {
             );
             return 0;
         }
+        if (!args.precompile.empty()) {
+            const auto count = Modules::precompile(args.precompile);
+            std::println("Precompiled {} module(s) into {}/library.ispac", count, args.precompile);
+            return 0;
+        }
         const auto executable = executablePath(argv[0]);
         args.executable_dir = executable.parent_path().string();
         if (!args.version) {
             const auto libraries = InstalledLibraries::discover(
-                InstalledLibraries::root(executable));
+                InstalledLibraries::root(executable), InstalledLibraries::bundledRoots(executable));
             args.library_dirs = libraries.source_directories;
             std::set<std::string> explicit_names;
             for (const auto& [name, prefix] : args.dependencies) explicit_names.insert(name);

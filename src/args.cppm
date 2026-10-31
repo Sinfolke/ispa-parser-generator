@@ -27,6 +27,7 @@ export struct Args {
     bool dependency_build = false;
     // Emit imported helper declarations without a generated grammar facade.
     bool library_only = false;
+    std::string precompile;
     bool debug = false;
     bool debug_instrumentation = true;
     // C++ only: token text fields are non-owning views of the input (ISPA_STD::Text) instead of std::string copies.

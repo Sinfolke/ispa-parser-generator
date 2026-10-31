@@ -484,6 +484,21 @@ def build_missing_rust_package(package, name):
     return None
 
 
+def precompile_library(ispalib):
+    """Bundle grammar modules and Python helpers into ispalib/library.ispac (optional speedup)."""
+    if not ispalib.is_dir():
+        return
+    executable = os.environ.get("ISPA") or shutil.which("ispa")
+    if not executable:
+        return
+    env = {key: value for key, value in os.environ.items() if key != "LD_LIBRARY_PATH"}
+    try:
+        subprocess.run([executable, "--precompile", str(ispalib)], check=True, env=env,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=300)
+    except (OSError, subprocess.SubprocessError) as error:
+        print(f"warning: could not precompile {ispalib}: {getattr(error, 'stderr', None) or error}", file=sys.stderr)
+
+
 def install(name, spec, root, allow_scripts=False, force=False, from_catalog=False, catalog_path=None, _active=()):
     if not NAME.fullmatch(name):
         raise PackageError(f"Invalid package name: {name}")
@@ -594,6 +609,7 @@ def install(name, spec, root, allow_scripts=False, force=False, from_catalog=Fal
             else:
                 command = ["sh", str(script_path), str(stage)]
             subprocess.run(command, cwd=config_tree, check=True)
+        precompile_library(stage / "ispalib")
         build_cpp_library(stage, name, root)
         build_cpp_core(stage, name, root)
         build_rust_package(stage, name)

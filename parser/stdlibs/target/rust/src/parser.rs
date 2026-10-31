@@ -145,6 +145,18 @@ where Action: FnMut(&mut IT, &mut RecoveryState) -> Shared<core_recovery::Decisi
     }
 }
 
+/// The positional boundary arguments of `ctx.sync_tokens(a, b, ...)` (Rust has no variadics).
+pub trait IntoBoundaries { fn into_boundaries(self) -> Vec<Shared<parser_ll::TokenBoundary>>; }
+macro_rules! boundaries_for_tuples {
+    ($(($($name:ident),+))+) => { $(
+        impl<$($name: Into<Shared<parser_ll::TokenBoundary>>),+> IntoBoundaries for ($($name,)+) {
+            #[allow(non_snake_case)]
+            fn into_boundaries(self) -> Vec<Shared<parser_ll::TokenBoundary>> { let ($($name,)+) = self; vec![$($name.into()),+] }
+        }
+    )+ };
+}
+boundaries_for_tuples! { (A) (A, B) (A, B, C) (A, B, C, D) (A, B, C, D, E) (A, B, C, D, E, F) (A, B, C, D, E, F, G) (A, B, C, D, E, F, G, H) (A, B, C, D, E, F, G, H, I) (A, B, C, D, E, F, G, H, I, J) }
+
 /// `ctx` of a fail block: reads see the typed cursor, repairs and diagnostics run in the core's `FailContext`.
 pub struct FailContext<'a, IT: BridgeCursor> {
     pub pos: &'a mut IT,
@@ -184,6 +196,14 @@ impl<'a, IT: BridgeCursor> FailContext<'a, IT> {
     pub fn sync(&mut self, boundaries: &[&str]) {
         self.push();
         self.core.borrow_mut().sync(&boundaries.iter().map(|b| b.to_string()).collect());
+        self.pull();
+    }
+    /// A boundary that is a token kind (by name), for `sync_tokens`.
+    pub fn token_boundary(&self, name: impl AsRef<str>) -> Shared<parser_ll::TokenBoundary> { parser_ll::token_boundary(&name.as_ref().to_string()) }
+    /// Skip whole tokens up to one of the boundaries (a tuple of `token_boundary` values, as many as the call site names).
+    pub fn sync_tokens(&mut self, boundaries: impl IntoBoundaries) {
+        self.push();
+        self.core.borrow_mut().sync_tokens(&boundaries.into_boundaries());
         self.pull();
     }
     pub fn skip(&mut self) { self.push(); self.core.borrow_mut().skip(); self.pull(); }

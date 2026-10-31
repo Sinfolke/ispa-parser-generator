@@ -14,9 +14,10 @@ separate packages: `ispa-pkg install target-cpp` for C++ and
 | Module | Contents |
 | --- | --- |
 | `std.names` | ASCII identifier token `ID` and dotted `qualified_name` rule |
-| `std.separators` | `__WS` and `NEWLINE` lexer productions |
+| `std.whitespace` | `HORIZONTAL`, `NEWLINE` (LF, CRLF, CR), `WHITESPACE` and the skip token `__WS` |
+| `std.numbers` | `UNSIGNED`, `INTEGER`, `HEX_INTEGER`, `BINARY_INTEGER`, `OCTAL_INTEGER`, `DECIMAL` |
 | `std.comments` | Parameterized line and block comment productions |
-| `std.literals` | `NUMBER`, quoted `STRING`, and `ID` productions, with recovery handlers for malformed literals |
+| `std.literals` | `SIMPLE_NUMBER` and quoted `STRING<quote>` productions (use `std.names` for `ID`), with recovery handlers for malformed literals |
 | `std.collections` | Parameterized separated-list and key/value-list productions; both accept an optional trailing separator |
 
 Grammar productions are reusable templates. Import only the productions a

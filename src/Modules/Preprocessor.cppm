@@ -50,7 +50,14 @@ struct Source {
     std::set<Path> detached_symbols;
     bool has_directives = false;
 };
+// A Python helper module carried by a precompiled library.
+struct PythonSource {
+    std::filesystem::path file;
+    std::string text;
+};
 struct Project {
+    // Keyed by path relative to the library's python root, e.g. "stdmath.py".
+    std::map<std::string, PythonSource> python_sources;
     std::vector<Source> sources;
     bool modular = false;
     std::optional<Path> entry;
@@ -73,4 +80,10 @@ Project preprocess(const std::vector<std::string>& directories,
                    const std::map<std::string, std::string>& resolve = {},
                    const std::vector<std::string>& library_directories = {});
 std::string spelling(const Path& path);
+// Bundle the .isc modules (`directory/grammar`) and .py helpers (`directory/python`) of a
+// library into `directory/library.ispac`; a flat directory holds both. discover() loads a
+// .ispac entry of the library list instead of re-scanning and re-parsing module directives, as long as the
+// listed sources are unchanged (or no longer present, as in a shipped library). Returns the
+// number of modules written.
+std::size_t precompile(const std::string& directory);
 }

@@ -199,6 +199,15 @@ impl<Token> LexerTypes for LexerBase<Token> {
     type LazyIterator = LazyIterator<Token>;
 }
 impl<Token: Clone + Default + 'static> LexerBase<Token> {
+    /// Source queries of token actions (`ctx.next_char`, the line of an emitted token), by position.
+    pub fn __line(&self, at: Ptr) -> i64 { at.line() as i64 }
+    pub fn __next_char(&self, at: Ptr) -> String { at.get().map(|byte| (byte as char).to_string()).unwrap_or_default() }
+    pub fn __line_prefix(&self, at: Ptr) -> String {
+        let text = at.text().as_bytes();
+        let end = at.offset().min(text.len());
+        let begin = text[..end].iter().rposition(|byte| *byte == b'\n' || *byte == b'\r').map_or(0, |i| i + 1);
+        text[begin..end].iter().map(|byte| *byte as char).collect()
+    }
     pub fn append_token(&mut self, token: Token) { self.tokens.push(token); }
     pub fn clone_(&self) -> Shared<LexerBase<Token>> { (self.__vt_clone_)(self) }
     pub fn init(&mut self) { (self.__vt_init)(self) }

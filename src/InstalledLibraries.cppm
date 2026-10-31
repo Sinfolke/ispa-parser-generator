@@ -32,18 +32,69 @@ fs::path root(const fs::path& executable) {
     return {};
 }
 
-Discovery discover(const fs::path& library_root) {
+// Libraries shipped with the compiler (such as `std`) live beside the executable, so imports
+// resolve without ispa-pkg or an explicit --dir. Candidates cover the build tree, a relocatable
+// archive, and a prefix install.
+std::vector<fs::path> bundledRoots(const fs::path& executable) {
+    std::vector<fs::path> roots;
+    std::error_code error;
+    const auto binary = fs::weakly_canonical(executable, error);
+    if (error) return roots;
+    const auto directory = binary.parent_path();
+    for (const auto& candidate : {directory / "libraries",
+                                  directory.parent_path() / "libraries",
+                                  directory.parent_path() / "share" / "ispa" / "libraries"})
+        if (fs::is_directory(candidate, error)) roots.push_back(candidate);
+    return roots;
+}
+
+Discovery discover(const fs::path& library_root, const std::set<std::string>& skip);
+
+std::set<std::string> packageNames(const fs::path& library_root) {
+    std::set<std::string> names;
+    std::error_code error;
+    if (fs::is_directory(library_root, error))
+        for (const auto& entry : fs::directory_iterator(library_root))
+            if (entry.is_directory() && !entry.path().filename().string().starts_with('.'))
+                names.insert(entry.path().filename().string());
+    return names;
+}
+
+// Installed libraries win over bundled ones: a package the user installed replaces the shipped
+// package of the same name, and bundled roots are searched after the installed one.
+Discovery discover(const fs::path& library_root, const std::vector<fs::path>& extra_roots) {
+    auto result = discover(library_root, std::set<std::string>{});
+    auto taken = packageNames(library_root);
+    for (const auto& extra : extra_roots) {
+        if (extra == library_root) continue;
+        auto more = discover(extra, taken);
+        taken.merge(packageNames(extra));
+        result.source_directories.insert(result.source_directories.end(),
+            more.source_directories.begin(), more.source_directories.end());
+        for (auto& [name, prefix] : more.dependencies) result.dependencies.emplace(name, prefix);
+    }
+    return result;
+}
+
+Discovery discover(const fs::path& library_root) { return discover(library_root, std::set<std::string>{}); }
+
+Discovery discover(const fs::path& library_root, const std::set<std::string>& skip) {
     Discovery result;
     std::error_code error;
     if (!fs::is_directory(library_root, error)) return result;
     std::vector<fs::path> packages;
     for (const auto& entry : fs::directory_iterator(library_root))
-        if (entry.is_directory() && !entry.path().filename().string().starts_with('.'))
+        if (entry.is_directory() && !entry.path().filename().string().starts_with('.') &&
+            !skip.contains(entry.path().filename().string()))
             packages.push_back(entry.path());
     std::sort(packages.begin(), packages.end());
 
     std::map<std::string, std::set<std::string>> candidates;
     for (const auto& package : packages) {
+        // A precompiled bundle is tried first; the directories stay as the fallback when
+        // it is stale or the sources are absent.
+        if (const auto bundle = package / "ispalib" / "library.ispac"; fs::is_regular_file(bundle))
+            result.source_directories.push_back(bundle.string());
         for (const auto& kind : {"grammar", "python"}) {
             const auto directory = package / "ispalib" / kind;
             if (fs::is_directory(directory)) result.source_directories.push_back(directory.string());

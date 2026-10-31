@@ -254,6 +254,13 @@ std::string Imports::module(const Modules::Path& source_path, const std::string&
             canonical = std::move(candidate);
         }
     }
+    // Not on disk: a precompiled library (.ispac) may carry the module.
+    if (canonical.empty())
+        for (auto key : {relative.generic_string() + ".py", (relative / "__init__.py").generic_string()})
+            if (const auto found = project.python_sources.find(key); found != project.python_sources.end()) {
+                canonical = found->second.file;
+                break;
+            }
     if (canonical.empty())
         fail(at, "Python module not found: " + Modules::spelling(source_path));
     const auto name = Modules::spelling(source_path);
@@ -261,8 +268,15 @@ std::string Imports::module(const Modules::Path& source_path, const std::string&
         fail(at, "module " + name + " resolves to different Python files");
     if (!paths.contains(name)) {
         std::ifstream input(canonical, std::ios::binary);
-        if (!input) fail(at, "cannot read " + canonical.string());
-        const std::string text(std::istreambuf_iterator<char>{input}, {});
+        std::string text;
+        if (input) text.assign(std::istreambuf_iterator<char>{input}, {});
+        else {
+            const auto bundled = std::ranges::find_if(project.python_sources, [&](const auto& item) {
+                return item.second.file == canonical;
+            });
+            if (bundled == project.python_sources.end()) fail(at, "cannot read " + canonical.string());
+            text = bundled->second.text;
+        }
         auto syntax = UAST::parsePythonModule(text, {canonical.string(), 0, text.size(), 1, 1});
         if (!loading.insert(name).second) fail(at, "circular Python import: " + name);
         forwardReferences(syntax.body);

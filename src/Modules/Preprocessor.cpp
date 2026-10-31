@@ -191,6 +191,156 @@ public:
                 if (out.grammar[i] != '\n' && out.grammar[i] != '\r') out.grammar[i] = ' ';
     }
 };
+
+// ---- precompiled library bundle (library.ispac) ----
+constexpr std::string_view bundle_name = "library.ispac", bundle_magic = "ISPAC001";
+struct BundleWriter {
+    std::string out;
+    void num(std::uint64_t v) { out.append(reinterpret_cast<const char*>(&v), sizeof v); }
+    void str(const std::string& v) { num(v.size()); out += v; }
+    void path(const Path& v) { num(v.size()); for (const auto& x : v) str(x); }
+    void pos(const Position& v) { str(v.file); num(v.offset); num(v.line); num(v.column); }
+    void paths(const std::vector<Path>& v) { num(v.size()); for (const auto& x : v) path(x); }
+    void import(const Import& v) {
+        num(static_cast<std::uint64_t>(v.kind)); path(v.source); str(v.alias); str(v.external);
+        paths(v.symbols); pos(v.position); num(v.python_import);
+    }
+    // File identity: root-relative path, size and modification time.
+    void stamp(const std::filesystem::path& file, const std::filesystem::path& root) {
+        std::error_code error;
+        str(file.lexically_relative(root).generic_string());
+        num(std::filesystem::file_size(file, error));
+        num(std::filesystem::last_write_time(file, error).time_since_epoch().count());
+    }
+    template<class M, class F> void map(const M& m, F f) { num(m.size()); for (const auto& [k, v] : m) { path(k); f(v); } }
+};
+struct BundleReader {
+    const std::string& in;
+    std::size_t at = 0;
+    std::uint64_t num() {
+        if (at + 8 > in.size()) throw std::runtime_error("truncated bundle");
+        std::uint64_t v; std::memcpy(&v, in.data() + at, 8); at += 8; return v;
+    }
+    std::string str() {
+        const auto n = num();
+        if (at + n > in.size()) throw std::runtime_error("truncated bundle");
+        std::string v = in.substr(at, n); at += n; return v;
+    }
+    Path path() { Path v; for (auto n = num(); n--;) v.push_back(str()); return v; }
+    Position pos() { Position v; v.file = str(); v.offset = num(); v.line = num(); v.column = num(); return v; }
+    std::vector<Path> paths() { std::vector<Path> v; for (auto n = num(); n--;) v.push_back(path()); return v; }
+    Import import() {
+        Import v; v.kind = static_cast<Import::Kind>(num()); v.source = path(); v.alias = str();
+        v.external = str(); v.symbols = paths(); v.position = pos(); v.python_import = num(); return v;
+    }
+    // False when the file exists on disk but differs from what was bundled.
+    bool stamp(std::filesystem::path& file, const std::filesystem::path& root) {
+        std::error_code error;
+        file = (root / str()).lexically_normal();
+        const auto size = num();
+        const auto time = static_cast<std::int64_t>(num());
+        if (!std::filesystem::is_regular_file(file, error)) return true;
+        return std::filesystem::file_size(file, error) == size &&
+               std::filesystem::last_write_time(file, error).time_since_epoch().count() == time;
+    }
+    template<class M, class F> void map(M& m, F f) { for (auto n = num(); n--;) { auto k = path(); m.emplace(std::move(k), f()); } }
+};
+// Source files are stored relative to the library root so the bundle survives being moved.
+void writeSource(BundleWriter& w, const Source& s, const std::filesystem::path& root) {
+    namespace fs = std::filesystem;
+    std::error_code error;
+    w.stamp(s.file, root);
+    w.path(s.name); w.num(s.entry.has_value()); if (s.entry) w.path(*s.entry);
+    w.str(s.grammar);
+    w.map(s.declarations, [&](const Position& p) { w.pos(p); });
+    w.num(s.imports.size()); for (const auto& i : s.imports) w.import(i);
+    w.num(s.detach.size()); for (const auto& d : s.detach) { w.path(d.name); w.num(d.feature); w.pos(d.position); }
+    w.map(s.features, [&](const std::vector<Path>& v) { w.paths(v); });
+    w.map(s.allowed_symbols, [&](const Path& v) { w.path(v); });
+    w.map(s.resolved_symbols, [&](const Path& v) { w.path(v); });
+    w.map(s.allowed_features, [&](const std::vector<Path>& v) { w.paths(v); });
+    w.num(s.detached_symbols.size()); for (const auto& p : s.detached_symbols) w.path(p);
+    w.num(s.has_directives);
+}
+// Returns false when a listed source changed on disk.
+bool readSource(BundleReader& r, Source& s, const std::filesystem::path& root) {
+    namespace fs = std::filesystem;
+    std::error_code error;
+    fs::path file;
+    const bool fresh = r.stamp(file, root);
+    s.file = file.string();
+    s.name = r.path(); if (r.num()) s.entry = r.path();
+    s.grammar = r.str();
+    r.map(s.declarations, [&] { return r.pos(); });
+    for (auto n = r.num(); n--;) s.imports.push_back(r.import());
+    for (auto n = r.num(); n--;) { Detach d; d.name = r.path(); d.feature = r.num(); d.position = r.pos(); s.detach.push_back(std::move(d)); }
+    r.map(s.features, [&] { return r.paths(); });
+    r.map(s.allowed_symbols, [&] { return r.path(); });
+    r.map(s.resolved_symbols, [&] { return r.path(); });
+    r.map(s.allowed_features, [&] { return r.paths(); });
+    for (auto n = r.num(); n--;) s.detached_symbols.insert(r.path());
+    s.has_directives = r.num();
+    // Positions were recorded against the file's location at bundling time.
+    for (auto& [name, position] : s.declarations) position.file = s.file;
+    for (auto& item : s.imports) item.position.file = s.file;
+    for (auto& item : s.detach) item.position.file = s.file;
+    return fresh;
+}
+// The directories a library bundle describes: `grammar/` and `python/` next to it, or the
+// bundle's own directory for a flat library.
+std::filesystem::path grammarRoot(const std::filesystem::path& bundle) {
+    const auto sub = bundle.parent_path() / "grammar";
+    return std::filesystem::is_directory(sub) ? sub : bundle.parent_path();
+}
+std::filesystem::path pythonRoot(const std::filesystem::path& bundle) {
+    const auto sub = bundle.parent_path() / "python";
+    return std::filesystem::is_directory(sub) ? sub : bundle.parent_path();
+}
+struct Bundle {
+    std::vector<Source> sources;
+    std::map<std::string, PythonSource> python;
+    std::filesystem::path grammar_root;
+};
+// Loads a .ispac file; nullopt when damaged or stale (a listed source changed, or a source
+// was added since). Sources that are no longer on disk are trusted.
+std::optional<Bundle> loadBundle(const std::filesystem::path& bundle_file) {
+    namespace fs = std::filesystem;
+    std::ifstream in(bundle_file, std::ios::binary);
+    if (!in) return std::nullopt;
+    const std::string data(std::istreambuf_iterator<char>(in), {});
+    if (!data.starts_with(bundle_magic)) return std::nullopt;
+    try {
+        Bundle result;
+        result.grammar_root = grammarRoot(bundle_file);
+        const auto python_root = pythonRoot(bundle_file);
+        BundleReader reader{data, bundle_magic.size()};
+        std::set<fs::path> listed;
+        bool fresh = true;
+        for (auto n = reader.num(); n--;) {
+            Source source;
+            fresh &= readSource(reader, source, result.grammar_root);
+            listed.insert(fs::path(source.file));
+            result.sources.push_back(std::move(source));
+        }
+        for (auto n = reader.num(); n--;) {
+            PythonSource module;
+            fresh &= reader.stamp(module.file, python_root);
+            module.text = reader.str();
+            listed.insert(module.file);
+            result.python.emplace(module.file.lexically_relative(python_root).generic_string(), std::move(module));
+        }
+        if (!fresh) return std::nullopt;
+        std::error_code error;
+        for (const auto& root : {result.grammar_root, python_root})
+            for (const auto& item : fs::recursive_directory_iterator(root, error))
+                if (item.is_regular_file() &&
+                    (item.path().extension() == ".isc" || item.path().extension() == ".py") &&
+                    !listed.contains(item.path().lexically_normal())) return std::nullopt;
+        return result;
+    } catch (const std::exception&) {
+        return std::nullopt;
+    }
+}
 }
 
 Project discover(const std::vector<std::string>& directories, const std::vector<std::string>& files,
@@ -198,9 +348,25 @@ Project discover(const std::vector<std::string>& directories, const std::vector<
     namespace fs = std::filesystem;
     Project project;
     std::map<fs::path, fs::path> discovered;
+    std::vector<Source> bundled;
+    std::set<fs::path> bundled_roots;
+    // Precompiled libraries first: a fresh bundle replaces scanning its grammar directory.
+    for (const auto& entry : library_directories) {
+        if (fs::path(entry).extension() != ".ispac") continue;
+        std::error_code error;
+        const auto file = fs::weakly_canonical(entry, error);
+        if (error) continue;
+        if (auto bundle = loadBundle(file)) {
+            bundled_roots.insert(fs::weakly_canonical(bundle->grammar_root, error));
+            for (auto& source : bundle->sources) bundled.push_back(std::move(source));
+            for (auto& [key, module] : bundle->python) project.python_sources.emplace(key, std::move(module));
+        }
+    }
     auto scan = [&](const std::string& directory, bool library) {
+        if (fs::path(directory).extension() == ".ispac") return;
         auto root = fs::canonical(directory);
         if (!fs::is_directory(root)) throw std::runtime_error("Not a module directory: " + directory);
+        if (library && bundled_roots.contains(root)) return;
         std::vector<fs::path> paths;
         for (const auto& item : fs::recursive_directory_iterator(root))
             if (item.is_regular_file() && item.path().extension() == ".isc") paths.push_back(fs::canonical(item.path()));
@@ -230,6 +396,14 @@ Project discover(const std::vector<std::string>& directories, const std::vector<
         project.modular |= source.has_directives && !project.library_files.contains(source.file);
         project.sources.push_back(std::move(source));
     }
+    for (auto& source : bundled) {
+        // Real files (local directories, explicit inputs) take precedence over a bundle.
+        if (discovered.contains(source.file)) continue;
+        project.library_files.insert(source.file);
+        project.sources.push_back(std::move(source));
+    }
+    // Same order as a plain scan, so a bundle never changes generated output.
+    std::ranges::stable_sort(project.sources, {}, &Source::file);
     project.input_files = files;
     project.search_directories = directories;
     project.library_search_directories = library_directories;
@@ -441,5 +615,45 @@ Project preprocess(const std::vector<std::string>& directories, const std::vecto
         });
     }
     return project;
+}
+
+std::size_t precompile(const std::string& directory) {
+    namespace fs = std::filesystem;
+    const auto root = fs::canonical(directory);
+    const auto bundle = root / bundle_name;
+    const auto grammar = grammarRoot(bundle), python = pythonRoot(bundle);
+    const auto list = [](const fs::path& base, std::string_view extension) {
+        std::vector<fs::path> paths;
+        for (const auto& item : fs::recursive_directory_iterator(base))
+            if (item.is_regular_file() && item.path().extension() == extension) paths.push_back(fs::canonical(item.path()));
+        std::sort(paths.begin(), paths.end());
+        return paths;
+    };
+    const auto sources = list(grammar, ".isc");
+    const auto modules = list(python, ".py");
+    BundleWriter writer;
+    writer.out.assign(bundle_magic);
+    writer.num(sources.size());
+    for (const auto& file : sources) {
+        Source source;
+        source.file = file.string();
+        auto module_path = file.lexically_relative(grammar);
+        module_path.replace_extension();
+        for (const auto& component : module_path) source.name.push_back(component.string());
+        std::ifstream in(file, std::ios::binary);
+        source.grammar.assign(std::istreambuf_iterator<char>(in), {});
+        SourceSyntax(source).run();
+        writeSource(writer, source, grammar);
+    }
+    writer.num(modules.size());
+    for (const auto& file : modules) {
+        writer.stamp(file, python);
+        std::ifstream in(file, std::ios::binary);
+        writer.str(std::string(std::istreambuf_iterator<char>(in), {}));
+    }
+    std::ofstream out(bundle, std::ios::binary | std::ios::trunc);
+    out << writer.out;
+    if (!out) throw std::runtime_error("Cannot write " + bundle.string());
+    return sources.size() + modules.size();
 }
 }

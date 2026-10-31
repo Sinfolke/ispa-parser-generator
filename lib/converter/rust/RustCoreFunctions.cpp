@@ -1190,6 +1190,9 @@ auto RustCore::convertFunctionCall(const LangAPI::FunctionCall &call, bool membe
         const auto &symbol = *std::get<std::shared_ptr<LangAPI::Symbol>>(call.name);
         // a method name after `.` never refers to a local or member of the same spelling
         const auto symbol_name = convertSymbol(symbol, !member);
+        // ctx.sync_tokens(a, b, ...) is variadic in the source language; Rust takes the boundaries as one tuple
+        if (member && symbol_name == "sync_tokens" && !args.empty())
+            return "sync_tokens((" + joinStrings(args, ", ") + (args.size() == 1 ? "," : "") + "))";
         if (symbol_name == "custom_failure" && !member && !counter.empty()) {
             // the cursor is named so the block's parameters have a known type
             const auto object = receiver.empty() ? std::string("self") : receiver;

@@ -329,7 +329,8 @@ auto ConstructParser::constructLRParser(LangAPI::Class &parser) -> void {
         if (const auto* source = production.source.normalization_source.get()) {
             Array indices, offsets, splice;
             std::size_t count = 0;
-            const bool explicit_captures = innerCaptures(*source) != 0;
+            // An outer `@` on a group (`@ (A @ B)?`) captures every member of the group as one value, whatever is marked inside.
+            const bool explicit_captures = source->prefix.empty() && innerCaptures(*source) != 0;
             for (std::size_t m = 0; m < production.rhs.size(); ++m) {
                 const auto& member = *production.source.rule_members[m];
                 const auto* child = helperSource(production.rhs[m]);

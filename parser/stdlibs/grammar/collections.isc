@@ -1,11 +1,10 @@
 module std.collections;
-import py {sep_seq_to_list} from ast;
+import py {sep_seq_to_list, kv_to_dict} from ast;
 list<member, separator>:
     &f member (separator &seq member)* separator?
     {sep_seq_to_list(f, seq)}
 ;
 key_value<key, value, kv_sep, sep>:
     &k key kv_sep &v value (sep &k_seq key kv_sep &v_seq value)* sep?
-
     {kv_to_dict(k, v, k_seq, v_seq)}
 ;

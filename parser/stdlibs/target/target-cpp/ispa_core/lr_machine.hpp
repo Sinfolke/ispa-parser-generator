@@ -195,8 +195,8 @@ ISPA_STD::MatchResult<MainNode, IT> lr_core_run(CoreParser& parser, Host& host, 
 template<typename MainNode, typename Token>
 class LRParser : public ISPA_STD::LRParser<MainNode, Token> {
     std::shared_ptr<core_detail::lo::lr::LRParser> core_;
-    core_detail::FailHost<MainNode, Token> failure_host_;  // owns the recovery state that fail blocks (ctx.error, ctx.skip, ...) work on
 protected:
+    core_detail::FailHost<MainNode, Token> failure_host_;  // owns the recovery state that fail blocks (ctx.error, ctx.skip, ...) work on
     // Value helpers the generated reductions call, over the parser's closed LRValue instead of std::any.
     template<class T>
     static auto lr_token(T node) {

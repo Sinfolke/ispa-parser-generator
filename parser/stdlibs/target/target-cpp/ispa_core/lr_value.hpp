@@ -157,6 +157,10 @@ template<class V, class T> bool lr_convert_value(T& target, const V& value) {
             }
             return true;
         } else if constexpr (ISPA_STD::is_tuple_like_v<T> && !ISPA_STD::is_variant_v<T>) {
+            // an optional group wraps its own pack as the single value of one column: look through it
+            if (captures.columns.size() == 1 && captures.columns[0].size() == 1 && captures.columns[0][0].template holds<typename V::Caps>() &&
+                std::tuple_size_v<T> != 1)
+                return lr_convert<V>(target, captures.columns[0][0]);
             if (captures.columns.size() != std::tuple_size_v<T>) return false;
             return lr_convert_tuple<V>(target, captures, std::make_index_sequence<std::tuple_size_v<T>>{});
         } else {

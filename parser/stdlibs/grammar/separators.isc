@@ -1,6 +1,0 @@
-module std.separators;
-
-__WS:
-    [ \t\r\n\v\f]+
-;
-NEWLINE: '\n';
