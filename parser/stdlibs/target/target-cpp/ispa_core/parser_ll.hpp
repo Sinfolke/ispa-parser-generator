@@ -254,6 +254,15 @@ public:
     core_detail::FrameScope recovery_frame(std::string_view rule) { return core_detail::FrameScope(core().get(), std::string(rule)); }
     bool unwinding() const noexcept { return const_cast<LLParser*>(this)->core()->unwinding(); }
 
+    // A rule abandoned because a required descendant never started is not a match (the core's reject_absent_rule);
+    // one abandoned by a recovery unwind still returns its partial result.
+    template<typename AST, typename IT>
+    auto action_result(AST& ast, IT pos) {
+        using Result = decltype(Base::action_result(ast, pos));
+        if (core()->absent_pending()) return Result{};  // not a match; same value as the generated `return {};`
+        return Base::action_result(ast, std::move(pos));
+    }
+
     template<typename... Sets, typename... Names>
     void recovery_at(std::string_view expecting, Names... names) {
         static_assert(sizeof...(Sets) == sizeof...(Names), "recovery_at: one claim name per claim set");
@@ -276,6 +285,7 @@ public:
 
     template<typename SpaceToken, typename IT>
     void skip_spaces(IT& pos) {
+        if (core()->absent_pending()) return;  // see LLParser.skip_spaces
         use_space_token<SpaceToken>();
         // A leaf call into the core: one cursor per iterator type is reused instead of allocating one per call.
         static thread_local std::shared_ptr<core_detail::TypedCursor<IT, Token, SpaceToken>> scratch;
@@ -318,12 +328,7 @@ public:
         // Same shape as the core's required_rule when nothing observes it; only a failed first attempt enters the core.
         if (core()->fast_path_ok(fail.handler, false)) {
             IT attempt = pos;
-            typename std::decay_t<decltype(rec(attempt))> match;
-            try {
-                match = rec(attempt);
-            } catch (const typename Base::NoMatch&) {
-                ISPA_STD::fail(ISPA_STD::EK_NoMatch, "no match");
-            }
+            auto match = rec(attempt);
             if (match.status) {
                 pos = match.it;
                 core()->accept_at(static_cast<long long>(pos.distance()));
@@ -581,12 +586,14 @@ public:
     MainNode& parse() override {
         ISPA_STD::ArenaScope arena;
         core()->reset_recovery();
+        core()->reset_probes();
         struct Merge { LLParser& parser; ~Merge() { parser.merge_diagnostics(); parser.core()->reset_recovery(); } } merge{*this};
         return Base::parse();
     }
     MainNode& parseLazy() override {
         ISPA_STD::ArenaScope arena;
         core()->reset_recovery();
+        core()->reset_probes();
         struct Merge { LLParser& parser; ~Merge() { parser.merge_diagnostics(); parser.core()->reset_recovery(); } } merge{*this};
         return Base::parseLazy();
     }
@@ -635,17 +642,13 @@ protected:
         namespace lo = core_detail::lo;
         return [&rec](std::shared_ptr<lo::lexer::TokenCursor> base) -> std::shared_ptr<lo::match_result::MatchResult> {
             auto& cursor = static_cast<core_detail::TypedCursor<IT, Token, NodeStruct>&>(*base);
-            try {
-                auto match = rec(cursor.it);
-                auto out_cursor = core_detail::counted<core_detail::TypedCursor<IT, Token, NodeStruct>>(match.it);
-                auto node = match.status ? core_detail::typed_node<NodeStruct>(std::move(match.node), 0, 0, 0, 0, 0)
-                                         : std::shared_ptr<core_detail::TypedNode<NodeStruct>>();
-                auto result = core_detail::counted<lo::match_result::MatchResult>();
-                result->__init__(match.status, node ? std::static_pointer_cast<lo::node::Node>(node) : lo::node::Node::blank(), out_cursor);
-                return result;
-            } catch (const typename Base::NoMatch&) {
-                ISPA_STD::fail(ISPA_STD::EK_NoMatch, "no match");
-            }
+            auto match = rec(cursor.it);
+            auto out_cursor = core_detail::counted<core_detail::TypedCursor<IT, Token, NodeStruct>>(match.it);
+            auto node = match.status ? core_detail::typed_node<NodeStruct>(std::move(match.node), 0, 0, 0, 0, 0)
+                                     : std::shared_ptr<core_detail::TypedNode<NodeStruct>>();
+            auto result = core_detail::counted<lo::match_result::MatchResult>();
+            result->__init__(match.status, node ? std::static_pointer_cast<lo::node::Node>(node) : lo::node::Node::blank(), out_cursor);
+            return result;
         };
     }
 

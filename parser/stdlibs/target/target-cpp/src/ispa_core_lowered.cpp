@@ -2925,6 +2925,7 @@ auto python::ispa_std::parser_ll::RuleProbe::__init__(std::shared_ptr<python::is
 	((*this)).start = start;
 	((*this)).committed = false;
 	((*this)).open = true;
+	((*this)).depth = static_cast<long long>(((*parser)).probes_.size());
 	(((*parser)).probes_).push_back(::ISPA_STD::self_ptr(this));
 }
 auto python::ispa_std::parser_ll::RuleProbe::close() -> void {
@@ -2932,7 +2933,9 @@ auto python::ispa_std::parser_ll::RuleProbe::close() -> void {
 		return ;
 	}
 	((*this)).open = false;
-	ISPA_STD::python_pop((((*((*this)).parser)).probes_));
+	while (((static_cast<long long>(((*((*this)).parser)).probes_.size())) > (((*this)).depth))) {
+		ISPA_STD::python_pop((((*((*this)).parser)).probes_));
+	}
 }
 auto python::ispa_std::parser_ll::Resume::__init__(long long skip, long long frame, std::shared_ptr<python::ispa_std::recovery::ContextClaim> claim, bool has_claim) -> void {
 	((*this)).skip = skip;
@@ -2970,6 +2973,10 @@ auto python::ispa_std::parser_ll::LLParser::getErrors() -> std::vector<std::shar
 }
 auto python::ispa_std::parser_ll::LLParser::getContextErrors() -> const std::vector<std::shared_ptr<python::ispa_std::recovery::ContextDiagnostic>>& {
 	return ((*this)).context_errors_;
+}
+auto python::ispa_std::parser_ll::LLParser::reset_probes() -> void {
+	"Start of a parse: drop probes an error left open. Not part of reset_recovery, which the\n        native facade also calls in the middle of a parse (drain_core) while probes are live.";
+	(((*this)).probes_).clear();
 }
 auto python::ispa_std::parser_ll::LLParser::reset_recovery() -> void {
 	((*((*this)).counters_)).clear();
@@ -3046,11 +3053,28 @@ auto python::ispa_std::parser_ll::LLParser::bind_counter_node(const std::string&
 auto python::ispa_std::parser_ll::LLParser::begin_probe(std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos) -> std::shared_ptr<python::ispa_std::parser_ll::RuleProbe> {
 	return ISPA_STD::construct<python::ispa_std::parser_ll::RuleProbe>(::ISPA_STD::self_ptr(this), python::ispa_std::parser_ll::cursor_position(pos));
 }
-auto python::ispa_std::parser_ll::LLParser::reject_absent_rule() -> void {
-	"Raise NoMatch when we are inside an uncommitted probe: the rule never\n        started, so the caller\'s `optional` should simply not match.";
-	if (((((static_cast<long long>(((*this)).probes_.size())) > (0))) && ((!(((*(((*this)).probes_)[((static_cast<long long>(((*this)).probes_.size())) - (1))])).committed))))) {
-		python::ispa_std::failures::no_match();
+auto python::ispa_std::parser_ll::LLParser::reject_absent_rule() -> bool {
+	"Signal \"absent rule\" when we are inside an uncommitted probe: the rule\n        never started, so the caller\'s `optional` should simply not match.\n\n        Nothing is thrown. The signal reuses the recovery unwind: unwind_ becomes\n        -1, so unwinding() is true, every member of every abandoned rule returns at\n        its next `unwinding()` check (the generator emits it after each member, so\n        no further member and no rule action runs), and action_result() reports the\n        abandoned rule as not matched. The probe\'s owner takes the signal with\n        take_absent() right after its rec() returns. Returns True when the signal\n        was raised: the caller must then return at once, doing no further work.";
+	if (((((*this)).unwind_) < (0))) {
+		return true;
 	}
+	if (((((((((*this)).unwind_) == (0))) && (((static_cast<long long>(((*this)).probes_.size())) > (0))))) && ((!(((*(((*this)).probes_)[((static_cast<long long>(((*this)).probes_.size())) - (1))])).committed))))) {
+		((*this)).unwind_ = ( - (1));
+		return true;
+	}
+	return false;
+}
+auto python::ispa_std::parser_ll::LLParser::absent_pending() -> bool {
+	"Whether the current unwind is the absent-rule signal (native action_result uses it).";
+	return ((((*this)).unwind_) < (0));
+}
+auto python::ispa_std::parser_ll::LLParser::take_absent() -> bool {
+	"The owner of a probe: whether a required descendant of rec() never started\n        (clears the signal).";
+	if (((((*this)).unwind_) < (0))) {
+		((*this)).unwind_ = 0;
+		return true;
+	}
+	return false;
 }
 auto python::ispa_std::parser_ll::LLParser::commit_rule(std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos) -> void {
 	((*this)).commit_at(python::ispa_std::parser_ll::cursor_position(pos));
@@ -3143,7 +3167,7 @@ auto python::ispa_std::parser_ll::LLParser::enter_frame(const std::string& rule)
 auto python::ispa_std::parser_ll::LLParser::leave_frame() -> void {
 	((*this)).frame_count = ((((*this)).frame_count) - (1));
 	((*((*this)).recovery_state_)).anchor_count = ((((*((*this)).recovery_state_)).anchor_count) - (1));
-	if (((((*this)).unwind_) != (0))) {
+	if (((((*this)).unwind_) > (0))) {
 		((*this)).unwind_ = ((((*this)).unwind_) - (1));
 	}
 }
@@ -3344,7 +3368,9 @@ auto python::ispa_std::parser_ll::LLParser::sync_loop(std::shared_ptr<python::is
 }
 auto python::ispa_std::parser_ll::LLParser::recover_choice(std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos, const std::string& rule, const std::string& expected, const std::vector<std::shared_ptr<python::ispa_std::recovery::TokenSet>>& first_sets, const std::vector<std::shared_ptr<python::ispa_std::recovery::TokenSet>>& inner_sets) -> long long {
 	"Called only after normal LL(k) selection failed. Prefer an\n        unambiguous FIRST token, then an unambiguous terminal inside an\n        alternative (shared interior terminals do not identify a branch).\n        `first_sets[i]` / `inner_sets[i]` are the two sets of alternative i\n        (the C++ even/odd template pack). Returns the alternative, or -1.";
-	((*this)).reject_absent_rule();
+	if (((*this)).reject_absent_rule()) {
+		return ( - (1));
+	}
 	if (((static_cast<long long>(first_sets.size())) != (static_cast<long long>(inner_sets.size())))) {
 		python::ispa_std::failures::logic_error("recover_choice: one FIRST set and one interior set per alternative");
 	}
@@ -3435,7 +3461,9 @@ auto python::ispa_std::parser_ll::LLParser::recover_choice(std::shared_ptr<pytho
 	return selected;
 }
 auto python::ispa_std::parser_ll::LLParser::raise_error(std::shared_ptr<python::ispa_std::raw_token::RawToken> token, const std::string& message) -> void {
-	((*this)).reject_absent_rule();
+	if (((*this)).reject_absent_rule()) {
+		return ;
+	}
 	auto diagnostic = ISPA_STD::construct<python::ispa_std::recovery::Diagnostic>();
 	if (((((*this)).frame_count) == (0))) {
 		((*diagnostic)).rule = "<rule>";
@@ -3460,7 +3488,9 @@ auto python::ispa_std::parser_ll::LLParser::required_recovering(std::shared_ptr<
 			((*this)).note_match();
 			return ISPA_STD::construct<python::ispa_std::recovery::RequiredResult>(python::ispa_std::recovery::RequiredStatus::Matched, true, node, python::ispa_std::recovery::Decision::initial());
 		}
-		((*this)).reject_absent_rule();
+		if (((*this)).reject_absent_rule()) {
+			return python::ispa_std::recovery::RequiredResult::boundary_only();
+		}
 		auto decision = ((*fail)).run(pos, ((*this)).recovery_state_);
 		bool retry = false;
 		if (((((*decision)).mode) == (python::ispa_std::recovery::Mode::Delete))) {
@@ -3489,7 +3519,10 @@ auto python::ispa_std::parser_ll::LLParser::required_recovering(std::shared_ptr<
 	}
 }
 auto python::ispa_std::parser_ll::LLParser::_attempt_rule(std::function<std::shared_ptr<python::ispa_std::match_result::MatchResult>(std::shared_ptr<python::ispa_std::lexer::TokenCursor>)> rec, std::shared_ptr<python::ispa_std::lexer::TokenCursor> attempt) -> std::shared_ptr<python::ispa_std::match_result::MatchResult> {
-	"Run `rec(attempt)` inside a probe, absorbing NoMatch and\n        ExternalParse so an explicitly bound parent handler can run (C++\n        `catch (const NoMatch&)` / `catch (const ExternalParseError&)`).";
+	"Run `rec(attempt)` inside a probe. An absent rule (take_absent) and an\n        ExternalParse error both make the attempt fail, so an explicitly bound\n        parent handler can run. This is the only place that still catches: foreign\n        syntax errors are real exceptions (rare), the absent rule is not.";
+	if (((((*this)).unwind_) < (0))) {
+		return python::ispa_std::match_result::MatchResult::failed(attempt);
+	}
 	std::vector<std::shared_ptr<python::ispa_std::match_result::MatchResult>> holder = std::vector<std::shared_ptr<python::ispa_std::match_result::MatchResult>>{};
 	auto probe = ((*this)).begin_probe(attempt);
 	long long scope = python::ispa_std::debug::scope_depth();
@@ -3498,10 +3531,13 @@ return (holder).push_back(rec(attempt));
 });
 	((*probe)).close();
 	if (((failed) == (0))) {
+		if (((*this)).take_absent()) {
+			return python::ispa_std::match_result::MatchResult::failed(attempt);
+		}
 		return (holder)[0];
 	}
 	python::ispa_std::debug::unwind_to(scope);
-	if (((((failed) == (python::ispa_std::errors::ErrorKind::NoMatch))) || (((failed) == (python::ispa_std::errors::ErrorKind::ExternalParse))))) {
+	if (((failed) == (python::ispa_std::errors::ErrorKind::ExternalParse))) {
 		return python::ispa_std::match_result::MatchResult::failed(attempt);
 	}
 	python::ispa_std::failures::rethrow(failed, ::ISPA_STD::failure_message());
@@ -3537,7 +3573,9 @@ auto python::ispa_std::parser_ll::LLParser::_rule_recovery(std::shared_ptr<pytho
 			((*pos)).assign(((*match)).it);
 			return ISPA_STD::construct<python::ispa_std::recovery::RequiredResult>(python::ispa_std::recovery::RequiredStatus::Boundary, false, python::ispa_std::node::Node::blank(), python::ispa_std::recovery::Decision::initial());
 		}
-		((*this)).reject_absent_rule();
+		if (((*this)).reject_absent_rule()) {
+			return python::ispa_std::recovery::RequiredResult::boundary_only();
+		}
 		auto decision = ((*fail)).run(pos, ((*this)).recovery_state_);
 		bool again = false;
 		if (((((((*decision)).mode) == (python::ispa_std::recovery::Mode::Retry))) || (((((*decision)).mode) == (python::ispa_std::recovery::Mode::Delete))))) {
@@ -3615,7 +3653,10 @@ auto python::ispa_std::parser_ll::LLParser::required_token(std::shared_ptr<pytho
 		((*scope)).close();
 		return node;
 	}
-	((*this)).reject_absent_rule();
+	if (((*this)).reject_absent_rule()) {
+		((*scope)).close();
+		return python::ispa_std::node::Node::blank();
+	}
 	((*fail)).run(pos, ((*this)).recovery_state_);
 	((*scope)).close();
 	python::ispa_std::debug::breakpoint("required token failed");
@@ -3657,7 +3698,10 @@ auto python::ispa_std::parser_ll::LLParser::required_rule(std::shared_ptr<python
 		((*scope)).close();
 		return ((*match)).node;
 	}
-	((*this)).reject_absent_rule();
+	if (((*this)).reject_absent_rule()) {
+		((*scope)).close();
+		return python::ispa_std::node::Node::blank();
+	}
 	((*fail)).run(pos, ((*this)).recovery_state_);
 	((*scope)).close();
 	python::ispa_std::debug::breakpoint("required rule failed");
@@ -3685,38 +3729,35 @@ auto python::ispa_std::parser_ll::LLParser::optional_token(std::shared_ptr<pytho
 	return python::ispa_std::node::Node::blank();
 }
 auto python::ispa_std::parser_ll::LLParser::optional_rule(std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos, std::function<std::shared_ptr<python::ispa_std::match_result::MatchResult>(std::shared_ptr<python::ispa_std::lexer::TokenCursor>)> rec) -> std::shared_ptr<python::ispa_std::node::Node> {
-	"NOTE: a rule that abandons itself during unwinding must still return\n        status == True (a partial match) or the committed-probe check throws.";
-	auto attempt = ((*pos)).copy();
-	std::vector<std::shared_ptr<python::ispa_std::match_result::MatchResult>> holder = std::vector<std::shared_ptr<python::ispa_std::match_result::MatchResult>>{};
-	auto probe = ((*this)).begin_probe(pos);
-	long long scope = python::ispa_std::debug::scope_depth();
-	auto failed = ::ISPA_STD::attempt([&]() {
-return (holder).push_back(rec(attempt));
-});
-	if (((failed) == (0))) {
-		auto match = (holder)[0];
-		if (((*match)).status) {
-			((*pos)).assign(((*match)).it);
-			((*this)).commit_rule(pos);
-			((*probe)).close();
-			return ((*match)).node;
-		}
-		bool committed = ((*probe)).committed;
-		((*probe)).close();
-		if (committed) {
-			python::ispa_std::failures::logic_error("ISPA optional(): rule failed after consuming input");
-		}
+	"NOTE: a rule that abandons itself during a recovery unwind must still return\n        status == True (a partial match) or the committed-probe check throws. An\n        abandoned absent rule (take_absent) returns status False instead.";
+	if (((((*this)).unwind_) < (0))) {
 		return python::ispa_std::node::Node::blank();
 	}
+	auto attempt = ((*pos)).copy();
+	auto probe = ((*this)).begin_probe(pos);
+	auto match = rec(attempt);
+	if (((*this)).take_absent()) {
+		((*probe)).close();
+		return python::ispa_std::node::Node::blank();
+	}
+	if (((*match)).status) {
+		((*pos)).assign(((*match)).it);
+		((*this)).commit_rule(pos);
+		((*probe)).close();
+		return ((*match)).node;
+	}
+	bool committed = ((*probe)).committed;
 	((*probe)).close();
-	python::ispa_std::debug::unwind_to(scope);
-	if (((failed) != (python::ispa_std::errors::ErrorKind::NoMatch))) {
-		python::ispa_std::failures::rethrow(failed, ::ISPA_STD::failure_message());
+	if (committed) {
+		python::ispa_std::failures::logic_error("ISPA optional(): rule failed after consuming input");
 	}
 	return python::ispa_std::node::Node::blank();
 }
 auto python::ispa_std::parser_ll::LLParser::skip_spaces(std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos) -> void {
 	if ((!(((*this)).has_space_token_))) {
+		return ;
+	}
+	if (((((*this)).unwind_) < (0))) {
 		return ;
 	}
 	if (((*pos)).kind_is(((*this)).space_token_)) {
@@ -3768,7 +3809,10 @@ auto python::ispa_std::parser_ll::LLParser::counted_impl(std::shared_ptr<python:
 		}
 	}
 	if (((((has_limit) && (((static_cast<long long>(nodes.size())) != (limit))))) || (((static_cast<long long>(nodes.size())) < (((*spec)).minimum))))) {
-		((*this)).reject_absent_rule();
+		if (((*this)).reject_absent_rule()) {
+			(nodes).clear();
+			return nodes;
+		}
 		auto diagnostic = ISPA_STD::construct<python::ispa_std::recovery::Diagnostic>();
 		if (((((*this)).frame_count) == (0))) {
 			((*diagnostic)).rule = "<rule>";
@@ -3925,6 +3969,9 @@ auto python::ispa_std::parser_ll::LLParser::custom_failure(std::function<std::sh
 	return ISPA_STD::construct<python::ispa_std::recovery::ActionFailure>(action);
 }
 auto python::ispa_std::parser_ll::LLParser::action_result(std::any ast, std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos) -> std::shared_ptr<python::ispa_std::match_result::MatchResult> {
+	if (((((*this)).unwind_) < (0))) {
+		return python::ispa_std::match_result::MatchResult::failed(pos);
+	}
 	auto node = python::ispa_std::node::Node::blank();
 	((*node)).set_data(ast);
 	return ISPA_STD::construct<python::ispa_std::match_result::MatchResult>(true, node, ((*pos)).copy());

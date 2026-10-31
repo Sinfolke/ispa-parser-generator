@@ -49,10 +49,13 @@ GRAMMARS = {
 
 
 # LR grammars: the same corpora, parsed by an LR algorithm instead of LL
-LR_ALGORITHMS = {'lrjson': ('json', 'LALR'), 'lr0json': ('json', 'LR'), 'lrambig': ('ambig', 'LALR'), 'lrsql': ('sql', 'LALR'), 'lrpyexpr': ('pyexpr', 'LALR'), 'lrdyn': ('dyn', 'LALR'), 'lract': ('lraction', 'LALR'), 'lrfail': ('failblock', 'LALR')}
+LR_ALGORITHMS = {'lrautoinline': ('autoinline', 'LALR'), 'lrjson': ('json', 'LALR'), 'lr0json': ('json', 'LR'), 'lrambig': ('ambig', 'LALR'), 'lrsql': ('sql', 'LALR'), 'lrpyexpr': ('pyexpr', 'LALR'), 'lrdyn': ('dyn', 'LALR'), 'lract': ('lraction', 'LALR'), 'lrfail': ('failblock', 'LALR')}
 # Python statements and bindings in an advanced rule (LL and LR run them alike)
 GRAMMARS['lraction'] = (HERE / 'grammars' / 'lraction', 'lraction.isc',
                         ['1+2;', '1+2;3+4;', '1+2;3+4;5+6;', '1+2', '1+;', '', '1', '+', ';'], ['1', '2', '+', ';', ' ', '12'])
+# pass-through rules are removed and aliased (docs/auto-inline.md); #[noinline] keeps `kept`
+GRAMMARS['autoinline'] = (HERE / 'grammars' / 'autoinline', 'autoinline.isc',
+                          ['abc;', 'abc;12;x;', '!abc;', 'a;!1;b;', '', 'a', 'a;;', '!;', '! a ;', '1 2;'], ['a', 'b', '1', ';', '!', ' '])
 # an ambiguous expression grammar: conflicts are decided while parsing (the generalized driver)
 GRAMMARS['ambig'] = (HERE / 'grammars' / 'ambig', 'ambig.isc',
                      ['1', '1+2', '1*2', '1+2*3', '1*2+3', '1+2+3', '1*2*3', '1+2*3+4*5', '1+', '+', '', '1 2', '1++2', '*1', '12+34*56'],

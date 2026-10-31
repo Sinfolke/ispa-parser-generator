@@ -484,7 +484,7 @@ namespace Parser {
 			namespace grammar {
 				namespace modifier {
 					namespace MOD {
-						inline const std::size_t id = 8552179551334197203;
+						inline const std::size_t id = 430281962100151336;
 					} // namespace MOD
 				} // namespace modifier
 			} // namespace grammar
@@ -7106,12 +7106,12 @@ namespace Parser {
 		auto hasExternalRules() const -> bool override;
 	private:
 		static ::ISPA_CORE::DFA::API::CharToClass char_class_table;
-		static ::ISPA_CORE::DFA::API::Table<80, 52> dfa_table;
-		static ::ISPA_CORE::DFA::API::Table<94, 4> action_table;
+		static ::ISPA_CORE::DFA::API::Table<88, 52> dfa_table;
+		static ::ISPA_CORE::DFA::API::Table<111, 4> action_table;
 		auto semantic_action_exec(long long state, const ::ISPA_CORE::DFA::API::Captures& captures, long long start_pos, const char* start, long long length, long long line, const char*& cursor) -> std::pair<long long, Token>;
 		bool init_done = false;
 		auto init() -> void override;
-		::ISPA_CORE::DFA::API::TdfaLayout<23, 22> tdfa_registers;
+		::ISPA_CORE::DFA::API::TdfaLayout<25, 24> tdfa_registers;
 		static std::array<::ISPA_CORE::DFA::API::DFADebug, 1> debug_array;
 		static std::unordered_map<long long, std::unordered_map<long long, long long>> debug_index;
 	public:

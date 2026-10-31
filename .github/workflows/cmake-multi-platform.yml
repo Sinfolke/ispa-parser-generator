@@ -791,6 +791,34 @@ jobs:
             --parallel 3 \
             ${verbose[@]+"${verbose[@]}"} 2>&1 | tee diag/build.log
 
+      - name: Backtrace ispa crash
+        # The post-build `ispa --precompile` step can segfault; the binary is already linked,
+        # so re-run it under a debugger to print where it crashes.
+        if: failure() && runner.os != 'Windows'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          BIN=build/ispa
+          LIB=build/libraries/std/ispalib
+          [[ -x "$BIN" ]] || { echo "no $BIN"; exit 0; }
+          echo "::group::ispa --version"
+          "$BIN" --version | head -n 1; echo "exit=$?"
+          echo "::endgroup::"
+          echo "::group::ispa --precompile backtrace"
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            # Apple's /usr/bin/lldb, not a conda one.
+            /usr/bin/lldb --batch -o "process launch -s" -o "process handle SIGSEGV -s true -p true" \
+              -o "continue" -o "bt 40" -o "register read" -o "frame variable" \
+              -- "$BIN" --precompile "$LIB" 2>&1 | tail -n 150
+          elif command -v gdb >/dev/null; then
+            gdb -batch -ex run -ex "bt 40" --args "$BIN" --precompile "$LIB" 2>&1 | tail -n 150
+          fi
+          echo "::endgroup::"
+          echo "::group::linked libc++ / loader info"
+          if [[ "$RUNNER_OS" == "macOS" ]]; then otool -L "$BIN"; which clang++; else ldd "$BIN"; fi
+          echo "::endgroup::"
+
       - name: Diagnose build failure
         if: failure()
         shell: bash

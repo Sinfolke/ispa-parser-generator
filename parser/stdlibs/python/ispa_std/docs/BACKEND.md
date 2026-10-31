@@ -48,8 +48,8 @@ Note: the supplied `LangAPI.StdlibExports` has no `StdFail`, so it is older than
 
 ## Action required from you: `prim.attempt`
 
-Only `prim.fail` crosses the compiler boundary today. C++ catch sites (NoMatch probing, external parser
-errors, recovery) need `attempt(fn, report) -> bool` (`report = [kind, message]`). Add it to
+Only `prim.fail` crosses the compiler boundary today. C++ catch sites (external parser
+errors, recovery; the absent-rule NoMatch no longer throws) need `attempt(fn, report) -> bool` (`report = [kind, message]`). Add it to
 `StdlibExports`, regenerate `prim.py`, and map the new `ErrorKind` values 6-11 (LogicError, RuntimeFailure,
 InternalError, ApiError, NoMatch, ExternalParse). `prim_cpython.py` is the reference implementation.
 

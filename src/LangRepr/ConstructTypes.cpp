@@ -688,6 +688,15 @@ namespace LangRepr {
         };
         addData(lexer_builder.getDataBlocks());
         addData(ir.getDataBlocks());
+        // Rules removed by TreePass::autoInline keep their type name: Types::R is the type of the rule it forwards to.
+        NameSet autoInlined;
+        for (const auto& [alias, target] : tree.getAliases()) {
+            (void)target;
+            addName(alias);
+            autoInlined.insert(alias);
+            for (std::size_t len = 1; len < alias.size(); ++len)
+                addName(Name(alias.begin(), alias.begin() + len));
+        }
 
         // Your original generator uses path segments as identifiers. If it
         // sanitizes or escapes identifiers elsewhere, reuse that function here.
@@ -899,6 +908,12 @@ namespace LangRepr {
         // Emit all canonical forward declarations before any fields/aliases.
         LangAPI::Declarations flatForwards;
         for (const Name& n : names) {
+            if (autoInlined.contains(n)) {
+                flatForwards.push_back(LangAPI::TypeAlias::createDeclaration(LangAPI::TypeAlias{
+                    .name = flattenName(n), .type = flatType(tree.resolveAlias(n)),
+                    .template_parameters = templateNames(tree.resolveAlias(n))}));
+                continue;
+            }
             if (tree.contains(n) && tree[n].templateOrigin) continue;
             if (tree.contains(n) && tree[n].external) {
                 flatForwards.push_back(LangAPI::TypeAlias::createDeclaration(LangAPI::TypeAlias{
@@ -919,6 +934,7 @@ namespace LangRepr {
         // LangAPI class names in this namespace are SIMPLE flat identifiers.
         // The types' generated printer methods stay on the canonical classes.
         for (const Name& fullName : sorted) {
+            if (autoInlined.contains(fullName)) continue;
             if (tree.contains(fullName) && (tree[fullName].external || tree[fullName].templateOrigin)) continue;
             const Node* old = root.find(fullName);
             if (!old) throw std::runtime_error("ISPA: missing type tree node");

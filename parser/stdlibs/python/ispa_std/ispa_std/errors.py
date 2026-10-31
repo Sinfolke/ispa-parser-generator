@@ -21,8 +21,9 @@ class ErrorKind:
     InternalError: ClassVar[int] = 8
     # ISPA_STD::IspaAPIExcept (a misuse by the caller)
     ApiError: ClassVar[int] = 9
-    # LLParser::NoMatch: control flow, an absent optional rule. Only
-    # prim.attempt() ever catches it.
+    # Legacy: an absent optional rule used to be thrown as NoMatch. LLParser now
+    # signals it without an exception (reject_absent_rule / take_absent), so the
+    # core never raises this kind; it stays so existing kind numbers keep their meaning.
     NoMatch: ClassVar[int] = 10
     # ISPA_STD::ExternalParseError
     ExternalParse: ClassVar[int] = 11

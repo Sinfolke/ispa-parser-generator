@@ -1,0 +1,45 @@
+NUMBER:
+    @ [0-9]+ ('.' @ [0-9]+)?
+    @{main, floating}
+;
+
+STRING:
+    '"' \s0 @ [^"]* \s0 '"'
+    {@}
+;
+BOOLEAN:
+    @ 'true' | 'false'
+    {@}
+;
+rv:
+    @ NUMBER | STRING | BOOLEAN
+    {@}
+;
+
+array:
+    '[' @ element (',' @ element)* ']'
+    @{first, sequence}
+;
+
+map:
+    '{' @ STRING ':' @ element (',' @ STRING ':' @ element)* '}'
+    @{key, value, keys, values}
+;
+
+json:
+    @ map | array | rv
+    {@}
+;
+
+main:
+    @ json
+    {@}
+;
+value:
+    @ json
+    {@}
+;
+element:
+    @ value
+    {@}
+;

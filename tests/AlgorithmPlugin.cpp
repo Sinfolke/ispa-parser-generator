@@ -7,6 +7,8 @@ import AST.API;
 import AST.Pass;
 import AST.Tree;
 import AST.types;
+import corelib;
+import dstd;
 import LangAPI;
 import LangRepr.Converter;
 import LexerBuilder;
@@ -640,6 +642,7 @@ fail missing {
     ctx.ast.prior_literal: bool = prior.name == "a"
     ctx.take()
 }
+#[noinline]
 starts: @ start_failure {@};
 optional_rule: @ start_failure? {@};
 start_failure {
@@ -1508,4 +1511,68 @@ int main() {
         "/parser/stdlibs/target/target-cpp/src/core.cpp\" \"" + std::string(ROOT_DIR) + "/parser/stdlibs/target/target-cpp/src/ispa_core_lowered.cpp\" -o \"" + (directory / "run").string() + "\"";
     ASSERT_EQ(std::system(command.c_str()), 0);
     EXPECT_EQ(std::system(('"' + (directory / "run").string() + '"').c_str()), 0);
+}
+
+// --- auto-inline of pass-through rules (docs/auto-inline.md) --------------------------------------------------
+namespace {
+auto contains(const AST::Tree& tree, const char* name) -> bool { return tree.contains({name}); }
+auto aliasOf(const AST::Tree& tree, const char* name) -> std::string {
+    const auto found = tree.getAliases().find({name});
+    return found == tree.getAliases().end() ? std::string{} : corelib::text::join(found->second, "::");
+}
+}
+
+TEST(AutoInline, PassThroughRulesBecomeAliasesAndChainsCollapse) {
+    auto tree = pluginGrammar(
+        "A:'a'; B:'b'; leaf: @ A | B {@}; wrap: @ leaf {@}; wrap2: @ wrap {@}; item: @ wrap2 A {@}; main: @ item+ {@};");
+    EXPECT_FALSE(contains(tree, "wrap"));
+    EXPECT_FALSE(contains(tree, "wrap2"));
+    EXPECT_EQ(aliasOf(tree, "wrap"), "leaf");
+    EXPECT_EQ(aliasOf(tree, "wrap2"), "leaf");  // a -> b -> c resolves to c
+    EXPECT_TRUE(contains(tree, "leaf"));
+    EXPECT_TRUE(contains(tree, "item"));
+    // every reference now names the surviving rule
+    const auto& item = tree[{"item"}];
+    ASSERT_FALSE(item.rule_members.empty());
+    ASSERT_TRUE(item.rule_members.front()->isName());
+    EXPECT_EQ(item.rule_members.front()->getName().name, (stdu::vector<std::string>{"leaf"}));
+    EXPECT_EQ(tree.resolveAlias({"wrap2"}), (stdu::vector<std::string>{"leaf"}));
+    EXPECT_EQ(tree.resolveAlias({"leaf"}), (stdu::vector<std::string>{"leaf"}));
+}
+
+TEST(AutoInline, NoinlineAndEntryRuleStay) {
+    auto tree = pluginGrammar(
+        "A:'a'; leaf: @ A+ {@}; #[noinline] pinned: @ leaf {@}; main: @ leaf {@}; user: @ pinned {@};");
+    EXPECT_TRUE(contains(tree, "pinned"));
+    EXPECT_TRUE(contains(tree, "main"));
+    EXPECT_FALSE(contains(tree, "user"));
+    EXPECT_EQ(aliasOf(tree, "user"), "pinned");  // forwards to the pinned rule, which stays a real rule
+    EXPECT_TRUE(tree.getAliases().find({"pinned"}) == tree.getAliases().end());
+}
+
+TEST(AutoInline, RulesThatDoMoreThanForwardStay) {
+    auto tree = pluginGrammar(
+        "A:'a'; B:'b'; leaf: @ A | B {@}; "
+        "alt: @ leaf | B {@}; "                     // alternatives
+        "named: @ leaf @{value}; "                  // keyed data block
+        "many: @ leaf+ {@}; "                       // quantified
+        "two: @ leaf A {@}; "                       // a second member
+        "tok: @ A {@}; "                            // forwards to a token
+        "loop1: @ loop2 {@}; loop2: @ loop1 {@}; "  // cycle of pass-throughs
+        "self: @ self {@}; "                        // self reference
+        "main: @ alt many two tok named loop1 self {@};");
+    for (const char* kept : {"alt", "named", "many", "two", "tok", "loop1", "loop2", "self"})
+        EXPECT_TRUE(contains(tree, kept)) << kept;
+    EXPECT_TRUE(tree.getAliases().empty());
+}
+
+TEST(AutoInline, GeneratedTypesKeepTheRemovedNameAsAnAlias) {
+    dlib library("libispa-algorithm-LL");
+    const auto* descriptor = library.load<Algorithm::EntryFn*>("ispa_algorithm_v1")();
+    auto tree = pluginGrammar("A:'a'; leaf: @ A+ {@}; wrap: @ leaf {@}; main: @ wrap {@};");
+    Algorithm::Metadata metadata;
+    const auto text = convert(*descriptor, tree, metadata);
+    EXPECT_NE(text.find("using wrap = ::PluginTest::FlatTypes::leaf;"), std::string::npos);
+    EXPECT_EQ(text.find("struct wrap {"), std::string::npos);  // no wrapper node type any more
+    EXPECT_NE(text.find("struct leaf {"), std::string::npos);
 }

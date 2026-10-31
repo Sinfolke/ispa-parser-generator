@@ -56,6 +56,8 @@ export namespace AST {
         static bool prioritySort(const AST::Tree& ast, const AST::RuleMemberOp &first, const AST::RuleMemberOp &second);
         static bool prioritySort(const AST::Tree& ast, const AST::RuleMember &first, const AST::RuleMember &second);
 
+        // Removes pass-through rules (`name: @ other {@}`) and rewrites every reference to them; see docs/auto-inline.md.
+        static void autoInline(Tree &ast);
         static void removeEmptyRule(Tree &ast);
         static void inlineSingleGroups(Tree &ast);
         static void literalsToToken(Tree &ast);
@@ -63,6 +65,7 @@ export namespace AST {
         static void addSpaceToken(Tree &ast);
         static void sortByPriority(Tree &ast, AST::RuleMemberOp& options);
         static void sortByPriority(Tree &ast, stdu::vector<std::shared_ptr<AST::RuleMember>>& members);
+        void autoInline();
         void removeEmptyRule();
         void inlineSingleGroups();
         void literalsToToken();
@@ -70,6 +73,7 @@ export namespace AST {
         void sortByPriority();
         void addSpaceToken();
         void work() {
+            autoInline();
             removeEmptyRule();
             inlineSingleGroups();
             // sortByPriority();

@@ -5727,6 +5727,7 @@ return ((a) < (b));
 				pub start: i64,
 				pub committed: bool,
 				pub open: bool,
+				pub depth: i64,
 			}
 			impl RuleProbe {
 				pub fn shared_default() -> ::ispa_std::Shared<Self> {
@@ -5741,6 +5742,7 @@ return ((a) < (b));
 					(self).start = (start).clone();
 					(self).committed = false;
 					(self).open = true;
+					(self).depth = ((((*(parser).borrow_mut())).probes_.len() as i64)).clone();
 					(((*(parser).borrow_mut())).probes_).push(self.__ispa_owner.upgrade().expect("instance has no shared owner").upcast());
 				}
 				pub fn close(&mut self) {
@@ -5749,11 +5751,13 @@ return ((a) < (b));
 						return;
 					}
 					(self).open = false;
-					(((*((self).parser).borrow_mut())).probes_).pop().unwrap_or_else(|| ::ispa_std::fail(1, "pop from empty sequence"));
+					'w94: while (((((*((self).parser).borrow_mut())).probes_.len() as i64)) > ((self).depth)) {
+						(((*((self).parser).borrow_mut())).probes_).pop().unwrap_or_else(|| ::ispa_std::fail(1, "pop from empty sequence"));
+					}
 				}
-				pub fn members(&self) -> (&::ispa_std::Shared<python::ispa_std::parser_ll::LLParser>, &i64, &bool, &bool) { (&self.parser, &self.start, &self.committed, &self.open) }
-				pub fn members_mut(&mut self) -> (&mut ::ispa_std::Shared<python::ispa_std::parser_ll::LLParser>, &mut i64, &mut bool, &mut bool) { (&mut self.parser, &mut self.start, &mut self.committed, &mut self.open) }
-				pub fn members_str() -> [&'static str; 4] { ["parser", "start", "committed", "open"] }
+				pub fn members(&self) -> (&::ispa_std::Shared<python::ispa_std::parser_ll::LLParser>, &i64, &bool, &bool, &i64) { (&self.parser, &self.start, &self.committed, &self.open, &self.depth) }
+				pub fn members_mut(&mut self) -> (&mut ::ispa_std::Shared<python::ispa_std::parser_ll::LLParser>, &mut i64, &mut bool, &mut bool, &mut i64) { (&mut self.parser, &mut self.start, &mut self.committed, &mut self.open, &mut self.depth) }
+				pub fn members_str() -> [&'static str; 5] { ["parser", "start", "committed", "open", "depth"] }
 				pub fn methods_str() -> [&'static str; 2] { ["__init__", "close"] }
 			}
 			#[repr(C)]
@@ -5881,6 +5885,7 @@ return ((a) < (b));
 					((*((self).recovery_state_).borrow_mut())).anchor_count = 0;
 					(self).frame_count = 0;
 					(self).unwind_ = 0;
+					((self).probes_).clear();
 					(self).last_resume_pos_ = ((*python::ispa_std::parser_ll::NPOS.get())).clone();
 					(self).recovering_ = false;
 					((self).context_errors_).clear();
@@ -5901,7 +5906,7 @@ return ((a) < (b));
 					let mut at_end: bool = (((*(((*(result).borrow_mut())).it).borrow_mut())).isEnd()).clone();
 					let mut messages = (((*(((*(result).borrow_mut())).it).borrow_mut())).getErrors()).clone();
 					let mut i: i64 = 0;
-					'w94: while ((i) < ((messages.len() as i64))) {
+					'w95: while ((i) < ((messages.len() as i64))) {
 						let mut diagnostic = { let __object = <python::ispa_std::recovery::Diagnostic>::shared_default(); __object.borrow_mut().__init__(); __object };
 						((*(diagnostic).borrow_mut())).rule = String::from("lexer");
 						((*(diagnostic).borrow_mut())).message = (::ispa_std::pycoll::PyIndex::py_index(&(messages), &(i))).clone();
@@ -5960,12 +5965,28 @@ return ((a) < (b));
 					let __p = self as *const Self as *mut Self;
 					return ({ let __object = <python::ispa_std::parser_ll::RuleProbe>::shared_default(); __object.borrow_mut().__init__((self.__ispa_owner.upgrade().expect("instance has no shared owner")).upcast(), python::ispa_std::parser_ll::cursor_position(((pos).clone()).upcast())); __object }).upcast();
 				}
-				pub fn reject_absent_rule(&mut self) {
+				pub fn reject_absent_rule(&mut self) -> bool {
 					let __p = self as *const Self as *mut Self;
-					String::from("Raise NoMatch when we are inside an uncommitted probe: the rule never\n        started, so the caller's `optional` should simply not match.");
-					if ((((((self).probes_.len() as i64)) > (0))) && ((!(((*({ let __h21 = ((((self).probes_.len() as i64)) - (1)); ::ispa_std::pycoll::PyIndex::py_index(&((self).probes_), &(__h21)) }).borrow_mut())).committed)))) {
-						python::ispa_std::failures::no_match();
+					String::from("Signal \"absent rule\" when we are inside an uncommitted probe: the rule\n        never started, so the caller's `optional` should simply not match.\n\n        Nothing is thrown. The signal reuses the recovery unwind: unwind_ becomes\n        -1, so unwinding() is true, every member of every abandoned rule returns at\n        its next `unwinding()` check (the generator emits it after each member, so\n        no further member and no rule action runs), and action_result() reports the\n        abandoned rule as not matched. The probe's owner takes the signal with\n        take_absent() right after its rec() returns. Returns True when the signal\n        was raised: the caller must then return at once, doing no further work.");
+					if (((((((self).unwind_) == (0))) && (((((self).probes_.len() as i64)) > (0))))) && ((!(((*({ let __h21 = ((((self).probes_.len() as i64)) - (1)); ::ispa_std::pycoll::PyIndex::py_index(&((self).probes_), &(__h21)) }).borrow_mut())).committed)))) {
+						(self).unwind_ = ( - (1));
+						return true;
 					}
+					return false;
+				}
+				pub fn absent_pending(&mut self) -> bool {
+					let __p = self as *const Self as *mut Self;
+					String::from("Whether the current unwind is the absent-rule signal (native action_result uses it).");
+					return (((self).unwind_) < (0));
+				}
+				pub fn take_absent(&mut self) -> bool {
+					let __p = self as *const Self as *mut Self;
+					String::from("The owner of a probe: whether a required descendant of rec() never started\n        (clears the signal).");
+					if (((self).unwind_) < (0)) {
+						(self).unwind_ = 0;
+						return true;
+					}
+					return false;
 				}
 				pub fn commit_rule(&mut self, mut pos: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>) {
 					let __p = self as *const Self as *mut Self;
@@ -5985,7 +6006,7 @@ return ((a) < (b));
 				pub fn commit_at(&mut self, mut here: i64) {
 					let __p = self as *const Self as *mut Self;
 					let mut k: i64 = ((((self).probes_.len() as i64)) - (1));
-					'w95: while ((k) >= (0)) {
+					'w96: while ((k) >= (0)) {
 						if ((here) != (((*(::ispa_std::pycoll::PyIndex::py_index(&((self).probes_), &(k))).borrow_mut())).start)) {
 							((*(::ispa_std::pycoll::PyIndex::py_index(&((self).probes_), &(k))).borrow_mut())).committed = true;
 						}
@@ -6068,7 +6089,7 @@ return ((a) < (b));
 					let __p = self as *const Self as *mut Self;
 					(self).frame_count = (((self).frame_count) - (1));
 					((*((self).recovery_state_).borrow_mut())).anchor_count = ((((*((self).recovery_state_).borrow_mut())).anchor_count) - (1));
-					if (((self).unwind_) != (0)) {
+					if (((self).unwind_) > (0)) {
 						(self).unwind_ = (((self).unwind_) - (1));
 					}
 				}
@@ -6110,7 +6131,7 @@ return ((a) < (b));
 					let __p = self as *const Self as *mut Self;
 					let mut out: String = String::from("");
 					let mut i: i64 = 0;
-					'w96: while ((i) < ((self).frame_count)) {
+					'w97: while ((i) < ((self).frame_count)) {
 						if (((out.len() as i64)) > (0)) {
 							out = (((out).clone()) + &(String::from(" > ")));
 						}
@@ -6125,15 +6146,15 @@ return ((a) < (b));
 					let mut repeat_spot: bool = ((python::ispa_std::parser_ll::cursor_position(((pos).clone()).upcast())) == ((self).last_resume_pos_));
 					let mut candidate = (((*(pos).borrow_mut())).copy()).clone();
 					let mut k: i64 = 0;
-					'w97: while ((((k) <= (max_skip))) && ((!(((*(candidate).borrow_mut())).isEnd())))) {
+					'w98: while ((((k) <= (max_skip))) && ((!(((*(candidate).borrow_mut())).isEnd())))) {
 						let mut token = (((*(candidate).borrow_mut())).current()).clone();
 						let mut f: i64 = ((self).frame_count).clone();
-						'w98: while ((f) > (0)) {
+						'w99: while ((f) > (0)) {
 							f = ((f) - (1));
 							if (!(((((((k) == (0))) && (repeat_spot))) && ((((((f).clone()) + &(1))) == ((self).frame_count)))))) {
 								let mut claims: &mut Vec<::ispa_std::Shared<python::ispa_std::recovery::ContextClaim>> = &mut ((*(((*(::ispa_std::pycoll::PyIndex::py_index(&((self).frames_), &(f))).borrow_mut())).claim_set).borrow_mut())).claims;
 								let mut c: i64 = 0;
-								'w99: while ((c) < ((claims.len() as i64))) {
+								'w100: while ((c) < ((claims.len() as i64))) {
 									if ((*(((*(::ispa_std::pycoll::PyIndex::py_index(&(claims), &(c))).borrow_mut())).tokens).borrow_mut())).matches(((token).clone()).upcast()) {
 										return ({ let __object = <python::ispa_std::parser_ll::Resume>::shared_default(); __object.borrow_mut().__init__((k).clone(), (f).clone(), ((::ispa_std::pycoll::PyIndex::py_index(&(claims), &(c))).clone()).upcast(), true); __object }).upcast();
 									}
@@ -6229,7 +6250,7 @@ return ((a) < (b));
 						(self).report_context(((pos).clone()).upcast(), (effective).clone(), ((r).clone()).upcast());
 					}
 					let mut i: i64 = 0;
-					'w100: while ((((i) < (((*(r).borrow_mut())).skip))) && ((!(((*(pos).borrow_mut())).isEnd())))) {
+					'w101: while ((((i) < (((*(r).borrow_mut())).skip))) && ((!(((*(pos).borrow_mut())).isEnd())))) {
 						((*(pos).borrow_mut())).next();
 						i = (((i).clone()) + &(1));
 					}
@@ -6258,10 +6279,10 @@ return ((a) < (b));
 					let mut token = (((*(candidate).borrow_mut())).current()).clone();
 					let mut any_claims: bool = false;
 					let mut i: i64 = 0;
-					'w101: while ((i) < ((self).frame_count)) {
+					'w102: while ((i) < ((self).frame_count)) {
 						let mut claims: &mut Vec<::ispa_std::Shared<python::ispa_std::recovery::ContextClaim>> = &mut ((*(((*(::ispa_std::pycoll::PyIndex::py_index(&((self).frames_), &(i))).borrow_mut())).claim_set).borrow_mut())).claims;
 						let mut c: i64 = 0;
-						'w102: while ((c) < ((claims.len() as i64))) {
+						'w103: while ((c) < ((claims.len() as i64))) {
 							any_claims = true;
 							if ((*(((*(::ispa_std::pycoll::PyIndex::py_index(&(claims), &(c))).borrow_mut())).tokens).borrow_mut())).matches(((token).clone()).upcast()) {
 								return;
@@ -6279,7 +6300,9 @@ return ((a) < (b));
 				pub fn recover_choice(&mut self, mut pos: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>, rule: &String, expected: &String, first_sets: &Vec<::ispa_std::Shared<python::ispa_std::recovery::TokenSet>>, inner_sets: &Vec<::ispa_std::Shared<python::ispa_std::recovery::TokenSet>>) -> i64 {
 					let __p = self as *const Self as *mut Self;
 					String::from("Called only after normal LL(k) selection failed. Prefer an\n        unambiguous FIRST token, then an unambiguous terminal inside an\n        alternative (shared interior terminals do not identify a branch).\n        `first_sets[i]` / `inner_sets[i]` are the two sets of alternative i\n        (the C++ even/odd template pack). Returns the alternative, or -1.");
-					(self).reject_absent_rule();
+					if (self).reject_absent_rule() {
+						return ( - (1));
+					}
 					if ((((*first_sets).len() as i64)) != (((*inner_sets).len() as i64))) {
 						python::ispa_std::failures::logic_error(&(String::from("recover_choice: one FIRST set and one interior set per alternative")));
 					}
@@ -6293,7 +6316,7 @@ return ((a) < (b));
 						((*(diagnostic).borrow_mut())).length = (((*(((*(((*(pos).borrow_mut())).current()).borrow_mut())).meta()).borrow_mut())).length()).clone();
 					}
 					let mut i: i64 = 0;
-					'w103: while ((i) < (((*first_sets).len() as i64))) {
+					'w104: while ((i) < (((*first_sets).len() as i64))) {
 						(((*(diagnostic).borrow_mut())).expected).extend((((*(::ispa_std::pycoll::PyIndex::py_index(&((*first_sets)), &(i))).borrow_mut())).values()).clone().into_iter());
 						i = (((i).clone()) + &(1));
 					}
@@ -6301,10 +6324,10 @@ return ((a) < (b));
 					let mut skipped: i64 = 0;
 					if (!(((*((self).recovery_state_).borrow_mut())).exhausted())) {
 						let mut scanning: bool = true;
-						'w104: while ((scanning) && ((!(((*(pos).borrow_mut())).isEnd())))) {
+						'w105: while ((scanning) && ((!(((*(pos).borrow_mut())).isEnd())))) {
 							let mut ident: i64 = python::ispa_std::recovery::token_id(((((*(pos).borrow_mut())).current()).clone()).upcast());
 							let mut phase: i64 = 0;
-							'w105: while ((((phase) < (2))) && (((selected) == (( - (1)))))) {
+							'w106: while ((((phase) < (2))) && (((selected) == (( - (1)))))) {
 								let mut sets = ((*first_sets)).clone();
 								if ((phase) == (1)) {
 									sets = ((*inner_sets)).clone();
@@ -6312,7 +6335,7 @@ return ((a) < (b));
 								let mut candidate: i64 = ( - (1));
 								let mut ambiguous: bool = false;
 								let mut j: i64 = 0;
-								'w106: while ((j) < ((sets.len() as i64))) {
+								'w107: while ((j) < ((sets.len() as i64))) {
 									if python::ispa_std::recovery::contains(&(((*(::ispa_std::pycoll::PyIndex::py_index(&(sets), &(j))).borrow_mut())).values()), (ident).clone()) {
 										if ((candidate) != (( - (1)))) {
 											ambiguous = true;
@@ -6333,7 +6356,7 @@ return ((a) < (b));
 							} else {
 								let mut boundary: bool = false;
 								let mut a: i64 = 0;
-								'w107: while ((a) < (((*((self).recovery_state_).borrow_mut())).anchor_count)) {
+								'w108: while ((a) < (((*((self).recovery_state_).borrow_mut())).anchor_count)) {
 									if python::ispa_std::recovery::contains(&(((*(::ispa_std::pycoll::PyIndex::py_index(&(((*((self).recovery_state_).borrow_mut())).anchors), &(a))).borrow_mut())).tokens), (ident).clone()) {
 										boundary = true;
 									}
@@ -6371,7 +6394,9 @@ return ((a) < (b));
 				}
 				pub fn raise_error(&mut self, mut token: ::ispa_std::Shared<python::ispa_std::raw_token::RawToken>, message: &String) {
 					let __p = self as *const Self as *mut Self;
-					(self).reject_absent_rule();
+					if (self).reject_absent_rule() {
+						return;
+					}
 					let mut diagnostic = { let __object = <python::ispa_std::recovery::Diagnostic>::shared_default(); __object.borrow_mut().__init__(); __object };
 					if (((self).frame_count) == (0)) {
 						((*(diagnostic).borrow_mut())).rule = String::from("<rule>");
@@ -6389,7 +6414,7 @@ return ((a) < (b));
 						return (python::ispa_std::recovery::RequiredResult::boundary_only()).upcast();
 					}
 					let mut retries: i64 = 0;
-					'w108: loop {
+					'w109: loop {
 						if ((*(pos).borrow_mut())).kind_is((type_id).clone()) {
 							let mut node = (((*(((*(pos).borrow_mut())).current()).borrow_mut())).to_node((type_id).clone())).clone();
 							((*(pos).borrow_mut())).next();
@@ -6397,7 +6422,9 @@ return ((a) < (b));
 							(self).note_match();
 							return ({ let __object = <python::ispa_std::recovery::RequiredResult>::shared_default(); __object.borrow_mut().__init__(((*python::ispa_std::recovery::RequiredStatus_Matched.get())).clone(), true, ((node).clone()).upcast(), (python::ispa_std::recovery::Decision::initial()).upcast()); __object }).upcast();
 						}
-						(self).reject_absent_rule();
+						if (self).reject_absent_rule() {
+							return (python::ispa_std::recovery::RequiredResult::boundary_only()).upcast();
+						}
 						let mut decision = (((*(fail).borrow_mut())).run(((pos).clone()).upcast(), (((self).recovery_state_).clone()).upcast())).clone();
 						let mut retry: bool = false;
 						if ((((*(decision).borrow_mut())).mode) == ((*python::ispa_std::recovery::Mode_Delete.get()))) {
@@ -6427,7 +6454,7 @@ return ((a) < (b));
 				}
 				pub fn _attempt_rule(&mut self, mut rec: impl FnMut(::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>) -> ::ispa_std::Shared<python::ispa_std::match_result::MatchResult>, mut attempt: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>) -> ::ispa_std::Shared<python::ispa_std::match_result::MatchResult> {
 					let __p = self as *const Self as *mut Self;
-					String::from("Run `rec(attempt)` inside a probe, absorbing NoMatch and\n        ExternalParse so an explicitly bound parent handler can run (C++\n        `catch (const NoMatch&)` / `catch (const ExternalParseError&)`).");
+					String::from("Run `rec(attempt)` inside a probe. An absent rule (take_absent) and an\n        ExternalParse error both make the attempt fail, so an explicitly bound\n        parent handler can run. This is the only place that still catches: foreign\n        syntax errors are real exceptions (rare), the absent rule is not.");
 					let mut holder: Vec<::ispa_std::Shared<python::ispa_std::match_result::MatchResult>> = Vec::<::ispa_std::Shared<python::ispa_std::match_result::MatchResult>>::new();
 					let mut probe = ((self).begin_probe(((attempt).clone()).upcast())).clone();
 					let mut scope: i64 = python::ispa_std::debug::scope_depth();
@@ -6437,10 +6464,13 @@ return (holder).push((&mut rec)(((attempt).clone()).upcast()));
 });
 					((*(probe).borrow_mut())).close();
 					if ((failed) == (0)) {
+						if (self).take_absent() {
+							return (python::ispa_std::match_result::MatchResult::failed(((attempt).clone()).upcast())).upcast();
+						}
 						return ((::ispa_std::pycoll::PyIndex::py_index(&(holder), &(0))).clone()).upcast();
 					}
 					python::ispa_std::debug::unwind_to((scope).clone());
-					if ((((failed) == ((*python::ispa_std::errors::ErrorKind_NoMatch.get())))) || (((failed) == ((*python::ispa_std::errors::ErrorKind_ExternalParse.get()))))) {
+					if ((failed) == ((*python::ispa_std::errors::ErrorKind_ExternalParse.get()))) {
 						return (python::ispa_std::match_result::MatchResult::failed(((attempt).clone()).upcast())).upcast();
 					}
 					python::ispa_std::failures::rethrow((failed).clone(), &(::ispa_std::failure_message()));
@@ -6456,7 +6486,7 @@ return (holder).push((&mut rec)(((attempt).clone()).upcast()));
 						return (python::ispa_std::recovery::RequiredResult::boundary_only()).upcast();
 					}
 					let mut retries: i64 = 0;
-					'w109: loop {
+					'w110: loop {
 						let mut r#match: ::ispa_std::Shared<python::ispa_std::match_result::MatchResult> = ((first).clone()).upcast();
 						if have_first {
 							have_first = false;
@@ -6478,7 +6508,9 @@ return (holder).push((&mut rec)(((attempt).clone()).upcast()));
 							((*(pos).borrow_mut())).assign(((((*(r#match).borrow_mut())).it).clone()).upcast());
 							return ({ let __object = <python::ispa_std::recovery::RequiredResult>::shared_default(); __object.borrow_mut().__init__(((*python::ispa_std::recovery::RequiredStatus_Boundary.get())).clone(), false, (python::ispa_std::node::Node::blank()).upcast(), (python::ispa_std::recovery::Decision::initial()).upcast()); __object }).upcast();
 						}
-						(self).reject_absent_rule();
+						if (self).reject_absent_rule() {
+							return (python::ispa_std::recovery::RequiredResult::boundary_only()).upcast();
+						}
 						let mut decision = (((*(fail).borrow_mut())).run(((pos).clone()).upcast(), (((self).recovery_state_).clone()).upcast())).clone();
 						let mut again: bool = false;
 						if ((((((*(decision).borrow_mut())).mode) == ((*python::ispa_std::recovery::Mode_Retry.get())))) || (((((*(decision).borrow_mut())).mode) == ((*python::ispa_std::recovery::Mode_Delete.get()))))) {
@@ -6559,7 +6591,10 @@ return (holder).push((&mut rec)(((attempt).clone()).upcast()));
 						((*(scope).borrow_mut())).close();
 						return ((node).clone()).upcast();
 					}
-					(self).reject_absent_rule();
+					if (self).reject_absent_rule() {
+						((*(scope).borrow_mut())).close();
+						return (python::ispa_std::node::Node::blank()).upcast();
+					}
 					((*(fail).borrow_mut())).run(((pos).clone()).upcast(), (((self).recovery_state_).clone()).upcast());
 					((*(scope).borrow_mut())).close();
 					python::ispa_std::debug::breakpoint(&(String::from("required token failed")));
@@ -6602,7 +6637,10 @@ return (holder).push((&mut rec)(((attempt).clone()).upcast()));
 						((*(scope).borrow_mut())).close();
 						return ((((*(r#match).borrow_mut())).node).clone()).upcast();
 					}
-					(self).reject_absent_rule();
+					if (self).reject_absent_rule() {
+						((*(scope).borrow_mut())).close();
+						return (python::ispa_std::node::Node::blank()).upcast();
+					}
 					((*(fail).borrow_mut())).run(((pos).clone()).upcast(), (((self).recovery_state_).clone()).upcast());
 					((*(scope).borrow_mut())).close();
 					python::ispa_std::debug::breakpoint(&(String::from("required rule failed")));
@@ -6632,34 +6670,24 @@ return (holder).push((&mut rec)(((attempt).clone()).upcast()));
 				}
 				pub fn optional_rule(&mut self, mut pos: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>, mut rec: impl FnMut(::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>) -> ::ispa_std::Shared<python::ispa_std::match_result::MatchResult>) -> ::ispa_std::Shared<python::ispa_std::node::Node> {
 					let __p = self as *const Self as *mut Self;
-					String::from("NOTE: a rule that abandons itself during unwinding must still return\n        status == True (a partial match) or the committed-probe check throws.");
+					String::from("NOTE: a rule that abandons itself during a recovery unwind must still return\n        status == True (a partial match) or the committed-probe check throws. An\n        abandoned absent rule (take_absent) returns status False instead.");
 					let mut attempt = (((*(pos).borrow_mut())).copy()).clone();
-					let mut holder: Vec<::ispa_std::Shared<python::ispa_std::match_result::MatchResult>> = Vec::<::ispa_std::Shared<python::ispa_std::match_result::MatchResult>>::new();
 					let mut probe = ((self).begin_probe(((pos).clone()).upcast())).clone();
-					let mut scope: i64 = python::ispa_std::debug::scope_depth();
-					let mut failed = ::ispa_std::attempt(|| {
-let __this = unsafe { &mut *__p };
-return (holder).push((&mut rec)(((attempt).clone()).upcast()));
-});
-					if ((failed) == (0)) {
-						let mut r#match = (::ispa_std::pycoll::PyIndex::py_index(&(holder), &(0))).clone();
-						if ((*(r#match).borrow_mut())).status {
-							((*(pos).borrow_mut())).assign(((((*(r#match).borrow_mut())).it).clone()).upcast());
-							(self).commit_rule(((pos).clone()).upcast());
-							((*(probe).borrow_mut())).close();
-							return ((((*(r#match).borrow_mut())).node).clone()).upcast();
-						}
-						let mut committed: bool = (((*(probe).borrow_mut())).committed).clone();
+					let mut r#match = (&mut rec)(((attempt).clone()).upcast());
+					if (self).take_absent() {
 						((*(probe).borrow_mut())).close();
-						if committed {
-							python::ispa_std::failures::logic_error(&(String::from("ISPA optional(): rule failed after consuming input")));
-						}
 						return (python::ispa_std::node::Node::blank()).upcast();
 					}
+					if ((*(r#match).borrow_mut())).status {
+						((*(pos).borrow_mut())).assign(((((*(r#match).borrow_mut())).it).clone()).upcast());
+						(self).commit_rule(((pos).clone()).upcast());
+						((*(probe).borrow_mut())).close();
+						return ((((*(r#match).borrow_mut())).node).clone()).upcast();
+					}
+					let mut committed: bool = (((*(probe).borrow_mut())).committed).clone();
 					((*(probe).borrow_mut())).close();
-					python::ispa_std::debug::unwind_to((scope).clone());
-					if ((failed) != ((*python::ispa_std::errors::ErrorKind_NoMatch.get()))) {
-						python::ispa_std::failures::rethrow((failed).clone(), &(::ispa_std::failure_message()));
+					if committed {
+						python::ispa_std::failures::logic_error(&(String::from("ISPA optional(): rule failed after consuming input")));
 					}
 					return (python::ispa_std::node::Node::blank()).upcast();
 				}
@@ -6678,7 +6706,7 @@ return (holder).push((&mut rec)(((attempt).clone()).upcast()));
 						let mut origin: String = (((*(pos).borrow_mut())).sourceOrigin()).clone();
 						let mut begin: i64 = (((*(pos).borrow_mut())).sourcePosition()).clone();
 						let mut end: i64 = (begin).clone();
-						'w110: while python::ispa_std::chars::is_space(&(python::ispa_std::chars::at(&(origin), (end).clone()))) {
+						'w111: while python::ispa_std::chars::is_space(&(python::ispa_std::chars::at(&(origin), (end).clone()))) {
 							end = (((end).clone()) + &(1));
 						}
 						if ((end) != (begin)) {
@@ -6701,7 +6729,7 @@ return (holder).push((&mut rec)(((attempt).clone()).upcast()));
 					let mut nodes: Vec<::ispa_std::Shared<python::ispa_std::node::Node>> = Vec::<::ispa_std::Shared<python::ispa_std::node::Node>>::new();
 					let mut cursor = (((*(pos).borrow_mut())).copy()).clone();
 					let mut matching: bool = true;
-					'w111: while ((matching) && ((((!(has_limit))) || ((((nodes.len() as i64)) < (limit)))))) {
+					'w112: while ((matching) && ((((!(has_limit))) || ((((nodes.len() as i64)) < (limit)))))) {
 						let mut attempt = (((*(cursor).borrow_mut())).copy()).clone();
 						if (((self).has_space_token_) && ((((nodes.len() as i64)) > (0)))) {
 							(self).skip_spaces(((attempt).clone()).upcast());
@@ -6719,7 +6747,10 @@ return (holder).push((&mut rec)(((attempt).clone()).upcast()));
 						}
 					}
 					if ((((has_limit) && ((((nodes.len() as i64)) != (limit))))) || ((((nodes.len() as i64)) < (((*(spec).borrow_mut())).minimum)))) {
-						(self).reject_absent_rule();
+						if (self).reject_absent_rule() {
+							(nodes).clear();
+							return (nodes).clone();
+						}
 						let mut diagnostic = { let __object = <python::ispa_std::recovery::Diagnostic>::shared_default(); __object.borrow_mut().__init__(); __object };
 						if (((self).frame_count) == (0)) {
 							((*(diagnostic).borrow_mut())).rule = String::from("<rule>");
@@ -6795,7 +6826,7 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 						return (result).clone();
 					}
 					let mut repeating: bool = true;
-					'w112: while ((((repeating) && ((!(((*(pos).borrow_mut())).isEnd()))))) && ((!((self).unwinding())))) {
+					'w113: while ((((repeating) && ((!(((*(pos).borrow_mut())).isEnd()))))) && ((!((self).unwinding())))) {
 						let mut node = ((self).repeat_optional(((pos).clone()).upcast(), |attempt| {
 let __this = unsafe { &mut *__p };
 return (__this).optional_token(((attempt).clone()).upcast(), (type_id).clone());
@@ -6826,7 +6857,7 @@ return (__this).optional_token(((attempt).clone()).upcast(), (type_id).clone());
 						return (result).clone();
 					}
 					let mut repeating: bool = true;
-					'w113: while ((((repeating) && ((!(((*(pos).borrow_mut())).isEnd()))))) && ((!((self).unwinding())))) {
+					'w114: while ((((repeating) && ((!(((*(pos).borrow_mut())).isEnd()))))) && ((!((self).unwinding())))) {
 						let mut node = ((self).repeat_optional(((pos).clone()).upcast(), |attempt| {
 let __this = unsafe { &mut *__p };
 return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
@@ -6844,7 +6875,7 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 					let __p = self as *const Self as *mut Self;
 					let mut result: Vec<::ispa_std::Shared<python::ispa_std::node::Node>> = Vec::<::ispa_std::Shared<python::ispa_std::node::Node>>::new();
 					let mut repeating: bool = true;
-					'w114: while ((((repeating) && ((!(((*(pos).borrow_mut())).isEnd()))))) && ((!((self).unwinding())))) {
+					'w115: while ((((repeating) && ((!(((*(pos).borrow_mut())).isEnd()))))) && ((!((self).unwinding())))) {
 						let mut node = ((self).repeat_optional(((pos).clone()).upcast(), |attempt| {
 let __this = unsafe { &mut *__p };
 return (__this).optional_token(((attempt).clone()).upcast(), (type_id).clone());
@@ -6862,7 +6893,7 @@ return (__this).optional_token(((attempt).clone()).upcast(), (type_id).clone());
 					let __p = self as *const Self as *mut Self;
 					let mut result: Vec<::ispa_std::Shared<python::ispa_std::node::Node>> = Vec::<::ispa_std::Shared<python::ispa_std::node::Node>>::new();
 					let mut repeating: bool = true;
-					'w115: while ((((repeating) && ((!(((*(pos).borrow_mut())).isEnd()))))) && ((!((self).unwinding())))) {
+					'w116: while ((((repeating) && ((!(((*(pos).borrow_mut())).isEnd()))))) && ((!((self).unwinding())))) {
 						let mut node = ((self).repeat_optional(((pos).clone()).upcast(), |attempt| {
 let __this = unsafe { &mut *__p };
 return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
@@ -6904,6 +6935,9 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 				}
 				pub fn action_result(&mut self, mut ast: ::ispa_std::PyAny, mut pos: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>) -> ::ispa_std::Shared<python::ispa_std::match_result::MatchResult> {
 					let __p = self as *const Self as *mut Self;
+					if (((self).unwind_) < (0)) {
+						return (python::ispa_std::match_result::MatchResult::failed(((pos).clone()).upcast())).upcast();
+					}
 					let mut node = python::ispa_std::node::Node::blank();
 					((*(node).borrow_mut())).set_data(::ispa_std::pycoll::to_any((ast).clone()));
 					return ({ let __object = <python::ispa_std::match_result::MatchResult>::shared_default(); __object.borrow_mut().__init__(true, ((node).clone()).upcast(), ((((*(pos).borrow_mut())).copy()).clone()).upcast()); __object }).upcast();
@@ -6911,7 +6945,7 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 				pub fn members(&self) -> (&::ispa_std::Shared<python::ispa_std::recovery::State>, &::ispa_std::Shared<python::ispa_std::sortedmap::StrIntMap>, &Vec<::ispa_std::Shared<python::ispa_std::parser_ll::Frame>>, &i64, &i64, &i64, &bool, &i64, &Vec<::ispa_std::Shared<python::ispa_std::recovery::ContextDiagnostic>>, &Vec<::ispa_std::Shared<python::ispa_std::parser_ll::RuleProbe>>, &::ispa_std::Shared<python::ispa_std::parser_ll::TokenNames>, &i64, &i64, &bool) { (&self.recovery_state_, &self.counters_, &self.frames_, &self.frame_count, &self.unwind_, &self.last_resume_pos_, &self.recovering_, &self.context_max_skip_, &self.context_errors_, &self.probes_, &self.token_names_, &self.ambiguous_id_, &self.space_token_, &self.has_space_token_) }
 				pub fn members_mut(&mut self) -> (&mut ::ispa_std::Shared<python::ispa_std::recovery::State>, &mut ::ispa_std::Shared<python::ispa_std::sortedmap::StrIntMap>, &mut Vec<::ispa_std::Shared<python::ispa_std::parser_ll::Frame>>, &mut i64, &mut i64, &mut i64, &mut bool, &mut i64, &mut Vec<::ispa_std::Shared<python::ispa_std::recovery::ContextDiagnostic>>, &mut Vec<::ispa_std::Shared<python::ispa_std::parser_ll::RuleProbe>>, &mut ::ispa_std::Shared<python::ispa_std::parser_ll::TokenNames>, &mut i64, &mut i64, &mut bool) { (&mut self.recovery_state_, &mut self.counters_, &mut self.frames_, &mut self.frame_count, &mut self.unwind_, &mut self.last_resume_pos_, &mut self.recovering_, &mut self.context_max_skip_, &mut self.context_errors_, &mut self.probes_, &mut self.token_names_, &mut self.ambiguous_id_, &mut self.space_token_, &mut self.has_space_token_) }
 				pub fn members_str() -> [&'static str; 14] { ["recovery_state_", "counters_", "frames_", "frame_count", "unwind_", "last_resume_pos_", "recovering_", "context_max_skip_", "context_errors_", "probes_", "token_names_", "ambiguous_id_", "space_token_", "has_space_token_"] }
-				pub fn methods_str() -> [&'static str; 61] { ["__init__", "set_token_names", "set_space_token", "getErrors", "getContextErrors", "reset_recovery", "before_parse", "parseLazy", "counter_scope", "bind_counter_count", "bind_counter_list", "bind_counter_node", "begin_probe", "reject_absent_rule", "commit_rule", "fast_path_ok", "accept_at", "commit_at", "note_match", "debug_actual", "debug_recovery_mode", "recovery_frame", "enter_frame", "leave_frame", "recovery_at", "recovery_at_set", "unwinding", "describe_token", "breadcrumb", "resolve_context", "report_context", "recover_at_context", "sync_loop", "recover_choice", "raise_error", "required_recovering", "_attempt_rule", "required_rule_recovering", "_rule_recovery", "required_rule_resume", "_required_outcome", "required_token", "required_rule", "optional_token", "optional_rule", "skip_spaces", "skip_external_spaces", "counted_impl", "counted_token", "counted_rule", "repeat_optional", "range_token", "range_rule", "range_optional_token", "range_optional_rule", "rule_context", "fail_context", "custom_failure_decision", "custom_failure_decision_ctx", "custom_failure", "action_result"] }
+				pub fn methods_str() -> [&'static str; 63] { ["__init__", "set_token_names", "set_space_token", "getErrors", "getContextErrors", "reset_recovery", "before_parse", "parseLazy", "counter_scope", "bind_counter_count", "bind_counter_list", "bind_counter_node", "begin_probe", "reject_absent_rule", "absent_pending", "take_absent", "commit_rule", "fast_path_ok", "accept_at", "commit_at", "note_match", "debug_actual", "debug_recovery_mode", "recovery_frame", "enter_frame", "leave_frame", "recovery_at", "recovery_at_set", "unwinding", "describe_token", "breadcrumb", "resolve_context", "report_context", "recover_at_context", "sync_loop", "recover_choice", "raise_error", "required_recovering", "_attempt_rule", "required_rule_recovering", "_rule_recovery", "required_rule_resume", "_required_outcome", "required_token", "required_rule", "optional_token", "optional_rule", "skip_spaces", "skip_external_spaces", "counted_impl", "counted_token", "counted_rule", "repeat_optional", "range_token", "range_rule", "range_optional_token", "range_optional_rule", "rule_context", "fail_context", "custom_failure_decision", "custom_failure_decision_ctx", "custom_failure", "action_result"] }
 			}
 		}
 		pub mod lr {
@@ -7310,7 +7344,7 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 				pub fn is_empty(&mut self) -> bool {
 					let __p = self as *const Self as *mut Self;
 					let mut i: i64 = 0;
-					'w116: while ((i) < (((self).columns.len() as i64))) {
+					'w117: while ((i) < (((self).columns.len() as i64))) {
 						if (((::ispa_std::pycoll::PyIndex::py_index(&((self).columns), &(i)).len() as i64)) > (0)) {
 							return false;
 						}
@@ -7330,17 +7364,17 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 			pub fn lr_pack<V: ::ispa_std::PyVal>(values: &Vec<V>, indices: &Vec<i64>, offsets: &Vec<i64>, splice: &Vec<i64>, mut count: i64, mut repeated: bool) -> ::ispa_std::Shared<python::ispa_std::lr::LRCaptures<V>> {
 				let mut columns: Vec<Vec<V>> = Vec::<Vec<V>>::new();
 				let mut i: i64 = 0;
-				'w117: while ((i) < (count)) {
+				'w118: while ((i) < (count)) {
 					(columns).push(Vec::new());
 					i = (((i).clone()) + &(1));
 				}
 				i = 0;
-				'w118: while ((i) < (((*indices).len() as i64))) {
+				'w119: while ((i) < (((*indices).len() as i64))) {
 					let mut value = (::ispa_std::pycoll::PyIndex::py_index(&((*values)), &(::ispa_std::pycoll::PyIndex::py_index(&((*indices)), &(i))))).clone();
 					if ((::ispa_std::pycoll::PyIndex::py_index(&((*splice)), &(i))) != (0)) {
 						let mut c: i64 = 0;
 						let mut spliced: ::ispa_std::Shared<python::ispa_std::lr::LRCaptures<V>> = (python::ispa_std::lr::lr_captures_of((value).clone())).upcast();
-						'w119: while ((c) < ((((*(spliced).borrow_mut())).columns.len() as i64))) {
+						'w120: while ((c) < ((((*(spliced).borrow_mut())).columns.len() as i64))) {
 							(::ispa_std::pycoll::PyIndex::py_index(&(columns), &((((::ispa_std::pycoll::PyIndex::py_index(&((*offsets)), &(i))).clone()) + &(c))))).extend((::ispa_std::pycoll::PyIndex::py_index(&(((*(spliced).borrow_mut())).columns), &(c))).clone().into_iter());
 							c = (((c).clone()) + &(1));
 						}
@@ -7383,7 +7417,7 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 				pub fn _skip<V: ::ispa_std::PyVal>(&mut self, mut g: ::ispa_std::Shared<python::ispa_std::lr::LRGrammar<V>>, mut it: ::ispa_std::Shared<python::ispa_std::lexer::TokenCursor>, offset: &mut Vec<i64>) {
 					let __p = self as *const Self as *mut Self;
 					if ((*(g).borrow_mut())).has_is_space() {
-						'w120: while (((!(((*(it).borrow_mut())).isEnd()))) && (((*(g).borrow_mut())).lr_is_space(((((*(it).borrow_mut())).current()).clone()).upcast()))) {
+						'w121: while (((!(((*(it).borrow_mut())).isEnd()))) && (((*(g).borrow_mut())).lr_is_space(((((*(it).borrow_mut())).current()).clone()).upcast()))) {
 							((*(it).borrow_mut())).next();
 							if ((((*offset).len() as i64)) > (0)) {
 								{ let __k = 0; let __v = (((::ispa_std::pycoll::PyIndex::py_index(&((*offset)), &(0))).clone()) + &(1)); ::ispa_std::pycoll::py_set_index(&mut ((*offset)), __k, __v) };
@@ -7412,7 +7446,7 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 					}
 					let mut __ispa_seq0 = ((self)._window(((g).clone()).upcast(), ((position).clone()).upcast())).clone();
 					let mut __ispa_idx0: i64 = 0;
-					'w121: while ((__ispa_idx0) < ((__ispa_seq0.len() as i64))) {
+					'w122: while ((__ispa_idx0) < ((__ispa_seq0.len() as i64))) {
 						kind = (::ispa_std::pycoll::PyIndex::py_index(&(__ispa_seq0), &(__ispa_idx0))).clone();
 						__ispa_idx0 += 1;
 						((*window)).push((kind).clone());
@@ -7424,7 +7458,7 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 					let mut window: Vec<i64> = Vec::<i64>::new();
 					let mut scratch: Vec<i64> = Vec::<i64>::new();
 					let mut i: i64 = 0;
-					'w122: while ((i) < (((*(g).borrow_mut())).lr_k())) {
+					'w123: while ((i) < (((*(g).borrow_mut())).lr_k())) {
 						(self)._skip(((g).clone()).upcast(), ((peek).clone()).upcast(), &mut (scratch));
 						let mut end: bool = (((*(peek).borrow_mut())).isEnd()).clone();
 						if end {
@@ -7468,7 +7502,7 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 					if (((((*(d).borrow_mut())).expected.len() as i64)) > (0)) {
 						message = (((message).clone()) + &(String::from("; expected ")));
 						let mut i: i64 = 0;
-						'w123: while ((i) < ((((*(d).borrow_mut())).expected.len() as i64))) {
+						'w124: while ((i) < ((((*(d).borrow_mut())).expected.len() as i64))) {
 							if ((i) > (0)) {
 								message = (((message).clone()) + &(String::from(", ")));
 							}
@@ -7494,7 +7528,7 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 				}
 				pub fn _pop_spans<V: ::ispa_std::PyVal>(&mut self, mut region: ::ispa_std::Shared<python::ispa_std::lr::LRRegionFrame<V>>, mut keep: i64) {
 					let __p = self as *const Self as *mut Self;
-					'w124: while (((((*(region).borrow_mut())).span_begin.len() as i64)) > (keep)) {
+					'w125: while (((((*(region).borrow_mut())).span_begin.len() as i64)) > (keep)) {
 						(((*(region).borrow_mut())).span_begin).pop().unwrap_or_else(|| ::ispa_std::fail(1, "pop from empty sequence"));
 						(((*(region).borrow_mut())).span_end).pop().unwrap_or_else(|| ::ispa_std::fail(1, "pop from empty sequence"));
 						(((*(region).borrow_mut())).span_leading).pop().unwrap_or_else(|| ::ispa_std::fail(1, "pop from empty sequence"));
@@ -7510,7 +7544,7 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 					((*(region).borrow_mut())).rx = true;
 					let mut allowed: bool = ((self)._gap(((g).clone()).upcast(), (rule).clone(), 0)).clone();
 					let mut i: i64 = 0;
-					'w125: while ((i) < (count)) {
+					'w126: while ((i) < (count)) {
 						let mut at: i64 = (((begin).clone()) + &(i));
 						if ::ispa_std::pycoll::PyIndex::py_index(&(((*(region).borrow_mut())).span_empty), &(at)) {
 							allowed = ((((allowed) || (::ispa_std::pycoll::PyIndex::py_index(&(((*(region).borrow_mut())).span_leading), &(at))))) || (::ispa_std::pycoll::PyIndex::py_index(&(((*(region).borrow_mut())).span_trailing), &(at))));
@@ -7544,7 +7578,7 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 					let mut offset: Vec<i64> = vec![0];
 					let mut window: Vec<i64> = Vec::<i64>::new();
 					let mut rhs: Vec<V> = Vec::<V>::new();
-					'w126: loop {
+					'w127: loop {
 						((*(control).borrow_mut())).phase = ((*python::ispa_std::lr::LRControlPhase_Decide.get())).clone();
 						{ let __k = 0; let __v = (((*(region).borrow_mut())).cursor).clone(); ::ispa_std::pycoll::py_set_index(&mut (offset), __k, __v) };
 						(self)._skip(((g).clone()).upcast(), ((position).clone()).upcast(), &mut (offset));
@@ -7615,7 +7649,7 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 									let mut value: V = Default::default();
 									if ((*(g).borrow_mut())).has_semantic_reduce() {
 										let mut i: i64 = (begin).clone();
-										'w127: while ((i) < ((((*(region).borrow_mut())).values.len() as i64))) {
+										'w128: while ((i) < ((((*(region).borrow_mut())).values.len() as i64))) {
 											(rhs).push((::ispa_std::pycoll::PyIndex::py_index(&(((*(region).borrow_mut())).values), &(i))).clone());
 											i = (((i).clone()) + &(1));
 										}
@@ -7629,18 +7663,18 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 										((*(region).borrow_mut())).rx = (((*(span).borrow_mut())).empty).clone();
 									} else {
 										let mut i: i64 = 0;
-										'w128: while ((i) < (count)) {
+										'w129: while ((i) < (count)) {
 											(rhs).push(((((*(region).borrow_mut())).values).py_pop((begin).clone())).clone());
 											i = (((i).clone()) + &(1));
 										}
 										value = (((*(g).borrow_mut())).lr_reduce((rule).clone(), &(rhs))).clone();
 									}
 									(rhs).clear();
-									'w129: while (((((*(region).borrow_mut())).values.len() as i64)) > (begin)) {
+									'w130: while (((((*(region).borrow_mut())).values.len() as i64)) > (begin)) {
 										(((*(region).borrow_mut())).values).pop().unwrap_or_else(|| ::ispa_std::fail(1, "pop from empty sequence"));
 									}
 									(self)._pop_spans(((region).clone()).upcast(), (begin).clone());
-									'w130: while (((((*(region).borrow_mut())).states.len() as i64)) > ((((begin).clone()) + &(1)))) {
+									'w131: while (((((*(region).borrow_mut())).states.len() as i64)) > ((((begin).clone()) + &(1)))) {
 										(((*(region).borrow_mut())).states).pop().unwrap_or_else(|| ::ispa_std::fail(1, "pop from empty sequence"));
 									}
 									let mut nxt: i64 = (((*(g).borrow_mut())).lr_goto((::ispa_std::pycoll::PyIndex::py_index(&(((*(region).borrow_mut())).states), &((((((*(region).borrow_mut())).states.len() as i64)) - (1))))).clone(), (((*(g).borrow_mut())).lr_lhs((rule).clone())).clone())).clone();
@@ -7717,7 +7751,7 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 						return false;
 					}
 					let mut i: i64 = 0;
-					'w131: while ((i) < (((self).children.len() as i64))) {
+					'w132: while ((i) < (((self).children.len() as i64))) {
 						if ((::ispa_std::pycoll::PyIndex::py_index(&((self).children), &(i))) != (::ispa_std::pycoll::PyIndex::py_index(&(((*(other).borrow_mut())).children), &(i)))) {
 							return false;
 						}
@@ -7886,7 +7920,7 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 					((*(active).borrow_mut())).add(0);
 					let mut roots: ::ispa_std::Shared<python::ispa_std::sortedmap::IntSet> = { let __object = <python::ispa_std::sortedmap::IntSet>::shared_default(); __object.borrow_mut().__init__(); __object };
 					let mut running: bool = true;
-					'w132: while running {
+					'w133: while running {
 						let mut offset = vec![cursor];
 						(self)._skip(((g).clone()).upcast(), ((pos).clone()).upcast(), &mut (offset));
 						cursor = (::ispa_std::pycoll::PyIndex::py_index(&(offset), &(0))).clone();
@@ -7896,7 +7930,7 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 						let mut closure = (((*(active).borrow_mut())).copy()).clone();
 						let mut shifted = { let __object = <python::ispa_std::sortedmap::IntSet>::shared_default(); __object.borrow_mut().__init__(); __object };
 						let mut nxt: i64 = 0;
-						'w133: while ((nxt) < ((pending.len() as i64))) {
+						'w134: while ((nxt) < ((pending.len() as i64))) {
 							(self)._tick(&(forest), &(stacks));
 							let mut top_id: i64 = (::ispa_std::pycoll::PyIndex::py_index(&(pending), &(nxt))).clone();
 							nxt = (((nxt).clone()) + &(1));
@@ -7911,7 +7945,7 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 								}
 							}
 							let mut ai: i64 = 0;
-							'w134: while ((ai) < ((actions.len() as i64))) {
+							'w135: while ((ai) < ((actions.len() as i64))) {
 								let mut action: i64 = (::ispa_std::pycoll::PyIndex::py_index(&(actions), &(ai))).clone();
 								ai = (((ai).clone()) + &(1));
 								(self)._tick(&(forest), &(stacks));
@@ -7935,7 +7969,7 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 										let mut children: Vec<i64> = Vec::<i64>::new();
 										let mut base: i64 = (top_id).clone();
 										i = 0;
-										'w135: while ((((i) < (count))) && (((base) != (0)))) {
+										'w136: while ((((i) < (count))) && (((base) != (0)))) {
 											(children).push((((*(::ispa_std::pycoll::PyIndex::py_index(&(stacks), &(base))).borrow_mut())).forest).clone());
 											base = (((*(::ispa_std::pycoll::PyIndex::py_index(&(stacks), &(base))).borrow_mut())).previous).clone();
 											i = (((i).clone()) + &(1));
@@ -7946,7 +7980,7 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 											let mut allowed: bool = ((self)._gap(((g).clone()).upcast(), (rule).clone(), 0)).clone();
 											let mut valid: bool = true;
 											i = 0;
-											'w136: while ((i) < ((children.len() as i64))) {
+											'w137: while ((i) < ((children.len() as i64))) {
 												let mut child = (((*(::ispa_std::pycoll::PyIndex::py_index(&(forest), &(::ispa_std::pycoll::PyIndex::py_index(&(children), &(i))))).borrow_mut())).span).clone();
 												if ((*(child).borrow_mut())).empty {
 													allowed = ((((allowed) || (((*(child).borrow_mut())).leading))) || (((*(child).borrow_mut())).trailing));
@@ -7976,7 +8010,7 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 												let mut alternative = { let __object = <python::ispa_std::lr_conflicts::_Alternative>::shared_default(); __object.borrow_mut().__init__((rule).clone(), &(children)); __object };
 												let mut known: bool = false;
 												let mut k: i64 = 0;
-												'w137: while ((k) < ((((*(::ispa_std::pycoll::PyIndex::py_index(&(forest), &(value))).borrow_mut())).alternatives.len() as i64))) {
+												'w138: while ((k) < ((((*(::ispa_std::pycoll::PyIndex::py_index(&(forest), &(value))).borrow_mut())).alternatives.len() as i64))) {
 													if ((*(::ispa_std::pycoll::PyIndex::py_index(&(((*(::ispa_std::pycoll::PyIndex::py_index(&(forest), &(value))).borrow_mut())).alternatives), &(k))).borrow_mut())).equals(((alternative).clone()).upcast()) {
 														known = true;
 													}
@@ -8012,7 +8046,7 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 					let mut visiting: Vec<i64> = Vec::<i64>::new();
 					let mut ways: Vec<i64> = Vec::<i64>::new();
 					i = 0;
-					'w138: while ((i) < ((forest.len() as i64))) {
+					'w139: while ((i) < ((forest.len() as i64))) {
 						(visiting).push(0);
 						(ways).push(0);
 						i = (((i).clone()) + &(1));
@@ -8020,13 +8054,13 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 					let mut ambiguous = ((*python::ispa_std::lr::ABSENT.get())).clone();
 					let mut order: Vec<i64> = Vec::<i64>::new();
 					let mut ri: i64 = 0;
-					'w139: while ((((ri) < (((*(roots).borrow_mut()).items.len() as i64)))) && (((ambiguous) == ((*python::ispa_std::lr::ABSENT.get()))))) {
+					'w140: while ((((ri) < (((*(roots).borrow_mut()).items.len() as i64)))) && (((ambiguous) == ((*python::ispa_std::lr::ABSENT.get()))))) {
 						let mut root: i64 = (::ispa_std::pycoll::PyIndex::py_index(&((*(roots).borrow_mut()).items), &(ri))).clone();
 						ri = (((ri).clone()) + &(1));
 						if ((::ispa_std::pycoll::PyIndex::py_index(&(visiting), &(root))) != (2)) {
 							let mut pending_nodes: Vec<::ispa_std::Shared<python::ispa_std::lr_conflicts::_Visit>> = vec![{ let __object = <python::ispa_std::lr_conflicts::_Visit>::shared_default(); __object.borrow_mut().__init__((root).clone()); __object }];
 							{ let __k = root; let __v = 1; ::ispa_std::pycoll::py_set_index(&mut (visiting), __k, __v) };
-							'w140: while (((((pending_nodes.len() as i64)) > (0))) && (((ambiguous) == ((*python::ispa_std::lr::ABSENT.get()))))) {
+							'w141: while (((((pending_nodes.len() as i64)) > (0))) && (((ambiguous) == ((*python::ispa_std::lr::ABSENT.get()))))) {
 								(self)._tick(&(forest), &(stacks));
 								let mut frame: ::ispa_std::Shared<python::ispa_std::lr_conflicts::_Visit> = ((::ispa_std::pycoll::PyIndex::py_index(&(pending_nodes), &((((pending_nodes.len() as i64)) - (1))))).clone()).upcast();
 								let mut node = (::ispa_std::pycoll::PyIndex::py_index(&(forest), &(((*(frame).borrow_mut())).node))).clone();
@@ -8060,7 +8094,7 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 						total = 2;
 					} else {
 						let mut oi: i64 = 0;
-						'w141: while ((oi) < ((order.len() as i64))) {
+						'w142: while ((oi) < ((order.len() as i64))) {
 							let mut ident: i64 = (::ispa_std::pycoll::PyIndex::py_index(&(order), &(oi))).clone();
 							oi = (((oi).clone()) + &(1));
 							let mut n: i64 = 0;
@@ -8068,11 +8102,11 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 								n = 1;
 							}
 							let mut ai: i64 = 0;
-							'w142: while ((ai) < ((((*(::ispa_std::pycoll::PyIndex::py_index(&(forest), &(ident))).borrow_mut())).alternatives.len() as i64))) {
+							'w143: while ((ai) < ((((*(::ispa_std::pycoll::PyIndex::py_index(&(forest), &(ident))).borrow_mut())).alternatives.len() as i64))) {
 								let mut product: i64 = 1;
 								let mut ci: i64 = 0;
 								let mut children = (((*(::ispa_std::pycoll::PyIndex::py_index(&(((*(::ispa_std::pycoll::PyIndex::py_index(&(forest), &(ident))).borrow_mut())).alternatives), &(ai))).borrow_mut())).children).clone();
-								'w143: while ((ci) < ((children.len() as i64))) {
+								'w144: while ((ci) < ((children.len() as i64))) {
 									product = python::ispa_std::lr_conflicts::min2(2, ((product) * (::ispa_std::pycoll::PyIndex::py_index(&(ways), &(::ispa_std::pycoll::PyIndex::py_index(&(children), &(ci)))))));
 									ci = (((ci).clone()) + &(1));
 								}
@@ -8085,7 +8119,7 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 							}
 						}
 						ri = 0;
-						'w144: while ((ri) < (((*(roots).borrow_mut()).items.len() as i64))) {
+						'w145: while ((ri) < (((*(roots).borrow_mut()).items.len() as i64))) {
 							total = python::ispa_std::lr_conflicts::min2(2, (((total).clone()) + &(::ispa_std::pycoll::PyIndex::py_index(&(ways), &(::ispa_std::pycoll::PyIndex::py_index(&((*(roots).borrow_mut()).items), &(ri)))))));
 							ri = (((ri).clone()) + &(1));
 						}
@@ -8096,7 +8130,7 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 							let mut node = (::ispa_std::pycoll::PyIndex::py_index(&(forest), &(ambiguous))).clone();
 							message = (((((((((message).clone()) + &(String::from(" at tokens ")))) + &(python::ispa_std::format::int_to_string((((*(((*(node).borrow_mut())).span).borrow_mut())).begin).clone())))) + &(String::from("..")))) + &(python::ispa_std::format::int_to_string((((*(((*(node).borrow_mut())).span).borrow_mut())).end).clone())));
 							let mut ai: i64 = 0;
-							'w145: while ((ai) < ((((*(node).borrow_mut())).alternatives.len() as i64))) {
+							'w146: while ((ai) < ((((*(node).borrow_mut())).alternatives.len() as i64))) {
 								let mut rule: i64 = (((*(::ispa_std::pycoll::PyIndex::py_index(&(((*(node).borrow_mut())).alternatives), &(ai))).borrow_mut())).rule).clone();
 								if ((*(g).borrow_mut())).has_rule_label() {
 									message = (((((message).clone()) + &(String::from("\n  ")))) + &(((*(g).borrow_mut())).lr_rule_label((rule).clone())));
@@ -8110,7 +8144,7 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 					}
 					let mut evaluating: Vec<::ispa_std::Shared<python::ispa_std::lr_conflicts::_Eval<V>>> = vec![{ let __object = <python::ispa_std::lr_conflicts::_Eval<V>>::shared_default(); __object.borrow_mut().__init__(((*(roots).borrow_mut()).smallest()).clone()); __object }];
 					let mut result: V = Default::default();
-					'w146: while (((evaluating.len() as i64)) > (0)) {
+					'w147: while (((evaluating.len() as i64)) > (0)) {
 						(self)._tick(&(forest), &(stacks));
 						let mut frame: ::ispa_std::Shared<python::ispa_std::lr_conflicts::_Eval<V>> = ((::ispa_std::pycoll::PyIndex::py_index(&(evaluating), &((((evaluating.len() as i64)) - (1))))).clone()).upcast();
 						let mut node = (::ispa_std::pycoll::PyIndex::py_index(&(forest), &(((*(frame).borrow_mut())).node))).clone();
@@ -8139,7 +8173,7 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 					let __p = self as *const Self as *mut Self;
 					let mut out: Vec<String> = Vec::<String>::new();
 					let mut i: i64 = 0;
-					'w147: while ((i) < (((*parts).len() as i64))) {
+					'w148: while ((i) < (((*parts).len() as i64))) {
 						(out).push((::ispa_std::pycoll::PyIndex::py_index(&((*parts)), &(i))).clone());
 						i = (((i).clone()) + &(1));
 					}
@@ -8239,14 +8273,14 @@ return (__this).optional_rule(((attempt).clone()).upcast(), (&mut rec));
 				}
 				let mut line: i64 = 1;
 				let mut i: i64 = 0;
-				'w148: while ((((i) < (start))) && (((i) < (((*origin).len() as i64))))) {
+				'w149: while ((((i) < (start))) && (((i) < (((*origin).len() as i64))))) {
 					if ((::ispa_std::pycoll::CharLike::char_string(&(::ispa_std::pycoll::PyIndex::py_index(&((*origin)), &(i))))) == (String::from("\n"))) {
 						line = (((line).clone()) + &(1));
 					}
 					i = (((i).clone()) + &(1));
 				}
 				let mut line_start: i64 = (start).clone();
-				'w149: while ((((line_start) > (0))) && (((::ispa_std::pycoll::CharLike::char_string(&(::ispa_std::pycoll::PyIndex::py_index(&((*origin)), &(((line_start) - (1))))))) != (String::from("\n"))))) {
+				'w150: while ((((line_start) > (0))) && (((::ispa_std::pycoll::CharLike::char_string(&(::ispa_std::pycoll::PyIndex::py_index(&((*origin)), &(((line_start) - (1))))))) != (String::from("\n"))))) {
 					line_start = ((line_start) - (1));
 				}
 				return (python::ispa_std::node::Node::with_data((start).clone(), &((*origin)), true, ((end) - (start)), (line).clone(), ((((start) - ((line_start).clone()))) + &(1)), (((*(node).borrow_mut())).name()).clone(), ::ispa_std::pycoll::to_any((((*(node).borrow_mut())).data()).clone()))).upcast();
@@ -8560,7 +8594,7 @@ return (holder).push((((*(binding).borrow_mut())).parse(&(origin), (begin).clone
 				let mut kept = (((*arr)).clone()).clone();
 				((*arr)).clear();
 				let mut i: i64 = 0;
-				'w150: while ((i) < (n)) {
+				'w151: while ((i) < (n)) {
 					if ((((i) < (first))) || (((i) >= (last)))) {
 						((*arr)).push((::ispa_std::pycoll::PyIndex::py_index(&(kept), &(i))).clone());
 					}
@@ -8571,10 +8605,10 @@ return (holder).push((((*(binding).borrow_mut())).parse(&(origin), (begin).clone
 				if ((count) < (0)) {
 					::ispa_std::fail(((*python::ispa_std::errors::ErrorKind_LengthError.get())).clone(), String::from("vector.resize: negative size"));
 				}
-				'w151: while ((((*arr).len() as i64)) > (count)) {
+				'w152: while ((((*arr).len() as i64)) > (count)) {
 					((*arr)).pop().unwrap_or_else(|| ::ispa_std::fail(1, "pop from empty sequence"));
 				}
-				'w152: while ((((*arr).len() as i64)) < (count)) {
+				'w153: while ((((*arr).len() as i64)) < (count)) {
 					((*arr)).push((fill).clone());
 				}
 			}
@@ -8591,7 +8625,7 @@ return (holder).push((((*(binding).borrow_mut())).parse(&(origin), (begin).clone
 			}
 			pub fn lexicographical_less<T: ::ispa_std::PyVal>(a: &Vec<T>, b: &Vec<T>) -> bool {
 				let mut i: i64 = 0;
-				'w153: while ((((i) < (((*a).len() as i64)))) && (((i) < (((*b).len() as i64))))) {
+				'w154: while ((((i) < (((*a).len() as i64)))) && (((i) < (((*b).len() as i64))))) {
 					if ((::ispa_std::pycoll::PyIndex::py_index(&((*a)), &(i))) < (::ispa_std::pycoll::PyIndex::py_index(&((*b)), &(i)))) {
 						return true;
 					}
@@ -8645,7 +8679,7 @@ return (holder).push((((*(binding).borrow_mut())).parse(&(origin), (begin).clone
 						return;
 					}
 					let mut i: i64 = 0;
-					'w154: while (((((i).clone()) + &(1))) < (depth)) {
+					'w155: while (((((i).clone()) + &(1))) < (depth)) {
 						if ::ispa_std::pycoll::PyIndex::py_index(&((self)._branches), &(i)) {
 							((self)._out).push(String::from("│   "));
 						} else {
@@ -8690,7 +8724,7 @@ return (holder).push((((*(binding).borrow_mut())).parse(&(origin), (begin).clone
 			pub fn list_to_string<T: ::ispa_std::PyVal>(items: &Vec<T>, mut element_to_string: impl FnMut(T) -> String) -> String {
 				let mut out: String = String::from("");
 				let mut i: i64 = 0;
-				'w155: while ((i) < (((*items).len() as i64))) {
+				'w156: while ((i) < (((*items).len() as i64))) {
 					out = (((out).clone()) + &((&mut element_to_string)((::ispa_std::pycoll::PyIndex::py_index(&((*items)), &(i))).clone())));
 					i = (((i).clone()) + &(1));
 				}

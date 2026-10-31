@@ -75,7 +75,7 @@ def main():
     parser.add_argument('--timeout', type=float, default=60)
     parser.add_argument('--text-view', action='store_true', help='C++ target: generate with --text-view (token text as views of the input)')
     parser.add_argument('--algorithm', default='LL', help='ispa -a value, e.g. LL or LALR (C++ target for LR)')
-    parser.add_argument('--grammar', choices=('json', 'expr'), default='json')
+    parser.add_argument('--grammar', choices=('json', 'expr', 'wrapjson', 'wrapjsonpinned'), default='json')
     parser.add_argument('--work', type=Path, default=None)
     args = parser.parse_args()
     if any(size < 2 for size in args.sizes) or args.timeout <= 0:
@@ -111,7 +111,7 @@ def main():
     row = '{"id":1,"name":"item","value":123.45,"active":true,"tags":["a","b","c"]}'
     unit = '(12+34*56-78/9)*(3+(4-5)*6)+'
     for size in args.sizes:
-        if args.grammar == 'json':
+        if args.grammar != 'expr':
             count = max(1, (size - 1) // (len(row) + 1))
             text = '[' + ','.join([row] * count) + ']'
         else:

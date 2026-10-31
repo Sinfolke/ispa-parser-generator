@@ -18,12 +18,17 @@ LegacyFail), which is how C++ distinguished them by signature.
 
 RAII becomes explicit: `recovery_frame(rule)` returns a FrameGuard to
 `close()`, `counter_scope()` a CounterScope to `restore()`, and a probe is
-`begin_probe()`/`end_probe()`. Every path that leaves a rule must close them,
-including the NoMatch path, which is why probing goes through prim.attempt."""
+`begin_probe()` / RuleProbe.close().
+
+An absent rule (a required first member that never started, inside a probe) is
+not an exception: reject_absent_rule() sets unwind_ = -1 and every abandoned rule
+returns through its normal `unwinding()` checks; the probe's owner calls
+take_absent(). Only foreign (ExternalParse) errors still travel as exceptions,
+which is why _attempt_rule alone still goes through prim.attempt."""
 from ispa_std import debug, prim, recovery
 from ispa_std.counter import CountSpec
 from ispa_std.errors import ErrorKind
-from ispa_std.failures import api_error, invalid_argument, length_error, logic_error, no_match, out_of_range, rethrow, runtime_error
+from ispa_std.failures import api_error, invalid_argument, length_error, logic_error, out_of_range, rethrow, runtime_error
 from ispa_std.format import fmt, int_to_string, replace_all
 from typing import Callable, Generic, TypeVar
 from ispa_std.chars import at, is_space
@@ -580,24 +585,30 @@ class CounterScope:
 
 class RuleProbe:
     """`optional(pos, rec)` and custom fail actions probe a rule: if a required
-    descendant never started, the probe absorbs the NoMatch."""
+    descendant never started, the probe's owner takes the absent-rule signal
+    (see LLParser.reject_absent_rule)."""
     parser: "LLParser"
     start: int
     committed: bool
     open: bool
+    depth: int
 
     def __init__(self, parser: "LLParser", start: int):
         self.parser = parser
         self.start = start
         self.committed = False
         self.open = True
+        self.depth = len(parser.probes_)
         parser.probes_.append(self)
 
     def close(self) -> None:
         if not self.open:
             return
         self.open = False
-        self.parser.probes_.pop()
+        # Drop this probe and any inner probe an error left open (an error that
+        # propagates out of an owner never reaches that owner's close()).
+        while len(self.parser.probes_) > self.depth:
+            self.parser.probes_.pop()
 
 
 class Resume:
@@ -667,6 +678,11 @@ class LLParser(Parser_base):
     def getContextErrors(self) -> list[recovery.ContextDiagnostic]:
         return self.context_errors_
 
+    def reset_probes(self) -> None:
+        """Start of a parse: drop probes an error left open. Not part of reset_recovery, which the
+        native facade also calls in the middle of a parse (drain_core) while probes are live."""
+        self.probes_.clear()
+
     def reset_recovery(self) -> None:
         self.counters_.clear()
         self.recovery_state_.diagnostics.clear()
@@ -735,11 +751,35 @@ class LLParser(Parser_base):
     def begin_probe(self, pos: TokenCursor) -> RuleProbe:
         return RuleProbe(self, cursor_position(pos))
 
-    def reject_absent_rule(self) -> None:
-        """Raise NoMatch when we are inside an uncommitted probe: the rule never
-        started, so the caller's `optional` should simply not match."""
-        if len(self.probes_) > 0 and not self.probes_[len(self.probes_) - 1].committed:
-            no_match()
+    def reject_absent_rule(self) -> bool:
+        """Signal "absent rule" when we are inside an uncommitted probe: the rule
+        never started, so the caller's `optional` should simply not match.
+
+        Nothing is thrown. The signal reuses the recovery unwind: unwind_ becomes
+        -1, so unwinding() is true, every member of every abandoned rule returns at
+        its next `unwinding()` check (the generator emits it after each member, so
+        no further member and no rule action runs), and action_result() reports the
+        abandoned rule as not matched. The probe's owner takes the signal with
+        take_absent() right after its rec() returns. Returns True when the signal
+        was raised: the caller must then return at once, doing no further work."""
+        if self.unwind_ < 0:
+            return True  # already abandoning: a later step of the same member must not do any work
+        if self.unwind_ == 0 and len(self.probes_) > 0 and not self.probes_[len(self.probes_) - 1].committed:
+            self.unwind_ = -1
+            return True
+        return False
+
+    def absent_pending(self) -> bool:
+        """Whether the current unwind is the absent-rule signal (native action_result uses it)."""
+        return self.unwind_ < 0
+
+    def take_absent(self) -> bool:
+        """The owner of a probe: whether a required descendant of rec() never started
+        (clears the signal)."""
+        if self.unwind_ < 0:
+            self.unwind_ = 0
+            return True
+        return False
 
     def commit_rule(self, pos: TokenCursor) -> None:
         self.commit_at(cursor_position(pos))
@@ -824,7 +864,9 @@ class LLParser(Parser_base):
         # resume target is the first one that sees it reach zero.
         self.frame_count = self.frame_count - 1
         self.recovery_state_.anchor_count = self.recovery_state_.anchor_count - 1
-        if self.unwind_ != 0:
+        # Only a recovery unwind (> 0) counts down; the absent-rule signal (< 0)
+        # stays set until the probe owner takes it.
+        if self.unwind_ > 0:
             self.unwind_ = self.unwind_ - 1
 
     def recovery_at(self, expecting: str, claims: list[recovery.ContextClaim]) -> None:
@@ -1003,7 +1045,8 @@ class LLParser(Parser_base):
         alternative (shared interior terminals do not identify a branch).
         `first_sets[i]` / `inner_sets[i]` are the two sets of alternative i
         (the C++ even/odd template pack). Returns the alternative, or -1."""
-        self.reject_absent_rule()
+        if self.reject_absent_rule():
+            return -1
         if len(first_sets) != len(inner_sets):
             logic_error("recover_choice: one FIRST set and one interior set per alternative")
         diagnostic = recovery.Diagnostic()
@@ -1078,7 +1121,8 @@ class LLParser(Parser_base):
         return selected
 
     def raise_error(self, token: RawToken, message: str) -> None:
-        self.reject_absent_rule()
+        if self.reject_absent_rule():
+            return
         diagnostic = recovery.Diagnostic()
         if self.frame_count == 0:
             diagnostic.rule = "<rule>"
@@ -1102,7 +1146,8 @@ class LLParser(Parser_base):
                 self.note_match()
                 return recovery.RequiredResult(recovery.RequiredStatus.Matched, True, node,
                                                recovery.Decision.initial())
-            self.reject_absent_rule()
+            if self.reject_absent_rule():
+                return recovery.RequiredResult.boundary_only()
             decision = fail.run(pos, self.recovery_state_)
             retry = False
             if decision.mode == recovery.Mode.Delete:
@@ -1123,18 +1168,23 @@ class LLParser(Parser_base):
                 return recovery.RequiredResult(recovery.RequiredStatus.Boundary, False, Node.blank(), decision)
 
     def _attempt_rule(self, rec: Callable[[TokenCursor], MatchResult], attempt: TokenCursor) -> MatchResult:
-        """Run `rec(attempt)` inside a probe, absorbing NoMatch and
-        ExternalParse so an explicitly bound parent handler can run (C++
-        `catch (const NoMatch&)` / `catch (const ExternalParseError&)`)."""
+        """Run `rec(attempt)` inside a probe. An absent rule (take_absent) and an
+        ExternalParse error both make the attempt fail, so an explicitly bound
+        parent handler can run. This is the only place that still catches: foreign
+        syntax errors are real exceptions (rare), the absent rule is not."""
+        if self.unwind_ < 0:
+            return MatchResult.failed(attempt)
         holder = []
         probe = self.begin_probe(attempt)
         scope = debug.scope_depth()
         failed = prim.attempt(lambda: holder.append(rec(attempt)))
         probe.close()
         if failed == 0:
+            if self.take_absent():
+                return MatchResult.failed(attempt)
             return holder[0]
         debug.unwind_to(scope)
-        if failed == ErrorKind.NoMatch or failed == ErrorKind.ExternalParse:
+        if failed == ErrorKind.ExternalParse:
             return MatchResult.failed(attempt)
         rethrow(failed, prim.failure_message())
         return MatchResult.failed(attempt)
@@ -1171,7 +1221,8 @@ class LLParser(Parser_base):
                 # here, just propagate.
                 return recovery.RequiredResult(recovery.RequiredStatus.Boundary, False, Node.blank(),
                                                recovery.Decision.initial())
-            self.reject_absent_rule()
+            if self.reject_absent_rule():
+                return recovery.RequiredResult.boundary_only()
             decision = fail.run(pos, self.recovery_state_)
             # We cannot synthesize an arbitrary nonterminal from one token.
             again = False
@@ -1239,7 +1290,9 @@ class LLParser(Parser_base):
             scope.success()
             scope.close()
             return node
-        self.reject_absent_rule()
+        if self.reject_absent_rule():
+            scope.close()
+            return Node.blank()
         fail.run(pos, self.recovery_state_)
         scope.close()
         debug.breakpoint("required token failed")
@@ -1274,7 +1327,9 @@ class LLParser(Parser_base):
             scope.success()
             scope.close()
             return match.node
-        self.reject_absent_rule()
+        if self.reject_absent_rule():
+            scope.close()
+            return Node.blank()
         fail.run(pos, self.recovery_state_)
         scope.close()
         debug.breakpoint("required rule failed")
@@ -1300,36 +1355,38 @@ class LLParser(Parser_base):
         return Node.blank()
 
     def optional_rule(self, pos: TokenCursor, rec: Callable[[TokenCursor], MatchResult]) -> Node:
-        """NOTE: a rule that abandons itself during unwinding must still return
-        status == True (a partial match) or the committed-probe check throws."""
-        attempt = pos.copy()
-        holder = []
-        probe = self.begin_probe(pos)
-        scope = debug.scope_depth()
-        failed = prim.attempt(lambda: holder.append(rec(attempt)))
-        if failed == 0:
-            match = holder[0]
-            if match.status:
-                pos.assign(match.it)
-                self.commit_rule(pos)
-                probe.close()
-                return match.node
-            committed = probe.committed
-            probe.close()
-            if committed:
-                logic_error("ISPA optional(): rule failed after consuming input")
+        """NOTE: a rule that abandons itself during a recovery unwind must still return
+        status == True (a partial match) or the committed-probe check throws. An
+        abandoned absent rule (take_absent) returns status False instead."""
+        if self.unwind_ < 0:
+            # Already abandoning for an outer probe: the signal is not ours to take.
             return Node.blank()
+        attempt = pos.copy()
+        probe = self.begin_probe(pos)
+        match = rec(attempt)
+        if self.take_absent():
+            # A required descendant did not start. Only the optional caller handles
+            # this signal; recovery has not run.
+            probe.close()
+            return Node.blank()
+        if match.status:
+            pos.assign(match.it)
+            self.commit_rule(pos)
+            probe.close()
+            return match.node
+        committed = probe.committed
         probe.close()
-        debug.unwind_to(scope)
-        if failed != ErrorKind.NoMatch:
-            rethrow(failed, prim.failure_message())
-        # A required descendant did not start. Only the optional caller handles
-        # this signal; recovery has not run.
+        if committed:
+            logic_error("ISPA optional(): rule failed after consuming input")
         return Node.blank()
 
     # --- repetition ----------------------------------------------------------
     def skip_spaces(self, pos: TokenCursor) -> None:
         if not self.has_space_token_:
+            return
+        if self.unwind_ < 0:
+            # The member that raised the absent-rule signal may still have a trailing space skip
+            # to run; an exception used to cut it off, so it must not touch the cursor.
             return
         if pos.kind_is(self.space_token_):
             pos.next()
@@ -1370,7 +1427,9 @@ class LLParser(Parser_base):
                 nodes.append(node)
                 cursor.assign(attempt)
         if (has_limit and len(nodes) != limit) or len(nodes) < spec.minimum:
-            self.reject_absent_rule()
+            if self.reject_absent_rule():
+                nodes.clear()
+                return nodes
             diagnostic = recovery.Diagnostic()
             if self.frame_count == 0:
                 diagnostic.rule = "<rule>"
@@ -1509,6 +1568,9 @@ class LLParser(Parser_base):
         return recovery.ActionFailure(action)
 
     def action_result(self, ast: object, pos: TokenCursor) -> MatchResult:
+        if self.unwind_ < 0:
+            # abandoned because a required descendant never started: not a match
+            return MatchResult.failed(pos)
         node = Node.blank()
         node.set_data(ast)
         return MatchResult(True, node, pos.copy())

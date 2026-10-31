@@ -1,0 +1,41 @@
+NUM:
+    @ [0-9]+
+    {@}
+;
+WORD:
+    @ [a-z]+
+    {@}
+;
+SEMI:
+    @ ';'
+    {@}
+;
+leaf:
+    @ NUM | WORD
+    {@}
+;
+wrap:
+    @ leaf
+    {@}
+;
+wrap2:
+    @ wrap
+    {@}
+;
+#[noinline]
+kept:
+    @ leaf
+    {@}
+;
+item:
+    @ wrap2 SEMI
+    {@}
+;
+pair:
+    '!' @ kept SEMI
+    {@}
+;
+main:
+    @ (item | pair)+
+    {@}
+;

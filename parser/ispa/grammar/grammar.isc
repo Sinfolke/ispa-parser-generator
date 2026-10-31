@@ -16,7 +16,7 @@ modifier:
     {@}
 
     #MOD:
-        @ 'inline' | 'skip' | 'extern' | 'global'
+        @ 'inline' | 'noinline' | 'skip' | 'extern' | 'global'
         {@}
     ;
 ;

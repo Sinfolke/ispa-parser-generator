@@ -30,6 +30,10 @@ export namespace AST {
         std::map<std::size_t, LLkTable> first_k_cache;
         std::map<std::size_t, LLkTable> follow_k_cache;
         NameToIndexMap name_to_index;
+        // Rules removed by TreePass::autoInline: alias -> rule that now stands for it. Every reference in
+        // the tree was already rewritten; the alias survives only as a type name (ConstructTypes) and as an
+        // export (External::exports), both of which must keep resolving.
+        std::map<stdu::vector<std::string>, stdu::vector<std::string>> aliases;
 
         static auto compute_group_length(const stdu::vector<std::shared_ptr<AST::RuleMember>> &group) -> std::size_t;
         void getUsePlacesTable(const stdu::vector<std::shared_ptr<AST::RuleMember>> &members, const stdu::vector<std::string> &name);
@@ -88,6 +92,20 @@ export namespace AST {
         auto getMemberFirstSet(const AST::RuleMember& member, std::size_t k) -> LLkSet;
         auto getFollowSet(std::size_t k) -> const LLkTable&;
         auto getAlternativeLookahead(const AST::RuleMember& alt, const stdu::vector<std::string>& ruleName, std::size_t k) -> LLkSet;
+        auto getAliases() const -> const std::map<stdu::vector<std::string>, stdu::vector<std::string>>& { return aliases; }
+        void addAlias(stdu::vector<std::string> alias, stdu::vector<std::string> target) {
+            aliases[std::move(alias)] = std::move(target);
+        }
+        // The rule that implements `name`: follows auto-inline aliases, returns `name` itself otherwise.
+        auto resolveAlias(const stdu::vector<std::string>& name) const -> stdu::vector<std::string> {
+            auto current = name;
+            for (std::size_t hops = 0; hops <= aliases.size(); ++hops) {
+                const auto found = aliases.find(current);
+                if (found == aliases.end()) return current;
+                current = found->second;
+            }
+            return current;
+        }
         auto getTreeMap() const -> const TreeMap& { return tree_map; };
         auto getSpacemode() const -> const SpacemodeStates& { return spacemode; };
         auto getName() const -> const std::string& { return name; }

@@ -957,6 +957,9 @@ struct AST::Semantic::Impl {
                 valid = valid && captures == 1;
                 if (!valid) out.error("GRM101", "[inline] requires exactly one captured rule reference", at(rule.position));
             }
+            if (std::ranges::find(r.modifiers, "inline") != r.modifiers.end() &&
+                std::ranges::find(r.modifiers, "noinline") != r.modifiers.end())
+                out.error("GRM103", "[inline] and [noinline] contradict each other", at(rule.position));
             if (std::ranges::find(r.modifiers, "skip") != r.modifiers.end() &&
                 (r.name.empty() || !std::isupper(static_cast<unsigned char>(leaf(r.name)[0]))))
                 out.error("GRM102", "[skip] can only be applied to token rules", at(rule.position));

@@ -32,7 +32,9 @@ std::vector<std::pair<std::string, std::string>> exports(AST::Tree& tree,
         manifest << "module " << std::quoted(Modules::spelling(source.name)) << ' '
             << std::quoted(entry ? Modules::spelling(*entry) : "") << '\n';
         for (const auto& [relative, position] : source.declarations) {
-            const auto path = canonical(relative);
+            const auto declared = canonical(relative);
+            // A rule removed by TreePass::autoInline stays exported under its own name; it parses as the rule it forwards to.
+            const auto path = tree.resolveAlias(declared);
             if (!tree.contains(path)) continue;
             // An external parser has no arguments to supply to a parameterized rule.
             bool needs_arguments = false;
@@ -41,11 +43,11 @@ std::vector<std::pair<std::string, std::string>> exports(AST::Tree& tree,
                     needs_arguments = !syntax->parameters.empty() || !syntax->templateParameters.empty();
             if (needs_arguments) continue;
             const bool token = AST::RuleMemberName{.name = path}.isTerminal();
-            const auto qualified = corelib::text::join(path, "::");
+            const auto qualified = corelib::text::join(declared, "::");
             const auto binding = "symbol_" + std::to_string(index++);
             if (python) python_exports << "    " << binding << " = ispa_std.ExternalRule(Parser, Lexer, "
                 << std::quoted(Parser::ParserBase::fun_name(path)) << ", Types."
-                << corelib::text::join(path, ".") << ", "
+                << corelib::text::join(declared, ".") << ", "
                 << (token ? "True" : "False") << ")\n";
             manifest << "symbol " << std::quoted(Modules::spelling(source.name)) << ' '
                 << std::quoted(Modules::spelling(relative)) << ' '
