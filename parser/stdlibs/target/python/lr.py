@@ -29,6 +29,11 @@ CONFLICT_ACTION = (1 << 63) - 1        # std::numeric_limits<long long>::max()
 INVALID_ACTION = -CONFLICT_ACTION
 
 
+class _Window(list):
+    """Lookahead window; generated tables index it with the C++-style `.at(i)`."""
+    at = list.__getitem__
+
+
 class LRControlPhase(enum.IntEnum):
     Decide = 0
     Shift = 1
@@ -105,7 +110,9 @@ def lr_pack(values: list, indices: list[int], offsets: list[int], splice: list[i
 
 
 def lr_get(values: list, index: int) -> Any:
-    return values[index]
+    value = values[index]
+    # Mid-rule actions read a member as the typed node (C++ lr_get<T>), not the capture wrapper.
+    return value.node if isinstance(value, LRTokenValue) else value
 
 
 def lr_node(value: Any) -> Node:
@@ -222,7 +229,7 @@ class LRParser(LLParser):
     """Deterministic LR driver (ISPA_STD::LRParser::lr_parse)."""
 
     def getErrors(self) -> list[Diagnostic]:
-        return self._lr_errors
+        return self._lr_errors + list(self.recovery_state.diagnostics)
 
     @property
     def _lr_errors(self) -> list[Diagnostic]:
@@ -269,6 +276,41 @@ class LRParser(LLParser):
         d.message, d.code = message, 'lr-unexpected-token'
         return d
 
+    def _lr_failure_recover(self, generated, region: LRRegionFrame, diagnostic: Diagnostic) -> bool:
+        """A syntax error where a `%handler` member was expected: run the fail block, then repair the stack."""
+        from .recovery import Mode
+        state = region.states[-1]
+        expected = generated.lr_failure_token(state)
+        if expected == -1:
+            return False
+        state_diagnostics = self.recovery_state.diagnostics
+        reported = len(state_diagnostics)
+        decision = generated.lr_failure(self, state, region.pos, region.values)
+        if len(state_diagnostics) > reported:
+            diagnostic.code = 'lr-superseded'
+        if decision.mode == Mode.Abort:
+            return False
+        if decision.mode not in (Mode.Insert, Mode.Replace):
+            return True
+        if expected == -2:
+            return False  # the member is a rule: only a token can be inserted
+        window = _Window([expected])
+        peek = region.pos.copy()
+        for _ in range(1, generated.lr_k()):
+            self._lr_skip(generated, peek, None)
+            if peek.isEnd():
+                window.append(-1)
+            else:
+                window.append(int(peek.peek().kind))
+                peek.advance()
+        action = generated.lr_action(state, window)
+        if action <= 0:
+            return False
+        region.values.append(generated.lr_synthesize(expected))
+        region.spans.append(LRRuleSpan(region.cursor, region.cursor, False, False, True))
+        region.states.append(action - 1)
+        return True
+
     def lr_parse(self, generated: Any, pos: Cursor) -> MatchResult:
         generated = generated or type(self)
         errors = self._lr_errors
@@ -284,21 +326,26 @@ class LRParser(LLParser):
             self._lr_skip(generated, position, offset)
             region.cursor = offset[0]
             peek = position.copy()
-            window: list[int] = []
+            window = _Window()
             for _ in range(k):
                 self._lr_skip(generated, peek, None)
                 end = peek.isEnd()
-                window.append(ABSENT if end else int(peek.peek().kind))
+                window.append(-1 if end else int(peek.peek().kind))
                 if not end:
                     peek.advance()
             action = generated.lr_action(states[-1], window)
             if action == INVALID_ACTION:
                 errors.append(self._lr_diagnostic(generated, region, window))
                 recover = getattr(self, 'lr_recover', None)
+                if recover is None and hasattr(generated, 'lr_failure'):
+                    recover = lambda r, d: self._lr_failure_recover(generated, r, d)
                 if recover is not None:
                     control.phase = LRControlPhase.Recover
                     old_cursor, old_size, old_state = region.cursor, len(states), states[-1]
                     if recover(region, errors[-1]):
+                        # A handler that reported its own diagnostic replaces the generic one.
+                        if errors[-1].code == 'lr-superseded':
+                            errors.pop()
                         if region.cursor == old_cursor and len(states) == old_size and states[-1] == old_state:
                             raise RuntimeError('LR recovery handler made no progress')
                         if region.cursor != old_cursor:
@@ -355,7 +402,15 @@ class LRParser(LLParser):
             if span.empty:
                 span.leading = allowed
             semantic = getattr(self, 'lr_semantic_reduce', None)
-            if semantic is not None:
+            typed = getattr(generated, 'lr_semantic_rule', None)
+            if typed is not None:
+                if typed(rule):
+                    # Generated mid-rule action: runs on the live value stack at the exact reduce point.
+                    control.phase = LRControlPhase.Semantic
+                    value = generated.lr_semantic_reduce(rule, position, values)
+                else:
+                    value = generated.lr_reduce(rule, rhs)
+            elif semantic is not None:
                 # Runs at the ACTION table's exact reduce point and may adjust cursor/span.
                 control.phase = LRControlPhase.Semantic
                 value = semantic(rule, region, span, rhs)
@@ -431,11 +486,11 @@ class LRGeneralizedParser(LRParser):
         while True:
             self._lr_skip(generated, pos, cursor)
             peek = pos.copy()
-            window: list[int] = []
+            window = _Window()
             for _ in range(k):
                 self._lr_skip(generated, peek, None)
                 end = peek.isEnd()
-                window.append(ABSENT if end else int(peek.peek().kind))
+                window.append(-1 if end else int(peek.peek().kind))
                 if not end:
                     peek.advance()
             pending = sorted(active)

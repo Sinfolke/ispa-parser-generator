@@ -4013,7 +4013,16 @@ namespace python {
 				std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos;
 				std::vector<long long> states;
 				std::vector<V> values;
-				std::vector<std::shared_ptr<python::ispa_std::lr::LRRuleSpan>> spans;
+				std::vector<long long> span_begin;
+				std::vector<long long> span_end;
+				std::vector<bool> span_leading;
+				std::vector<bool> span_trailing;
+				std::vector<bool> span_empty;
+				long long rb;
+				long long re;
+				bool rl;
+				bool rt;
+				bool rx;
 				std::vector<long long> capture_destinations;
 				long long cursor;
 				bool recovered_prefix;
@@ -4022,7 +4031,16 @@ namespace python {
 					((*this)).pos = start;
 					((*this)).states = std::vector<long long>{0};
 					((*this)).values = {};
-					((*this)).spans = {};
+					((*this)).span_begin = {};
+					((*this)).span_end = {};
+					((*this)).span_leading = {};
+					((*this)).span_trailing = {};
+					((*this)).span_empty = {};
+					((*this)).rb = 0;
+					((*this)).re = 0;
+					((*this)).rl = false;
+					((*this)).rt = false;
+					((*this)).rx = true;
 					((*this)).capture_destinations = {};
 					((*this)).cursor = 0;
 					((*this)).recovered_prefix = false;
@@ -4030,13 +4048,13 @@ namespace python {
 					((*((*this)).control)).continuation = continuation;
 				}
 				constexpr auto members() {
-					return std::tie(pos, states, values, spans, capture_destinations, cursor, recovered_prefix, control);
+					return std::tie(pos, states, values, span_begin, span_end, span_leading, span_trailing, span_empty, rb, re, rl, rt, rx, capture_destinations, cursor, recovered_prefix, control);
 				}
 				constexpr auto members() const {
-					return std::tie(pos, states, values, spans, capture_destinations, cursor, recovered_prefix, control);
+					return std::tie(pos, states, values, span_begin, span_end, span_leading, span_trailing, span_empty, rb, re, rl, rt, rx, capture_destinations, cursor, recovered_prefix, control);
 				}
 				static constexpr auto members_str() {
-					return std::array<std::string_view, 8>{{"pos", "states", "values", "spans", "capture_destinations", "cursor", "recovered_prefix", "control"}};
+					return std::array<std::string_view, 17>{{"pos", "states", "values", "span_begin", "span_end", "span_leading", "span_trailing", "span_empty", "rb", "re", "rl", "rt", "rx", "capture_destinations", "cursor", "recovered_prefix", "control"}};
 				}
 				constexpr auto methods() {
 					return std::make_tuple(&LRRegionFrame::__init__);
@@ -4268,9 +4286,12 @@ namespace python {
 				virtual auto getErrors() -> const std::vector<std::shared_ptr<python::ispa_std::recovery::Diagnostic>>&;
 				template<typename V> auto _skip(std::shared_ptr<python::ispa_std::lr::LRGrammar<V>> g, std::shared_ptr<python::ispa_std::lexer::TokenCursor> it, std::vector<long long>& offset) -> void;
 				template<typename V> auto _gap(std::shared_ptr<python::ispa_std::lr::LRGrammar<V>> g, long long rule, long long index) -> bool;
+				template<typename V> auto _window_into(std::shared_ptr<python::ispa_std::lr::LRGrammar<V>> g, std::shared_ptr<python::ispa_std::lexer::TokenCursor> position, std::vector<long long>& window) -> void;
 				template<typename V> auto _window(std::shared_ptr<python::ispa_std::lr::LRGrammar<V>> g, std::shared_ptr<python::ispa_std::lexer::TokenCursor> position) -> std::vector<long long>;
 				template<typename V> auto _unexpected(std::shared_ptr<python::ispa_std::lr::LRGrammar<V>> g, const std::vector<long long>& states, const std::vector<long long>& window, std::shared_ptr<python::ispa_std::lexer::TokenCursor> position) -> std::shared_ptr<python::ispa_std::recovery::Diagnostic>;
-				template<typename V> auto _reduce_span(std::shared_ptr<python::ispa_std::lr::LRGrammar<V>> g, long long rule, long long count, long long begin, const std::vector<std::shared_ptr<python::ispa_std::lr::LRRuleSpan>>& spans, long long cursor) -> std::shared_ptr<python::ispa_std::lr::LRRuleSpan>;
+				template<typename V> auto _push_span(std::shared_ptr<python::ispa_std::lr::LRRegionFrame<V>> region, long long begin, long long end, bool leading, bool trailing, bool empty) -> void;
+				template<typename V> auto _pop_spans(std::shared_ptr<python::ispa_std::lr::LRRegionFrame<V>> region, long long keep) -> void;
+				template<typename V> auto _reduce_span(std::shared_ptr<python::ispa_std::lr::LRGrammar<V>> g, long long rule, long long count, long long begin, std::shared_ptr<python::ispa_std::lr::LRRegionFrame<V>> region) -> void;
 				template<typename V> auto lr_parse(std::shared_ptr<python::ispa_std::lr::LRGrammar<V>> g, std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos) -> std::shared_ptr<python::ispa_std::match_result::MatchResult>;
 				constexpr auto members() {
 					return std::tie(errors_);
@@ -5350,6 +5371,25 @@ template<typename V> auto python::ispa_std::lr::LRParser::_gap(std::shared_ptr<p
 	}
 	return false;
 }
+template<typename V> auto python::ispa_std::lr::LRParser::_window_into(std::shared_ptr<python::ispa_std::lr::LRGrammar<V>> g, std::shared_ptr<python::ispa_std::lexer::TokenCursor> position, std::vector<long long>& window) -> void {
+	long long kind;
+	(window).clear();
+	if (((((*g)).lr_k()) == (1))) {
+		if (((*position)).isEnd()) {
+			(window).push_back(python::ispa_std::lr::ABSENT);
+		} else {
+			(window).push_back(((*((*position)).current())).kind());
+		}
+		return ;
+	}
+	auto __ispa_seq0 = ((*this))._window(g, position);
+	long long __ispa_idx0 = 0;
+	while (((__ispa_idx0) < (static_cast<long long>(__ispa_seq0.size())))) {
+		kind = (__ispa_seq0)[__ispa_idx0];
+		__ispa_idx0 += 1;
+		(window).push_back(kind);
+	}
+}
 template<typename V> auto python::ispa_std::lr::LRParser::_window(std::shared_ptr<python::ispa_std::lr::LRGrammar<V>> g, std::shared_ptr<python::ispa_std::lexer::TokenCursor> position) -> std::vector<long long> {
 	auto peek = ((*position)).copy();
 	std::vector<long long> window = std::vector<long long>{};
@@ -5362,7 +5402,9 @@ template<typename V> auto python::ispa_std::lr::LRParser::_window(std::shared_pt
 			(window).push_back(python::ispa_std::lr::ABSENT);
 		} else {
 			(window).push_back(((*((*peek)).current())).kind());
-			((*peek)).next();
+			if (((((i) + (1))) < (((*g)).lr_k()))) {
+				((*peek)).next();
+			}
 		}
 		i = ((i) + (1));
 	}
@@ -5412,68 +5454,89 @@ template<typename V> auto python::ispa_std::lr::LRParser::_unexpected(std::share
 	((*d)).code = "lr-unexpected-token";
 	return d;
 }
-template<typename V> auto python::ispa_std::lr::LRParser::_reduce_span(std::shared_ptr<python::ispa_std::lr::LRGrammar<V>> g, long long rule, long long count, long long begin, const std::vector<std::shared_ptr<python::ispa_std::lr::LRRuleSpan>>& spans, long long cursor) -> std::shared_ptr<python::ispa_std::lr::LRRuleSpan> {
-	auto span = ISPA_STD::construct<python::ispa_std::lr::LRRuleSpan>(cursor, cursor, false, false, true);
+template<typename V> auto python::ispa_std::lr::LRParser::_push_span(std::shared_ptr<python::ispa_std::lr::LRRegionFrame<V>> region, long long begin, long long end, bool leading, bool trailing, bool empty) -> void {
+	(((*region)).span_begin).push_back(begin);
+	(((*region)).span_end).push_back(end);
+	(((*region)).span_leading).push_back(leading);
+	(((*region)).span_trailing).push_back(trailing);
+	(((*region)).span_empty).push_back(empty);
+}
+template<typename V> auto python::ispa_std::lr::LRParser::_pop_spans(std::shared_ptr<python::ispa_std::lr::LRRegionFrame<V>> region, long long keep) -> void {
+	while (((static_cast<long long>(((*region)).span_begin.size())) > (keep))) {
+		ISPA_STD::python_pop((((*region)).span_begin));
+		ISPA_STD::python_pop((((*region)).span_end));
+		ISPA_STD::python_pop((((*region)).span_leading));
+		ISPA_STD::python_pop((((*region)).span_trailing));
+		ISPA_STD::python_pop((((*region)).span_empty));
+	}
+}
+template<typename V> auto python::ispa_std::lr::LRParser::_reduce_span(std::shared_ptr<python::ispa_std::lr::LRGrammar<V>> g, long long rule, long long count, long long begin, std::shared_ptr<python::ispa_std::lr::LRRegionFrame<V>> region) -> void {
+	((*region)).rb = ((*region)).cursor;
+	((*region)).re = ((*region)).cursor;
+	((*region)).rl = false;
+	((*region)).rx = true;
 	bool allowed = ((*this))._gap(g, rule, 0);
 	long long i = 0;
 	while (((i) < (count))) {
-		auto child = (spans)[((begin) + (i))];
-		if (((*child)).empty) {
-			allowed = ((((allowed) || (((*child)).leading))) || (((*child)).trailing));
+		long long at = ((begin) + (i));
+		if ((((*region)).span_empty)[at]) {
+			allowed = ((((allowed) || ((((*region)).span_leading)[at]))) || ((((*region)).span_trailing)[at]));
 		} else {
-			if (((*span)).empty) {
-				((*span)).begin = ((*child)).begin;
-				((*span)).leading = ((allowed) || (((*child)).leading));
+			if (((*region)).rx) {
+				((*region)).rb = (((*region)).span_begin)[at];
+				((*region)).rl = ((allowed) || ((((*region)).span_leading)[at]));
 			} else {
-				if (((((((*child)).begin) > (((*span)).end))) && ((!(((allowed) || (((*child)).leading))))))) {
+				if ((((((((*region)).span_begin)[at]) > (((*region)).re))) && ((!(((allowed) || ((((*region)).span_leading)[at]))))))) {
 					python::ispa_std::failures::runtime_error("Whitespace is not allowed between these rule members");
 				}
 			}
-			((*span)).empty = false;
-			((*span)).end = ((*child)).end;
-			allowed = ((*child)).trailing;
+			((*region)).rx = false;
+			((*region)).re = (((*region)).span_end)[at];
+			allowed = (((*region)).span_trailing)[at];
 		}
 		allowed = ((allowed) || (((*this))._gap(g, rule, ((i) + (1)))));
 		i = ((i) + (1));
 	}
-	((*span)).trailing = allowed;
-	if (((*span)).empty) {
-		((*span)).leading = allowed;
+	((*region)).rt = allowed;
+	if (((*region)).rx) {
+		((*region)).rl = allowed;
 	}
-	return span;
 }
 template<typename V> auto python::ispa_std::lr::LRParser::lr_parse(std::shared_ptr<python::ispa_std::lr::LRGrammar<V>> g, std::shared_ptr<python::ispa_std::lexer::TokenCursor> pos) -> std::shared_ptr<python::ispa_std::match_result::MatchResult> {
 	((*this)).errors_ = {};
 	std::shared_ptr<python::ispa_std::lr::LRRegionFrame<V>> region = ISPA_STD::construct<python::ispa_std::lr::LRRegionFrame<V>>(pos, 0);
-	std::vector<long long>& states = ((*region)).states;
-	auto values = ((*region)).values;
-	std::vector<std::shared_ptr<python::ispa_std::lr::LRRuleSpan>>& spans = ((*region)).spans;
 	auto control = ((*region)).control;
 	auto position = ((*region)).pos;
+	std::vector<long long> offset = std::vector<long long>{0};
+	std::vector<long long> window = std::vector<long long>{};
+	std::vector<V> rhs = std::vector<V>{};
 	while (true) {
 		((*control)).phase = python::ispa_std::lr::LRControlPhase::Decide;
-		std::vector<long long> offset = std::vector<long long>{((*region)).cursor};
+		(offset)[0] = ((*region)).cursor;
 		((*this))._skip(g, position, offset);
 		((*region)).cursor = (offset)[0];
-		auto window = ((*this))._window(g, position);
-		long long action = ((*g)).lr_action((states)[((static_cast<long long>(states.size())) - (1))], window);
+		((*this))._window_into(g, position, window);
+		long long action = ((*g)).lr_action((((*region)).states)[((static_cast<long long>(((*region)).states.size())) - (1))], window);
 		if (((action) == (python::ispa_std::lr::LR_INVALID))) {
-			(((*this)).errors_).push_back(((*this))._unexpected(g, states, window, position));
+			(((*this)).errors_).push_back(((*this))._unexpected(g, ((*region)).states, window, position));
 			bool recovered = false;
 			if (((*g)).has_recover()) {
 				((*control)).phase = python::ispa_std::lr::LRControlPhase::Recover;
 				long long old_cursor = ((*region)).cursor;
-				long long old_size = static_cast<long long>(states.size());
-				long long old_state = (states)[((static_cast<long long>(states.size())) - (1))];
+				long long old_size = static_cast<long long>(((*region)).states.size());
+				long long old_state = (((*region)).states)[((static_cast<long long>(((*region)).states.size())) - (1))];
 				if (((*g)).lr_recover(region, (((*this)).errors_)[((static_cast<long long>(((*this)).errors_.size())) - (1))])) {
-					if (((((((((*region)).cursor) == (old_cursor))) && (((static_cast<long long>(states.size())) == (old_size))))) && ((((states)[((static_cast<long long>(states.size())) - (1))]) == (old_state))))) {
+					if (((((*(((*this)).errors_)[((static_cast<long long>(((*this)).errors_.size())) - (1))])).code) == ("lr-superseded"))) {
+						ISPA_STD::python_pop((((*this)).errors_));
+					}
+					if (((((((((*region)).cursor) == (old_cursor))) && (((static_cast<long long>(((*region)).states.size())) == (old_size))))) && ((((((*region)).states)[((static_cast<long long>(((*region)).states.size())) - (1))]) == (old_state))))) {
 						python::ispa_std::failures::runtime_error("LR recovery handler made no progress");
 					}
 					if (((((*region)).cursor) != (old_cursor))) {
-						if (((static_cast<long long>(spans.size())) == (0))) {
+						if (((static_cast<long long>(((*region)).span_begin.size())) == (0))) {
 							((*region)).recovered_prefix = true;
 						} else {
-							((*(spans)[((static_cast<long long>(spans.size())) - (1))])).trailing = true;
+							(((*region)).span_trailing)[((static_cast<long long>(((*region)).span_trailing.size())) - (1))] = true;
 						}
 					}
 					recovered = true;
@@ -5485,61 +5548,71 @@ template<typename V> auto python::ispa_std::lr::LRParser::lr_parse(std::shared_p
 		} else {
 			if (((action) == (0))) {
 				((*control)).phase = python::ispa_std::lr::LRControlPhase::Accept;
-				if (((((static_cast<long long>(values.size())) != (1))) || ((!(((*position)).isEnd()))))) {
+				if (((((static_cast<long long>(((*region)).values.size())) != (1))) || ((!(((*position)).isEnd()))))) {
 					python::ispa_std::failures::runtime_error("Invalid LR accept stack");
 				}
-				auto last = (spans)[((static_cast<long long>(spans.size())) - (1))];
-				if (((((((((((*last)).begin) != (0))) && ((!(((*last)).leading))))) && ((!(((*region)).recovered_prefix))))) || (((((((*region)).cursor) > (((*last)).end))) && ((!(((*last)).trailing))))))) {
+				long long at = ((static_cast<long long>(((*region)).span_begin.size())) - (1));
+				if ((((((((((((*region)).span_begin)[at]) != (0))) && ((!((((*region)).span_leading)[at]))))) && ((!(((*region)).recovered_prefix))))) || (((((((*region)).cursor) > ((((*region)).span_end)[at]))) && ((!((((*region)).span_trailing)[at]))))))) {
 					python::ispa_std::failures::runtime_error("Whitespace is not allowed at the input boundary");
 				}
-				return ISPA_STD::construct<python::ispa_std::match_result::MatchResult>(true, python::ispa_std::lr::lr_node((values)[((static_cast<long long>(values.size())) - (1))]), position);
+				return ISPA_STD::construct<python::ispa_std::match_result::MatchResult>(true, python::ispa_std::lr::lr_node((((*region)).values)[((static_cast<long long>(((*region)).values.size())) - (1))]), position);
 			} else {
 				if (((action) > (0))) {
 					((*control)).phase = python::ispa_std::lr::LRControlPhase::Shift;
 					if (((*position)).isEnd()) {
 						python::ispa_std::failures::runtime_error("LR shift past end of input");
 					}
-					(values).push_back(((*g)).lr_shift(((*position)).current()));
-					(spans).push_back(ISPA_STD::construct<python::ispa_std::lr::LRRuleSpan>(((*region)).cursor, ((((*region)).cursor) + (1)), false, false, false));
+					(((*region)).values).push_back(((*g)).lr_shift(((*position)).current()));
+					((*this))._push_span(region, ((*region)).cursor, ((((*region)).cursor) + (1)), false, false, false);
 					((*region)).cursor = ((((*region)).cursor) + (1));
-					(states).push_back(((action) - (1)));
+					(((*region)).states).push_back(((action) - (1)));
 					((*position)).next();
 				} else {
 					long long rule = ((( - (action))) - (1));
 					((*control)).phase = python::ispa_std::lr::LRControlPhase::Reduce;
 					((*control)).production = rule;
 					long long count = ((*g)).lr_length(rule);
-					if (((count) > (static_cast<long long>(values.size())))) {
+					if (((count) > (static_cast<long long>(((*region)).values.size())))) {
 						python::ispa_std::failures::runtime_error("LR stack underflow");
 					}
-					long long begin = ((static_cast<long long>(values.size())) - (count));
-					std::vector<V> rhs = std::vector<V>{};
-					long long i = begin;
-					while (((i) < (static_cast<long long>(values.size())))) {
-						(rhs).push_back((values)[i]);
-						i = ((i) + (1));
-					}
-					auto span = ((*this))._reduce_span(g, rule, count, begin, spans, ((*region)).cursor);
+					long long begin = ((static_cast<long long>(((*region)).values.size())) - (count));
+					(rhs).clear();
+					((*this))._reduce_span(g, rule, count, begin, region);
 					V value;
 					if (((*g)).has_semantic_reduce()) {
+						long long i = begin;
+						while (((i) < (static_cast<long long>(((*region)).values.size())))) {
+							(rhs).push_back((((*region)).values)[i]);
+							i = ((i) + (1));
+						}
 						((*control)).phase = python::ispa_std::lr::LRControlPhase::Semantic;
+						auto span = ISPA_STD::construct<python::ispa_std::lr::LRRuleSpan>(((*region)).rb, ((*region)).re, ((*region)).rl, ((*region)).rt, ((*region)).rx);
 						value = ((*g)).lr_semantic_reduce(rule, region, span, rhs);
+						((*region)).rb = ((*span)).begin;
+						((*region)).re = ((*span)).end;
+						((*region)).rl = ((*span)).leading;
+						((*region)).rt = ((*span)).trailing;
+						((*region)).rx = ((*span)).empty;
 					} else {
+						long long i = 0;
+						while (((i) < (count))) {
+							(rhs).push_back(ISPA_STD::python_pop((((*region)).values), begin));
+							i = ((i) + (1));
+						}
 						value = ((*g)).lr_reduce(rule, rhs);
 					}
-					while (((static_cast<long long>(values.size())) > (begin))) {
-						ISPA_STD::python_pop((values));
+					(rhs).clear();
+					while (((static_cast<long long>(((*region)).values.size())) > (begin))) {
+						ISPA_STD::python_pop((((*region)).values));
 					}
-					while (((static_cast<long long>(spans.size())) > (begin))) {
-						ISPA_STD::python_pop((spans));
+					((*this))._pop_spans(region, begin);
+					while (((static_cast<long long>(((*region)).states.size())) > (((begin) + (1))))) {
+						ISPA_STD::python_pop((((*region)).states));
 					}
-					while (((static_cast<long long>(states.size())) > (((begin) + (1))))) {
-						ISPA_STD::python_pop((states));
-					}
-					long long nxt = ((*g)).lr_goto((states)[((static_cast<long long>(states.size())) - (1))], ((*g)).lr_lhs(rule));
-					(values).push_back(value);
-					(spans).push_back(span);
-					(states).push_back(nxt);
+					long long nxt = ((*g)).lr_goto((((*region)).states)[((static_cast<long long>(((*region)).states.size())) - (1))], ((*g)).lr_lhs(rule));
+					(((*region)).values).push_back(value);
+					((*this))._push_span(region, ((*region)).rb, ((*region)).re, ((*region)).rl, ((*region)).rt, ((*region)).rx);
+					(((*region)).states).push_back(nxt);
 				}
 			}
 		}

@@ -2,11 +2,32 @@ module;
 #include <tsl/ordered_map.h>
 module LangRepr.ConstructParser;
 import ParserIR.API;
+import Parser.Base;
 import corelib;
 import constants;
 import std;
 
 namespace LangRepr {
+namespace {
+std::set<std::string> pythonClassNames(const LangAPI::Declarations& declarations, const std::string& prefix = "") {
+    std::set<std::string> names;
+    for (const auto& declaration : declarations) {
+        if (declaration.isNamespace()) {
+            const auto& ns = declaration.getNamespace();
+            const auto nested = pythonClassNames(ns.declarations, prefix + ns.name + ".");
+            names.insert(nested.begin(), nested.end());
+        } else if (declaration.isClass()) {
+            std::string name = prefix;
+            for (const auto& part : declaration.getClass().name.path) if (const auto* value = std::get_if<std::string>(&part)) {
+                if (name.size() > prefix.size()) name += ".";
+                name += *value;
+            }
+            names.insert(name);
+        }
+    }
+    return names;
+}
+}
 auto ConstructParser::constructLRParser(LangAPI::Class &parser) -> void {
     using namespace LangAPI;
     auto integer = [](long long value) { return Int::createExpression(Int{.value = value}); };
@@ -221,31 +242,90 @@ auto ConstructParser::constructLRParser(LangAPI::Class &parser) -> void {
     gotos.push_back(fail());
     add("lr_goto", size, {{size, "state"}, {size, "lhs"}}, std::move(gotos));
     Statements lengths, lhs, reductions;
+    std::function<std::size_t(const AST::RuleMember&)> captureCount;
+    captureCount = [&](const AST::RuleMember& member) -> std::size_t {
+        if (!member.prefix.empty()) return 1;
+        std::size_t count = 0;
+        if (member.isGroup()) for (const auto& child : member.getGroup().values) count += captureCount(*child);
+        else if (member.isOp() && !member.getOp().options.empty()) count = captureCount(*member.getOp().options.front());
+        return count;
+    };
+    const auto helperSource = [&](const LRBase::Name& name) -> const AST::RuleMember* {
+        for (const auto& candidate : lr->getProductions())
+            if (candidate.lhs == name && candidate.source.normalization_source)
+                return candidate.source.normalization_source.get();
+        return nullptr;
+    };
+    const auto innerCaptures = [&](const AST::RuleMember& source) {
+        auto uncaptured = source;
+        uncaptured.prefix.clear();
+        return captureCount(uncaptured);
+    };
+    // A parser statement of an advanced rule is an empty nonterminal after normalization (a mid-rule action): the
+    // reduction of that nonterminal runs the statement, with the members before it still on the value stack.
+    struct ActionSite { std::size_t production; std::size_t parent; std::size_t member; };
+    std::map<std::size_t, std::vector<ActionSite>> sites_by_parent;
+    std::vector<ActionSite> action_sites;
+    for (std::size_t i = 1; i < lr->getProductions().size(); ++i) {
+        const auto& candidate = lr->getProductions()[i];
+        if (!candidate.rhs.empty() || !candidate.source.normalization_source) continue;
+        if (!std::ranges::any_of(candidate.source.features, [](const auto& f) { return std::holds_alternative<AST::PythonAction>(f); })) continue;
+        std::optional<ActionSite> found;
+        for (std::size_t j = 1; j < lr->getProductions().size() && !found; ++j) {
+            const auto& parent = lr->getProductions()[j];
+            for (std::size_t k = 0; k < parent.rhs.size(); ++k) if (parent.rhs[k] == candidate.lhs) { found = ActionSite{i, j, k}; break; }
+        }
+        if (!found || lr->getProductions()[found->parent].source.normalization_source)
+            throw std::invalid_argument("LR parsers run Python statements only where they are written directly in an advanced rule: " +
+                corelib::text::join(candidate.source.original_rules.empty() ? candidate.lhs : candidate.source.original_rules, "::"));
+        sites_by_parent[found->parent].push_back(*found);
+        action_sites.push_back(*found);
+    }
+    for (auto& [parent, sites] : sites_by_parent)
+        std::ranges::sort(sites, {}, &ActionSite::member);
+    // Value of the AST that earlier actions of a rule built, stored by the action's reduction.
+    auto carried = [&](const Type& result_type, Expression values_expr, Expression index) {
+        StorageSymbol data;
+        data.what = IspaLibFunctionCall::createExpression(IspaLibFunctionCall{
+            .symbol = IspaLibSymbol{.exports = StdlibExports::LRGet},
+            .args = {std::move(values_expr), std::move(index)}, .template_parameters = {std::make_shared<Type>(result_type)}});
+        data.path.emplace_back(FunctionCall{.name = std::make_shared<Symbol>("data")});
+        return StorageSymbol::createExpression(data);
+    };
+    // Stores the captures of members [from, to) into `result`; `index` maps a member to its slot in the value list.
+    auto assignCaptures = [&](const LRBase::Production& production, std::size_t from, std::size_t to, const std::string& list,
+                              const std::function<Expression(std::size_t)>& index) {
+        Statements out;
+        auto block = ParserIR::dataBlock(production.source.data_block);
+        std::size_t capture = 0;
+        for (std::size_t m = 0; m < to; ++m) {
+            const auto& member = *production.source.rule_members[m];
+            const auto* helper = helperSource(production.rhs[m]);
+            const auto count = !member.prefix.empty() ? 1 : helper ? innerCaptures(*helper) : 0;
+            for (std::size_t column = 0; column < count; ++column) {
+                if (m >= from && !block.empty()) {
+                    StorageSymbol destination;
+                    destination.what = symbol("result");
+                    if (block.is_regular_data_block()) destination.path.emplace_back("value");
+                    else if (block.is_inclosed_map()) destination.path.emplace_back(production.source.data_block.fields.at(capture).first);
+                    else throw std::invalid_argument("LR capture has undefined datablock");
+                    out.push_back(IspaLibFunctionCall::createStatement(IspaLibFunctionCall{
+                        .symbol = IspaLibSymbol{.exports = StdlibExports::LRCaptureAssign},
+                        .args = {StorageSymbol::createExpression(destination), symbol(list), index(m),
+                            Cast::createExpression(Cast{.type = std::make_shared<Type>(size),
+                                .what = integer(member.prefix.empty() ? static_cast<long long>(column) : -1)})}}));
+                }
+                ++capture;
+            }
+        }
+        return out;
+    };
     for (std::size_t i = 1; i < lr->getProductions().size(); ++i) {
         const auto &production = lr->getProductions()[i];
         const auto id = i - 1;
         lengths.push_back(If::createStatement(If{equals(symbol("rule"), integer(id)), {returned(integer(production.rhs.size()))}}));
         lhs.push_back(If::createStatement(If{equals(symbol("rule"), integer(id)), {returned(integer(ids.at(production.lhs)))}}));
         Statements reduce;
-        std::function<std::size_t(const AST::RuleMember&)> captureCount;
-        captureCount = [&](const AST::RuleMember& member) -> std::size_t {
-            if (!member.prefix.empty()) return 1;
-            std::size_t count = 0;
-            if (member.isGroup()) for (const auto& child : member.getGroup().values) count += captureCount(*child);
-            else if (member.isOp() && !member.getOp().options.empty()) count = captureCount(*member.getOp().options.front());
-            return count;
-        };
-        const auto helperSource = [&](const LRBase::Name& name) -> const AST::RuleMember* {
-            for (const auto& candidate : lr->getProductions())
-                if (candidate.lhs == name && candidate.source.normalization_source)
-                    return candidate.source.normalization_source.get();
-            return nullptr;
-        };
-        const auto innerCaptures = [&](const AST::RuleMember& source) {
-            auto uncaptured = source;
-            uncaptured.prefix.clear();
-            return captureCount(uncaptured);
-        };
         if (const auto* source = production.source.normalization_source.get()) {
             Array indices, offsets, splice;
             std::size_t count = 0;
@@ -270,29 +350,18 @@ auto ConstructParser::constructLRParser(LangAPI::Class &parser) -> void {
                          Bool::createExpression(Bool{.value = source->quantifier == '*' || source->quantifier == '+'})}})));
         } else {
             Type result_type = Type{Symbol{"Types", production.lhs}};
-            reduce.push_back(Variable{.name = "result", .type = result_type});
-            auto block = ParserIR::dataBlock(production.source.data_block);
-            std::size_t capture = 0;
-            for (std::size_t m = 0; m < production.source.rule_members.size(); ++m) {
-                const auto& member = *production.source.rule_members[m];
-                const auto* helper = helperSource(production.rhs[m]);
-                const auto count = !member.prefix.empty() ? 1 : helper ? innerCaptures(*helper) : 0;
-                for (std::size_t column = 0; column < count; ++column) {
-                    if (!block.empty()) {
-                        StorageSymbol destination;
-                        destination.what = symbol("result");
-                        if (block.is_regular_data_block()) destination.path.emplace_back("value");
-                        else if (block.is_inclosed_map()) destination.path.emplace_back(production.source.data_block.fields.at(capture).first);
-                        else throw std::invalid_argument("LR capture has undefined datablock");
-                        reduce.push_back(IspaLibFunctionCall::createStatement(IspaLibFunctionCall{
-                            .symbol = IspaLibSymbol{.exports = StdlibExports::LRCaptureAssign},
-                            .args = {StorageSymbol::createExpression(destination), symbol("values"), integer(m),
-                                Cast::createExpression(Cast{.type = std::make_shared<Type>(size),
-                                    .what = integer(member.prefix.empty() ? static_cast<long long>(column) : -1)})}}));
-                    }
-                    ++capture;
-                }
+            // Mid-rule actions already ran (see lr_semantic_reduce): continue from the AST they built.
+            const auto actions = sites_by_parent.find(i);
+            Variable result{.name = "result", .type = result_type};
+            std::size_t first_member = 0;
+            if (actions != sites_by_parent.end()) {
+                first_member = actions->second.back().member + 1;
+                result.value = carried(result_type, symbol("values"), integer(actions->second.back().member));
             }
+            reduce.push_back(std::move(result));
+            auto assignments = assignCaptures(production, first_member, production.source.rule_members.size(), "values",
+                [&](std::size_t m) { return integer(m); });
+            reduce.insert(reduce.end(), std::make_move_iterator(assignments.begin()), std::make_move_iterator(assignments.end()));
             reduce.push_back(returned(IspaLibFunctionCall::createExpression(IspaLibFunctionCall{
                 .symbol = IspaLibSymbol{.exports = StdlibExports::LRNode},
                 .args = {symbol("result")}, .template_parameters = {std::make_shared<Type>(result_type)}})));
@@ -303,6 +372,214 @@ auto ConstructParser::constructLRParser(LangAPI::Class &parser) -> void {
     add("lr_length", size, {{size, "rule"}}, std::move(lengths));
     add("lr_lhs", size, {{size, "rule"}}, std::move(lhs));
     add("lr_reduce", any, {{size, "rule"}, {Type{ValueType::ImmutableSemantic, Type{ValueType::BorrowSemantic, values}}, "values"}}, std::move(reductions));
+
+    // --- fail blocks: a `%name` marker on a member is the recovery point for a syntax error where that member is expected.
+    struct FailSite { std::size_t state; std::size_t production; std::size_t dot; const AST::FailMarker* marker; };
+    std::vector<FailSite> fail_sites;
+    {
+        const auto& collection = lr->getCanonicalCollection();
+        for (std::size_t state = 0; state < collection.size(); ++state)
+            for (const auto& [core, lookaheads] : collection[state]) {
+                const auto& item = lr->getProductions()[core.production];
+                if (core.production == 0 || item.source.normalization_source || core.dot_pos >= item.rhs.size() ||
+                    core.dot_pos >= item.source.rule_members.size()) continue;
+                const AST::FailMarker* marker = nullptr;
+                for (const auto& feature : item.source.rule_members[core.dot_pos]->features)
+                    if (const auto* found = std::get_if<AST::FailMarker>(&feature)) marker = found;
+                if (!marker) continue;
+                if (helperSource(item.rhs[core.dot_pos]))
+                    throw std::invalid_argument("LR parsers support fail markers only on plain rule or token members: " +
+                        corelib::text::join(marker->name, "::"));
+                fail_sites.push_back({state, core.production, core.dot_pos, marker});
+                break;
+            }
+    }
+    if (!fail_sites.empty()) {
+        const auto classes = pythonClassNames(tree.getPythonDeclarations());
+        const Type token_size = size;
+        Statements kinds, handlers;
+        auto notFound = Cast::createExpression(Cast{.type = std::make_shared<Type>(size), .what = integer(-1)});
+        auto notToken = Cast::createExpression(Cast{.type = std::make_shared<Type>(size), .what = integer(-2)});
+        for (const auto& site : fail_sites) {
+            const auto& item = lr->getProductions()[site.production];
+            const auto& expected = item.rhs[site.dot];
+            kinds.push_back(If::createStatement(If{equals(symbol("state"), integer(site.state)),
+                {returned(AST::RuleMemberName{.name = expected}.isTerminal() ? tokenId(expected) : notToken)}}));
+            const Type result_type = Type{Symbol{"Types", item.lhs}};
+            Statements body;
+            Expression base = memberCall("stack", "size");
+            base.push_back(ExpressionElement::Minus);
+            auto offset = integer(site.dot);
+            base.insert(base.end(), offset.begin(), offset.end());
+            body.push_back(Variable{.name = "base", .type = size, .value = std::move(base)});
+            auto slot = [&](std::size_t m) {
+                Expression e = symbol("base");
+                e.push_back(ExpressionElement::Add);
+                auto index = integer(m);
+                e.insert(e.end(), index.begin(), index.end());
+                return e;
+            };
+            const ActionSite* previous = nullptr;
+            if (const auto found = sites_by_parent.find(site.production); found != sites_by_parent.end())
+                for (const auto& other : found->second) if (other.member < site.dot) previous = &other;
+            Variable result{.name = "result", .type = result_type};
+            if (previous) result.value = carried(result_type, symbol("stack"), slot(previous->member));
+            body.push_back(std::move(result));
+            auto published = assignCaptures(item, previous ? previous->member + 1 : 0, site.dot, "stack", slot);
+            body.insert(body.end(), std::make_move_iterator(published.begin()), std::make_move_iterator(published.end()));
+            std::set<std::string> locals;
+            for (std::size_t m = 0; m < site.dot; ++m) for (const auto& feature : item.source.rule_members[m]->features)
+                if (const auto* capture = std::get_if<AST::VariableCapture>(&feature)) {
+                    if (helperSource(item.rhs[m]))
+                        throw std::invalid_argument("LR parsers bind match variables only to plain rule or token names: " + capture->name);
+                    locals.insert(capture->name);
+                    IspaLibSymbol node{.exports = StdlibExports::Node};
+                    node.template_parameters.push_back(std::make_shared<Type>(Symbol{"Types", item.rhs[m]}));
+                    body.push_back(Variable{.name = "ispa_action_" + capture->name, .type = Type{node},
+                        .value = IspaLibFunctionCall::createExpression(IspaLibFunctionCall{
+                            .symbol = IspaLibSymbol{.exports = StdlibExports::LRGet}, .args = {symbol("stack"), slot(m)},
+                            .template_parameters = {std::make_shared<Type>(Symbol{"Types", item.rhs[m]})}})});
+                }
+            const auto rule_name = corelib::text::join(item.source.original_rules.empty() ? item.lhs : item.source.original_rules, ".");
+            body.push_back(Variable{.name = "before_failure", .type = Type{ValueType::Undef}, .value = symbol("pos")});
+            body.push_back(Variable{.name = "ctx", .type = Type{ValueType::Undef},
+                .value = FunctionCall::createExpression(FunctionCall{.name = std::make_shared<Symbol>("fail_context"),
+                    .args = {symbol("host"), symbol("pos"), symbol("result"), symbol("before_failure"),
+                    String::createExpression(String{.value = rule_name}),
+                    String::createExpression(String{.value = corelib::text::join(expected, ".")}), symbol("TokensToString")}})});
+            // Resolve the handler in the rule's lexical scopes, then globally (as the LL lowering does).
+            const AST::FailBlock* block = nullptr;
+            const auto& scope = item.source.original_rules.empty() ? item.lhs : item.source.original_rules;
+            for (std::size_t length = scope.size();; --length) {
+                stdu::vector<std::string> candidate(scope.begin(), scope.begin() + length);
+                candidate.insert(candidate.end(), site.marker->name.begin(), site.marker->name.end());
+                for (const auto& fail : tree.getFailBlocks()) if (fail.name == candidate) { block = &fail; break; }
+                if (block || length == 0) break;
+            }
+            if (!block) throw std::invalid_argument("Unknown fail block " + corelib::text::join(site.marker->name, "::") + " in " + rule_name);
+            if (block->parameters.size() != site.marker->parameters.size())
+                throw std::invalid_argument("Fail block " + corelib::text::join(site.marker->name, "::") + " expects " +
+                    std::to_string(block->parameters.size()) + " arguments");
+            Statements code;
+            for (std::size_t i = 0; i < block->parameters.size(); ++i) {
+                const auto& argument = site.marker->parameters[i];
+                code.push_back(Variable{.name = "ispa_action_" + block->parameters[i], .type = Type{ValueType::Undef},
+                    .value = symbol(locals.contains(argument) ? "ispa_action_" + argument : argument)});
+                locals.insert(block->parameters[i]);
+            }
+            std::set<std::string> objects;
+            for (auto& statement : Parser::ParserBase::convertPythonAction(block->action, locals, true, classes, &objects))
+                code.push_back(finalizeTypes(statement));
+            body.push_back(If::createStatement(If{Bool::createExpression(Bool{.value = true}), std::move(code)}));
+            body.push_back(returned(FunctionCall::createExpression(FunctionCall{.name = std::make_shared<Symbol>("custom_failure_decision"),
+                .args = {symbol("host"), symbol("before_failure"), symbol("pos"), symbol("ctx")}})));
+            handlers.push_back(If::createStatement(If{equals(symbol("state"), integer(site.state)), std::move(body)}));
+        }
+        kinds.push_back(returned(notFound));
+        add("lr_failure_token", token_size, {{size, "state"}}, std::move(kinds));
+        handlers.push_back(fail());
+        Function failure;
+        failure.type = Type{IspaLibSymbol{.exports = StdlibExports::RecoveryDecision}};
+        failure.name = "lr_failure";
+        failure.parameters = {{Type{ValueType::BorrowSemantic, Type{Symbol{"Host"}}}, "host"}, {size, "state"},
+            {Type{ValueType::BorrowSemantic, Type{Symbol{"IT"}}}, "pos"},
+            {Type{ValueType::ImmutableSemantic, Type{ValueType::BorrowSemantic, values}}, "stack"}};
+        failure.template_parameters = {{"Host", {}}, {"IT", {IspaLibSymbol{.exports = StdlibExports::LexerTokenIterator}, IspaLibSymbol{.exports = StdlibExports::LexerLazyIterator}}}};
+        failure.statements = std::move(handlers);
+        failure.is_static = true;
+        parser.data.emplace_back(std::make_shared<Declaration>(Function::createDeclaration(std::move(failure))), Visibility::Public);
+        // Value of an inserted (missing) token: an empty node.
+        Statements synthesize;
+        for (const auto& [name, block] : lexer_builder.getDataBlocks()) {
+            IspaLibSymbol node{.exports = StdlibExports::Node};
+            node.template_parameters.push_back(std::make_shared<Type>(Symbol{"Types", name}));
+            synthesize.push_back(If::createStatement(If{equals(symbol("kind"), tokenId(name)), {
+                Variable{.name = "missing", .type = Type{node}},
+                returned(IspaLibFunctionCall::createExpression(IspaLibFunctionCall{
+                    .symbol = IspaLibSymbol{.exports = StdlibExports::LRToken}, .args = {symbol("missing")}}))}}));
+        }
+        synthesize.push_back(fail());
+        add("lr_synthesize", any, {{size, "kind"}}, std::move(synthesize));
+    }
+
+    if (!action_sites.empty()) {
+        // lr_semantic_reduce(rule, pos, stack): runs the statement of a mid-rule action (lr_semantic_rule tells which rules); every other reduction is lr_reduce.
+        // The parent's earlier members are the last `member` entries of `stack` (an action nonterminal consumes nothing).
+        const auto classes = pythonClassNames(tree.getPythonDeclarations());
+        Statements dispatch;
+        for (const auto& site : action_sites) {
+            const auto& action_production = lr->getProductions()[site.production];
+            const auto& parent = lr->getProductions()[site.parent];
+            const Type result_type = Type{Symbol{"Types", parent.lhs}};
+            const auto& siblings = sites_by_parent.at(site.parent);
+            const ActionSite* previous = nullptr;
+            for (const auto& other : siblings) if (other.member < site.member) previous = &other;
+            auto slot = [&](std::size_t m) {
+                Expression e = symbol("base");
+                e.push_back(ExpressionElement::Add);
+                auto index = integer(m);
+                e.insert(e.end(), index.begin(), index.end());
+                return e;
+            };
+            Statements body;
+            Expression base = memberCall("stack", "size");
+            base.push_back(ExpressionElement::Minus);
+            auto offset = integer(site.member);
+            base.insert(base.end(), offset.begin(), offset.end());
+            body.push_back(Variable{.name = "base", .type = size, .value = std::move(base)});
+            Variable result{.name = "result", .type = result_type};
+            if (previous) result.value = carried(result_type, symbol("stack"), slot(previous->member));
+            body.push_back(std::move(result));
+            auto published = assignCaptures(parent, previous ? previous->member + 1 : 0, site.member, "stack", slot);
+            body.insert(body.end(), std::make_move_iterator(published.begin()), std::make_move_iterator(published.end()));
+            std::set<std::string> locals;
+            for (std::size_t m = 0; m < site.member; ++m) for (const auto& feature : parent.source.rule_members[m]->features)
+                if (const auto* capture = std::get_if<AST::VariableCapture>(&feature)) {
+                    if (helperSource(parent.rhs[m]))
+                        throw std::invalid_argument("LR parsers bind match variables only to plain rule or token names: " + capture->name);
+                    if (capture->name == "ctx" || !locals.insert(capture->name).second)
+                        throw std::invalid_argument("Duplicate or reserved action binding " + capture->name);
+                    IspaLibSymbol node{.exports = StdlibExports::Node};
+                    node.template_parameters.push_back(std::make_shared<Type>(Symbol{"Types", parent.rhs[m]}));
+                    body.push_back(Variable{.name = "ispa_action_" + capture->name, .type = Type{node},
+                        .value = IspaLibFunctionCall::createExpression(IspaLibFunctionCall{
+                            .symbol = IspaLibSymbol{.exports = StdlibExports::LRGet}, .args = {symbol("stack"), slot(m)},
+                            .template_parameters = {std::make_shared<Type>(Symbol{"Types", parent.rhs[m]})}})});
+                }
+            body.push_back(Variable{.name = "ispa_start", .type = Type{ValueType::Undef}, .value = symbol("pos")});
+            body.push_back(Variable{.name = "ctx", .type = Type{ValueType::Undef},
+                .value = FunctionCall::createExpression(FunctionCall{
+                    .name = std::make_shared<Symbol>("rule_context"),
+                    .args = {symbol("pos"), symbol("result"), symbol("ispa_start"),
+                        String::createExpression(String{.value = corelib::text::join(parent.source.original_rules.empty() ? parent.lhs : parent.source.original_rules, ".")}),
+                        symbol("TokensToString")}})});
+            std::set<std::string> objects;
+            for (const auto& feature : action_production.source.features) if (const auto* action = std::get_if<AST::PythonAction>(&feature))
+                for (auto& statement : Parser::ParserBase::convertPythonAction(*action, locals, false, classes, &objects))
+                    body.push_back(finalizeTypes(statement));
+            body.push_back(returned(IspaLibFunctionCall::createExpression(IspaLibFunctionCall{
+                .symbol = IspaLibSymbol{.exports = StdlibExports::LRNode},
+                .args = {symbol("result")}, .template_parameters = {std::make_shared<Type>(result_type)}})));
+            dispatch.push_back(If::createStatement(If{equals(symbol("rule"), integer(site.production - 1)), std::move(body)}));
+        }
+        dispatch.push_back(fail());
+        // which reductions run a statement (the others are lr_reduce)
+        Statements is_action;
+        for (const auto& site : action_sites)
+            is_action.push_back(If::createStatement(If{equals(symbol("rule"), integer(site.production - 1)),
+                {returned(Bool::createExpression(Bool{.value = true}))}}));
+        is_action.push_back(returned(Bool::createExpression(Bool{.value = false})));
+        add("lr_semantic_rule", Type{ValueType::Bool}, {{size, "rule"}}, std::move(is_action));
+        Function semantic;
+        semantic.type = any;
+        semantic.name = "lr_semantic_reduce";
+        semantic.parameters = {{size, "rule"}, {Type{ValueType::BorrowSemantic, Type{Symbol{"IT"}}}, "pos"},
+            {Type{ValueType::ImmutableSemantic, Type{ValueType::BorrowSemantic, values}}, "stack"}};
+        semantic.template_parameters = {{"IT", {IspaLibSymbol{.exports = StdlibExports::LexerTokenIterator}, IspaLibSymbol{.exports = StdlibExports::LexerLazyIterator}}}};
+        semantic.statements = std::move(dispatch);
+        semantic.is_static = true;
+        parser.data.emplace_back(std::make_shared<Declaration>(Function::createDeclaration(std::move(semantic))), Visibility::Public);
+    }
 
     Statements shifts;
     for (const auto &[name, block] : lexer_builder.getDataBlocks()) {

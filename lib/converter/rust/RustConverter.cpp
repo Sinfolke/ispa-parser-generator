@@ -52,7 +52,7 @@ namespace Rust {
         }
         // outer attributes: the file can be `include!`d as well as be a module file
         constexpr const char *kAllow =
-            "#[allow(unused_imports)]\nuse ::ispa_std::pycoll::{PyContains, PyPop, VecAt};\n";
+            "#[allow(unused_imports)]\nuse ::ispa_std::pycoll::{PyContains, PyPop, VecAt, VecSize};\n";
         constexpr const char *kRootAllow =
             "#[allow(non_snake_case, non_camel_case_types, non_upper_case_globals, unused_mut, unused_variables,\n"
             "         unused_parens, unused_labels, unused_imports, unreachable_patterns, unreachable_code, dead_code,\n"
@@ -328,7 +328,7 @@ namespace Rust {
             if (tp.second.empty()) {
                 RustCore::warn("template parameter `" + tp.first + "` of `" + func.name +
                                "` has no fixed type list: the Rust generic is unbounded and the body will not type-check without bounds");
-                generics.push_back(param + (tp.first == "K" ? ": ::ispa_std::PyKey" : ": ::ispa_std::PyVal"));
+                generics.push_back(param + (tp.first == "K" ? ": ::ispa_std::PyKey" : tp.first == "Host" ? ": ::ispa_std::FailHost" : ": ::ispa_std::PyVal"));
                 continue;
             }
             const auto marker = "__Allowed_" + fileSafe(scope) + "_" + fileSafe(func.name) + "_" + fileSafe(tp.first) + "_" +
@@ -760,7 +760,7 @@ namespace Rust {
                             if (token_type.starts_with("&mut ")) token_type.erase(0, 5);
                         }
                     }
-                if (present.contains("lr_recover") || present.contains("lr_semantic_reduce"))
+                if (present.contains("lr_recover"))
                     throw Error("Rust target: LR recovery handlers and semantic reductions are not available through the runtime yet");
                 emitLine(w, "impl ::ispa_std::LrTables for " + name + " {");
                 w.increaseIndentation();
@@ -794,6 +794,19 @@ namespace Rust {
                     }
                     emitLine(w, std::string("fn ") + table.name + "(" + table.params + ") -> " + table.ret + " { " + name + "::" + table.name +
                                 "(" + table.args + ") }");
+                }
+                if (present.contains("lr_failure")) {
+                    emitLine(w, "const HAS_RECOVER: bool = true;");
+                    emitLine(w, "fn lr_failure_token(state: usize) -> usize { " + name + "::lr_failure_token(state) }");
+                    emitLine(w, "fn lr_failure<H: ::ispa_std::FailHost, IT: ::ispa_std::ParserCursor>(host: &mut H, state: usize, pos: &mut IT, stack: &mut Vec<::ispa_std::LRValue>) -> ::ispa_std::Shared<::ispa_std::python::ispa_std::recovery::Decision> { " +
+                                name + "::lr_failure(host, state, pos, stack) }");
+                    emitLine(w, "fn lr_synthesize(kind: usize) -> ::ispa_std::LRValue { " + name + "::lr_synthesize(kind) }");
+                }
+                if (present.contains("lr_semantic_reduce")) {
+                    emitLine(w, "const HAS_SEMANTIC: bool = true;");
+                    emitLine(w, "fn lr_semantic_rule(rule: usize) -> bool { " + name + "::lr_semantic_rule(rule) }");
+                    emitLine(w, "fn lr_semantic_reduce<IT: ::ispa_std::ParserCursor>(rule: usize, pos: &mut IT, stack: &mut Vec<::ispa_std::LRValue>) -> ::ispa_std::LRValue { " +
+                                name + "::lr_semantic_reduce(rule, pos, stack) }");
                 }
                 w.decreaseIndentation();
                 emitLine(w, "}");

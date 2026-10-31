@@ -30,7 +30,11 @@ void check(const AST::FrontendFeature& feature) {
 }
 
 void check(const AST::RuleMember& member, bool token, bool actions) {
+    // LR parsers run a rule's Python statements at the reduction of their (empty) mid-rule nonterminal and bind
+    // `match ... -> name` variables from the value stack.
+    const bool lr_parser = !actions && !token;
     for (const auto& f : member.features) {
+        if (lr_parser && (std::holds_alternative<AST::PythonAction>(f) || std::holds_alternative<AST::VariableCapture>(f) || std::holds_alternative<AST::FailMarker>(f))) continue;
         if (actions && !token && member.isName() && member.getName().isNonterminal()) if (const auto* syntax = std::get_if<AST::DeclarationSyntax>(&f);
             syntax && syntax->modifiers.empty()) continue;
         if (actions && !token && (std::holds_alternative<AST::PythonAction>(f) ||
@@ -63,13 +67,14 @@ void check(const AST::RuleMember& member, bool token, bool actions) {
 }
 
 void AST::requireCppSupport(const Tree& tree, bool ll_actions) {
-    if (!ll_actions) for (const auto& fail : tree.getFailBlocks()) reject(fail.position, "fail block");
     for (const auto& [name, rule] : tree.getTreeMap()) {
         const bool token = AST::RuleMemberName{.name = name}.isTerminal();
+        // Lexing is shared by every parsing algorithm, so token rules get the full action language.
+        const bool actions = ll_actions || token;
         const bool advanced = std::ranges::any_of(rule.features, [](const auto& feature) {
             return std::holds_alternative<AST::AdvancedRule>(feature);
         });
-        if (ll_actions && token && advanced) {
+        if (actions && token && advanced) {
             const auto uses = [&](auto&& self, const AST::RuleMember& member) -> bool {
                 if (member.isName() && member.getName().name == name) return true;
                 if (member.isGroup()) for (const auto& child : member.getGroup().values)
@@ -83,7 +88,7 @@ void AST::requireCppSupport(const Tree& tree, bool ll_actions) {
                     for (const auto& member : other.rule_members)
                         if (uses(uses, *member)) reject(rule.position, "advanced token embedded in another token");
         }
-        if (ll_actions && token && advanced && rule.rule_members.size() == 1 &&
+        if (actions && token && advanced && rule.rule_members.size() == 1 &&
             rule.rule_members.front()->isGroup() && rule.rule_members.front()->getGroup().values.empty())
             reject(rule.position, "advanced token without a match");
         for (const auto& feature : rule.features) {
@@ -96,13 +101,14 @@ void AST::requireCppSupport(const Tree& tree, bool ll_actions) {
             // A parser advanced rule made only of ordinary `match` clauses is
             // already an LR production after normalization.  Statements and
             // stream matches still need semantic callbacks and stay rejected.
-            if (!ll_actions && !token && std::holds_alternative<AST::AdvancedRule>(feature)) continue;
-            if (ll_actions && (std::holds_alternative<AST::AdvancedRule>(feature) ||
+            if (!actions && !token && std::holds_alternative<AST::AdvancedRule>(feature)) continue;
+            if (const auto* statement = std::get_if<AST::PythonAction>(&feature); statement && !actions && !token && statement->target.empty()) continue;
+            if (actions && (std::holds_alternative<AST::AdvancedRule>(feature) ||
                 std::holds_alternative<AST::PythonAction>(feature) ||
                 std::holds_alternative<AST::DeclarationSyntax>(feature))) continue;
-            if (ll_actions && std::holds_alternative<AST::FailBinding>(feature)) continue;
+            if (actions && std::holds_alternative<AST::FailBinding>(feature)) continue;
             check(feature);
         }
-        for (const auto& member : rule.rule_members) check(*member, token, ll_actions);
+        for (const auto& member : rule.rule_members) check(*member, token, actions);
     }
 }

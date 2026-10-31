@@ -11,6 +11,8 @@ impl<K: Eq + Hash> PyContains<K> for HashSet<K> { fn py_contains(&self, key: &K)
 impl PyContains<String> for String { fn py_contains(&self, key: &String) -> bool { self.contains(key.as_str()) } }
 
 /// `vector.at(i)` of generated tables: a copy of the checked element.
+pub trait VecSize { fn size(&self) -> usize; }
+impl<T> VecSize for Vec<T> { fn size(&self) -> usize { self.len() } }
 pub trait VecAt<T> { fn at(&self, index: usize) -> T; }
 impl<T: Clone> VecAt<T> for Vec<T> {
     fn at(&self, index: usize) -> T { self.get(index).cloned().unwrap_or_else(|| crate::fail(1, "vector::at")) }

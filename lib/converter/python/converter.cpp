@@ -396,7 +396,8 @@ void Construct::function(const LangAPI::Function& fn, bool ctor) {
     const bool is_method = class_context_ && !fn.is_static;
     if (is_method || ctor) args = "self";
     for (const auto& [parameter, constraints] : fn.template_parameters) {
-        if (!constraints.empty() || parameter.starts_with("ISPAParam")) continue;
+        // "Host" (the LR fail-block host type) is a pure type parameter: erased in Python.
+        if (!constraints.empty() || parameter.starts_with("ISPAParam") || parameter == "Host") continue;
         if (!args.empty()) args += ", ";
         args += Core::identifier(parameter);
     }
@@ -409,7 +410,7 @@ void Construct::function(const LangAPI::Function& fn, bool ctor) {
     ++indentation_;
     const bool saved_inside_function = inside_function_;
     inside_function_ = true;
-    if (is_method || ctor) core_.set_method_members(class_members_);
+    core_.set_method_members(is_method || ctor ? class_members_ : std::unordered_set<std::string>{});
     {
         std::vector<std::string> names;
         for (const auto& param : fn.parameters) names.push_back(Core::identifier(param.second));

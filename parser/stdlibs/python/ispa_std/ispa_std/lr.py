@@ -75,7 +75,18 @@ class LRRegionFrame(Generic[V]):
     pos: TokenCursor
     states: list[int]
     values: list[V]
-    spans: list[LRRuleSpan]
+    # The spans of the stack entries, as parallel lists (an object per entry cost two allocations per step).
+    span_begin: list[int]
+    span_end: list[int]
+    span_leading: list[bool]
+    span_trailing: list[bool]
+    span_empty: list[bool]
+    # The span of the reduction in progress.
+    rb: int
+    re: int
+    rl: bool
+    rt: bool
+    rx: bool
     capture_destinations: list[int]
     cursor: int
     recovered_prefix: bool
@@ -85,7 +96,16 @@ class LRRegionFrame(Generic[V]):
         self.pos = start
         self.states = [0]
         self.values = []
-        self.spans = []
+        self.span_begin = []
+        self.span_end = []
+        self.span_leading = []
+        self.span_trailing = []
+        self.span_empty = []
+        self.rb = 0
+        self.re = 0
+        self.rl = False
+        self.rt = False
+        self.rx = True
         self.capture_destinations = []
         self.cursor = 0
         self.recovered_prefix = False
@@ -266,6 +286,19 @@ class LRParser:
             return g.lr_space(rule, index)
         return False
 
+    def _window_into(self, g: LRGrammar[V], position: TokenCursor, window: list[int]) -> None:
+        # The decision window written into a reused list (no allocation per step for k = 1).
+        window.clear()
+        if g.lr_k() == 1:
+            # The caller has already skipped trivia, so the first token is the current one.
+            if position.isEnd():
+                window.append(ABSENT)
+            else:
+                window.append(position.current().kind())
+            return
+        for kind in self._window(g, position):
+            window.append(kind)
+
     def _window(self, g: LRGrammar[V], position: TokenCursor) -> list[int]:
         peek = position.copy()
         window: list[int] = []
@@ -278,7 +311,10 @@ class LRParser:
                 window.append(ABSENT)
             else:
                 window.append(peek.current().kind())
-                peek.next()
+                # Do not step past the last lookahead token: with lazy lexing that would
+                # tokenize input the decision does not need (and report its errors early).
+                if i + 1 < g.lr_k():
+                    peek.next()
             i = i + 1
         return window
 
@@ -317,113 +353,147 @@ class LRParser:
         d.code = "lr-unexpected-token"
         return d
 
-    def _reduce_span(self, g: LRGrammar[V], rule: int, count: int, begin: int, spans: list[LRRuleSpan], cursor: int) -> LRRuleSpan:
-        span = LRRuleSpan(cursor, cursor, False, False, True)
+    def _push_span(self, region: LRRegionFrame[V], begin: int, end: int, leading: bool, trailing: bool, empty: bool) -> None:
+        region.span_begin.append(begin)
+        region.span_end.append(end)
+        region.span_leading.append(leading)
+        region.span_trailing.append(trailing)
+        region.span_empty.append(empty)
+
+    def _pop_spans(self, region: LRRegionFrame[V], keep: int) -> None:
+        while len(region.span_begin) > keep:
+            region.span_begin.pop()
+            region.span_end.pop()
+            region.span_leading.pop()
+            region.span_trailing.pop()
+            region.span_empty.pop()
+
+    # Computes the span of a reduction of `count` entries into region.rb/re/rl/rt/rx.
+    def _reduce_span(self, g: LRGrammar[V], rule: int, count: int, begin: int, region: LRRegionFrame[V]) -> None:
+        region.rb = region.cursor
+        region.re = region.cursor
+        region.rl = False
+        region.rx = True
         allowed = self._gap(g, rule, 0)
         i = 0
         while i < count:
-            child = spans[begin + i]
-            if child.empty:
-                allowed = allowed or child.leading or child.trailing
+            at = begin + i
+            if region.span_empty[at]:
+                allowed = allowed or region.span_leading[at] or region.span_trailing[at]
             else:
-                if span.empty:
-                    span.begin = child.begin
-                    span.leading = allowed or child.leading
-                elif child.begin > span.end and not (allowed or child.leading):
+                if region.rx:
+                    region.rb = region.span_begin[at]
+                    region.rl = allowed or region.span_leading[at]
+                elif region.span_begin[at] > region.re and not (allowed or region.span_leading[at]):
                     runtime_error("Whitespace is not allowed between these rule members")
-                span.empty = False
-                span.end = child.end
-                allowed = child.trailing
+                region.rx = False
+                region.re = region.span_end[at]
+                allowed = region.span_trailing[at]
             allowed = allowed or self._gap(g, rule, i + 1)
             i = i + 1
-        span.trailing = allowed
-        if span.empty:
-            span.leading = allowed
-        return span
+        region.rt = allowed
+        if region.rx:
+            region.rl = allowed
 
     def lr_parse(self, g: LRGrammar[V], pos: TokenCursor) -> MatchResult:
         self.errors_ = []
         region: LRRegionFrame[V] = LRRegionFrame[V](pos, 0)
-        states = region.states
-        values = region.values
-        spans = region.spans
         control = region.control
         position = region.pos
+        offset: list[int] = [0]
+        window: list[int] = []
+        rhs: list[V] = []
         while True:
             control.phase = LRControlPhase.Decide
-            offset: list[int] = [region.cursor]
+            offset[0] = region.cursor
             self._skip(g, position, offset)
             region.cursor = offset[0]
-            window = self._window(g, position)
-            action = g.lr_action(states[len(states) - 1], window)
+            self._window_into(g, position, window)
+            action = g.lr_action(region.states[len(region.states) - 1], window)
             if action == LR_INVALID:
-                self.errors_.append(self._unexpected(g, states, window, position))
+                self.errors_.append(self._unexpected(g, region.states, window, position))
                 recovered = False
                 if g.has_recover():
                     control.phase = LRControlPhase.Recover
                     old_cursor = region.cursor
-                    old_size = len(states)
-                    old_state = states[len(states) - 1]
+                    old_size = len(region.states)
+                    old_state = region.states[len(region.states) - 1]
                     if g.lr_recover(region, self.errors_[len(self.errors_) - 1]):
-                        if region.cursor == old_cursor and len(states) == old_size \
-                                and states[len(states) - 1] == old_state:
+                        # A handler that reported its own diagnostic replaces the generic one.
+                        if self.errors_[len(self.errors_) - 1].code == "lr-superseded":
+                            self.errors_.pop()
+                        if region.cursor == old_cursor and len(region.states) == old_size \
+                                and region.states[len(region.states) - 1] == old_state:
                             runtime_error("LR recovery handler made no progress")
                         if region.cursor != old_cursor:
-                            if len(spans) == 0:
+                            if len(region.span_begin) == 0:
                                 region.recovered_prefix = True
                             else:
-                                spans[len(spans) - 1].trailing = True
+                                region.span_trailing[len(region.span_trailing) - 1] = True
                         recovered = True
                 if not recovered:
                     runtime_error(self.errors_[len(self.errors_) - 1].message)
             elif action == 0:
                 control.phase = LRControlPhase.Accept
-                if len(values) != 1 or not position.isEnd():
+                if len(region.values) != 1 or not position.isEnd():
                     runtime_error("Invalid LR accept stack")
-                last = spans[len(spans) - 1]
-                if (last.begin != 0 and not last.leading and not region.recovered_prefix) \
-                        or (region.cursor > last.end and not last.trailing):
+                at = len(region.span_begin) - 1
+                if (region.span_begin[at] != 0 and not region.span_leading[at] and not region.recovered_prefix) \
+                        or (region.cursor > region.span_end[at] and not region.span_trailing[at]):
                     runtime_error("Whitespace is not allowed at the input boundary")
-                return MatchResult(True, lr_node(values[len(values) - 1]), position)
+                return MatchResult(True, lr_node(region.values[len(region.values) - 1]), position)
             elif action > 0:
                 control.phase = LRControlPhase.Shift
                 if position.isEnd():
                     runtime_error("LR shift past end of input")
-                values.append(g.lr_shift(position.current()))
-                spans.append(LRRuleSpan(region.cursor, region.cursor + 1, False, False, False))
+                region.values.append(g.lr_shift(position.current()))
+                self._push_span(region, region.cursor, region.cursor + 1, False, False, False)
                 region.cursor = region.cursor + 1
-                states.append(action - 1)
+                region.states.append(action - 1)
                 position.next()
             else:
                 rule = -action - 1
                 control.phase = LRControlPhase.Reduce
                 control.production = rule
                 count = g.lr_length(rule)
-                if count > len(values):
+                if count > len(region.values):
                     runtime_error("LR stack underflow")
-                begin = len(values) - count
-                rhs: list[V] = []
-                i = begin
-                while i < len(values):
-                    rhs.append(values[i])
-                    i = i + 1
-                span = self._reduce_span(g, rule, count, begin, spans, region.cursor)
+                begin = len(region.values) - count
+                rhs.clear()
+                self._reduce_span(g, rule, count, begin, region)
                 value: V
                 if g.has_semantic_reduce():
                     # Semantic reductions run at the ACTION table's exact reduce
                     # point. The callback may update the cursor and span, and
-                    # may enter an independent nested LR region.
+                    # may enter an independent nested LR region. The values stay
+                    # on the stack for it, so the right-hand side is a copy.
+                    i = begin
+                    while i < len(region.values):
+                        rhs.append(region.values[i])
+                        i = i + 1
                     control.phase = LRControlPhase.Semantic
+                    span = LRRuleSpan(region.rb, region.re, region.rl, region.rt, region.rx)
                     value = g.lr_semantic_reduce(rule, region, span, rhs)
+                    region.rb = span.begin
+                    region.re = span.end
+                    region.rl = span.leading
+                    region.rt = span.trailing
+                    region.rx = span.empty
                 else:
+                    # The right-hand side is moved off the stack: the reduction owns
+                    # it, so packed captures can be extended in place, not copied.
+                    i = 0
+                    while i < count:
+                        rhs.append(region.values.pop(begin))
+                        i = i + 1
                     value = g.lr_reduce(rule, rhs)
-                while len(values) > begin:
-                    values.pop()
-                while len(spans) > begin:
-                    spans.pop()
-                while len(states) > begin + 1:
-                    states.pop()
-                nxt = g.lr_goto(states[len(states) - 1], g.lr_lhs(rule))
-                values.append(value)
-                spans.append(span)
-                states.append(nxt)
+                rhs.clear()
+                while len(region.values) > begin:
+                    region.values.pop()
+                self._pop_spans(region, begin)
+                while len(region.states) > begin + 1:
+                    region.states.pop()
+                nxt = g.lr_goto(region.states[len(region.states) - 1], g.lr_lhs(rule))
+                region.values.append(value)
+                self._push_span(region, region.rb, region.re, region.rl, region.rt, region.rx)
+                region.states.append(nxt)

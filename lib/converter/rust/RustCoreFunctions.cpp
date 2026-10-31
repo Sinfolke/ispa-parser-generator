@@ -736,6 +736,7 @@ auto RustCore::convertIspaLibSymbol(const LangAPI::IspaLibSymbol &symbol, bool e
     switch (symbol.exports) {
         case LangAPI::StdlibExports::TextOutput: return "dyn ::std::fmt::Write";
         case LangAPI::StdlibExports::RecoveryHandler: return "::ispa_std::recovery::handler";
+        case LangAPI::StdlibExports::RecoveryDecision: return "::ispa_std::Shared<::ispa_std::python::ispa_std::recovery::Decision>";
         case LangAPI::StdlibExports::Node: return "::ispa_std::Node" + g();
         case LangAPI::StdlibExports::MatchResult: return "::ispa_std::MatchResult" + g();
         case LangAPI::StdlibExports::Lexer: return "::ispa_std::LexerBase" + g();
@@ -1194,10 +1195,25 @@ auto RustCore::convertFunctionCall(const LangAPI::FunctionCall &call, bool membe
             const auto object = receiver.empty() ? std::string("self") : receiver;
             return object + ".custom_failure(&" + counter.back() + (args.empty() ? "" : ", " + joinStrings(args, ", ")) + ")";
         }
+        if (symbol_name == "fail_context" && !member && args.size() == 7) {
+            // LR fail blocks name the parser object they run against
+            const auto cursor = args[1].starts_with("&mut ") ? args[1] : "&mut " + args[1];
+            return args[0] + ".fail_context(" + cursor + ", (" + args[2] + ").clone(), (" + args[3] + ").clone(), " + args[4] + ", " + args[5] + ", " + args[6] + ")";
+        }
+        if (symbol_name == "custom_failure_decision" && !member && args.size() == 4) {
+            return args[0] + ".custom_failure_decision(" + runtimeArgument(call.args[1], args[1]) + ", " + runtimeArgument(call.args[3], args[3]) + ")";
+        }
         if (symbol_name == "custom_failure_decision" && !member && args.size() == 3) {
             // the context holds the failing position: the decision is taken from it, not from a second borrow of the cursor
             const auto object = receiver.empty() ? std::string("self") : receiver;
             return object + ".custom_failure_decision(" + runtimeArgument(call.args[0], args[0]) + ", " + runtimeArgument(call.args[2], args[2]) + ")";
+        }
+        if (symbol_name == "rule_context" && !member && args.size() == 5) {
+            // the AST is edited in place: lend the local, do not copy it
+            auto ast = args[1];
+            if (ast.starts_with("(") && ast.ends_with(").clone()")) ast = ast.substr(1, ast.size() - 10);
+            const auto cursor = args[0].starts_with("&mut ") ? args[0] : "&mut " + args[0];
+            return "::ispa_std::rule_context(" + cursor + ", &mut " + ast + ", " + args[2] + ", " + args[3] + ", " + args[4] + ")";
         }
         if (symbol_name == "recovery_at" || symbol_name == "recover_choice") {
             std::vector<std::string> sets;

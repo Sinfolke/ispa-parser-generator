@@ -4,6 +4,7 @@ export module ParserIR.API;
 
 import LangAPI;
 import AST.API;
+import AST.Tree;
 import LangAPI.Accessor;
 import hash;
 import dstd;
@@ -99,5 +100,7 @@ export namespace ParserIR {
         }
     };
     auto dataBlock(const AST::DataBlock& block) -> DataBlock;
+    // The rule's data block extended with the AST fields its actions and fail handlers declare (ctx.ast.x).
+    auto withActionFields(AST::Tree& tree, const stdu::vector<std::string>& name, const AST::Rule& rule, DataBlock block) -> DataBlock;
     using DataBlockList = tsl::ordered_map<stdu::vector<std::string>, DataBlock, uhash>;
 }

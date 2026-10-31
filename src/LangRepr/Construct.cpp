@@ -34,6 +34,9 @@ namespace LangRepr {
             ParserIR::Production entry;
             entry.name = production.lhs;
             entry.block = ParserIR::dataBlock(production.source.data_block);
+            // ctx.ast.x assigned by a rule's statements are AST fields in every algorithm
+            if (!production.source.normalization_source && tree.contains(production.lhs))
+                entry.block = ParserIR::withActionFields(tree, production.lhs, tree[production.lhs], std::move(entry.block));
             metadata.push_back(std::move(entry));
         }
         stdu::vector<DFA::DFA> dfas;

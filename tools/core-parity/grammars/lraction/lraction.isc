@@ -1,0 +1,27 @@
+NUM:
+    @ [0-9]+
+    {@}
+;
+PLUS:
+    @ '+'
+    {@}
+;
+SEMI:
+    @ ';'
+    {@}
+;
+sum {
+    ctx.ast.steps: int = 1
+    match NUM -> left;
+    ctx.ast.first = left
+    ctx.ast.steps += 1
+    match PLUS NUM -> op right;
+    ctx.ast.last = right
+    ctx.ast.steps += 1
+    ctx.ast.at_end: bool = ctx.at(";")
+    match SEMI;
+}
+main:
+    @ sum+
+    {@}
+;

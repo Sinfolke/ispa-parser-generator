@@ -126,7 +126,7 @@ struct PythonConverter {
         }
         return {};
     }
-    std::size_t block_depth = 0, loop_depth = 0;
+    std::size_t block_depth = 0, loop_depth = 0, for_counter = 0;
     // Python locals are function-scoped; the targets' are block-scoped. A first assignment inside a block
     // is declared there when the block alone uses the name, otherwise it is hoisted to the function top.
     const py::StmtList* function_body = nullptr;
@@ -1450,6 +1450,33 @@ struct PythonConverter {
             } else if constexpr (std::is_same_v<T, py::Raise>) {
                 if (x.cause) unsupported(s.pos, "raise from is unsupported");
                 return la::Statements{la::Throw{.throw_value = x.exc ? expr(x.exc) : la::Expression{}}};
+            } else if constexpr (std::is_same_v<T, py::For>) {
+                // `for t in seq: body` is lowered to an index loop (the targets here have no iterator protocol):
+                //   seq_N = seq; idx_N = 0; while idx_N < len(seq_N): t = seq_N[idx_N]; idx_N += 1; body
+                // The increment precedes the body so that `continue` still advances.
+                if (!x.orelse.empty() || x.is_async) unsupported(s.pos, "loop else and async for are unsupported");
+                const auto mk = [&](auto kind) { auto e = std::make_shared<py::Expr>(); e->pos = s.pos; e->kind = std::move(kind); return e; };
+                const auto st = [&](auto kind) { auto r = std::make_shared<py::Stmt>(); r->pos = s.pos; r->kind = std::move(kind); return r; };
+                const auto id = std::to_string(for_counter++);
+                const auto name = [&](const std::string& n, py::ExprContext ctx) { return mk(py::Name{n, ctx}); };
+                const std::string seq = "__ispa_seq" + id, idx = "__ispa_idx" + id;
+                py::StmtList body;
+                body.push_back(st(py::Assign{{x.target}, mk(py::Subscript{name(seq, py::ExprContext::Load), name(idx, py::ExprContext::Load), py::ExprContext::Load})}));
+                body.push_back(st(py::AugAssign{name(idx, py::ExprContext::Store), py::BinOp::Add, mk(py::Constant{py::ConstantKind::Int, "1"})}));
+                body.insert(body.end(), x.body.begin(), x.body.end());
+                py::Call length;
+                length.func = name("len", py::ExprContext::Load);
+                length.args = {name(seq, py::ExprContext::Load)};
+                py::Compare below;
+                below.left = name(idx, py::ExprContext::Load);
+                below.ops = {py::CmpOp::Lt};
+                below.comparators = {mk(std::move(length))};
+                la::Statements out;
+                const auto append = [&](const py::Stmt& piece) { auto part = stmt(piece); out.insert(out.end(), part.begin(), part.end()); };
+                append(*st(py::Assign{{name(seq, py::ExprContext::Store)}, x.iter}));
+                append(*st(py::Assign{{name(idx, py::ExprContext::Store)}, mk(py::Constant{py::ConstantKind::Int, "0"})}));
+                append(*st(py::While{mk(std::move(below)), std::move(body), {}}));
+                return out;
             } else unsupported(s.pos, "statement has no LangAPI representation (use declaration conversion for definitions)");
         }, s.kind);
     }

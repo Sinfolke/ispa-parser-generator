@@ -12,7 +12,8 @@
 namespace ISPA_CORE {
 namespace core_detail {
 // A shifted terminal: the typed node and its text (the text serves char/string targets).
-template<class N> struct LRTokenBox { N node; std::string text; };
+// The text is a view of the input, which outlives the parse (the value stack never outlives it).
+template<class N> struct LRTokenBox { N node; std::string_view text; };
 }  // namespace core_detail
 
 template<class Token, class... Ts>
@@ -48,7 +49,7 @@ public:
     ~LRValueOf() { reset(); }
 
     bool token() const { return token_; }
-    const std::string& text() const { return text_; }
+    std::string_view text() const { return text_; }
     template<class T> bool holds() const {
         if constexpr (index_of<T>() == npos) return false;
         else return id_ == index_of<T>();
@@ -89,13 +90,16 @@ private:
     alignas(align_) unsigned char data_[size_];
     std::uint16_t id_ = none;
     bool token_ = false;
-    std::string text_;
+    std::string_view text_;
 };
 
 namespace core_detail {
 // --- capture conversion over the closed value type (port of ispastdlib's std::any lr_convert) ---------------
 template<class V> V lr_captures_value(std::vector<std::vector<V>> columns, bool repeated) {
-    return V(ISPA_STD::construct<lo::lr::LRCaptures<V>>(std::move(columns), repeated));
+    // The lowered constructor takes its columns by const reference: construct empty, then move them in (no copy of the lists).
+    auto captures = ISPA_STD::construct<lo::lr::LRCaptures<V>>(std::vector<std::vector<V>>{}, repeated);
+    captures->columns = std::move(columns);
+    return V(std::move(captures));
 }
 template<class V, class T> bool lr_convert(T& target, const V& value);
 
@@ -174,7 +178,7 @@ template<class V, class T> bool lr_convert(T& target, const V& value) {
             if (value.text().size() != 1) return false;
             target = value.text().front(); return true;
         } else if constexpr (std::is_same_v<T, std::string>) {
-            target = value.text(); return true;
+            target = std::string{value.text()}; return true;
         } else if constexpr (!ISPA_STD::is_variant_v<T>) return lr_convert_value<V>(target, value);
         // A variant may contain a literal char/string alternative as well as typed nodes: try them all.
     }

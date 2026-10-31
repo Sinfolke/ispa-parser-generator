@@ -39,4 +39,4 @@ demand. Tests are single-threaded (`.cargo/config.toml`): namespace variables ar
 ## Not yet
 
 `--static`, grammars whose actions embed C++ (examples/yaml), LR(*) (the generator does not implement it for any target), and
-LR recovery handlers / semantic reductions (`lr_recover`, `lr_semantic_reduce`: refused at generation, as in the C++ core facade).
+LR actions (Python statements and `match ... -> name` bindings of advanced rules) and fail blocks (`%handler` markers) work as in the C++ core; the std::any-style `lr_recover(region)` / `lr_semantic_reduce(region)` hooks are refused at generation.

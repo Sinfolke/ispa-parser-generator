@@ -200,6 +200,52 @@ impl<'a, IT: BridgeCursor> FailContext<'a, IT> {
     }
 }
 
+/// `ctx` of the Python statements in an advanced rule: cursor queries over the token stream, and the rule's AST.
+pub struct RuleContext<'a, IT: BridgeCursor, AST> {
+    pub pos: &'a mut IT,
+    pub ast: &'a mut AST,
+    pub rule: String,
+    cursor: Shared<TypedCursor<IT>>,
+    core: Shared<parser_ll::RuleContext<()>>,
+}
+impl<'a, IT: BridgeCursor, AST> RuleContext<'a, IT, AST> {
+    fn push(&mut self) { self.cursor.borrow_mut().it = self.pos.clone(); }
+    fn pull(&mut self) { *self.pos = self.cursor.borrow().it.clone(); }
+    pub fn at(&mut self, spelling: impl AsRef<str>) -> bool { self.at_ahead(spelling, 0) }
+    pub fn at_ahead(&mut self, spelling: impl AsRef<str>, lookahead: i64) -> bool {
+        self.push();
+        self.core.borrow_mut().at(&spelling.as_ref().to_string(), lookahead)
+    }
+    pub fn at_token(&mut self, name: impl AsRef<str>) -> bool { self.at_token_ahead(name, 0) }
+    pub fn at_token_ahead(&mut self, name: impl AsRef<str>, lookahead: i64) -> bool {
+        self.push();
+        self.core.borrow_mut().at_token(&name.as_ref().to_string(), lookahead)
+    }
+    pub fn peek(&mut self) -> Shared<parser_ll::ActionToken> { self.push(); self.core.borrow_mut().peek(0) }
+    pub fn peek_ahead(&mut self, lookahead: i64) -> Shared<parser_ll::ActionToken> { self.push(); self.core.borrow_mut().peek(lookahead) }
+    pub fn take(&mut self) -> Shared<parser_ll::ActionToken> { self.push(); let token = self.core.borrow_mut().take(); self.pull(); token }
+    pub fn prev(&mut self) -> Shared<parser_ll::ActionToken> { self.push(); self.core.borrow_mut().prev() }
+    pub fn mark(&mut self, name: impl AsRef<str>) { self.push(); self.core.borrow_mut().mark(&name.as_ref().to_string()) }
+    pub fn restore(&mut self, name: impl AsRef<str>) { self.core.borrow_mut().restore(&name.as_ref().to_string()); self.pull(); }
+    pub fn commit(&mut self, name: impl AsRef<str>) { self.core.borrow_mut().commit(&name.as_ref().to_string()) }
+}
+thread_local! { static ACTION_PARSER: std::cell::RefCell<Option<Shared<parser_ll::LLParser>>> = Default::default(); }
+/// `ctx` for the statements of a rule running at `pos`, writing to `ast`.
+pub fn rule_context<'a, IT: BridgeCursor, AST>(pos: &'a mut IT, ast: &'a mut AST, start: IT, rule: impl AsRef<str>,
+                                               token_name: fn(usize) -> Ptr) -> RuleContext<'a, IT, AST> {
+    let parser = ACTION_PARSER.with(|slot| slot.borrow_mut().get_or_insert_with(|| {
+        let core = parser_ll::LLParser::shared_default();
+        core.borrow_mut().__init__();
+        core
+    }).clone());
+    let names = TOKEN_NAMES.with(|cache| cache.borrow_mut().entry(token_name as usize).or_insert_with(|| spell_names(token_name)).clone());
+    parser.borrow_mut().set_token_names(names, -1);
+    let cursor = TypedCursor::handle(pos.clone(), None);
+    let start_cursor: Shared<TokenCursor> = TypedCursor::handle(start, None).upcast();
+    let core = parser.borrow_mut().rule_context(cursor.clone().upcast(), (), start_cursor, &rule.as_ref().to_string());
+    RuleContext { pos, ast, rule: rule.as_ref().to_string(), cursor, core }
+}
+
 impl<Main, Token> LLParser<Main, Token> {
     /// `ctx` for a fail block running at `pos`; `token_name` spells the ids of tokens.
     pub fn fail_context<'a, IT: BridgeCursor, R>(&mut self, pos: &'a mut IT, _ast: R, start: IT, rule: impl AsRef<str>, failed_rule: impl AsRef<str>,
@@ -550,5 +596,30 @@ where
 impl<Main, Token> LLParser<Main, Token> {
     fn use_space_token<IT: BridgeCursor, S: 'static>(&mut self) {
         if let Some(id) = <IT::Token as BridgeToken>::alt_of::<S>() { self.core().borrow_mut().set_space_token(id); }
+    }
+}
+
+/// What a generated LR parser's fail blocks need from the parser base they run against.
+pub trait FailHost {
+    fn fail_context<'a, IT: BridgeCursor, R>(&mut self, pos: &'a mut IT, ast: R, start: IT, rule: impl AsRef<str>, failed_rule: impl AsRef<str>,
+                                              token_name: fn(usize) -> Ptr) -> FailContext<'a, IT>;
+    fn custom_failure_decision<IT: BridgeCursor>(&mut self, before: IT, ctx: &mut FailContext<IT>) -> Shared<core_recovery::Decision>;
+    /// How many diagnostics the fail blocks have reported, and their (rule, message) pairs.
+    fn reported(&mut self) -> usize;
+    fn reports(&mut self) -> Vec<(String, String)>;
+}
+impl<Main, Token> FailHost for LLParser<Main, Token> {
+    fn fail_context<'a, IT: BridgeCursor, R>(&mut self, pos: &'a mut IT, ast: R, start: IT, rule: impl AsRef<str>, failed_rule: impl AsRef<str>,
+                                              token_name: fn(usize) -> Ptr) -> FailContext<'a, IT> {
+        LLParser::fail_context(self, pos, ast, start, rule, failed_rule, token_name)
+    }
+    fn custom_failure_decision<IT: BridgeCursor>(&mut self, before: IT, ctx: &mut FailContext<IT>) -> Shared<core_recovery::Decision> {
+        LLParser::custom_failure_decision(self, before, ctx)
+    }
+    fn reported(&mut self) -> usize { self.core().borrow_mut().getErrors().len() }
+    fn reports(&mut self) -> Vec<(String, String)> {
+        let core = self.core();
+        let found: Vec<_> = core.borrow_mut().getErrors().iter().map(|d| (d.borrow().rule.clone(), d.borrow().message.clone())).collect();
+        found
     }
 }

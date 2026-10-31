@@ -36,7 +36,8 @@ int main(int argc, char** argv) {
     generated::Parser parser;
     parser.parse(lexer);
     const auto parse_end = std::chrono::steady_clock::now();
-    if (!parser.getErrors().empty() || !parser.getContextErrors().empty()) return 1;
+    if (!parser.getErrors().empty()) return 1;
+    if ([](auto& p) { if constexpr (requires { p.getContextErrors(); }) return !p.getContextErrors().empty(); else return false; }(parser)) return 1;
     std::cout << "{\"lex_ms\":" << std::chrono::duration<double, std::milli>(lex_end-start).count()
               << ",\"parse_ms\":" << std::chrono::duration<double, std::milli>(parse_end-lex_end).count() << "}\n";
 }
@@ -73,20 +74,22 @@ def main():
     parser.add_argument('--sizes', nargs='+', type=int, default=[8192, 32768, 131072, 10485760])
     parser.add_argument('--timeout', type=float, default=60)
     parser.add_argument('--text-view', action='store_true', help='C++ target: generate with --text-view (token text as views of the input)')
-    parser.add_argument('--work', type=Path, default=HERE / 'build/benchmark-json')
+    parser.add_argument('--algorithm', default='LL', help='ispa -a value, e.g. LL or LALR (C++ target for LR)')
+    parser.add_argument('--grammar', choices=('json', 'expr'), default='json')
+    parser.add_argument('--work', type=Path, default=None)
     args = parser.parse_args()
     if any(size < 2 for size in args.sizes) or args.timeout <= 0:
         parser.error('sizes must be >= 2 and timeout must be positive')
-    work = args.work.resolve()
+    work = (args.work or HERE / ('build/benchmark-json' if args.grammar == 'json' else 'build/benchmark-' + args.grammar)).resolve()
     work.mkdir(parents=True, exist_ok=True)
     env = {key: value for key, value in os.environ.items() if key != 'LD_LIBRARY_PATH'}
-    grammar = HERE / 'grammars/json/json.isc'
+    grammar = HERE / f'grammars/{args.grammar}/{args.grammar}.isc'
     commands = {}
     for target in args.targets:
         generated = work / target
         generated.mkdir(exist_ok=True)
         print(f'Building JSON benchmark: {target}', file=sys.stderr, flush=True)
-        run([args.ispa, '-l', target, *(['--stdlib', str(REPO / 'parser/stdlibs/target/target-cpp')] if target == 'cpp' else []), '-a', 'LL', '--no-incremental', '--no-debug-instrumentation',
+        run([args.ispa, '-l', target, *(['--stdlib', str(REPO / 'parser/stdlibs/target/target-cpp')] if target == 'cpp' else []), '-a', args.algorithm, '--no-incremental', '--no-debug-instrumentation',
              *(['--text-view'] if args.text_view and target == 'cpp' else []), '--no-ai-recovery', '--dir', str(grammar.parent), str(grammar), '-o', str(generated / 'generated')], env=env)
         if target == 'rust':
             (generated / 'src').mkdir(exist_ok=True)
@@ -106,15 +109,19 @@ def main():
     env['PYTHONPATH'] = os.pathsep.join(filter(None, [str(REPO / 'parser/stdlibs/target'), env.get('PYTHONPATH', '')]))
     # Compact, single-line input exposes quadratic source-column scans. No file IO or AST printing is timed.
     row = '{"id":1,"name":"item","value":123.45,"active":true,"tags":["a","b","c"]}'
+    unit = '(12+34*56-78/9)*(3+(4-5)*6)+'
     for size in args.sizes:
-        count = max(1, (size - 1) // (len(row) + 1))
-        text = '[' + ','.join([row] * count) + ']'
-        path = work / f'input-{size}.json'
+        if args.grammar == 'json':
+            count = max(1, (size - 1) // (len(row) + 1))
+            text = '[' + ','.join([row] * count) + ']'
+        else:
+            text = unit * max(1, (size - 2) // len(unit)) + '1'
+        path = work / f'input-{size}.txt'
         path.write_text(text)
         for target, command in commands.items():
             try:
                 timing = json.loads(run([*command, str(path)], env=env, timeout=args.timeout))
-                print(json.dumps(dict(grammar='json', target=target, bytes=len(text), **timing)), flush=True)
+                print(json.dumps(dict(grammar=args.grammar, target=target, bytes=len(text), **timing)), flush=True)
             except subprocess.TimeoutExpired:
                 raise RuntimeError(f'{target}: JSON {len(text)} bytes timed out after {args.timeout}s')
 

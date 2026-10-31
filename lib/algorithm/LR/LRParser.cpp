@@ -142,6 +142,23 @@ void LRParser::prepareProductions() {
                 if (p.rhs.back().empty())
                     throw std::invalid_argument("LRParser: empty symbol in " + formatName(lhs));
             }
+            // The normalizer builds repetitions right-recursively (T -> payload T), which LL needs. For LR that costs a stack
+            // entry per element and a rebuilt capture list per reduction (quadratic). Rotate the recursive production to
+            // T -> T payload: constant stack depth, and the reduction appends to the list it already owns.
+            if (lhs.back() == "__tail" && p.rhs.size() >= 2 && p.rhs.back() == lhs) {
+                std::rotate(p.rhs.rbegin(), p.rhs.rbegin() + 1, p.rhs.rend());
+                std::rotate(p.source.rule_members.rbegin(), p.source.rule_members.rbegin() + 1, p.source.rule_members.rend());
+                std::rotate(p.source_members.rbegin(), p.source_members.rbegin() + 1, p.source_members.rend());
+                // Gap flags: g[i] precedes member i, g[n] follows the last. New order T p1..pk keeps the gap before the payload
+                // between T and p1; the old gaps around the former tail (after pk, after T) now both follow pk.
+                auto& g = p.whitespace_gaps;
+                const std::size_t n = p.rhs.size();
+                std::vector<bool> h(n + 1, false);
+                h[1] = g[0];
+                for (std::size_t i = 1; i + 1 < n; ++i) h[i + 1] = g[i];
+                h[n] = g[n - 1] || g[n];
+                g = std::move(h);
+            }
             const auto id = productions.size();
             productions_by_lhs[lhs].push_back(id);
             rules.push_back({lhs, {p.rhs.size(), p.source.rule_members}});

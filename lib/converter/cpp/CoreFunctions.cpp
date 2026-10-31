@@ -287,6 +287,8 @@ auto Core::convertIspaLibSymbol(const LangAPI::IspaLibSymbol &symbol) -> std::st
             return "::ISPA_STD::Recovery::EndOfInput";
         case LangAPI::StdlibExports::RecoveryPolicy:
             return "::ISPA_STD::Recovery::Policy<" + convertTemplates(symbol.template_parameters) + ">";
+        case LangAPI::StdlibExports::RecoveryDecision:
+            return "::ISPA_STD::Recovery::Decision";
         case LangAPI::StdlibExports::Node:
             return std::string("::ISPA_STD::Node<") + convertTemplates(symbol.template_parameters) + ">";
         case LangAPI::StdlibExports::MatchResult:

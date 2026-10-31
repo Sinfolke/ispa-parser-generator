@@ -21,9 +21,11 @@ TEST(UAST, BackendGuardAllowsSupportedGrammar) {
     EXPECT_NO_THROW(AST::requireCppSupport(counted));
     auto advanced_token = convert("T { ctx.ast.seen: bool = True\n match 'x'; } main: T;");
     EXPECT_NO_THROW(AST::requireCppSupport(advanced_token, true));
-    EXPECT_THROW(AST::requireCppSupport(advanced_token, false), std::runtime_error);
+    // lexing does not depend on the parsing algorithm: LR gets the same token actions
+    EXPECT_NO_THROW(AST::requireCppSupport(advanced_token, false));
     auto empty_token = convert("T { ctx.ast.seen: bool = True } main: T;");
     EXPECT_THROW(AST::requireCppSupport(empty_token, true), std::runtime_error);
+    EXPECT_THROW(AST::requireCppSupport(empty_token, false), std::runtime_error);
     auto nested_token = convert("T { match 'x'; ctx.ast.seen: bool = True } U: T; main: U;");
     EXPECT_THROW(AST::requireCppSupport(nested_token, true), std::runtime_error);
 }
@@ -31,15 +33,18 @@ TEST(UAST, BackendGuardAllowsSupportedGrammar) {
 TEST(UAST, LRBackendGuardAllowsMatchOnlyAdvancedRule) {
     auto advanced_match = convert("main { match 'a'; match 'b'; }");
     EXPECT_NO_THROW(AST::requireCppSupport(advanced_match, false));
+    // statements run at the reduction of their mid-rule nonterminal
     auto advanced_action = convert("main { match 'a'; ctx.ast.seen: bool = True }");
-    EXPECT_THROW(AST::requireCppSupport(advanced_action, false), std::runtime_error);
+    EXPECT_NO_THROW(AST::requireCppSupport(advanced_action, false));
+    auto advanced_binding = convert("A: 'a'; main { match A -> first; ctx.ast.seen = first }");
+    EXPECT_NO_THROW(AST::requireCppSupport(advanced_binding, false));
 }
 
 TEST(UAST, BackendGuardRejectsUnsupportedFeaturesWithPositions) {
     for (const auto* source : {
         "T: $name;", "T: @=('a');", "T: % 'a';",
         "T: 'a' %{handler};", "T: 'a'+=3;", "T: 'a' => count;",
-        "fail handler {py} T: 'a';", "T: 'a' {py};", "T: \\s;"
+        "T: 'a' {py};", "T: \\s;"
     }) {
         auto tree = convert(source);
         try {

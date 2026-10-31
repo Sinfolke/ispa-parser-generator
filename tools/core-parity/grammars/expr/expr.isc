@@ -1,0 +1,32 @@
+NUMBER:
+    @ [0-9]+
+    {@}
+;
+ADD:
+    @ '+' | '-'
+    {@}
+;
+MUL:
+    @ '*' | '/'
+    {@}
+;
+paren:
+    '(' @ sum ')'
+    {@}
+;
+atom:
+    @ NUMBER | paren
+    {@}
+;
+product:
+    @ atom (MUL @ atom)*
+    @{first, rest}
+;
+sum:
+    @ product (ADD @ product)*
+    @{first, rest}
+;
+main:
+    @ sum
+    {@}
+;

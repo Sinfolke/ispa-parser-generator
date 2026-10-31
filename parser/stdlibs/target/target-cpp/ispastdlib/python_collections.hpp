@@ -79,7 +79,7 @@ template<class T, class A>
 T python_pop(std::vector<T, A>& values, std::ptrdiff_t index = -1) {
     if (index < 0) index += static_cast<std::ptrdiff_t>(values.size());
     if (index < 0 || static_cast<std::size_t>(index) >= values.size()) throw std::out_of_range("list.pop: index out of range");
-    T value = values[index];
+    T value = std::move(values[index]);
     values.erase(values.begin() + index);
     return value;
 }

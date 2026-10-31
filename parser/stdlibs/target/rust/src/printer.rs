@@ -49,7 +49,9 @@ impl PrintValue for ScalarText { fn scalar(&self) -> String { self.0.clone() } }
 macro_rules! scalar_print {
     ($($t:ty),*) => { $(impl PrintValue for $t { fn scalar(&self) -> String { self.to_text() } })* };
 }
-scalar_print!(String, &str, i64, i32, u64, usize, bool, f64, char);
+scalar_print!(String, &str, i64, i32, u64, usize, f64, char);
+// the C++ printer streams a bool as a number
+impl PrintValue for bool { fn scalar(&self) -> String { (if *self { "1" } else { "0" }).to_string() } }
 // `u8` is the IR's character
 impl PrintValue for u8 { fn scalar(&self) -> String { (*self as char).to_string() } }
 impl<T: PrintValue> PrintValue for Vec<T> {

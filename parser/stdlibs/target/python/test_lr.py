@@ -1,6 +1,6 @@
 import ispa_std as s
 from ispa_std.model import RawToken
-A = s.ABSENT
+A = -1
 ID, PLUS = 0, 1
 class Lex(s.Lexer):
     def makeToken(self, pos):

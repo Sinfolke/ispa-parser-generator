@@ -277,6 +277,8 @@ std::string Core::symbol(const LangAPI::Symbol& s) {
             if (first && method_members_.contains(*str) &&
                 !std::ranges::any_of(scopes_, [&](const auto& scope) { return scope.contains(identifier(*str)); }))
                 item = "self." + item;
+            // LR mid-rule actions are static; the runtime's rule_context is a static method as well.
+            else if (first && *str == "rule_context" && !method_members_.contains(*str)) item = "ispa_std.LLParser.rule_context";
         } else if (const auto* special = std::get_if<LangAPI::IspaLibSymbol>(&piece)) {
             item = lib(*special);
         } else item = call(std::get<LangAPI::FunctionCall>(piece));
@@ -397,6 +399,7 @@ std::string Core::lib(const LangAPI::IspaLibSymbol& s) {
         case S::CloneSelfBox: return "__import__('copy').copy";
         case S::LookaheadKind: return "ispa_std.lookahead_kind";
         case S::RecoveryEndOfInput: return "ispa_std.EndOfInput";
+        case S::RecoveryDecision: return "ispa_std.recovery.Decision";
         case S::MatchResultValue: return "node";
         case S::VariantIndex: return "index()";
         case S::ParserRequired: return "self.required";
@@ -463,6 +466,15 @@ std::string Core::call(const LangAPI::FunctionCall& c) {
         return fn == "ISPA_STD.python_char_code" ? "(ord(" + value + ") if " + value + " else 0)" :
             "(chr(" + value + ") if 0 <= " + value + " <= 255 else \"\")";
     }
+    // LR fail blocks are static and receive the host parser explicitly: fail_context(host, ...) is host.fail_context(...),
+    // custom_failure_decision(host, before, after, ctx) does not need the host.
+    if (fn == "fail_context" && c.args.size() == 7) {
+        std::string out = "(" + expression(c.args[0]) + ").fail_context(";
+        for (std::size_t i = 1; i < c.args.size(); ++i) out += (i > 1 ? ", " : "") + expression(c.args[i]);
+        return out + ")";
+    }
+    if (fn == "custom_failure_decision" && c.args.size() == 4)
+        return "custom_failure_decision(" + expression(c.args[1]) + ", " + expression(c.args[2]) + ", " + expression(c.args[3]) + ")";
     // construct<Class>(args): Python constructs by calling the class.
     if (fn == "ISPA_STD.borrow" && c.args.size() == 1) return expression(c.args.front());
     if ((fn == "ISPA_STD.construct" || fn == "ISPA_STD.make_value") && c.template_parameters.size() == 1) {
