@@ -59,8 +59,12 @@ class PackageError(Exception):
 
 def python_command():
     """Use a real interpreter for helpers, including in frozen CLI releases."""
-    if not globals().get('__compiled__') and not getattr(sys, 'frozen', False):
-        return [sys.executable]
+    # Nuitka does not reliably expose __compiled__ here, and a onefile build's sys.executable points at a
+    # non-existent <tmpdir>/python, so validate the executable itself instead of trusting a frozen flag.
+    interpreter = sys.executable
+    if (interpreter and not globals().get('__compiled__') and not getattr(sys, 'frozen', False)
+            and Path(interpreter).name.lower().startswith('python') and Path(interpreter).is_file()):
+        return [interpreter]
     for name in ('python3', 'python'):
         executable = shutil.which(name)
         if executable:
