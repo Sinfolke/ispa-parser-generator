@@ -28,6 +28,16 @@ export namespace LangAPI::Typing {
             if (locals.empty()) pushScope();
             locals.back()[name] = type;
         }
+        auto localType(const std::string &n) const -> MaybeType { const auto *t = lookupLocal(n); return t ? MaybeType(*t) : std::nullopt; }
+        // (parameter types, return type) of a Callable<P..., R>
+        static auto callableSignature(const Type &t) -> std::optional<std::pair<std::vector<Type>, Type>> {
+            const auto s = strip(t);
+            if (!s.isValueType() || s.getValueType() != ValueType::Callable || s.template_parameters.empty()) return std::nullopt;
+            std::vector<Type> ps;
+            for (const auto &tp : s.template_parameters) { const auto *x = std::get_if<Type>(&tp); if (!x) return std::nullopt; ps.push_back(*x); }
+            auto ret = ps.back(); ps.pop_back();
+            return std::make_pair(std::move(ps), std::move(ret));
+        }
         auto currentClass() const -> const Class * { return cur_class; }
         auto setLocalType(const std::string &name, const Type &type) -> void {
             for (auto it = locals.rbegin(); it != locals.rend(); ++it)
@@ -185,6 +195,10 @@ export namespace LangAPI::Typing {
             if (parts.size() == 2 && parts[0] == "ISPA_STD" && (parts[1] == "construct" || parts[1] == "make_value") &&
                 c.template_parameters.size() == 1)
                 if (const auto *t = std::get_if<std::shared_ptr<Type>>(&c.template_parameters[0]); t && *t) return **t;
+            if (parts.size() == 1) {   // call of a Callable local / field
+                MaybeType v = lookupLocal(parts[0]) ? MaybeType(*lookupLocal(parts[0])) : (cur_class ? fieldType(*cur_class, parts[0]) : std::nullopt);
+                if (v) if (const auto sig = callableSignature(*v)) return sig->second;
+            }
             if (parts.size() == 1 && cur_class)
                 if (const auto *m = findMethod(*cur_class, parts[0])) return m->type;
             if (const auto *cls = findClass(**sym)) return classType(*cls);   // constructor call

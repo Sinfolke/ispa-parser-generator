@@ -66,11 +66,15 @@ void *ispa_vec_push(ispa_vec *v);                 /* returns the new (zeroed) sl
 void *ispa_vec_at(const ispa_vec *v, size_t i);
 void ispa_vec_clear(ispa_vec *v);                 /* just resets the length */
 
+/* ---- callable: function pointer + closure environment (lambdas are hoisted by the emitter) ---- */
+typedef struct ispa_fn { void *fn; void *env; } ispa_fn;
+
 /* ---- errors: fail() jumps to the innermost attempt(); with none installed the process aborts. Arena memory needs no cleanup. ---- */
 typedef struct ispa_jmp { jmp_buf buf; struct ispa_jmp *prev; } ispa_jmp;
 _Noreturn void ispa_fail(int64_t kind, ispa_str message);
 int64_t ispa_attempt(void (*fn)(void *env), void *env);   /* 0 on completion, else the kind passed to ispa_fail */
 ispa_str ispa_failure_message(void);
+int64_t ispa_attempt_fn(ispa_fn f);   /* f: void (*)(void *env) */
 
 /* ---- current arena: allocation sites in lowered code take it from here (set by the parser facade per parse) ---- */
 extern _Thread_local ispa_arena *ispa_cur;
@@ -119,8 +123,6 @@ typedef struct ispa_map { void *impl; ispa_arena *arena; } ispa_map;
 /* ---- any: type-erased value, tag = a per-type address (filled in by the emitter) ---- */
 typedef struct ispa_any { const void *tag; void *value; } ispa_any;
 
-/* ---- callable: function pointer + closure environment (lambdas are hoisted by the emitter) ---- */
-typedef struct ispa_fn { void *fn; void *env; } ispa_fn;
 
 #ifdef __cplusplus
 }

@@ -3,6 +3,7 @@ module C.Init;
 import Converter.Writer;
 import logging;
 import std;
+import LangAPI.Traverse;
 
 namespace C {
     struct Unsupported { std::string why; };
@@ -248,6 +249,17 @@ namespace C {
         }
         const auto *sym = std::get_if<std::shared_ptr<LangAPI::Symbol>>(&call.name);
         if (!sym || !*sym) throw Unsupported{"library function call"};
+        if ((*sym)->path.size() == 1 && std::holds_alternative<std::string>((*sym)->path[0])) {
+            const auto &nm = std::get<std::string>((*sym)->path[0]);
+            const bool is_local = isLocal(nm);
+            const auto vt = is_local ? typer->localType(nm) : (cur_class_decl ? typer->fieldType(*cur_class_decl, nm) : std::nullopt);
+            if (vt) if (const auto sig = LangAPI::Typing::Typer::callableSignature(*vt)) {
+                std::vector<std::string> cargs;
+                for (std::size_t k = 0; k < call.args.size(); ++k)
+                    cargs.push_back(k < sig->first.size() ? coerce(convertExprAs(call.args[k], sig->first[k]), typer->typeOf(call.args[k]), sig->first[k]) : convertExpr(call.args[k]));
+                return invokeCallable(convertSymbolValue(**sym), *vt, cargs);
+            }
+        }
         std::vector<std::string> args;
         const auto *decl = typer->resolveFunction(call);
         for (std::size_t k = 0; k < call.args.size(); ++k) {
@@ -271,6 +283,76 @@ namespace C {
         }
         const auto fn = convertSymbolValue(**sym);
         return fn + "(" + joined(args, ", ") + ")";
+    }
+
+    auto Construct::invokeCallable(const std::string &code, const LangAPI::Type &callable, const std::vector<std::string> &args) -> std::string {
+        const auto sig = LangAPI::Typing::Typer::callableSignature(callable);
+        if (!sig) throw Unsupported{"call of a non-callable"};
+        std::vector<std::string> d, ps = {"void*"};
+        for (const auto &p : sig->first) ps.push_back(typeName(p, d));
+        auto as = args;
+        as.insert(as.begin(), "(" + code + ").env");
+        return "((" + typeName(sig->second, d) + " (*)(" + joined(ps, ", ") + "))(" + code + ").fn)(" + joined(as, ", ") + ")";
+    }
+
+    // A lambda becomes a static function taking its captured variables through an env struct (captured by value; the
+    // lowered library only reads captured names inside lambdas, or mutates the objects they point to).
+    auto Construct::convertLambda(const LangAPI::Lambda &lam, const LangAPI::Typing::MaybeType &expected, bool void_ret) -> std::string {
+        const auto id = prefix() + "_lam" + std::to_string(lambda_counter++);
+        std::vector<std::string> d;
+        std::vector<LangAPI::Type> eparams; std::optional<LangAPI::Type> eret;
+        if (expected) if (auto sig = LangAPI::Typing::Typer::callableSignature(*expected)) { eparams = sig->first; eret = sig->second; }
+        std::vector<std::pair<LangAPI::Type, std::string>> params;
+        for (std::size_t i = 0; i < lam.parameters.size(); ++i) {
+            auto t = lam.parameters[i].first;
+            if (t.isValueType() && t.getValueType() == LangAPI::ValueType::Undef) {
+                if (i >= eparams.size()) throw Unsupported{"lambda parameter without a type"};
+                t = eparams[i];
+            }
+            params.emplace_back(t, lam.parameters[i].second);
+        }
+        const LangAPI::Type ret = void_ret || !eret ? LangAPI::Type(LangAPI::ValueType::Void) : *eret;
+        std::set<std::string> pnames;
+        for (const auto &[t, n] : params) pnames.insert(n);
+        std::vector<std::pair<std::string, LangAPI::Type>> caps;
+        std::set<std::string> seen;
+        bool bad = false;
+        LangAPI::Traverse::forEach<LangAPI::Symbol>(lam.statements, [&](const LangAPI::Symbol &sy) {
+            if (sy.path.size() != 1 || !std::holds_alternative<std::string>(sy.path[0])) return;
+            const auto &n = std::get<std::string>(sy.path[0]);
+            if (n == "self" || pnames.contains(n) || !isLocal(n) || !seen.insert(n).second) return;
+            if (const auto t = typer->localType(n)) caps.emplace_back(n, *t); else bad = true;
+        });
+        if (bad) throw Unsupported{"lambda captures a local of unknown type"};
+        if (cur_class_decl) caps.emplace_back("self", typer->classType(*cur_class_decl));
+        // body
+        Converter::Writer body;
+        body.increaseIndentation();
+        auto saved_locals = locals; const auto *saved_ret = cur_return;
+        locals.emplace_back();
+        for (const auto &[t, n] : params) locals.back().insert(n);
+        typer->pushScope();
+        for (const auto &[t, n] : params) typer->declare(n, t);
+        cur_return = &ret;
+        std::string env_fields, make_params, make_assign, make_args;
+        for (const auto &[n, t] : caps) {
+            const auto ct = n == "self" && cur_class_decl ? class_cname.at(cur_class_decl) + "*" : typeName(t, d);
+            body.writeln("{} {} = env->{};", ct, cIdent(n), cIdent(n));
+            env_fields += "    " + ct + " " + cIdent(n) + ";\n";
+            make_params += (make_params.empty() ? "" : ", ") + ct + " " + cIdent(n);
+            make_assign += "    e->" + cIdent(n) + " = " + cIdent(n) + ";\n";
+            make_args += (make_args.empty() ? "" : ", ") + cIdent(n);
+        }
+        try { convertStatements(lam.statements, body); }
+        catch (...) { typer->popScope(); locals = saved_locals; cur_return = saved_ret; throw; }
+        typer->popScope(); locals = saved_locals; cur_return = saved_ret;
+        std::vector<std::string> ps = {"void *env_"};
+        for (const auto &[t, n] : params) ps.push_back(typeName(t, d) + " " + cIdent(n));
+        std::string def = "typedef struct {\n" + (env_fields.empty() ? std::string("    char unused_;\n") : env_fields) + "} " + id + "_env;\n";
+        def += "static " + typeName(ret, d) + " " + id + "(" + joined(ps, ", ") + ") {\n    " + id + "_env *env = (" + id + "_env *)env_; (void)env;\n" + std::string(body.get()) + "}\n";
+        def += "static ispa_fn " + id + "_make(" + (make_params.empty() ? std::string("void") : make_params) + ") {\n    " + id + "_env *e = ISPA_NEW(" + id + "_env);\n" + make_assign + "    return (ispa_fn){ (void *)" + id + ", e };\n}\n\n";
+        lambda_defs += def;
+        return id + "_make(" + make_args + ")";
     }
 
     auto Construct::arrayLiteral(const LangAPI::Array &arr, const LangAPI::Type &type) -> std::string {
@@ -344,6 +426,15 @@ namespace C {
                     throw Unsupported{"storage call on a non-class or library member"};
                 const auto &mname = std::get<std::string>((*sym)->path[0]);
                 const auto *fn = typer->findMethod(*cls, mname);
+                if (!fn) if (const auto ft = typer->fieldType(*cls, mname)) if (const auto sig = LangAPI::Typing::Typer::callableSignature(*ft)) {
+                    const auto m = memberPath(class_cname.at(cls), mname);
+                    std::vector<std::string> cargs;
+                    for (std::size_t k = 0; k < call->args.size(); ++k)
+                        cargs.push_back(k < sig->first.size() ? coerce(convertExprAs(call->args[k], sig->first[k]), typer->typeOf(call->args[k]), sig->first[k]) : convertExpr(call->args[k]));
+                    out = invokeCallable(out + "->" + *m, *ft, cargs);
+                    cur = sig->second;
+                    continue;
+                }
                 std::vector<std::string> margs;
                 for (std::size_t k = 0; k < call->args.size(); ++k) {
                     if (fn && k < fn->parameters.size()) margs.push_back(coerce(convertExprAs(call->args[k], fn->parameters[k].first), typer->typeOf(call->args[k]), fn->parameters[k].first));
@@ -439,15 +530,29 @@ namespace C {
                             if (a.size() != 2) throw Unsupported{"fail arity"};
                             out += "ispa_fail(" + a[0] + ", " + a[1] + ")"; break;
                         case LangAPI::StdlibExports::FailureMessage: out += "ispa_failure_message()"; break;
-                        case LangAPI::StdlibExports::Attempt: throw Unsupported{"attempt (needs lambda hoisting)"};
+                        case LangAPI::StdlibExports::Attempt: {
+                            if (c.args.size() != 1 || c.args[0].size() != 1 || c.args[0][0].type() != LangAPI::ExpressionValueType::Lambda)
+                                throw Unsupported{"attempt of a non-lambda"};
+                            out += "ispa_attempt_fn(" + convertLambda(c.args[0][0].getLambda(), std::nullopt, true) + ")"; break;
+                        }
                         default: throw Unsupported{"ispa-lib call " + std::to_string(static_cast<int>(c.symbol.exports))};
                     }
+                    break;
+                }
+                case LangAPI::ExpressionValueType::Lambda: {
+                    const auto expected = array_hint;
+                    array_hint.reset();
+                    out += convertLambda(v.getLambda(), expected, false);
                     break;
                 }
                 case LangAPI::ExpressionValueType::Break: out += "break"; break;
                 case LangAPI::ExpressionValueType::Continue: out += "continue"; break;
                 case LangAPI::ExpressionValueType::Return: {
                     auto value = cur_return ? convertExprAs(v.getReturn().value, *cur_return) : convertExpr(v.getReturn().value);
+                    if (cur_return && cur_return->isValueType() && cur_return->getValueType() == LangAPI::ValueType::Void && !value.empty()) {
+                        out += "{ (void)(" + value + "); return; }";
+                        break;
+                    }
                     if (cur_return && !value.empty()) value = coerce(value, typer->typeOf(v.getReturn().value), *cur_return);
                     out += "return" + (value.empty() ? std::string() : " " + value);
                     break;
@@ -614,6 +719,10 @@ namespace C {
     auto Construct::convertExpr(const LangAPI::Expression &e) -> std::string {
         std::size_t i = 0;
         std::string out;
+        const auto hint = array_hint;      // the expected type only applies to a sole operand
+        array_hint.reset();
+        if (e.size() == 1) array_hint = hint;
+        struct Clear { LangAPI::Typing::MaybeType &h; ~Clear() { h.reset(); } } clear{array_hint};
         while (i < e.size()) {
             if (e[i].type() == LangAPI::ExpressionValueType::Empty) { ++i; continue; }
             out += parseBinary(e, i, 1);
@@ -702,6 +811,7 @@ namespace C {
             body.increaseIndentation();
             convertStatements(fn.statements, body);
         } catch (const Unsupported &u) { why = u.why; }
+        if (!lambda_defs.empty()) { if (why.empty()) impls.dwrite("{}", lambda_defs); lambda_defs.clear(); }
         impls.writeln("{} {", sig);
         if (why.empty()) {
             impls.dwrite("{}", body.get());

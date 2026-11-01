@@ -87,3 +87,4 @@ int64_t ispa_attempt(void (*fn)(void *env), void *env) {
     return ispa_fail_kind;
 }
 ispa_str ispa_failure_message(void) { return ispa_fail_message; }
+int64_t ispa_attempt_fn(ispa_fn f) { return ispa_attempt((void (*)(void *))f.fn, f.env); }

@@ -26,7 +26,11 @@ namespace C {
         std::unordered_map<const LangAPI::Class *, std::string> class_cname;
         mutable std::vector<std::pair<std::string, std::string>> vec_defs;   // (vector type name, element C type) in dependency order
         mutable std::unordered_set<std::string> vec_seen;
-        LangAPI::Typing::MaybeType array_hint;
+        LangAPI::Typing::MaybeType array_hint;                   // expected type of the sole operand being converted
+        std::string lambda_defs;                                 // hoisted lambda definitions, flushed before the enclosing function
+        std::size_t lambda_counter = 0;
+        auto convertLambda(const LangAPI::Lambda &lam, const LangAPI::Typing::MaybeType &expected, bool void_ret) -> std::string;
+        auto invokeCallable(const std::string &code, const LangAPI::Type &callable, const std::vector<std::string> &args) -> std::string;
         auto arrayLiteral(const LangAPI::Array &arr, const LangAPI::Type &type) -> std::string;
         auto convertExprAs(const LangAPI::Expression &e, const LangAPI::Type &expected) -> std::string;
         auto coerce(const std::string &code, const LangAPI::Typing::MaybeType &from, const LangAPI::Type &to) const -> std::string;
