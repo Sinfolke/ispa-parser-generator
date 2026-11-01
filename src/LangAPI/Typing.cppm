@@ -80,6 +80,8 @@ export namespace LangAPI::Typing {
         // monomorphization hooks, installed by the backend: instance of a generic class / function for concrete arguments
         std::function<const Class *(const Class &, const std::vector<Type> &)> instantiate_class;
         std::function<const Function *(const Function &, const std::vector<Type> &)> instantiate_function;
+        // generic method of the current class: the target's monomorphized form (its type is the call's type)
+        std::function<const Function *(const Function &, const FunctionCall &)> instantiate_method;
 
         auto classOf(const Type &t) const -> const Class * {
             const auto s = strip(t);
@@ -241,7 +243,11 @@ export namespace LangAPI::Typing {
                 const auto et = typeOf(vals[0]);
                 return et ? MaybeType(Type(ValueType::Array, *et)) : std::nullopt;
             }
-            if (r.type() == RValueType::Instance) return cur_class ? MaybeType(classType(*cur_class)) : std::nullopt;
+            if (r.type() == RValueType::Instance) {
+                if (cur_class) return MaybeType(classType(*cur_class));
+                if (const auto *self = lookupLocal("self")) return MaybeType(*self);      // a monomorphized method: `self` is its first parameter
+                return std::nullopt;
+            }
             if (r.type() == RValueType::GetFromBox) {
                 const auto t = typeOf(r.getGetFromBox().what);
                 return t ? MaybeType(strip(*t)) : std::nullopt;
@@ -322,7 +328,11 @@ export namespace LangAPI::Typing {
                 if (v) if (const auto sig = callableSignature(*v)) return sig->second;
             }
             if (parts.size() == 1 && cur_class)
-                if (const auto *m = findMethod(*cur_class, parts[0])) return m->type;
+                if (const auto *m = findMethod(*cur_class, parts[0])) {
+                    if (!m->template_parameters.empty() && instantiate_method)
+                        if (const auto *inst = instantiate_method(*m, c)) return inst->type;
+                    return m->type;
+                }
             if (const auto *qc = qualifiedMethodClass(**sym)) if (const auto *m = findMethod(*qc, parts.back())) return m->type;
             if (const auto *cls = findClass(**sym)) return classType(*cls);   // constructor call
             if (const auto *fn = findFunction(parts)) {

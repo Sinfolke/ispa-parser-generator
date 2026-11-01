@@ -36,6 +36,10 @@ namespace C {
         std::unordered_map<std::string, const LangAPI::Class *> generic_decl;
         std::unordered_map<std::string, std::vector<std::string>> generic_scope;
         std::unordered_map<const LangAPI::Function *, std::vector<std::string>> generic_fn_scope;
+        std::unordered_map<const LangAPI::Class *, std::vector<std::string>> class_path;      // qualified name of each class
+        std::unordered_map<const LangAPI::Function *, const LangAPI::Function *> method_fns;      // generic method -> its free-function form
+        std::deque<LangAPI::Function> method_clones;
+        auto methodClone(const LangAPI::Function &g0, const LangAPI::Class *owner) -> const LangAPI::Function *;
         auto instantiateClass(const LangAPI::Class &g, const std::vector<LangAPI::Type> &args) -> const LangAPI::Class *;
         auto instantiateFunction(const LangAPI::Function &g, const std::vector<LangAPI::Type> &args) -> const LangAPI::Function *;
         auto registerClass(const LangAPI::Class &c) -> void;

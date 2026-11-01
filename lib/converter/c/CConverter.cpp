@@ -138,6 +138,9 @@ namespace C {
     auto Construct::registerClass(const LangAPI::Class &c) -> void {
         const auto n = prefix() + "_" + symbolName(c.name);
         class_cname[&c] = n;
+        {   std::vector<std::string> cpath = scope;
+            for (const auto &part : c.name.path) if (const auto *ps = std::get_if<std::string>(&part)) cpath.push_back(*ps);
+            class_path[&c] = std::move(cpath); }
         handler_names[&c] = prefix() + "_get_" + symbolName(c.name) + "_handler";
         if (token_classes.contains(symbolName(c.name)) && !n.starts_with("python_ispa_std_")) token_cname = n;
         defined.insert(n);
@@ -200,7 +203,9 @@ namespace C {
     auto Construct::instantiateFunction(const LangAPI::Function &g, const std::vector<LangAPI::Type> &args) -> const LangAPI::Function * {
         std::vector<std::string> d, cargs;
         for (const auto &a : args) cargs.push_back(typeName(a, d));
-        const auto gscope = generic_fn_scope.at(&g);
+        const auto gs_it = generic_fn_scope.find(&g);
+        if (gs_it == generic_fn_scope.end()) throw Unsupported{"generic function " + g.name + " is not a namespace function (generic method?)"};
+        const auto gscope = gs_it->second;
         const auto key = joined(gscope, "::") + "::" + g.name + "<" + joined(cargs, ",") + ">";
         if (const auto it = fn_insts.find(key); it != fn_insts.end()) return it->second;
         fn_clones.push_back(g);
@@ -275,6 +280,9 @@ namespace C {
             return "ISPA_ANY_PTR(" + code + ")";
         }
         if (!from) return code;
+        if (LangAPI::Typing::Typer::isValue(to, LangAPI::ValueType::Char) && (LangAPI::Typing::Typer::isValue(*from, LangAPI::ValueType::String) ||
+                                                                              LangAPI::Typing::Typer::isValue(*from, LangAPI::ValueType::NonOwnedString)))
+            return "ispa_str_at(" + code + ", 0)";      // Python one-character str used as a char
         const auto *cf = typer->classOf(*from), *ct = typer->classOf(to);
         if (!cf || !ct || cf == ct) return code;
         const auto it = class_cname.find(ct);
@@ -626,6 +634,23 @@ namespace C {
         return methodCall(*cur_class_decl, "recover_choice", "self", {convertExpr(call.args[0]), convertExpr(call.args[1]), convertExpr(call.args[2]), mk(first), mk(inner)});
     }
 
+    // free-function form of a generic method of `owner` (`self` first); the instances are made by instantiateFunction
+    auto Construct::methodClone(const LangAPI::Function &g0, const LangAPI::Class *owner) -> const LangAPI::Function * {
+        const auto cp = owner ? class_path.find(owner) : class_path.end();
+        if (!owner || cp == class_path.end() || typer->findMethod(*owner, g0.name) != &g0)
+            throw Unsupported{"generic function " + g0.name + " is not a namespace function or an implicit-self method"};
+        auto &slot = method_fns[&g0];
+        if (!slot) {
+            method_clones.push_back(g0);
+            auto &c = method_clones.back();
+            c.parameters.insert(c.parameters.begin(), {LangAPI::Type(LangAPI::Symbol(cp->second)), "self"});
+            c.is_static = true;
+            generic_fn_scope[&c] = scope;
+            slot = &c;
+        }
+        return slot;
+    }
+
     auto Construct::convertCall(const LangAPI::FunctionCall &call) -> std::string {
         if (const auto *lib = std::get_if<std::shared_ptr<LangAPI::IspaLibSymbol>>(&call.name); lib && *lib) return convertLibCall(call, **lib);
         if (const auto *ls = std::get_if<std::shared_ptr<LangAPI::Symbol>>(&call.name); ls && *ls && (*ls)->path.size() == 1 &&
@@ -638,6 +663,31 @@ namespace C {
             std::holds_alternative<std::string>((*rs)->path[0]) && !call.template_parameters.empty() &&
             (std::get<std::string>((*rs)->path[0]) == "recovery_at" || std::get<std::string>((*rs)->path[0]) == "recover_choice"))
             return convertRecoveryCall(call, std::get<std::string>((*rs)->path[0]));
+        if (const auto *cs = std::get_if<std::shared_ptr<LangAPI::Symbol>>(&call.name); cs && *cs && (*cs)->path.size() == 3 &&
+            std::holds_alternative<std::string>((*cs)->path[0]) && std::get<std::string>((*cs)->path[0]) == "ISPA_STD" &&
+            std::holds_alternative<std::string>((*cs)->path[1]) && std::get<std::string>((*cs)->path[1]) == "CountSpec" &&
+            std::holds_alternative<std::string>((*cs)->path[2]) && call.args.size() == 2) {
+            std::vector<std::string> cargs;
+            for (const auto &a : call.args) cargs.push_back(convertExpr(a));
+            return "python_ispa_std_counter_CountSpec_" + std::get<std::string>((*cs)->path[2]) + "(" + joined(cargs, ", ") + ")";
+        }
+        if (const auto *fs = std::get_if<std::shared_ptr<LangAPI::Symbol>>(&call.name); fs && *fs && (*fs)->path.size() == 1 && cur_class_decl && call.args.size() == 3 &&
+            std::holds_alternative<std::string>((*fs)->path[0]) && std::get<std::string>((*fs)->path[0]) == "custom_failure_decision")
+        {   // (before, after, ctx): the context knows `after`, so the decision is ctx.finish(before)
+            const auto ct = typer->typeOf(call.args[2]);
+            const auto *cc = ct ? typer->classOf(*ct) : nullptr;
+            if (!cc) throw Unsupported{"custom_failure_decision over an untyped context"};
+            return methodCall(*cc, "finish", convertExpr(call.args[2]), {convertExpr(call.args[0])});
+        }
+        if (const auto *bs = std::get_if<std::shared_ptr<LangAPI::Symbol>>(&call.name); bs && *bs && (*bs)->path.size() == 1 && cur_class_decl && call.args.size() == 2 &&
+            std::holds_alternative<std::string>((*bs)->path[0]) && std::get<std::string>((*bs)->path[0]) == "bind_counter") {
+            // counter binding by the shape of the captured value: a list, a single node or a plain count
+            const auto vt = typer->typeOf(call.args[1]);
+            const char *m = "bind_counter_count";
+            if (vt && LangAPI::Typing::Typer::isValue(*vt, LangAPI::ValueType::Array)) m = "bind_counter_list";
+            else if (vt && !LangAPI::Typing::Typer::isValue(*vt, LangAPI::ValueType::Int)) m = "bind_counter_node";
+            return methodCall(*cur_class_decl, m, "self", {convertExpr(call.args[0]), convertExpr(call.args[1])});
+        }
         if (const auto *sy = std::get_if<std::shared_ptr<LangAPI::Symbol>>(&call.name); sy && *sy && (*sy)->path.size() == 2 &&
             std::holds_alternative<std::string>((*sy)->path[0]) && std::get<std::string>((*sy)->path[0]) == "ISPA_STD" &&
             std::holds_alternative<std::string>((*sy)->path[1]) &&
@@ -666,20 +716,31 @@ namespace C {
             }
             throw Unsupported{"construct of a non-class type"};
         }
-        if (const auto *g = typer->resolveFunction(call); g && !g->template_parameters.empty()) {
-            const auto targs = typer->bindTemplates(*g, call);
+        if (const auto *g0 = typer->resolveFunction(call); g0 && !g0->template_parameters.empty()) {
+            const LangAPI::Function *g = g0;
+            std::string receiver;      // generic methods are monomorphized into free functions taking `self` first
+            if (!generic_fn_scope.contains(g0)) {
+                const auto *ms = std::get_if<std::shared_ptr<LangAPI::Symbol>>(&call.name);
+                const auto *owner = cur_class_decl && ms && *ms && (*ms)->path.size() == 1 ? typer->methodOwner(*cur_class_decl, g0->name) : nullptr;
+                g = methodClone(*g0, owner);
+                receiver = "(" + class_cname.at(owner) + "*)self";
+            }
+            const auto targs = typer->bindTemplates(*g0, call);
             if (!targs) {
                 std::string tp;
-                for (const auto &[n, bounds] : g->template_parameters) { tp += n + "("; for (const auto &b : bounds) tp += b.isIspaLibSymbol() ? "lib" + std::to_string(static_cast<int>(b.getIspaLibSymbol().exports)) : b.isSymbol() ? symbolName(b.getSymbol()) : "v"; tp += ") "; }
+                for (const auto &[n, bounds] : g->template_parameters) { tp += n + "("; for (const auto &b : bounds) tp += b.isIspaLibSymbol() ? "lib" + std::to_string(static_cast<int>(b.getIspaLibSymbol().exports)) : b.isSymbol() ? symbolName(b.getSymbol()) : "?"; tp += ") "; }
                 throw Unsupported{"cannot infer the type arguments of " + g->name + " : " + tp};
             }
             const auto *inst = instantiateFunction(*g, *targs);
+            const std::size_t off = receiver.empty() ? 0 : 1;
             std::vector<std::string> cargs;
+            if (off) cargs.push_back(receiver);
             for (std::size_t k = 0; k < call.args.size(); ++k) {
-                if (k < inst->parameters.size()) {
-                    const auto &pt = inst->parameters[k].first;
+                if (k + off < inst->parameters.size()) {
+                    const auto &pt = inst->parameters[k + off].first;
                     cargs.push_back(coerce(convertExprAs(call.args[k], pt), typer->typeOf(call.args[k]), pt));
-                } else cargs.push_back(convertExpr(call.args[k]));
+                } else if (off) continue;      // the lowered runtime keeps the token-name table itself (the generated call passes TokensToString)
+                else cargs.push_back(convertExpr(call.args[k]));
             }
             const auto &gs = generic_fn_scope.at(g);
             std::vector<std::string> parts;
@@ -802,7 +863,9 @@ namespace C {
         std::vector<std::pair<LangAPI::Type, std::string>> params;
         for (std::size_t i = 0; i < lam.parameters.size(); ++i) {
             auto t = lam.parameters[i].first;
-            if (t.isValueType() && t.getValueType() == LangAPI::ValueType::Undef) {
+            const bool auto_param = t.isSymbol() && t.getSymbol().path.size() == 1 && std::holds_alternative<std::string>(t.getSymbol().path[0]) &&
+                                    (std::get<std::string>(t.getSymbol().path[0]) == "auto" || std::get<std::string>(t.getSymbol().path[0]) == "auto&");
+            if (auto_param || (t.isValueType() && t.getValueType() == LangAPI::ValueType::Undef)) {
                 if (i >= eparams.size()) throw Unsupported{"lambda parameter without a type"};
                 t = eparams[i];
             }
@@ -972,6 +1035,17 @@ namespace C {
         const auto it = class_cname.find(owner);
         if (it == class_cname.end()) throw Unsupported{"class of method " + name + " unknown"};
         const auto *fn = typer->findMethod(recv_cls, name);
+        if (fn && args.size() + (fn->is_static ? 0 : 0) < fn->parameters.size()) {
+            // grammar-facing calls omit trailing arguments (`ctx.error(msg)`, `ctx.at("x")`): C has no defaults
+            for (std::size_t k = args.size(); k < fn->parameters.size(); ++k) {
+                const auto &pt = fn->parameters[k].first;
+                if (name == "error" && k == 1) args.push_back("ISPA_STR(\"\")");
+                else if (name == "error") args.push_back("INT64_C(-1)");
+                else if (LangAPI::Typing::Typer::isValue(pt, LangAPI::ValueType::String)) args.push_back("ISPA_STR(\"\")");
+                else if (LangAPI::Typing::Typer::isValue(pt, LangAPI::ValueType::Bool)) args.push_back("false");
+                else args.push_back("INT64_C(0)");
+            }
+        }
         if (fn && fn->is_static) return it->second + "_" + cIdent(name) + "(" + joined(args, ", ") + ")";
         if (const auto v = slot_root.find({owner, name}); v != slot_root.end()) {   // overridden somewhere: dispatch through the vtable
             const auto *root = v->second;
@@ -995,9 +1069,9 @@ namespace C {
             std::vector<std::string> v; for (const auto &a : as) v.push_back(convertExpr(a)); return v;
         };
         for (const auto &part : ss.path) {
-            if (!cur) throw Unsupported{"storage path of unknown type"};
             const auto *name = std::get_if<std::string>(&part);
             if (!name) if (const auto *p = std::get_if<LangAPI::Property>(&part)) name = &p->name;
+            if (!cur) throw Unsupported{"storage path of unknown type (before " + (name ? *name : std::string("?")) + ", after " + out + ")"};
             const auto stripped = LangAPI::Typing::Typer::strip(*cur);
             if (name) {
                 const auto *cls = typer->classOf(*cur);
@@ -1217,7 +1291,7 @@ namespace C {
         }
         if (r.type() == LangAPI::RValueType::CharToStringConstructor) return "ispa_str_from_char(" + convertExpr(r.getCharToStringConstructor().what) + ")";
         if (r.type() == LangAPI::RValueType::Instance) {
-            if (cur_class.empty()) throw Unsupported{"instance outside a method"};
+            if (cur_class.empty() && !isLocal("self")) throw Unsupported{"instance outside a method"};
             return "self";
         }
         // Box<class> is already the object handle; a Box of a plain value will need a dereference once locals are typed
@@ -1589,7 +1663,8 @@ namespace C {
             auto declared = v.type;
             if (pending_local_type) { declared = *pending_local_type; pending_local_type.reset(); }
             const bool is_auto = declared.isSymbol() && declared.getSymbol().path.size() == 1 && std::holds_alternative<std::string>(declared.getSymbol().path[0]) &&
-                                 (std::get<std::string>(declared.getSymbol().path[0]) == "auto" || std::get<std::string>(declared.getSymbol().path[0]) == "auto&");
+                                 (std::get<std::string>(declared.getSymbol().path[0]) == "auto" || std::get<std::string>(declared.getSymbol().path[0]) == "auto&" ||
+                                  std::get<std::string>(declared.getSymbol().path[0]) == "auto_");
             if (is_auto || (declared.isValueType() && declared.getValueType() == LangAPI::ValueType::Undef)) {
                 const auto inferred = typer->typeOf(v.value);
                 if (!inferred) throw Unsupported{"local without a declared type"};
@@ -1600,7 +1675,7 @@ namespace C {
             if (!d.empty()) throw Unsupported{"local type: " + d.front()};
             locals.back().insert(v.name);
             if (t.ends_with("_FrameGuard*")) frame_guards.emplace_back(cIdent(v.name), t.substr(0, t.size() - 1) + "_close");
-            else if (t.ends_with("_CounterScope*")) frame_guards.emplace_back(cIdent(v.name), t.substr(0, t.size() - 1) + "_close");
+            else if (t.ends_with("_CounterScope*")) frame_guards.emplace_back(cIdent(v.name), t.substr(0, t.size() - 1) + "_restore");
             if (v.value.empty()) {
                 const auto *dcls = declared.isSymbol() ? typer->classOf(declared) : nullptr;
                 if (LangAPI::Typing::Typer::isValue(declared, LangAPI::ValueType::Array) && declared.isValueType())   // `x: list` starts as []
@@ -2134,6 +2209,14 @@ namespace C {
         typer = std::make_unique<LangAPI::Typing::Typer>(owned_tree);
         typer->instantiate_class = [this](const LangAPI::Class &c, const std::vector<LangAPI::Type> &a) { return instantiateClass(c, a); };
         typer->instantiate_function = [this](const LangAPI::Function &f, const std::vector<LangAPI::Type> &a) { return instantiateFunction(f, a); };
+        typer->instantiate_method = [this](const LangAPI::Function &m, const LangAPI::FunctionCall &c) -> const LangAPI::Function * {
+            try {
+                if (!cur_class_decl) return nullptr;
+                const auto *g = methodClone(m, typer->methodOwner(*cur_class_decl, m.name));
+                const auto targs = typer->bindTemplates(m, c);
+                return targs ? instantiateFunction(*g, *targs) : nullptr;
+            } catch (const Unsupported &) { return nullptr; }
+        };
         class_clones.clear(); fn_clones.clear(); class_insts.clear(); fn_insts.clear(); pending.clear();
         generic_decl.clear(); generic_scope.clear(); generic_fn_scope.clear();
         app_mode = false;

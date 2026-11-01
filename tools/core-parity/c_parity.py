@@ -43,7 +43,7 @@ def build(ispa, work, grammar, sanitize):
 def normalize(out):
     """The import lines make the grammar a module: rules are named modules::parser::x, and the root is a wrapper
     `main -> value -> <the user's main rule>`. Strip both so the output reads like the plain C++ parser's."""
-    out = out.replace('modules::parser::', '').replace('modules_parser_', '')
+    out = out.replace('modules::parser::', '').replace('modules_parser_', '').replace('modules.parser.', '')
     out = out.replace('in main > main >', 'in main >')      # the wrapper's own recovery frame
     lines = out.splitlines(keepends=True)
     if len(lines) > 2 and lines[0] == 'main\n' and lines[1] == '\u2514\u2500\u2500 value\n' and lines[2].startswith('    '):
