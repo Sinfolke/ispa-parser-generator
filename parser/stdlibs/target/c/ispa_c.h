@@ -76,6 +76,9 @@ int64_t ispa_attempt(void (*fn)(void *env), void *env);   /* 0 on completion, el
 ispa_str ispa_failure_message(void);
 int64_t ispa_attempt_fn(ispa_fn f);   /* f: void (*)(void *env) */
 
+/* shallow copy of an object into the current arena (CloneSelfBox) */
+void *ispa_clone_obj(const void *obj, size_t size);
+
 /* ---- current arena: allocation sites in lowered code take it from here (set by the parser facade per parse) ---- */
 extern _Thread_local ispa_arena *ispa_cur;
 #define ISPA_NEW(T) ((T *)ispa_arena_calloc(ispa_cur, sizeof(T)))

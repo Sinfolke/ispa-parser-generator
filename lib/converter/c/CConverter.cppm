@@ -47,6 +47,7 @@ namespace C {
         std::optional<LangAPI::Type> pending_local_type;      // inferred type for the next untyped local
         LangAPI::Declarations owned_tree;                        // working copy of the source with library symbols mapped
         auto mapLibrary() -> void;
+        int switch_counter = 0;
         bool app_mode = false;                                   // the tree holds an application next to the library
         std::unordered_set<std::string> thunks_done;
         auto functionValue(const LangAPI::Symbol &sy, const LangAPI::Function &fn) -> std::string;

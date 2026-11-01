@@ -333,6 +333,48 @@ namespace C {
         return out + "\"";
     }
 
+    // IspaLib symbols (types and base classes of generated code) become the lowered library classes they stand for, so the
+    // generated classes see ordinary declarations. Node<T>/MatchResult<T> payloads are type-erased (ispa_any): the
+    // template arguments are dropped.
+    namespace {
+        auto libPath(LangAPI::StdlibExports e) -> std::optional<std::vector<std::string>> {
+            using S = LangAPI::StdlibExports;
+            const auto P = [](std::initializer_list<const char *> l) { std::vector<std::string> v = {"python", "ispa_std"}; for (auto x : l) v.emplace_back(x); return v; };
+            switch (e) {
+                case S::Node: return P({"node", "Node"});
+                case S::MatchResult: return P({"match_result", "MatchResult"});
+                case S::Lexer: return P({"lexer", "Lexer_base"});
+                case S::Parser: return P({"parser_ll", "LLParser"});
+                case S::LRParser: return P({"lr", "LRParser"});
+                case S::LRGeneralizedParser: return P({"lr_conflicts", "LRGeneralizedParser"});
+                case S::LexerMakeTokenParameter: return P({"refs", "Cursor"});
+                case S::ParserFunctionParameter: case S::LexerTokenIterator: case S::LexerLazyIterator: return P({"lexer", "TokenCursor"});
+                case S::DfaCaptures: return P({"dfa_api", "Captures"});
+                case S::TdfaLayout: return P({"dfa_api", "TdfaLayout"});
+                case S::DFADebug: return P({"dfa_api", "DFADebug"});
+                case S::ASTPrinter: return P({"ast_printer", "ASTPrinter"});
+                case S::RecoveryDecision: return P({"recovery", "Decision"});
+                case S::RecoveryState: return P({"recovery", "State"});
+                case S::RecoveryTokenSet: return P({"recovery", "TokenSet"});
+                case S::RecoveryPolicy: return P({"recovery", "Policy"});
+                case S::RecoveryHandler: return P({"recovery", "Handler"});
+                default: return std::nullopt;
+            }
+        }
+        auto libType(const LangAPI::IspaLibSymbol &s) -> std::optional<LangAPI::Type> {
+            using S = LangAPI::StdlibExports;
+            const auto I = LangAPI::Type(LangAPI::ValueType::Int);
+            switch (s.exports) {
+                case S::DfaState: case S::DfaClassTable: return LangAPI::Type(LangAPI::ValueType::Array, I);
+                case S::DfaTable: case S::DfaAcceptTable: case S::DfaLRTable: return LangAPI::Type(LangAPI::ValueType::Array, LangAPI::Type(LangAPI::ValueType::Array, I));
+                case S::LRValue: return LangAPI::Type(LangAPI::ValueType::Any);
+                default: break;
+            }
+            if (const auto p = libPath(s.exports)) return LangAPI::Type(LangAPI::Symbol(*p));
+            return std::nullopt;
+        }
+    }
+
     auto Construct::convertSymbolValue(const LangAPI::Symbol &sym) -> std::string {
         std::vector<std::string> parts;
         for (const auto &p : sym.path) {
@@ -721,6 +763,47 @@ namespace C {
             if (arr.values.empty() && array_hint) return arrayLiteral(arr, *array_hint);
             throw Unsupported{"array literal of unknown element type"};
         }
+        if (r.type() == LangAPI::RValueType::Inheritance) {      // base-class construction inside a constructor
+            const auto &in = r.getInheritance();
+            const LangAPI::Class *base = nullptr;
+            if (const auto *sy = std::get_if<LangAPI::Symbol>(&in.name)) base = typer->findClass(*sy);
+            else if (const auto *ty = std::get_if<std::shared_ptr<LangAPI::Type>>(&in.name); ty && *ty) base = typer->classOf(**ty);
+            else if (const auto *il = std::get_if<LangAPI::IspaLibSymbol>(&in.name))
+                if (const auto lp = libPath(il->exports)) base = typer->findClass(LangAPI::Symbol(*lp));
+            // `Cls(args)` that is not one of the enclosing class's bases constructs an object
+            if (base && !(cur_class_decl && base != cur_class_decl && typer->classOf(typer->classType(*base)) == base &&
+                          pathToBase(*cur_class_decl, base))) {
+                const bool printer = std::get_if<LangAPI::IspaLibSymbol>(&in.name) &&
+                                     std::get<LangAPI::IspaLibSymbol>(in.name).exports == LangAPI::StdlibExports::ASTPrinter;
+                const auto *init = typer->findMethod(*base, "__init__");
+                std::vector<std::string> cargs;
+                for (std::size_t k = 0; init && !printer && k < in.args.size(); ++k) {
+                    if (k < init->parameters.size()) {
+                        const auto &pt = init->parameters[k].first;
+                        cargs.push_back(coerce(convertExprAs(in.args[k], pt), typer->typeOf(in.args[k]), pt));
+                    } else cargs.push_back(convertExpr(in.args[k]));
+                }
+                return class_cname.at(base) + "_new(" + joined(cargs, ", ") + ")";
+            }
+            if (!base) {
+                std::string what = "variant " + std::to_string(in.name.index());
+                if (const auto *sy = std::get_if<LangAPI::Symbol>(&in.name)) what += " symbol " + symbolName(*sy);
+                else if (const auto *il = std::get_if<LangAPI::IspaLibSymbol>(&in.name)) what += " ispalib " + std::to_string(static_cast<int>(il->exports));
+                else if (const auto *ty = std::get_if<std::shared_ptr<LangAPI::Type>>(&in.name); ty && *ty) what += (*ty)->isValueType() ? " valuetype " + std::to_string(static_cast<int>((*ty)->getValueType())) : std::string(" type");
+                throw Unsupported{"base class of an inheritance call is unknown: " + what};
+            }
+            const auto *init = typer->findMethod(*base, "__init__");
+            if (!init) return "((void)0)";
+            const auto *owner = typer->methodOwner(*base, "__init__");
+            std::vector<std::string> margs = {"(" + class_cname.at(owner) + "*)self"};
+            for (std::size_t k = 0; k < in.args.size(); ++k) {
+                if (k < init->parameters.size()) {
+                    const auto &pt = init->parameters[k].first;
+                    margs.push_back(coerce(convertExprAs(in.args[k], pt), typer->typeOf(in.args[k]), pt));
+                } else margs.push_back(convertExpr(in.args[k]));
+            }
+            return class_cname.at(owner) + "___init__(" + joined(margs, ", ") + ")";
+        }
         if (r.type() == LangAPI::RValueType::CharToStringConstructor) return "ispa_str_from_char(" + convertExpr(r.getCharToStringConstructor().what) + ")";
         if (r.type() == LangAPI::RValueType::Instance) {
             if (cur_class.empty()) throw Unsupported{"instance outside a method"};
@@ -748,6 +831,17 @@ namespace C {
                             if (a.size() != 2) throw Unsupported{"fail arity"};
                             out += "ispa_fail(" + a[0] + ", " + a[1] + ")"; break;
                         case LangAPI::StdlibExports::FailureMessage: out += "ispa_failure_message()"; break;
+                        case LangAPI::StdlibExports::CloneSelfBox:
+                            if (!cur_class_decl) throw Unsupported{"clone outside a method"};
+                            out += "(" + class_cname.at(cur_class_decl) + "*)ispa_clone_obj(self, sizeof(" + class_cname.at(cur_class_decl) + "))"; break;
+                        case LangAPI::StdlibExports::ResetTokenStream: {
+                            if (a.size() != 1) throw Unsupported{"reset token stream arity"};
+                            const auto lt = typer->typeOf(c.args[0]);
+                            const auto *lc = lt ? typer->classOf(*lt) : nullptr;
+                            const auto m = lc ? memberPath(class_cname.at(lc), "tokens") : std::nullopt;
+                            if (!m) throw Unsupported{"lexer without a tokens list"};
+                            out += "(" + a[0] + ")->" + *m + "->len = 0"; break;
+                        }
                         case LangAPI::StdlibExports::Attempt: {
                             if (c.args.size() != 1 || c.args[0].size() != 1 || c.args[0][0].type() != LangAPI::ExpressionValueType::Lambda)
                                 throw Unsupported{"attempt of a non-lambda"};
@@ -1028,8 +1122,37 @@ namespace C {
             o.writeln("{};", convertExpr(st.getExpression()));
         } else if (st.isComment()) {
             o.writeln("/* comment */");
+        } else if (st.isThrow()) {
+            const auto &tv = st.getThrow().throw_value;
+            if (tv.size() == 1 && tv[0].type() == LangAPI::ExpressionValueType::IspaLibFunctionCall &&
+                tv[0].getIspaLibFunctionCall().symbol.exports == LangAPI::StdlibExports::Error && tv[0].getIspaLibFunctionCall().args.size() == 1)
+                o.writeln("ispa_fail(python_ispa_std_errors_ErrorKind_RuntimeFailure, {});", convertExpr(tv[0].getIspaLibFunctionCall().args[0]));
+            else throw Unsupported{"throw of something other than Error(message)"};
+        } else if (st.isSwitch()) {
+            const auto &sw = st.getSwitch();
+            const auto st_type = typer->typeOf(sw.expression);
+            const bool is_str = st_type && LangAPI::Typing::Typer::isValue(*st_type, LangAPI::ValueType::String);
+            const auto tmp = "sw_" + std::to_string(switch_counter++);
+            std::vector<std::string> d;
+            const auto tn = st_type ? typeName(*st_type, d) : std::string("int64_t");
+            o.writeln("{");
+            o.increaseIndentation();
+            o.writeln("{} {} = {};", tn, tmp, convertExpr(sw.expression));
+            bool first = true;
+            for (const auto &[val, body] : sw.cases) {
+                const auto cv = convertRValue(val);
+                o.writeln("{}if ({}) {", first ? "" : "else ", is_str ? "ispa_str_eq(" + tmp + ", " + cv + ")" : tmp + " == " + cv);
+                LangAPI::Statements trimmed = body;     // a trailing `break` ends the case; in an if-chain it would leave the enclosing loop
+                if (!trimmed.empty() && trimmed.back().isExpression() && trimmed.back().getExpression().size() == 1 &&
+                    trimmed.back().getExpression()[0].type() == LangAPI::ExpressionValueType::Break) trimmed.pop_back();
+                o.increaseIndentation(); convertStatements(trimmed, o); o.decreaseIndentation();
+                o.writeln("}");
+                first = false;
+            }
+            o.decreaseIndentation();
+            o.writeln("}");
         } else {
-            throw Unsupported{st.isSwitch() ? "switch statement" : st.isThrow() ? "throw (error model pending)" : "statement kind"};
+            throw Unsupported{"statement kind"};
         }
     }
 
@@ -1247,48 +1370,6 @@ namespace C {
                 for (const auto &v : d.getEnum().value) items.push_back(prefix() + "_" + cIdent(d.getEnum().name) + "_" + cIdent(v));
                 fwd_w.writeln("typedef enum { {} } {}_{};", joined(items, ", "), prefix(), cIdent(d.getEnum().name));
             }
-        }
-    }
-
-    // IspaLib symbols (types and base classes of generated code) become the lowered library classes they stand for, so the
-    // generated classes see ordinary declarations. Node<T>/MatchResult<T> payloads are type-erased (ispa_any): the
-    // template arguments are dropped.
-    namespace {
-        auto libPath(LangAPI::StdlibExports e) -> std::optional<std::vector<std::string>> {
-            using S = LangAPI::StdlibExports;
-            const auto P = [](std::initializer_list<const char *> l) { std::vector<std::string> v = {"python", "ispa_std"}; for (auto x : l) v.emplace_back(x); return v; };
-            switch (e) {
-                case S::Node: return P({"node", "Node"});
-                case S::MatchResult: return P({"match_result", "MatchResult"});
-                case S::Lexer: return P({"lexer", "Lexer_base"});
-                case S::Parser: return P({"parser_ll", "LLParser"});
-                case S::LRParser: return P({"lr", "LRParser"});
-                case S::LRGeneralizedParser: return P({"lr_conflicts", "LRGeneralizedParser"});
-                case S::LexerMakeTokenParameter: return P({"refs", "Cursor"});
-                case S::ParserFunctionParameter: case S::LexerTokenIterator: case S::LexerLazyIterator: return P({"lexer", "TokenCursor"});
-                case S::DfaCaptures: return P({"dfa_api", "Captures"});
-                case S::TdfaLayout: return P({"dfa_api", "TdfaLayout"});
-                case S::DFADebug: return P({"dfa_api", "DFADebug"});
-                case S::ASTPrinter: return P({"ast_printer", "ASTPrinter"});
-                case S::RecoveryDecision: return P({"recovery", "Decision"});
-                case S::RecoveryState: return P({"recovery", "State"});
-                case S::RecoveryTokenSet: return P({"recovery", "TokenSet"});
-                case S::RecoveryPolicy: return P({"recovery", "Policy"});
-                case S::RecoveryHandler: return P({"recovery", "Handler"});
-                default: return std::nullopt;
-            }
-        }
-        auto libType(const LangAPI::IspaLibSymbol &s) -> std::optional<LangAPI::Type> {
-            using S = LangAPI::StdlibExports;
-            const auto I = LangAPI::Type(LangAPI::ValueType::Int);
-            switch (s.exports) {
-                case S::DfaState: case S::DfaClassTable: return LangAPI::Type(LangAPI::ValueType::Array, I);
-                case S::DfaTable: case S::DfaAcceptTable: case S::DfaLRTable: return LangAPI::Type(LangAPI::ValueType::Array, LangAPI::Type(LangAPI::ValueType::Array, I));
-                case S::LRValue: return LangAPI::Type(LangAPI::ValueType::Any);
-                default: break;
-            }
-            if (const auto p = libPath(s.exports)) return LangAPI::Type(LangAPI::Symbol(*p));
-            return std::nullopt;
         }
     }
 
