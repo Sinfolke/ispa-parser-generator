@@ -27,7 +27,10 @@ def main():
                         '--dir', str(LIBRARY), '--dir', str(work), str(entry), '-o', str(work / 'o')],
                        check=True, env=env)
         source = (work / 'o.c').read_text()
-    (HERE / 'lowered' ).mkdir(exist_ok=True); (HERE / 'lowered' / 'ispa_std.c').write_text(source); (HERE / 'lowered' / 'ispa_std.h').write_text((work / 'o.h').read_text())
+    source = source.replace('#include "o.h"', '#include "ispa_std.h"')
+    (HERE / 'lowered').mkdir(exist_ok=True)
+    (HERE / 'lowered' / 'ispa_std.c').write_text(source)
+    (HERE / 'lowered' / 'ispa_std.h').write_text((work / 'o.h').read_text())
     print('regenerated lowered/ispa_std.{h,c}')
 
 

@@ -226,7 +226,18 @@ export namespace LangAPI::Typing {
         auto resolveFunction(const FunctionCall &c) const -> const Function * {
             const auto *sym = std::get_if<std::shared_ptr<Symbol>>(&c.name);
             if (!sym || !*sym) return nullptr;
-            const auto parts = literalParts(**sym);
+            return resolveFunctionSymbol(**sym);
+        }
+        // `Class.method` (receiver passed explicitly): the class and whether the symbol names a method
+        auto qualifiedMethodClass(const Symbol &sym) const -> const Class * {
+            const auto parts = literalParts(sym);
+            if (parts.size() < 2) return nullptr;
+            Symbol cls_sym(std::vector<std::string>(parts.begin(), parts.end() - 1));
+            const auto *cls = findClass(cls_sym);
+            return cls && findMethod(*cls, parts.back()) ? cls : nullptr;
+        }
+        auto resolveFunctionSymbol(const Symbol &sym) const -> const Function * {
+            const auto parts = literalParts(sym);
             if (parts.empty()) return nullptr;
             if (parts.size() == 1 && cur_class)
                 if (const auto *m = findMethod(*cur_class, parts[0])) return m;
@@ -250,6 +261,7 @@ export namespace LangAPI::Typing {
             }
             if (parts.size() == 1 && cur_class)
                 if (const auto *m = findMethod(*cur_class, parts[0])) return m->type;
+            if (const auto *qc = qualifiedMethodClass(**sym)) if (const auto *m = findMethod(*qc, parts.back())) return m->type;
             if (const auto *cls = findClass(**sym)) return classType(*cls);   // constructor call
             if (const auto *fn = findFunction(parts)) {
                 if (!fn->template_parameters.empty()) {

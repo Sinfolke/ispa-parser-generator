@@ -88,3 +88,5 @@ int64_t ispa_attempt(void (*fn)(void *env), void *env) {
 }
 ispa_str ispa_failure_message(void) { return ispa_fail_message; }
 int64_t ispa_attempt_fn(ispa_fn f) { return ispa_attempt((void (*)(void *))f.fn, f.env); }
+const char ispa_tag_int = 0, ispa_tag_ptr = 0, ispa_tag_str = 0;
+ispa_any ispa_any_str(ispa_str s) { ispa_str *p = (ispa_str *)ispa_arena_alloc(ispa_cur, sizeof(ispa_str)); *p = s; return (ispa_any){ &ispa_tag_str, p }; }

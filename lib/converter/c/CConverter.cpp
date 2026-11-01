@@ -159,6 +159,19 @@ namespace C {
 
     // pointer-to-class conversions between different classes (derived -> base: the base struct is the first member)
     auto Construct::coerce(const std::string &code, const LangAPI::Typing::MaybeType &from, const LangAPI::Type &to) const -> std::string {
+        if (LangAPI::Typing::Typer::isValue(to, LangAPI::ValueType::Any)) {
+            if (code == "NULL") return "ISPA_ANY_NONE";
+            if (!from) return code;
+            if (LangAPI::Typing::Typer::isValue(*from, LangAPI::ValueType::Any)) return code;
+            const auto sf = LangAPI::Typing::Typer::strip(*from);
+            if (sf.isValueType()) switch (sf.getValueType()) {
+                case LangAPI::ValueType::Int: case LangAPI::ValueType::LargeUInt: case LangAPI::ValueType::Bool: case LangAPI::ValueType::Char:
+                    return "ISPA_ANY_INT(" + code + ")";
+                case LangAPI::ValueType::String: case LangAPI::ValueType::NonOwnedString: return "ispa_any_str(" + code + ")";
+                default: return "ISPA_ANY_PTR(" + code + ")";
+            }
+            return "ISPA_ANY_PTR(" + code + ")";
+        }
         if (!from) return code;
         const auto *cf = typer->classOf(*from), *ct = typer->classOf(to);
         if (!cf || !ct || cf == ct) return code;
@@ -355,6 +368,21 @@ namespace C {
         }
         std::vector<std::string> args;
         const auto *decl = typer->resolveFunction(call);
+        if (const auto *qcls = typer->qualifiedMethodClass(**sym); qcls && decl && !decl->is_static && !call.args.empty()) {
+            // Class.method(self, args...): explicit receiver
+            const auto &mname = std::get<std::string>((*sym)->path.back());
+            const auto *owner = typer->methodOwner(*qcls, mname);
+            std::vector<std::string> margs;
+            for (std::size_t k = 1; k < call.args.size(); ++k) {
+                if (k - 1 < decl->parameters.size()) {
+                    const auto &pt = decl->parameters[k - 1].first;
+                    margs.push_back(coerce(convertExprAs(call.args[k], pt), typer->typeOf(call.args[k]), pt));
+                } else margs.push_back(convertExpr(call.args[k]));
+            }
+            const auto recv = "(" + class_cname.at(owner) + "*)" + convertExpr(call.args[0]);
+            margs.insert(margs.begin(), recv);
+            return class_cname.at(owner) + "_" + cIdent(mname) + "(" + joined(margs, ", ") + ")";
+        }
         for (std::size_t k = 0; k < call.args.size(); ++k) {
             if (decl && k < decl->parameters.size()) {
                 const auto &pt = decl->parameters[k].first;
@@ -376,6 +404,19 @@ namespace C {
         }
         const auto fn = convertSymbolValue(**sym);
         return fn + "(" + joined(args, ", ") + ")";
+    }
+
+    // a free function used as a value: static thunk (void *env, params...) forwarding to it
+    auto Construct::functionValue(const LangAPI::Symbol &sy, const LangAPI::Function &fn) -> std::string {
+        const auto target = convertSymbolValue(sy);
+        const auto thunk = target + "__thunk";
+        if (thunks_done.insert(thunk).second) {
+            std::vector<std::string> d, ps = {"void *env_"}, as;
+            for (const auto &[t, n] : fn.parameters) { ps.push_back(typeName(t, d) + " " + cIdent(n)); as.push_back(cIdent(n)); }
+            const auto ret = typeName(fn.type, d);
+            lambda_defs += "static " + ret + " " + thunk + "(" + joined(ps, ", ") + ") { (void)env_; " + (ret == "void" ? "" : "return ") + target + "(" + joined(as, ", ") + "); }\n\n";
+        }
+        return "((ispa_fn){ (void *)" + thunk + ", NULL })";
     }
 
     auto Construct::invokeCallable(const std::string &code, const LangAPI::Type &callable, const std::vector<std::string> &args) -> std::string {
@@ -586,7 +627,17 @@ namespace C {
             return std::string("'") + c + "'";
         }
         if (r.isString()) return "ISPA_STR(" + cString(r.getString().value) + ")";
-        if (r.isSymbol()) return convertSymbolValue(r.getSymbol());
+        if (r.isSymbol()) {
+            const auto &sy = r.getSymbol();
+            const bool single_local = sy.path.size() == 1 && std::holds_alternative<std::string>(sy.path[0]) &&
+                                      (isLocal(std::get<std::string>(sy.path[0])) || std::get<std::string>(sy.path[0]) == "self" ||
+                                       (!cur_class.empty() && memberPath(cur_class, std::get<std::string>(sy.path[0]))) ||
+                                       (cur_class_decl && typer->findMethod(*cur_class_decl, std::get<std::string>(sy.path[0]))));
+            if (!single_local)
+                if (const auto *fn = typer->resolveFunctionSymbol(sy); fn && fn->template_parameters.empty() && !typer->qualifiedMethodClass(sy))
+                    return functionValue(sy, *fn);
+            return convertSymbolValue(sy);
+        }
         if (r.isStorageSymbol()) return convertStorage(r.getStorageSymbol());
         if (r.isArray()) {
             const auto &arr = r.getArray();
@@ -1054,6 +1105,7 @@ namespace C {
         generic_classes.clear();
         diagnostics.clear();
         init_globals.clear();
+        thunks_done.clear();
         vec_defs.clear(); vec_seen.clear(); class_cname.clear(); fwd_w = {};
         typer = std::make_unique<LangAPI::Typing::Typer>(*source);
         typer->instantiate_class = [this](const LangAPI::Class &c, const std::vector<LangAPI::Type> &a) { return instantiateClass(c, a); };

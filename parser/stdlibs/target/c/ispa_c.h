@@ -104,7 +104,7 @@ static inline char ispa_str_at(ispa_str s, int64_t i) { return s.data[ispa_idx(i
         if (v->len) memcpy(nd, v->data, v->len * sizeof(T));                                                   \
         v->data = nd; v->cap = nc;                                                                             \
     }                                                                                                          \
-    static inline NAME *NAME##_from(const T *p, size_t n) { NAME *v = NAME##_new(); NAME##_reserve(v, n); if (n) memcpy(v->data, p, n * sizeof(T)); v->len = n; return v; } \
+    static inline NAME *NAME##_from(T const *p, size_t n) { NAME *v = NAME##_new(); NAME##_reserve(v, n); if (n) memcpy(v->data, p, n * sizeof(T)); v->len = n; return v; } \
     static inline void NAME##_push(NAME *v, T x) { NAME##_reserve(v, v->len + 1); v->data[v->len++] = x; }     \
     static inline T NAME##_pop(NAME *v) { if (!v->len) { fprintf(stderr, "ispa: pop from empty\n"); abort(); } return v->data[--v->len]; } \
     static inline T NAME##_get(const NAME *v, int64_t i) { return v->data[ispa_idx(i, v->len)]; }              \
@@ -122,6 +122,11 @@ typedef struct ispa_map { void *impl; ispa_arena *arena; } ispa_map;
 
 /* ---- any: type-erased value, tag = a per-type address (filled in by the emitter) ---- */
 typedef struct ispa_any { const void *tag; void *value; } ispa_any;
+extern const char ispa_tag_int, ispa_tag_ptr, ispa_tag_str;
+#define ISPA_ANY_NONE ((ispa_any){ NULL, NULL })
+#define ISPA_ANY_INT(x) ((ispa_any){ &ispa_tag_int, (void *)(intptr_t)(x) })
+#define ISPA_ANY_PTR(p) ((ispa_any){ &ispa_tag_ptr, (void *)(p) })
+ispa_any ispa_any_str(ispa_str s);
 
 
 #ifdef __cplusplus
