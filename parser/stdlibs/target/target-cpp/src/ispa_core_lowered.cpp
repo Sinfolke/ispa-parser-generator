@@ -614,10 +614,14 @@ auto python::ispa_std::debug::MatchScope::__init__(const std::string& want, cons
 }
 auto python::ispa_std::debug::MatchScope::success() -> void {
 	((*this)).matched = true;
-	((*this)).reason = "matched";
+	if (((*this)).active) {
+		((*this)).reason = "matched";
+	}
 }
 auto python::ispa_std::debug::MatchScope::outcome(const std::string& why) -> void {
-	((*this)).reason = why;
+	if (((*this)).active) {
+		((*this)).reason = why;
+	}
 }
 auto python::ispa_std::debug::MatchScope::close() -> void {
 	if ((!(((*this)).open))) {
@@ -2328,6 +2332,7 @@ auto python::ispa_std::recovery::ContextClaim::__init__(const std::string& name,
 }
 auto python::ispa_std::recovery::ClaimSet::__init__(const std::vector<std::shared_ptr<python::ispa_std::recovery::ContextClaim>>& claims) -> void {
 	((*this)).claims = claims;
+	((*this)).expecting = "";
 	((*this)).tokens = {};
 	long long i = 0;
 	while (((i) < (static_cast<long long>(claims.size())))) {
@@ -2893,7 +2898,6 @@ auto python::ispa_std::parser_ll::Ctx::prev() -> std::shared_ptr<python::ispa_st
 }
 auto python::ispa_std::parser_ll::Frame::__init__(const std::string& rule) -> void {
 	((*this)).rule = rule;
-	((*this)).expecting = "";
 	((*this)).claim_set = python::ispa_std::recovery::empty_claim_set();
 }
 auto python::ispa_std::parser_ll::FrameGuard::__init__(std::shared_ptr<python::ispa_std::parser_ll::LLParser> parser, const std::string& rule) -> void {
@@ -3150,7 +3154,6 @@ auto python::ispa_std::parser_ll::LLParser::enter_frame(const std::string& rule)
 	if (((((*this)).frame_count) < (static_cast<long long>(((*this)).frames_.size())))) {
 		auto frame = (((*this)).frames_)[((*this)).frame_count];
 		((*frame)).rule = rule;
-		((*frame)).expecting = "";
 		((*frame)).claim_set = python::ispa_std::recovery::empty_claim_set();
 	} else {
 		(((*this)).frames_).push_back(ISPA_STD::construct<python::ispa_std::parser_ll::Frame>(rule));
@@ -3181,7 +3184,9 @@ auto python::ispa_std::parser_ll::LLParser::recovery_at_set(const std::string& e
 		return ;
 	}
 	auto frame = (((*this)).frames_)[((((*this)).frame_count) - (1))];
-	((*frame)).expecting = expecting;
+	if (((((*claims)).expecting) != (expecting))) {
+		((*claims)).expecting = expecting;
+	}
 	((*frame)).claim_set = claims;
 	(((*((*this)).recovery_state_)).anchors)[((((*((*this)).recovery_state_)).anchor_count) - (1))] = claims;
 }
@@ -3275,8 +3280,8 @@ auto python::ispa_std::parser_ll::LLParser::report_context(std::shared_ptr<pytho
 	std::string tok = ((*this)).describe_token(pos);
 	std::string where = ((*this)).breadcrumb();
 	std::string expected = "";
-	if (((static_cast<long long>(((*inner)).expecting.size())) > (0))) {
-		expected = (("; expected ") + (((*inner)).expecting));
+	if (((static_cast<long long>(((*((*inner)).claim_set)).expecting.size())) > (0))) {
+		expected = (("; expected ") + (((*((*inner)).claim_set)).expecting));
 	}
 	if (((kind) == (python::ispa_std::recovery::ContextKind::Misplaced))) {
 		((*d)).message = (((((((((((((((((((("unexpected ") + (tok))) + (" while parsing \'"))) + (((*d)).rule))) + ("\'"))) + (expected))) + ("; continuing at \'"))) + (((*d)).claim))) + ("\' in enclosing rule \'"))) + (((*d)).resume_rule))) + ("\'"));

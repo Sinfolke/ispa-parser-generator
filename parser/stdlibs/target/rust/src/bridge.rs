@@ -16,6 +16,8 @@ pub trait BridgeToken: Clone + 'static {
     fn node<T: Clone + Default + 'static>(&self) -> Option<Shared<CoreNode>>;
     /// The alternative index of `T`, if the token type has such an alternative.
     fn alt_of<T: 'static>() -> Option<i64>;
+    /// The token's own typed node of `T` (an empty node when it holds another alternative).
+    fn typed_node<T: Clone + Default + 'static>(&self) -> Node<T>;
 }
 impl<V: TokenVariant> BridgeToken for RawToken<V> {
     fn alt_index(&self) -> i64 { self.index() as i64 }
@@ -26,6 +28,7 @@ impl<V: TokenVariant> BridgeToken for RawToken<V> {
         if self.value.held().is::<T>() { Some(core_node(self.node_of::<T>())) } else { None }
     }
     fn alt_of<T: 'static>() -> Option<i64> { V::index_of::<T>().map(|index| index as i64) }
+    fn typed_node<T: Clone + Default + 'static>(&self) -> Node<T> { self.node_of::<T>() }
 }
 
 /// A typed iterator the core can walk.
@@ -36,6 +39,8 @@ pub trait BridgeCursor: Clone + 'static {
     fn retreat(&mut self);
     fn distance(&self) -> i64;
     fn current(&self) -> Option<Self::Token>;
+    /// Look at the token under the cursor without copying it (`None` past the end).
+    fn with_token<R>(&self, read: impl FnOnce(&Self::Token) -> R) -> Option<R>;
     /// The source text this cursor lexes from, when it knows it (lazy cursors do).
     fn source_origin(&self) -> Option<&'static str> { None }
 }
@@ -47,6 +52,7 @@ impl<V: TokenVariant> BridgeCursor for TokenIterator<RawToken<V>> {
     fn retreat(&mut self) { TokenIterator::retreat(self) }
     fn distance(&self) -> i64 { TokenIterator::distance(self) as i64 }
     fn current(&self) -> Option<RawToken<V>> { self.get().cloned() }
+    fn with_token<R>(&self, read: impl FnOnce(&RawToken<V>) -> R) -> Option<R> { self.get().map(read) }
 }
 impl<V: TokenVariant> BridgeCursor for LazyIterator<RawToken<V>> {
     type Token = RawToken<V>;
@@ -55,6 +61,7 @@ impl<V: TokenVariant> BridgeCursor for LazyIterator<RawToken<V>> {
     fn retreat(&mut self) { LazyIterator::retreat(self) }
     fn distance(&self) -> i64 { LazyIterator::distance(self) as i64 }
     fn current(&self) -> Option<RawToken<V>> { self.token() }
+    fn with_token<R>(&self, read: impl FnOnce(&RawToken<V>) -> R) -> Option<R> { self.token_ref().map(read) }
     fn source_origin(&self) -> Option<&'static str> { self.origin() }
 }
 

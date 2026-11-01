@@ -456,12 +456,14 @@ class ContextClaim:
 
 
 class ClaimSet:
-    """The claims of one recovery site plus their flattened token ids; immutable, shared by every visit of the site."""
+    """The claims of one recovery site plus their flattened token ids and what the site expects; shared by every visit of the site."""
     claims: list[ContextClaim]
     tokens: list[int]
+    expecting: str
 
     def __init__(self, claims: list[ContextClaim]):
         self.claims = claims
+        self.expecting = ""
         self.tokens = []
         i = 0
         while i < len(claims):

@@ -7,12 +7,19 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 thread_local! {
-    static TABLES: RefCell<HashMap<usize, Shared<dfa_run::DfaTables>>> = Default::default();
+    static TABLES: RefCell<HashMap<usize, Shared<dfa_run::DfaTables>, std::hash::BuildHasherDefault<crate::parser::FxHasher>>> = Default::default();
+    static LAST_TABLES: RefCell<Option<(usize, Shared<dfa_run::DfaTables>)>> = Default::default();
+    static SCAN: RefCell<Option<(Shared<refs::Cursor>, Shared<CoreToken>, Shared<Pair<i64, Shared<CoreToken>>>)>> = Default::default();
     static SOURCE: RefCell<Option<(usize, usize, Shared<dfa_api::SourceText>)>> = Default::default();
 }
 
 fn core_tables(key: usize, table: &[Vec<i64>], classes: &CharToClass, actions: &[Vec<i64>], registers: usize) -> Shared<dfa_run::DfaTables> {
-    if let Some(found) = TABLES.with(|tables| tables.borrow().get(&key).cloned()) { return found; }
+    // a lexer scans with the same tables token after token
+    if let Some(found) = LAST_TABLES.with(|last| last.borrow().as_ref().filter(|(at, _)| *at == key).map(|(_, tables)| tables.clone())) { return found; }
+    if let Some(found) = TABLES.with(|tables| tables.borrow().get(&key).cloned()) {
+        LAST_TABLES.with(|last| *last.borrow_mut() = Some((key, found.clone())));
+        return found;
+    }
     let layout = dfa_api::TdfaLayout::shared_default();
     layout.borrow_mut().__init__(registers as i64, 0);
     let index = dfa_api::DebugIndex::shared_default();
@@ -20,6 +27,7 @@ fn core_tables(key: usize, table: &[Vec<i64>], classes: &CharToClass, actions: &
     let made = dfa_run::DfaTables::shared_default();
     made.borrow_mut().__init__(&table.to_vec(), classes, &actions.to_vec(), layout, &Vec::new(), index);
     TABLES.with(|tables| tables.borrow_mut().insert(key, made.clone()));
+    LAST_TABLES.with(|last| *last.borrow_mut() = Some((key, made.clone())));
     made
 }
 
@@ -55,9 +63,12 @@ impl<Token: Clone + Default + 'static> LexerBase<Token> {
         if pos.is_eof() { return Token::default(); }
         let tables = core_tables(table.as_ptr() as usize, table, classes, actions, R);
         let source = core_source(text);
-        let cursor = refs::Cursor::shared_default();
+        // The scan objects are the same for every token, so they are made once: the cursor is set up again, the marker
+        // token is immutable, and the pair the semantic callback answers with is rewritten in place (the scan reads it at once).
+        let (cursor, carrier, pair) = SCAN.with(|scan| scan.borrow_mut().get_or_insert_with(|| {
+            (refs::Cursor::shared_default(), CoreToken::empty_token(), Pair::<i64, Shared<CoreToken>>::shared_default())
+        }).clone());
         cursor.borrow_mut().__init__(pos.offset() as i64, self.line);
-        let carrier = CoreToken::empty_token();
         let mut accepted: Option<Token> = None;
         {
             let adapter = |index: i64, captures: Shared<dfa_api::Captures>, first: i64, length: i64, line: i64, cur: Shared<refs::Cursor>| {
@@ -67,9 +78,8 @@ impl<Token: Clone + Default + 'static> LexerBase<Token> {
                 let (next, token) = semantic(index, &typed, first, start, length, line, &mut at);
                 cur.borrow_mut().pos = at.offset() as i64;
                 if next == NULL_STATE { accepted = Some(token); }
-                let pair = Pair::<i64, Shared<CoreToken>>::shared_default();
                 pair.borrow_mut().__init__(next, carrier.clone());
-                pair
+                pair.clone()
             };
             dfa_run::run(source, cursor.clone(), pos.offset() as i64, tables, adapter, carrier.clone());
         }

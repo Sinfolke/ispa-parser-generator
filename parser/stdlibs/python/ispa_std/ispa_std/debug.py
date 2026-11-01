@@ -477,10 +477,12 @@ class MatchScope(ScopeBase):
 
     def success(self) -> None:
         self.matched = True
-        self.reason = "matched"
+        if self.active:  # the reason is only reported by an active scope; an idle one must not allocate per match
+            self.reason = "matched"
 
     def outcome(self, why: str) -> None:
-        self.reason = why
+        if self.active:
+            self.reason = why
 
     def close(self) -> None:
         if not self.open:

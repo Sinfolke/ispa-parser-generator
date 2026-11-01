@@ -538,12 +538,10 @@ class FailContext(Ctx, Generic[AST]):
 class Frame:
     """One rule invocation's recovery frame."""
     rule: str
-    expecting: str
-    claim_set: recovery.ClaimSet
+    claim_set: recovery.ClaimSet  # the claims of the frame's current recovery site, and what that site expects
 
     def __init__(self, rule: str):
         self.rule = rule
-        self.expecting = ""
         self.claim_set = recovery.empty_claim_set()
 
 
@@ -847,7 +845,6 @@ class LLParser(Parser_base):
         if self.frame_count < len(self.frames_):
             frame = self.frames_[self.frame_count]
             frame.rule = rule
-            frame.expecting = ""
             frame.claim_set = recovery.empty_claim_set()
         else:
             self.frames_.append(Frame(rule))
@@ -880,7 +877,8 @@ class LLParser(Parser_base):
         if self.frame_count == 0:
             return
         frame = self.frames_[self.frame_count - 1]
-        frame.expecting = expecting
+        if claims.expecting != expecting:  # a site always expects the same text: stored once, not copied per visit
+            claims.expecting = expecting
         frame.claim_set = claims
         self.recovery_state_.anchors[self.recovery_state_.anchor_count - 1] = claims
 
@@ -960,8 +958,8 @@ class LLParser(Parser_base):
         tok = self.describe_token(pos)
         where = self.breadcrumb()
         expected = ""
-        if len(inner.expecting) > 0:
-            expected = "; expected " + inner.expecting
+        if len(inner.claim_set.expecting) > 0:
+            expected = "; expected " + inner.claim_set.expecting
         if kind == recovery.ContextKind.Misplaced:
             d.message = ("unexpected " + tok + " while parsing '" + d.rule + "'" + expected
                          + "; continuing at '" + d.claim + "' in enclosing rule '" + d.resume_rule + "'")

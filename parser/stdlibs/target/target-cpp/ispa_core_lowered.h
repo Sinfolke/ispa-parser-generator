@@ -2568,15 +2568,16 @@ namespace python {
 			struct ClaimSet : public ::ISPA_STD::Object {
 				std::vector<std::shared_ptr<python::ispa_std::recovery::ContextClaim>> claims;
 				std::vector<long long> tokens;
+				std::string expecting;
 				auto __init__(const std::vector<std::shared_ptr<python::ispa_std::recovery::ContextClaim>>& claims) -> void;
 				constexpr auto members() {
-					return std::tie(claims, tokens);
+					return std::tie(claims, tokens, expecting);
 				}
 				constexpr auto members() const {
-					return std::tie(claims, tokens);
+					return std::tie(claims, tokens, expecting);
 				}
 				static constexpr auto members_str() {
-					return std::array<std::string_view, 2>{{"claims", "tokens"}};
+					return std::array<std::string_view, 3>{{"claims", "tokens", "expecting"}};
 				}
 				constexpr auto methods() {
 					return std::make_tuple(&ClaimSet::__init__);
@@ -3634,17 +3635,16 @@ namespace python {
 		namespace parser_ll {
 			struct Frame : public ::ISPA_STD::Object {
 				std::string rule;
-				std::string expecting;
 				std::shared_ptr<python::ispa_std::recovery::ClaimSet> claim_set;
 				auto __init__(const std::string& rule) -> void;
 				constexpr auto members() {
-					return std::tie(rule, expecting, claim_set);
+					return std::tie(rule, claim_set);
 				}
 				constexpr auto members() const {
-					return std::tie(rule, expecting, claim_set);
+					return std::tie(rule, claim_set);
 				}
 				static constexpr auto members_str() {
-					return std::array<std::string_view, 3>{{"rule", "expecting", "claim_set"}};
+					return std::array<std::string_view, 2>{{"rule", "claim_set"}};
 				}
 				constexpr auto methods() {
 					return std::make_tuple(&Frame::__init__);

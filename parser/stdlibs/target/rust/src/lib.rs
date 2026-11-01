@@ -84,21 +84,28 @@ impl Ptr {
         // Inputs have static lifetimes, so pointer/length identifies immutable text.
         // Index each source once: scanning its prefix for every token is quadratic
         // for long lines, and metadata is read repeatedly while parsing.
+        // the line index of the text last asked about (a parse asks about one source over and over)
         thread_local! {
-            static LINES: std::cell::RefCell<std::collections::HashMap<(usize, usize), Vec<usize>>> =
+            static LAST: std::cell::RefCell<Option<((usize, usize), std::rc::Rc<Vec<usize>>)>> = Default::default();
+            static LINES: std::cell::RefCell<std::collections::HashMap<(usize, usize), std::rc::Rc<Vec<usize>>>> =
                 Default::default();
         }
-        LINES.with(|cache| {
-            let mut cache = cache.borrow_mut();
-            let starts = cache.entry((self.input.as_ptr() as usize, self.input.len())).or_insert_with(|| {
-                let mut starts = vec![0];
-                starts.extend(self.input.bytes().enumerate().filter_map(|(i, byte)| (byte == b'\n').then_some(i + 1)));
+        let key = (self.input.as_ptr() as usize, self.input.len());
+        let starts = match LAST.with(|last| last.borrow().as_ref().filter(|(at, _)| *at == key).map(|(_, starts)| starts.clone())) {
+            Some(starts) => starts,
+            None => {
+                let starts = LINES.with(|cache| cache.borrow_mut().entry(key).or_insert_with(|| {
+                    let mut starts = vec![0];
+                    starts.extend(self.input.bytes().enumerate().filter_map(|(i, byte)| (byte == b'\n').then_some(i + 1)));
+                    std::rc::Rc::new(starts)
+                }).clone());
+                LAST.with(|last| *last.borrow_mut() = Some((key, starts.clone())));
                 starts
-            });
-            let offset = self.offset.min(self.input.len());
-            let line = starts.partition_point(|start| *start <= offset) - 1;
-            (line + 1, offset - starts[line] + 1)
-        })
+            }
+        };
+        let offset = self.offset.min(self.input.len());
+        let line = starts.partition_point(|start| *start <= offset) - 1;
+        (line + 1, offset - starts[line] + 1)
     }
 }
 

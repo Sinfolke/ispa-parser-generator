@@ -237,8 +237,35 @@ namespace Rust {
     auto Construct::convertStatement(const LangAPI::Statement &stmt, Converter::Writer &o) -> void {
         if (stmt.isExpression()) {
             const std::string text = RustCore::convertExpression(stmt.getExpression());
-            if (!text.empty()) {
-                emitLine(o, text + ";");
+            // a docstring is an expression statement that is a lone string literal: it would allocate on every call
+            const auto lone_literal = [&] {
+                static const std::string head = "String::from(\"";
+                if (!text.starts_with(head) || !text.ends_with("\")")) return false;
+                for (std::size_t i = head.size(); i + 2 < text.size(); ++i) {
+                    if (text[i] == '\\') ++i;
+                    else if (text[i] == '"') return false;
+                }
+                return true;
+            }();
+            // `return (local).clone();` leaves nothing behind that could read the local again: hand it over instead of
+            // copying it (the C++ target does the same for the match result's `set_data(result)`)
+            std::string moved = text;
+            if (moved.starts_with("return (") && moved.ends_with(").clone()")) {
+                const auto name = moved.substr(8, moved.size() - 8 - 9);
+                if (!name.empty() && name != "self" && std::ranges::all_of(name, [](char c) { return std::isalnum(static_cast<unsigned char>(c)) || c == '_'; }))
+                    moved = "return " + name;
+            }
+            if (moved == "match_result.node.set_data((result).clone())") moved = "match_result.node.set_data(result)";
+            // `place.field = ((*param)).clone()`: copy into the existing value, which keeps its buffer (a pooled frame's
+            // String is rewritten on every rule call, and a fresh clone would allocate each time)
+            if (const auto eq = moved.find(" = ((*"); eq != std::string::npos && moved.ends_with(")).clone()") && moved.find('.') < eq &&
+                moved.find(" = ") == eq) {
+                const auto name = moved.substr(eq + 6, moved.size() - eq - 6 - 10);
+                if (!name.empty() && std::ranges::all_of(name, [](char c) { return std::isalnum(static_cast<unsigned char>(c)) || c == '_'; }))
+                    moved = moved.substr(0, eq) + ".clone_from(&*" + name + ")";
+            }
+            if (!text.empty() && !lone_literal) {
+                emitLine(o, moved + ";");
                 if (debug_instrumentation_ && text.find("assign_compatible(") != std::string::npos && text.find("result") != std::string::npos)
                     emitLine(o, "if ::ispa_std::debug::enabled() { ::ispa_std::debug::value(\"result\", &result, ::ispa_std::debug::active_location()); }");
             }
