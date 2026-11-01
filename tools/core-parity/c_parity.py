@@ -18,7 +18,7 @@ LIBRARY = REPO / 'parser' / 'stdlibs' / 'python' / 'ispa_std'
 MODULES = ('parser_ll', 'lr_conflicts', 'debug', 'external', 'optional', 'map', 'span', 'vector', 'algorithm', 'ast_printer', 'to_string')
 
 
-def build(ispa, work, grammar, sanitize):
+def build(ispa, work, grammar, sanitize, link=True):
     env = {key: value for key, value in os.environ.items() if key != 'LD_LIBRARY_PATH'}
     gen, gen_cpp = work / 'gen_c', work / 'gen_cpp'
     gen.mkdir(parents=True, exist_ok=True)
@@ -38,6 +38,8 @@ def build(ispa, work, grammar, sanitize):
     run([ispa, '-l', 'c', *common, '--dir', str(LIBRARY), str(gen / 'parser.isc'), '-o', str(gen / 'parser')], env=env)
     # the reference is the same module-wrapped grammar without the library imports, so both sides have the same root structure
     (gen_cpp / 'ref.isc').write_text(head + '\n' + rest if head.startswith('module ') else 'module main -> main;\n' + body)
+    if not link:
+        return None, None
     run([ispa, '-l', 'cpp', *common, str(gen_cpp / 'ref.isc'), '-o', str(gen_cpp / 'generated')], env=env)
     flags = ['-std=c11', '-O1', '-g', '-w'] + (['-fsanitize=address,undefined'] if sanitize else [])
     sources = [gen / 'parser.c', HERE / 'c' / 'run.c', RUNTIME / 'ispa_lexer.c', RUNTIME / 'ispa_print.c', RUNTIME / 'ispa_c.c', RUNTIME / 'lowered' / 'ispa_std.c']

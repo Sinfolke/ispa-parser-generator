@@ -171,8 +171,9 @@ Reproduce: `python3 tools/core-parity/benchmark_python.py --targets cpp rust pyt
 | **ISPA** C++ LALR | 881 ms | 2255 ms |
 | **ISPA** Rust LL | 998 ms | 1671 ms |
 | **ISPA** Rust LALR | 1084 ms | 4021 ms |
+| **ISPA** C LL | 861 ms | 981 ms |
 
-Medians of 5 interleaved runs on a 10 MB compact JSON file. For reference, the Rust LL target took 2064 ms to lex and 5892 ms to parse before the Rust speed-up work (3.5x faster parse, 2.1x faster lex now).
+Medians of 5 interleaved runs on a 10 MB compact JSON file. The C LL row was measured separately (median of 5, `-O2`, `python3 tools/core-parity/benchmark_c.py`) after the other rows; only LL exists for the C target so far. For reference, the Rust LL target took 2064 ms to lex and 5892 ms to parse before the Rust speed-up work (3.5x faster parse, 2.1x faster lex now).
 
 flex + bison is far faster, about 19x the C++ LL parse, but it only recognizes the input and builds no AST. ISPA's C++ LL parse builds a full typed AST. On this grammar LR is about 2x slower than LL in C++ and about 2.4x slower in Rust, whose LR driver has not been optimized yet. Sources: [`parser/ispa/bench`](parser/ispa/bench) and `tools/core-parity/benchmark_json.py`.
 
