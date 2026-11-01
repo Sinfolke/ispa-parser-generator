@@ -134,11 +134,20 @@ static inline char ispa_str_at(ispa_str s, int64_t i) { return s.data[ispa_idx(i
 typedef struct ispa_map { void *impl; ispa_arena *arena; } ispa_map;
 
 /* ---- any: type-erased value, tag = a per-type address (filled in by the emitter) ---- */
-typedef struct ispa_any { const void *tag; void *value; } ispa_any;
-extern const char ispa_tag_int, ispa_tag_ptr, ispa_tag_str;
+/* A boxed value carries a pointer to its ispa_type_info: the scalar kinds are fixed, objects register a printer. */
+typedef struct ispa_type_info {
+    int kind;                                   /* ISPA_KIND_* */
+    const char *name;
+    void (*print)(void *value, void *printer);  /* objects: the generated write_to_output; printer is the lowered ASTPrinter */
+} ispa_type_info;
+enum { ISPA_KIND_INT = 1, ISPA_KIND_PTR = 2, ISPA_KIND_STR = 3, ISPA_KIND_OBJ = 4, ISPA_KIND_NODE = 5 };
+typedef struct ispa_any { const ispa_type_info *tag; void *value; } ispa_any;
+extern const ispa_type_info ispa_tag_int, ispa_tag_ptr, ispa_tag_str, ispa_tag_node;
 #define ISPA_ANY_NONE ((ispa_any){ NULL, NULL })
 #define ISPA_ANY_INT(x) ((ispa_any){ &ispa_tag_int, (void *)(intptr_t)(x) })
 #define ISPA_ANY_PTR(p) ((ispa_any){ &ispa_tag_ptr, (void *)(p) })
+#define ISPA_ANY_NODE(p) ((ispa_any){ &ispa_tag_node, (void *)(p) })
+#define ISPA_ANY_OBJ(p, info) ((ispa_any){ (info), (void *)(p) })
 ispa_any ispa_any_str(ispa_str s);
 
 

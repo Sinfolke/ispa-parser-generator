@@ -48,11 +48,19 @@ namespace C {
         LangAPI::Declarations owned_tree;                        // working copy of the source with library symbols mapped
         auto mapLibrary() -> void;
         std::unordered_map<const LangAPI::Class *, std::string> handler_names;
+        auto ancestorHasField(const LangAPI::Class &cls, const std::string &name) const -> bool;
+        auto defaultValueExpr(const LangAPI::Type &t) -> std::string;
         auto defaultObject(const LangAPI::Class &cls) -> std::string;
         auto handlerName(const LangAPI::Class &cls) const -> std::string;
         std::vector<std::string> counters{"pos"};          // position-counter stack of the rule being emitted
         auto cursorCall(const std::string &method, const std::string &recv, std::vector<std::string> args) -> std::string;
         auto boundMethodValue(const std::string &name, const LangAPI::Function &fn) -> std::string;
+        std::set<std::string> printable;                          // application classes with write_to_output (they get a type info record)
+        std::map<std::string, std::string> print_fns;             // C type -> its generated print function
+        auto printText(const std::string &code, const LangAPI::Type &t) -> std::string;
+        auto isStructured(const LangAPI::Type &t) -> bool;
+        auto printSubtreeFn(const LangAPI::Type &t) -> std::string;
+        auto printerCall(const std::string &method, const std::string &printer, const std::vector<std::string> &a, const LangAPI::Typing::MaybeType &vt) -> std::string;
         struct RuleOrToken { bool token = false; std::string id, name; };
         auto siteStatic(const std::string &type, const std::string &init) -> std::string;
         auto tokenIdOf(const std::variant<std::shared_ptr<LangAPI::Type>, std::shared_ptr<LangAPI::RValue>> &item) -> std::string;

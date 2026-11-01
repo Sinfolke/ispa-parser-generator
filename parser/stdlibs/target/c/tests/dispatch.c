@@ -7,10 +7,10 @@ int main(void) {
     python_ispa_std_lexer_TokenIterator *it = python_ispa_std_lexer_TokenIterator_new(NULL, 3);
     python_ispa_std_lexer_TokenCursor *base = (python_ispa_std_lexer_TokenCursor *)it;
     python_ispa_std_lexer_TokenCursor_next_v(base);            /* TokenIterator::next (override), not TokenCursor::next */
-    assert(it->token_index == 4);
+    assert(it->base_python_ispa_std_lexer_TokenCursor.token_index == 4);
     python_ispa_std_lexer_TokenCursor_prev_v(base);
     python_ispa_std_lexer_TokenCursor_prev_v(base);
-    assert(it->token_index == 2);
+    assert(it->base_python_ispa_std_lexer_TokenCursor.token_index == 2);
     ispa_arena_free(&a);
     puts("dispatch ok");
     return 0;

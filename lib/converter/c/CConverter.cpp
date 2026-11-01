@@ -109,8 +109,23 @@ namespace C {
     auto Construct::defaultObject(const LangAPI::Class &cls) -> std::string {
         const auto cn = class_cname.at(&cls);
         if (cn == "python_ispa_std_node_Node") return "python_ispa_std_node_Node_blank()";
+        if (cn == "python_ispa_std_raw_token_RawToken") return "python_ispa_std_raw_token_RawToken_empty_token()";
         if (cn == "python_ispa_std_match_result_MatchResult") return "python_ispa_std_match_result_MatchResult_new(false, python_ispa_std_node_Node_blank(), NULL)";
         return handlerName(cls) + "(ispa_cur)";
+    }
+
+    auto Construct::defaultValueExpr(const LangAPI::Type &t) -> std::string {
+        std::vector<std::string> d;
+        const auto st = LangAPI::Typing::Typer::strip(t);
+        if (st.isValueType()) switch (st.getValueType()) {
+            case LangAPI::ValueType::Array: return vecName(typeName(*LangAPI::Typing::Typer::elementType(st), d)) + "_new()";
+            case LangAPI::ValueType::String: case LangAPI::ValueType::NonOwnedString: return "ISPA_STR(\"\")";
+            case LangAPI::ValueType::Any: return "ISPA_ANY_NONE";
+            default: break;
+        }
+        if (const auto *cls = st.isSymbol() ? typer->classOf(st) : nullptr)
+            if (st.isSymbol() && t.isSymbol()) return defaultObject(*cls);
+        return "(" + typeName(t, d) + "){0}";
     }
 
     // <ns>_get_<Class>_handler for a class (its C name is <ns>_<Class>, the handler name follows emitClass)
@@ -246,6 +261,11 @@ namespace C {
             if (!from) return code;
             if (LangAPI::Typing::Typer::isValue(*from, LangAPI::ValueType::Any)) return code;
             const auto sf = LangAPI::Typing::Typer::strip(*from);
+            if (sf.isSymbol())
+                if (const auto *fc = typer->classOf(sf)) {
+                    if (printable.contains(class_cname.at(fc))) return "ISPA_ANY_OBJ(" + code + ", &" + class_cname.at(fc) + "_type_info)";
+                    if (class_cname.at(fc) == "python_ispa_std_node_Node") return "ISPA_ANY_NODE(" + code + ")";
+                }
             if (sf.isValueType()) switch (sf.getValueType()) {
                 case LangAPI::ValueType::Int: case LangAPI::ValueType::LargeUInt: case LangAPI::ValueType::Bool: case LangAPI::ValueType::Char:
                     return "ISPA_ANY_INT(" + code + ")";
@@ -315,6 +335,7 @@ namespace C {
             if (app_mode && !token_cname.empty() && n == token_cname) return "python_ispa_std_raw_token_RawToken*";   // layout-compatible with its base
             return n + "*";
         }
+        if (type.isIspaLibSymbol() && type.getIspaLibSymbol().exports == LangAPI::StdlibExports::TextOutput) return "FILE*";
         diag.push_back("library type has no C spelling yet");
         return "void*";
     }
@@ -328,14 +349,26 @@ namespace C {
     auto Construct::memberPath(const std::string &cls, const std::string &name) const -> std::optional<std::string> {
         const auto it = classes.find(cls);
         if (it == classes.end()) return std::nullopt;
-        if (it->second.fields.contains(cIdent(name))) return cIdent(name);
+        // Python subclasses list inherited attributes again; there is one attribute, owned by the topmost class
         for (const auto &[base_c, member] : it->second.bases) {
-            // bases are recorded by bare name: find the resolved class in the same scope
             std::vector<std::string> d;
             const auto b = resolve(LangAPI::Symbol(base_c), d);
             if (const auto r = memberPath(b, name)) return "base_" + member + "." + *r;
         }
+        if (it->second.fields.contains(cIdent(name))) return cIdent(name);
         return std::nullopt;
+    }
+
+    // does an ancestor of cls declare the instance field `name`?
+    auto Construct::ancestorHasField(const LangAPI::Class &cls, const std::string &name) const -> bool {
+        for (const auto &[vis, base] : cls.inherit_members)
+            if (const auto *bs = std::get_if<LangAPI::Symbol>(&base))
+                if (const auto *b = typer->findClass(*bs); b && b != &cls) {
+                    for (const auto &[decl, v] : b->data)
+                        if (decl->isVariable() && !decl->getVariable().is_static && decl->getVariable().name == name) return true;
+                    if (ancestorHasField(*b, name)) return true;
+                }
+        return false;
     }
 
     static auto cString(const std::string &raw) -> std::string {
@@ -824,6 +857,81 @@ namespace C {
         return id + "_make(" + make_args + ")";
     }
 
+    // ------------------------------------------------------------------ AST printing
+    // The lowered ASTPrinter has node/scalar/up/down; node_with_value/subtree/print are chosen here from the static type of the
+    // value (C has no overloading). Each type gets a generated `static void ps_N(ispa_printer*, T)` printing its children.
+    auto Construct::printText(const std::string &code, const LangAPI::Type &t) -> std::string {
+        const auto st = LangAPI::Typing::Typer::strip(t);
+        if (st.isValueType()) switch (st.getValueType()) {
+            case LangAPI::ValueType::String: case LangAPI::ValueType::NonOwnedString: return code;
+            case LangAPI::ValueType::Bool: return "ispa_text_bool(" + code + ")";
+            case LangAPI::ValueType::Char: return "ispa_text_char(" + code + ")";
+            case LangAPI::ValueType::Float: return "ispa_text_float(" + code + ")";
+            case LangAPI::ValueType::Any: return "ispa_any_text(" + code + ")";
+            default: return "ispa_text_int(" + code + ")";
+        }
+        throw Unsupported{"text of a non-scalar value"};
+    }
+
+    auto Construct::isStructured(const LangAPI::Type &t) -> bool {
+        const auto st = LangAPI::Typing::Typer::strip(t);
+        if (st.isSymbol()) return true;                                   // a node or an AST object
+        return st.isValueType() && (st.getValueType() == LangAPI::ValueType::Array || st.getValueType() == LangAPI::ValueType::Any);
+    }
+
+    // name of `void f(ispa_printer*, T)` printing the children of a value of type t
+    auto Construct::printSubtreeFn(const LangAPI::Type &t) -> std::string {
+        const auto st = LangAPI::Typing::Typer::strip(t);
+        std::vector<std::string> d;
+        const auto tn = typeName(st, d);
+        if (const auto it = print_fns.find(tn); it != print_fns.end()) return it->second;
+        if (st.isSymbol()) {
+            const auto *cls = typer->classOf(st);
+            if (cls && class_cname.at(cls) == "python_ispa_std_node_Node") return print_fns[tn] = "ispa_print_node";
+            if (cls) {
+                const auto fn = prefix() + "_ps" + std::to_string(print_fns.size());
+                print_fns[tn] = fn;
+                if (!typer->findMethod(*cls, "write_to_output")) throw Unsupported{"printing an object without write_to_output: " + tn};
+                const auto owner = class_cname.at(typer->methodOwner(*cls, "write_to_output"));
+                lambda_defs += "static void " + fn + "(ispa_printer* p, " + tn + " v) { " + owner + "_write_to_output((" + owner + "*)v, p); }\n\n";
+                return fn;
+            }
+        }
+        if (st.isValueType() && st.getValueType() == LangAPI::ValueType::Any) return print_fns[tn] = "ispa_print_any_value";
+        const auto fn = prefix() + "_ps" + std::to_string(print_fns.size());
+        print_fns[tn] = fn;
+        if (st.isValueType() && st.getValueType() == LangAPI::ValueType::Array) {
+            const auto elem = LangAPI::Typing::Typer::elementType(st);
+            if (!elem) throw Unsupported{"array of unknown element type is not printable"};
+            const auto vn = vecName(typeName(*elem, d));
+            const auto ef = printSubtreeFn(*elem);
+            lambda_defs += "static void " + fn + "(ispa_printer* p, " + tn + " v) {\n    for (size_t i = 0; i < v->len; ++i) {\n        bool last = i + 1 == v->len;\n"
+                           "        ispa_print_node_name(p, ISPA_STR(\"item\"), last);\n        ispa_print_up(p, !last);\n        " + ef + "(p, v->data[i]);\n"
+                           "        ispa_print_down(p);\n    }\n}\n\n";
+            (void)vn;
+            return fn;
+        }
+        // scalar: `value: text`
+        lambda_defs += "static void " + fn + "(ispa_printer* p, " + tn + " v) { ispa_print_scalar(p, ISPA_STR(\"value\"), " + printText("v", st) + ", true); }\n\n";
+        return fn;
+    }
+
+    // printer.node_with_value(name, value, last) / printer.subtree(name, value, last)
+    auto Construct::printerCall(const std::string &method, const std::string &printer, const std::vector<std::string> &a,
+                                const LangAPI::Typing::MaybeType &vt) -> std::string {
+        if (a.size() != 3 || !vt) throw Unsupported{"printer call needs (name, value, last) of a known type"};
+        const auto &name = a[0], &value = a[1], &last = a[2];
+        const auto sub = [&](const LangAPI::Type &t) {
+            return "(ispa_print_node_name(" + printer + ", " + name + ", " + last + "), ispa_print_up(" + printer + ", !(" + last + ")), " +
+                   printSubtreeFn(t) + "(" + printer + ", " + value + "), ispa_print_down(" + printer + "))";
+        };
+        if (method == "subtree") return sub(*vt);
+        if (LangAPI::Typing::Typer::isValue(*vt, LangAPI::ValueType::Any))        // a boxed value: structured only when it holds an object
+            return "(ispa_any_structured(" + value + ") ? " + sub(*vt) + " : ispa_print_scalar(" + printer + ", " + name + ", ispa_any_text(" + value + "), " + last + "))";
+        if (isStructured(*vt)) return sub(*vt);
+        return "ispa_print_scalar(" + printer + ", " + name + ", " + printText(value, *vt) + ", " + last + ")";
+    }
+
     auto Construct::arrayLiteralValues(const decltype(LangAPI::Array::values) &values, const LangAPI::Typing::MaybeType &type) -> std::string {
         LangAPI::Typing::MaybeType elem = type ? LangAPI::Typing::Typer::elementType(*type) : std::nullopt;
         if (!elem && !values.empty()) elem = typer->typeOf(values[0]);
@@ -912,6 +1020,16 @@ namespace C {
                     throw Unsupported{"storage call on a non-class or library member"};
                 const auto &mname = std::get<std::string>((*sym)->path[0]);
                 const auto *fn = typer->findMethod(*cls, mname);
+                if (!fn && class_cname.at(cls) == "python_ispa_std_ast_printer_ASTPrinter" && (mname == "node_with_value" || mname == "subtree") && call->args.size() == 3) {
+                    out = printerCall(mname, out, {convertExpr(call->args[0]), convertExpr(call->args[1]), convertExpr(call->args[2])}, typer->typeOf(call->args[1]));
+                    cur = LangAPI::Type(LangAPI::ValueType::Void);
+                    continue;
+                }
+                if (!fn && mname == "print" && call->args.size() == 1) {      // Node.print(printer) / x.print(printer) on values without a print method
+                    out = printSubtreeFn(*cur) + "(" + convertExpr(call->args[0]) + ", " + out + ")";
+                    cur = LangAPI::Type(LangAPI::ValueType::Void);
+                    continue;
+                }
                 if (!fn) if (const auto ft = typer->fieldType(*cls, mname)) if (const auto sig = LangAPI::Typing::Typer::callableSignature(*ft)) {
                     const auto m = memberPath(class_cname.at(cls), mname);
                     std::vector<std::string> cargs;
@@ -945,7 +1063,11 @@ namespace C {
                 switch (am->method) {
                     case AM::Size: out = "(int64_t)(" + out + ")->len"; cur = LangAPI::Type(LangAPI::ValueType::Int); break;
                     case AM::Push: case AM::PythonAppend:
-                        if (a.empty()) { out = vn + "_push(" + out + ", (" + typeName(elemT, d) + "){0})"; cur = LangAPI::Type(LangAPI::ValueType::Void); break; }
+                        if (a.empty()) {       // `list.append(None)`: a default-constructed element (an empty token, a blank node, ...)
+                            const auto *ec = typer->classOf(elemT);
+                            const auto def = ec ? defaultObject(*ec) : "(" + typeName(elemT, d) + "){0}";
+                            out = vn + "_push(" + out + ", " + def + ")"; cur = LangAPI::Type(LangAPI::ValueType::Void); break;
+                        }
                         if (a.size() != 1) throw Unsupported{"append arity"};
                         out = vn + "_push(" + out + ", " + a[0] + ")"; cur = LangAPI::Type(LangAPI::ValueType::Void); break;
                     case AM::Pop: case AM::SequencePopBack: out = vn + "_pop(" + out + ")"; cur = elemT; break;
@@ -1043,6 +1165,19 @@ namespace C {
                 const bool printer = std::get_if<LangAPI::IspaLibSymbol>(&in.name) &&
                                      std::get<LangAPI::IspaLibSymbol>(in.name).exports == LangAPI::StdlibExports::ASTPrinter;
                 const auto *init = typer->findMethod(*base, "__init__");
+                if (!init && !printer && !in.args.empty() && !class_cname.at(base).starts_with("python_ispa_std_")) {
+                    // aggregate initialisation: the arguments fill the fields in order, the rest default
+                    std::vector<LangAPI::Type> ftypes;
+                    for (const auto &[decl, vis] : base->data)
+                        if (decl->isVariable() && !decl->getVariable().is_static && !ancestorHasField(*base, decl->getVariable().name)) ftypes.push_back(decl->getVariable().type);
+                    std::vector<std::string> margs;
+                    std::vector<std::string> dd;
+                    for (std::size_t k = 0; k < ftypes.size(); ++k) {
+                        if (k < in.args.size()) margs.push_back(coerce(convertExprAs(in.args[k], ftypes[k]), typer->typeOf(in.args[k]), ftypes[k]));
+                        else margs.push_back(defaultValueExpr(ftypes[k]));
+                    }
+                    return class_cname.at(base) + "_make(" + joined(margs, ", ") + ")";
+                }
                 std::vector<std::string> cargs;
                 for (std::size_t k = 0; init && !printer && k < in.args.size(); ++k) {
                     if (k < init->parameters.size()) {
@@ -1131,7 +1266,7 @@ namespace C {
                             const auto tn = typeName(*tt, dd), sn = typeName(*st, dd);
                             const auto v = coerce(a[1], st, *tt);
                             if (tn != sn && !v.starts_with("(")) throw Unsupported{"assign_compatible converts " + sn + " to " + tn};
-                            out += v; break;
+                            out += "(" + a[0] + " = " + v + ")"; break;      // writes through the target; also the converted value
                         }
                         case LangAPI::StdlibExports::TokenCursor:
                             if (a.size() != 1) throw Unsupported{"token cursor arity"};
@@ -1454,7 +1589,9 @@ namespace C {
             locals.back().insert(v.name);
             if (v.value.empty()) {
                 const auto *dcls = declared.isSymbol() ? typer->classOf(declared) : nullptr;
-                if (dcls && (token_cname.empty() || class_cname.at(dcls) != token_cname)) o.writeln("{} {} = {};", t, cIdent(v.name), defaultObject(*dcls));
+                if (LangAPI::Typing::Typer::isValue(declared, LangAPI::ValueType::Array) && declared.isValueType())   // `x: list` starts as []
+                    o.writeln("{} {} = {}_new();", t, cIdent(v.name), t.substr(0, t.size() - 1));
+                else if (dcls && (token_cname.empty() || class_cname.at(dcls) != token_cname)) o.writeln("{} {} = {};", t, cIdent(v.name), defaultObject(*dcls));
                 else o.writeln("{} {} = {0};", t, cIdent(v.name));
             }
             else o.writeln("{} {} = {};", t, cIdent(v.name), coerce(convertExprAs(v.value, declared), typer->typeOf(v.value), declared));
@@ -1554,6 +1691,10 @@ namespace C {
                 }
             }
             convertStatements(fn.statements, body);
+            // generated `print(os)`: the lowered printer buffers text, so it is written out at the end
+            if (fn.name == "print" && fn.parameters.size() == 1 && fn.parameters[0].first.isIspaLibSymbol() &&
+                fn.parameters[0].first.getIspaLibSymbol().exports == LangAPI::StdlibExports::TextOutput)
+                body.writeln("ispa_write_text({}, printer);", cIdent(fn.parameters[0].second));
         } catch (const Unsupported &u) { why = u.why; }
         if (!lambda_defs.empty()) { if (why.empty()) impls.dwrite("{}", lambda_defs); lambda_defs.clear(); }
         impls.writeln("{} {", sig);
@@ -1662,7 +1803,7 @@ namespace C {
             else diagnostics.push_back(c_name + ": library base class not mapped");
         if (is_root) types.writeln("const {}_vt* vt;", c_name);
         for (const auto &[decl, vis] : cls.data)
-            if (decl->isVariable() && !decl->getVariable().is_static) types.writeln("{} {};", typeName(decl->getVariable().type, diag), cIdent(decl->getVariable().name));
+            if (decl->isVariable() && !decl->getVariable().is_static && !ancestorHasField(cls, decl->getVariable().name)) types.writeln("{} {};", typeName(decl->getVariable().type, diag), cIdent(decl->getVariable().name));
         types.decreaseIndentation();
         types.writeln("};");
 
@@ -1711,8 +1852,13 @@ namespace C {
         impls.writeln("{}* {}_get_{}_handler(ispa_arena* arena) {", c_name, pfx, name);
         impls.increaseIndentation();
         impls.writeln("{}* h = ({}*)ispa_arena_calloc(arena, sizeof({}));", c_name, c_name, c_name);
+        if (const auto flag = memberPath(c_name, "has_space_token_"), id = memberPath(c_name, "space_token_");
+            flag && id && !c_name.starts_with("python_ispa_std_") && functions.contains(pfx + "_Tokens___WS_id")) {
+            impls.writeln("h->{} = true;", *flag);          // the implicit whitespace token (`__WS`) is skipped between members
+            impls.writeln("h->{} = (int64_t){}_Tokens___WS_id;", *id, pfx);
+        }
         for (const auto &[decl, vis] : cls.data)      // TdfaLayout<R, O> fields are born with their sizes
-            if (decl->isVariable() && !decl->getVariable().is_static && decl->getVariable().type.isSymbol() && decl->getVariable().value.empty()) {
+            if (decl->isVariable() && !decl->getVariable().is_static && decl->getVariable().type.isSymbol() && decl->getVariable().value.empty() && !ancestorHasField(cls, decl->getVariable().name)) {
                 const auto &ft = decl->getVariable().type;
                 const auto &sp = ft.getSymbol().path;
                 if (sp.size() == 4 && std::holds_alternative<std::string>(sp[3]) && std::get<std::string>(sp[3]) == "TdfaLayout" && ft.template_parameters.size() == 2) {
@@ -1726,7 +1872,7 @@ namespace C {
             }
         if (!c_name.starts_with("python_ispa_std_"))      // application classes: list fields start as fresh empty lists (Python `= []`)
             for (const auto &[decl, vis] : cls.data)
-                if (decl->isVariable() && !decl->getVariable().is_static && LangAPI::Typing::Typer::isValue(decl->getVariable().type, LangAPI::ValueType::Array)) {
+                if (decl->isVariable() && !decl->getVariable().is_static && !ancestorHasField(cls, decl->getVariable().name) && LangAPI::Typing::Typer::isValue(decl->getVariable().type, LangAPI::ValueType::Array)) {
                     std::vector<std::string> dd;
                     const auto tn = typeName(decl->getVariable().type, dd);
                     impls.writeln("h->{} = {}_new();", cIdent(decl->getVariable().name), tn.substr(0, tn.size() - 1));
@@ -1759,6 +1905,25 @@ namespace C {
             impls.writeln("return o;");
             impls.decreaseIndentation();
             impls.writeln("}");
+            if (!init && !c_name.starts_with("python_ispa_std_")) {      // aggregate (`T{a, b}`): fields in declaration order
+                std::vector<std::string> mps, assigns;
+                for (const auto &[decl, vis] : cls.data)
+                    if (decl->isVariable() && !decl->getVariable().is_static && !ancestorHasField(cls, decl->getVariable().name)) {
+                        const auto fname = cIdent(decl->getVariable().name);
+                        mps.push_back(typeName(decl->getVariable().type, diag) + " " + fname);
+                        assigns.push_back("o->" + fname + " = " + fname + ";");
+                    }
+                if (!mps.empty()) {
+                    protos.writeln("{}* {}_make({});", c_name, c_name, joined(mps, ", "));
+                    impls.writeln("{}* {}_make({}) {", c_name, c_name, joined(mps, ", "));
+                    impls.increaseIndentation();
+                    impls.writeln("{}* o = {}_get_{}_handler(ispa_cur);", c_name, pfx, name);
+                    for (const auto &a : assigns) impls.writeln("{}", a);
+                    impls.writeln("return o;");
+                    impls.decreaseIndentation();
+                    impls.writeln("}");
+                }
+            }
         }
 
         for (const auto &[decl, vis] : cls.data)
@@ -1766,6 +1931,10 @@ namespace C {
         for (const auto &[decl, vis] : cls.data)
             if (decl->isFunction()) emitFunction(decl->getFunction(), name, protos, impls);
         if (cls.constructor) emitFunction(*cls.constructor, name, protos, impls);
+        if (printable.contains(c_name)) {      // boxed objects find their printer through this record
+            protos.writeln("extern const ispa_type_info {}_type_info;", c_name);
+            impls.writeln("const ispa_type_info {}_type_info = { ISPA_KIND_OBJ, \"{}\", (void (*)(void *, void *)){}_write_to_output };", c_name, name, c_name);
+        }
         if (token_classes.contains(name) && !c_name.starts_with("python_ispa_std_")) emitTokenClass(cls, protos, impls);
         for (auto &d : diag) diagnostics.push_back(c_name + ": " + d);
     }
@@ -1950,6 +2119,9 @@ namespace C {
             if (!(d.isNamespace() && d.getNamespace().name == "python")) app_mode = true;
         collect(owned_tree);
         analyzeVirtuals();
+        printable.clear(); print_fns.clear();
+        for (const auto &[cls, cname] : class_cname)
+            if (!cname.starts_with("python_ispa_std_") && cls->template_parameters.empty() && definesMethod(*cls, "write_to_output")) printable.insert(cname);
         if (app_mode && std::getenv("ISPA_C_SURVEY"))     // library methods the application overrides (they need slots in the library build)
             for (const auto &[key, root] : slot_root) {
                 const auto &cn = class_cname.at(key.first);
@@ -1985,7 +2157,7 @@ namespace C {
 
         const auto stem = std::string(namespace_name);
         std::string header = "/* @generated by the ISPA C backend. Needs ispa_c.h (parser/stdlibs/target/c). */\n"
-                             "#pragma once\n#include \"" + std::string(app_mode ? "ispa_std.h\"\n#include \"ispa_lexer.h" : "ispa_c.h") + "\"\n\n";
+                             "#pragma once\n#include \"" + std::string(app_mode ? "ispa_std.h\"\n#include \"ispa_lexer.h\"\n#include \"ispa_print.h" : "ispa_c.h") + "\"\n\n";
         std::string vecs;
         for (const auto &[n, e] : vec_defs) vecs += "ISPA_DEFINE_VEC(" + n + ", " + e + ")\n";
         header += std::string(fwd_w.get()) + "\n" + vecs + "\n" + std::string(types.get()) + "\n" + std::string(protos.get());

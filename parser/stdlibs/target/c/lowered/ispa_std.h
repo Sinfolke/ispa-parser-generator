@@ -319,20 +319,9 @@ struct python_ispa_std_lexer_TokenCursor {
 };
 struct python_ispa_std_lexer_LazyIterator {
 	python_ispa_std_lexer_TokenCursor base_python_ispa_std_lexer_TokenCursor;
-	python_ispa_std_lexer_Lexer_base* owner;
-	python_ispa_std_lexer__SharedState* state;
-	int64_t token_index;
-	int64_t distance_base;
-	python_ispa_std_lexer_Lexer_base* owned_owner;
-	bool has_owned;
 };
 struct python_ispa_std_lexer_TokenIterator {
 	python_ispa_std_lexer_TokenCursor base_python_ispa_std_lexer_TokenCursor;
-	python_ispa_std_lexer_Lexer_base* owner;
-	int64_t token_index;
-	int64_t distance_base;
-	python_ispa_std_lexer_Lexer_base* owned_owner;
-	bool has_owned;
 };
 struct python_ispa_std_recovery_Mode {
 };
