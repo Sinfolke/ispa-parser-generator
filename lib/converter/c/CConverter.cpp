@@ -40,31 +40,103 @@ namespace C {
         return joined(parts, "_");
     }
 
+    auto Construct::registerClass(const LangAPI::Class &c) -> void {
+        const auto n = prefix() + "_" + symbolName(c.name);
+        class_cname[&c] = n;
+        defined.insert(n);
+        if (!c.template_parameters.empty()) { generic_classes.insert(n); generic_decl[n] = &c; generic_scope[n] = scope; }
+        ClassInfo info; info.c_name = n;
+        for (const auto &[vis, base] : c.inherit_members)
+            if (const auto *bs = std::get_if<LangAPI::Symbol>(&base)) { info.bases.emplace_back(symbolName(*bs), symbolName(*bs)); }
+        for (const auto &[decl, vis] : c.data) {
+            if (decl->isVariable() && decl->getVariable().is_static) functions.insert(n + "_" + cIdent(decl->getVariable().name));
+            else if (decl->isVariable()) info.fields.insert(cIdent(decl->getVariable().name));
+            else if (decl->isFunction()) { info.methods[decl->getFunction().name] = &decl->getFunction(); functions.insert(n + "_" + cIdent(decl->getFunction().name)); }
+        }
+        classes[n] = std::move(info);
+    }
+
+    namespace {
+        auto mangle(const std::string &s) -> std::string {
+            std::string m;
+            for (const char c : s) m += std::isalnum(static_cast<unsigned char>(c)) ? c : (c == '*' ? 'P' : '_');
+            return m;
+        }
+        template<class Root>
+        auto substitute(Root &root, const std::map<std::string, LangAPI::Type> &sub) -> void {
+            LangAPI::Traverse::unshare_shared = true;
+            LangAPI::Traverse::walk(root, [](auto &) {});
+            LangAPI::Traverse::unshare_shared = false;
+            LangAPI::Traverse::forEach<LangAPI::Type>(root, [&](LangAPI::Type &t) {
+                if (!t.isSymbol() || !t.template_parameters.empty() || t.getSymbol().path.size() != 1) return;
+                if (const auto *n = std::get_if<std::string>(&t.getSymbol().path[0]))
+                    if (const auto it = sub.find(*n); it != sub.end()) { auto r = it->second; t = std::move(r); }
+            });
+        }
+    }
+
+    auto Construct::instantiateClass(const LangAPI::Class &g, const std::vector<LangAPI::Type> &args) -> const LangAPI::Class * {
+        std::vector<std::string> d, cargs;
+        for (const auto &a : args) cargs.push_back(typeName(a, d));
+        const auto gname = class_cname.at(&g);
+        const auto key = gname + "<" + joined(cargs, ",") + ">";
+        if (const auto it = class_insts.find(key); it != class_insts.end()) return it->second;
+        class_clones.push_back(g);
+        auto &c = class_clones.back();
+        std::map<std::string, LangAPI::Type> sub;
+        for (std::size_t i = 0; i < args.size() && i < g.template_parameters.size(); ++i) sub.emplace(g.template_parameters[i], args[i]);
+        substitute(c, sub);
+        if (auto *last = std::get_if<std::string>(&c.name.path.back())) *last += "__" + mangle(joined(cargs, "_"));
+        c.template_parameters.clear();
+        class_insts[key] = &c;
+        auto saved = scope;
+        scope = generic_scope.at(gname);
+        registerClass(c);
+        typer->addClass(c, scope);
+        const auto n = class_cname.at(&c);
+        fwd_w.writeln("typedef struct {} {};", n, n);
+        pending.push_back({&c, nullptr, scope});
+        scope = std::move(saved);
+        return &c;
+    }
+
+    auto Construct::instantiateFunction(const LangAPI::Function &g, const std::vector<LangAPI::Type> &args) -> const LangAPI::Function * {
+        std::vector<std::string> d, cargs;
+        for (const auto &a : args) cargs.push_back(typeName(a, d));
+        const auto gscope = generic_fn_scope.at(&g);
+        const auto key = joined(gscope, "::") + "::" + g.name + "<" + joined(cargs, ",") + ">";
+        if (const auto it = fn_insts.find(key); it != fn_insts.end()) return it->second;
+        fn_clones.push_back(g);
+        auto &f = fn_clones.back();
+        std::map<std::string, LangAPI::Type> sub;
+        for (std::size_t i = 0; i < args.size() && i < g.template_parameters.size(); ++i) sub.emplace(g.template_parameters[i].first, args[i]);
+        substitute(f, sub);
+        f.name += "__" + mangle(joined(cargs, "_"));
+        f.template_parameters.clear();
+        fn_insts[key] = &f;
+        typer->addFunction(f, gscope);
+        auto saved = scope;
+        scope = gscope;
+        functions.insert(prefix() + "_" + cIdent(f.name));
+        pending.push_back({nullptr, &f, scope});
+        scope = std::move(saved);
+        return &f;
+    }
+
     auto Construct::collect(const LangAPI::Declarations &decls) -> void {
         for (const auto &d : decls) {
             if (d.isNamespace()) {
                 scope.push_back(d.getNamespace().name);
                 collect(d.getNamespace().declarations);
                 scope.pop_back();
-            } else if (d.isClass()) {
-                const auto n = prefix() + "_" + symbolName(d.getClass().name);
-                class_cname[&d.getClass()] = n;
-                defined.insert(n);
-                if (!d.getClass().template_parameters.empty()) generic_classes.insert(n);
-                ClassInfo info; info.c_name = n;
-                for (const auto &[vis, base] : d.getClass().inherit_members)
-                    if (const auto *bs = std::get_if<LangAPI::Symbol>(&base)) { info.bases.emplace_back(symbolName(*bs), symbolName(*bs)); }
-                for (const auto &[decl, vis] : d.getClass().data) {
-                    if (decl->isVariable() && decl->getVariable().is_static) functions.insert(n + "_" + cIdent(decl->getVariable().name));
-                    else if (decl->isVariable()) info.fields.insert(cIdent(decl->getVariable().name));
-                    else if (decl->isFunction()) { info.methods[decl->getFunction().name] = &decl->getFunction(); functions.insert(n + "_" + cIdent(decl->getFunction().name)); }
-                }
-                classes[n] = std::move(info);
-            } else if (d.isEnum()) {
+            } else if (d.isClass()) registerClass(d.getClass());
+            else if (d.isEnum()) {
                 defined.insert(prefix() + "_" + cIdent(d.getEnum().name));
                 for (const auto &v : d.getEnum().value) functions.insert(prefix() + "_" + cIdent(d.getEnum().name) + "_" + cIdent(v));
-            } else if (d.isFunction()) functions.insert(prefix() + "_" + cIdent(d.getFunction().name));
-            else if (d.isVariable()) functions.insert(prefix() + "_" + cIdent(d.getVariable().name));
+            } else if (d.isFunction()) {
+                if (!d.getFunction().template_parameters.empty()) generic_fn_scope[&d.getFunction()] = scope;
+                else functions.insert(prefix() + "_" + cIdent(d.getFunction().name));
+            } else if (d.isVariable()) functions.insert(prefix() + "_" + cIdent(d.getVariable().name));
             else if (d.isTypeAlias()) defined.insert(prefix() + "_" + cIdent(d.getTypeAlias().name));
         }
     }
@@ -104,7 +176,7 @@ namespace C {
 
     // C type of a lowered type. Anything without a direct C spelling is reported and degraded to a void pointer so the
     // header still compiles and the survey counts it.
-    auto Construct::typeName(const LangAPI::Type &type, std::vector<std::string> &diag) const -> std::string {
+    auto Construct::typeName(const LangAPI::Type &type, std::vector<std::string> &diag) -> std::string {
         using VT = LangAPI::ValueType;
         const auto inner = [&](std::size_t i) -> std::string {
             if (i < type.template_parameters.size())
@@ -136,9 +208,13 @@ namespace C {
         if (type.isSymbol()) {
             auto n = resolve(type.getSymbol(), diag);
             if (!defined.contains(n)) return "void*";   // unresolved (a generic parameter): already reported by resolve
-            if (!type.template_parameters.empty() || generic_classes.contains(n)) {
-                diag.push_back("generic instantiation of " + n + " (monomorphization pending)");
-                return "void*";
+            if (generic_classes.contains(n)) {
+                const auto *g = generic_decl.at(n);
+                std::vector<LangAPI::Type> targs;
+                for (const auto &tp : type.template_parameters)
+                    if (const auto *x = std::get_if<LangAPI::Type>(&tp)) targs.push_back(*x);
+                if (targs.size() != g->template_parameters.size()) { diag.push_back("generic class " + n + " used without its type arguments"); return "void*"; }
+                return class_cname.at(instantiateClass(*g, targs)) + "*";
             }
             return n + "*";
         }
@@ -240,6 +316,23 @@ namespace C {
                 if (elem) return vecName(typeName(*elem, d)) + "_new()";
             }
             throw Unsupported{"construct of a non-class type"};
+        }
+        if (const auto *g = typer->resolveFunction(call); g && !g->template_parameters.empty()) {
+            const auto targs = typer->bindTemplates(*g, call);
+            if (!targs) throw Unsupported{"cannot infer the type arguments of " + g->name};
+            const auto *inst = instantiateFunction(*g, *targs);
+            std::vector<std::string> cargs;
+            for (std::size_t k = 0; k < call.args.size(); ++k) {
+                if (k < inst->parameters.size()) {
+                    const auto &pt = inst->parameters[k].first;
+                    cargs.push_back(coerce(convertExprAs(call.args[k], pt), typer->typeOf(call.args[k]), pt));
+                } else cargs.push_back(convertExpr(call.args[k]));
+            }
+            const auto &gs = generic_fn_scope.at(g);
+            std::vector<std::string> parts;
+            if (gs.empty()) parts.push_back(cIdent(std::string(namespace_name)));
+            for (const auto &x : gs) parts.push_back(cIdent(x));
+            return joined(parts, "_") + "_" + cIdent(inst->name) + "(" + joined(cargs, ", ") + ")";
         }
         if (!call.template_parameters.empty()) {
             std::string nm = "?";
@@ -963,10 +1056,21 @@ namespace C {
         init_globals.clear();
         vec_defs.clear(); vec_seen.clear(); class_cname.clear(); fwd_w = {};
         typer = std::make_unique<LangAPI::Typing::Typer>(*source);
+        typer->instantiate_class = [this](const LangAPI::Class &c, const std::vector<LangAPI::Type> &a) { return instantiateClass(c, a); };
+        typer->instantiate_function = [this](const LangAPI::Function &f, const std::vector<LangAPI::Type> &a) { return instantiateFunction(f, a); };
+        class_clones.clear(); fn_clones.clear(); class_insts.clear(); fn_insts.clear(); pending.clear();
+        generic_decl.clear(); generic_scope.clear(); generic_fn_scope.clear();
         collect(*source);
         emitted_functions = skipped_functions = 0;
         Converter::Writer types, protos, impls;
         emitDeclarations(*source, types, protos, impls);
+        while (!pending.empty()) {       // monomorphized instances discovered while emitting
+            const auto p = pending.back();
+            pending.pop_back();
+            scope = p.scope;
+            if (p.cls) emitClass(*p.cls, types, protos, impls); else emitFunction(*p.fn, "", protos, impls);
+        }
+        scope.clear();
 
         const auto stem = std::string(namespace_name);
         std::string header = "/* @generated by the ISPA C backend. Needs ispa_c.h (parser/stdlibs/target/c). */\n"

@@ -11,6 +11,10 @@ template<class T> struct Children;
 template<class T>
 concept AstNode = requires { Children<std::remove_cvref_t<T>>::is_node; };
 
+// When set, walking a mutable tree replaces every shared_ptr it meets with a private copy of the pointee, so a
+// subsequent in-place rewrite (e.g. template substitution on a clone) cannot leak into the original.
+inline thread_local bool unshare_shared = false;
+
 namespace detail {
     template<class T> struct is_variant : std::false_type {};
     template<class... Ts> struct is_variant<std::variant<Ts...>> : std::true_type {};
@@ -28,7 +32,12 @@ namespace detail {
             visit(value);
         } else if constexpr (is_variant<U>::value) {
             std::visit([&](auto& v) { descend(v, visit); }, value);
-        } else if constexpr (is_optional<U>::value || is_shared<U>::value) {
+        } else if constexpr (is_shared<U>::value) {
+            if (value) {
+                if constexpr (!std::is_const_v<T>) if (unshare_shared) value = std::make_shared<typename U::element_type>(*value);
+                descend(*value, visit);
+            }
+        } else if constexpr (is_optional<U>::value) {
             if (value) descend(*value, visit);
         } else if constexpr (is_pair<U>::value) {
             descend(value.first, visit);

@@ -77,9 +77,58 @@ export namespace LangAPI::Typing {
             }
         }
 
+        // monomorphization hooks, installed by the backend: instance of a generic class / function for concrete arguments
+        std::function<const Class *(const Class &, const std::vector<Type> &)> instantiate_class;
+        std::function<const Function *(const Function &, const std::vector<Type> &)> instantiate_function;
+
         auto classOf(const Type &t) const -> const Class * {
             const auto s = strip(t);
-            return s.isSymbol() ? findClass(s.getSymbol()) : nullptr;
+            if (!s.isSymbol()) return nullptr;
+            const auto *cls = findClass(s.getSymbol());
+            if (cls && !cls->template_parameters.empty()) {
+                std::vector<Type> args;
+                for (const auto &tp : s.template_parameters) { const auto *x = std::get_if<Type>(&tp); if (!x) return nullptr; args.push_back(*x); }
+                if (args.size() != cls->template_parameters.size() || !instantiate_class) return nullptr;
+                return instantiate_class(*cls, args);
+            }
+            return cls;
+        }
+        auto addClass(const Class &c, std::vector<std::string> ns) -> void {
+            auto parts = std::move(ns);
+            for (const auto &p : c.name.path) if (const auto *s = std::get_if<std::string>(&p)) parts.push_back(*s);
+            classes_by_bare[parts.back()].push_back({join(parts), &c});
+        }
+        auto addFunction(const Function &f, std::vector<std::string> ns) -> void {
+            ns.push_back(f.name);
+            functions_by_bare[f.name].emplace_back(join(ns), &f);
+        }
+        // type arguments of a generic function call: explicit ones, else unified from the argument types
+        auto bindTemplates(const Function &fn, const FunctionCall &c) const -> std::optional<std::vector<Type>> {
+            std::vector<std::string> names;
+            for (const auto &[n, bounds] : fn.template_parameters) names.push_back(n);
+            std::map<std::string, Type> bound;
+            for (std::size_t i = 0; i < c.template_parameters.size() && i < names.size(); ++i)
+                if (const auto *t = std::get_if<std::shared_ptr<Type>>(&c.template_parameters[i]); t && *t) bound.emplace(names[i], **t);
+            for (std::size_t i = 0; i < c.args.size() && i < fn.parameters.size(); ++i)
+                if (const auto at = typeOf(c.args[i])) unify(fn.parameters[i].first, *at, names, bound);
+            std::vector<Type> out;
+            for (const auto &n : names) { const auto it = bound.find(n); if (it == bound.end()) return std::nullopt; out.push_back(it->second); }
+            return out;
+        }
+        static auto unify(const Type &param, const Type &arg, const std::vector<std::string> &names, std::map<std::string, Type> &bound) -> void {
+            const auto p = strip(param), a = strip(arg);
+            if (p.isSymbol() && p.template_parameters.empty() && p.getSymbol().path.size() == 1)
+                if (const auto *n = std::get_if<std::string>(&p.getSymbol().path[0]); n && std::ranges::find(names, *n) != names.end()) {
+                    bound.emplace(*n, a); return;
+                }
+            const bool same = (p.isValueType() && a.isValueType() && p.getValueType() == a.getValueType()) ||
+                              (p.isSymbol() && a.isSymbol() && p.getSymbol() == a.getSymbol());
+            if (!same) return;
+            for (std::size_t i = 0; i < p.template_parameters.size() && i < a.template_parameters.size(); ++i) {
+                const auto *pt = std::get_if<Type>(&p.template_parameters[i]);
+                const auto *at = std::get_if<Type>(&a.template_parameters[i]);
+                if (pt && at) unify(*pt, *at, names, bound);
+            }
         }
         auto findClass(const Symbol &sym) const -> const Class * {
             const auto parts = literalParts(sym);
@@ -202,7 +251,16 @@ export namespace LangAPI::Typing {
             if (parts.size() == 1 && cur_class)
                 if (const auto *m = findMethod(*cur_class, parts[0])) return m->type;
             if (const auto *cls = findClass(**sym)) return classType(*cls);   // constructor call
-            if (const auto *fn = findFunction(parts)) return fn->type;
+            if (const auto *fn = findFunction(parts)) {
+                if (!fn->template_parameters.empty()) {
+                    if (!instantiate_function) return std::nullopt;
+                    const auto args = bindTemplates(*fn, c);
+                    if (!args) return std::nullopt;
+                    const auto *inst = instantiate_function(*fn, *args);
+                    return inst ? MaybeType(inst->type) : std::nullopt;
+                }
+                return fn->type;
+            }
             return std::nullopt;
         }
 

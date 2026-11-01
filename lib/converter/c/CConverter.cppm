@@ -26,6 +26,19 @@ namespace C {
         std::unordered_map<const LangAPI::Class *, std::string> class_cname;
         mutable std::vector<std::pair<std::string, std::string>> vec_defs;   // (vector type name, element C type) in dependency order
         mutable std::unordered_set<std::string> vec_seen;
+        // monomorphization: instances are clones of the generic declaration with the type arguments substituted
+        struct Pending { const LangAPI::Class *cls = nullptr; const LangAPI::Function *fn = nullptr; std::vector<std::string> scope; };
+        std::deque<LangAPI::Class> class_clones;
+        std::deque<LangAPI::Function> fn_clones;
+        std::map<std::string, const LangAPI::Class *> class_insts;
+        std::map<std::string, const LangAPI::Function *> fn_insts;
+        std::vector<Pending> pending;
+        std::unordered_map<std::string, const LangAPI::Class *> generic_decl;
+        std::unordered_map<std::string, std::vector<std::string>> generic_scope;
+        std::unordered_map<const LangAPI::Function *, std::vector<std::string>> generic_fn_scope;
+        auto instantiateClass(const LangAPI::Class &g, const std::vector<LangAPI::Type> &args) -> const LangAPI::Class *;
+        auto instantiateFunction(const LangAPI::Function &g, const std::vector<LangAPI::Type> &args) -> const LangAPI::Function *;
+        auto registerClass(const LangAPI::Class &c) -> void;
         LangAPI::Typing::MaybeType array_hint;                   // expected type of the sole operand being converted
         std::string lambda_defs;                                 // hoisted lambda definitions, flushed before the enclosing function
         std::size_t lambda_counter = 0;
@@ -70,7 +83,7 @@ namespace C {
         auto isLocal(const std::string &n) const -> bool;
         auto collect(const LangAPI::Declarations &decls) -> void;
         auto resolve(const LangAPI::Symbol &symbol, std::vector<std::string> &diag) const -> std::string;
-        auto typeName(const LangAPI::Type &type, std::vector<std::string> &diag) const -> std::string;
+        auto typeName(const LangAPI::Type &type, std::vector<std::string> &diag) -> std::string;
 
         auto emitDeclarations(const LangAPI::Declarations &decls, ::Converter::Writer &types, ::Converter::Writer &protos,
                               ::Converter::Writer &impls) -> void;
