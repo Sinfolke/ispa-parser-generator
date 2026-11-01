@@ -26,8 +26,10 @@ namespace C {
         auto symbolParts(const LangAPI::Symbol &symbol) -> std::vector<std::string> {
             std::vector<std::string> parts;
             for (const auto &p : symbol.path)
-                if (const auto *s = std::get_if<std::string>(&p)) parts.push_back(cIdent(*s));
-                else parts.push_back("_dyn");
+                if (const auto *s = std::get_if<std::string>(&p)) {
+                    if (parts.empty() && (*s == "_" || s->empty()) && symbol.path.size() > 1) continue;     // `_::a::b`: rooted path
+                    parts.push_back(cIdent(*s));
+                } else parts.push_back("_dyn");
             return parts;
         }
         auto symbolName(const LangAPI::Symbol &symbol) -> std::string { return joined(symbolParts(symbol), "_"); }
@@ -76,6 +78,7 @@ namespace C {
         static const std::map<std::string, std::vector<std::string>> open_methods = {
             {"python_ispa_std_lexer_Lexer_base", {"clone", "init", "makeToken", "on_eof", "on_token"}},
             {"python_ispa_std_parser_base_Parser_base", {"lazyParse", "parseFromTokens"}},
+            {"python_ispa_std_raw_token_RawToken", {"to_node"}},
         };
         for (const auto &[cls, cname] : class_cname) {
             const auto it = open_methods.find(cname);
@@ -102,9 +105,17 @@ namespace C {
         return std::nullopt;
     }
 
+    // <ns>_get_<Class>_handler for a class (its C name is <ns>_<Class>, the handler name follows emitClass)
+    auto Construct::handlerName(const LangAPI::Class &cls) const -> std::string {
+        const auto it = handler_names.find(&cls);
+        if (it != handler_names.end()) return it->second;
+        throw Unsupported{"no handler for a class"};
+    }
+
     auto Construct::registerClass(const LangAPI::Class &c) -> void {
         const auto n = prefix() + "_" + symbolName(c.name);
         class_cname[&c] = n;
+        handler_names[&c] = prefix() + "_get_" + symbolName(c.name) + "_handler";
         defined.insert(n);
         if (!c.template_parameters.empty()) { generic_classes.insert(n); generic_decl[n] = &c; generic_scope[n] = scope; }
         ClassInfo info; info.c_name = n;
@@ -375,6 +386,16 @@ namespace C {
         }
     }
 
+    auto Construct::staticOwner(const LangAPI::Class &cls, const std::string &name) const -> const LangAPI::Class * {
+        for (const auto &[decl, vis] : cls.data)
+            if (decl->isVariable() && decl->getVariable().is_static && decl->getVariable().name == name) return &cls;
+        for (const auto &[vis, base] : cls.inherit_members)
+            if (const auto *bs = std::get_if<LangAPI::Symbol>(&base))
+                if (const auto *b = typer->findClass(*bs); b && b != &cls)
+                    if (const auto *o = staticOwner(*b, name)) return o;
+        return nullptr;
+    }
+
     auto Construct::convertSymbolValue(const LangAPI::Symbol &sym) -> std::string {
         std::vector<std::string> parts;
         for (const auto &p : sym.path) {
@@ -388,6 +409,8 @@ namespace C {
             if (n == "self") return "self";
             if (!cur_class.empty())
                 if (const auto m = memberPath(cur_class, n)) return "self->" + *m;
+            if (cur_class_decl)
+                if (const auto so = staticOwner(*cur_class_decl, n)) return class_cname.at(so) + "_" + cIdent(n);
             if (n == "None") return "NULL";
             if (n == "True") return "true";
             if (n == "False") return "false";
@@ -436,7 +459,11 @@ namespace C {
         }
         if (const auto *g = typer->resolveFunction(call); g && !g->template_parameters.empty()) {
             const auto targs = typer->bindTemplates(*g, call);
-            if (!targs) throw Unsupported{"cannot infer the type arguments of " + g->name};
+            if (!targs) {
+                std::string tp;
+                for (const auto &[n, bounds] : g->template_parameters) { tp += n + "("; for (const auto &b : bounds) tp += b.isIspaLibSymbol() ? "lib" + std::to_string(static_cast<int>(b.getIspaLibSymbol().exports)) : b.isSymbol() ? symbolName(b.getSymbol()) : "v"; tp += ") "; }
+                throw Unsupported{"cannot infer the type arguments of " + g->name + " : " + tp};
+            }
             const auto *inst = instantiateFunction(*g, *targs);
             std::vector<std::string> cargs;
             for (std::size_t k = 0; k < call.args.size(); ++k) {
@@ -464,7 +491,8 @@ namespace C {
                 if (f == "python_char_from_code") return "ispa_char_from_code(" + a0 + ")";
             }
         }
-        if (!call.template_parameters.empty()) {
+        // template arguments of a call to a lowered (dynamically typed) function carry no information in C
+        if (!call.template_parameters.empty() && !typer->resolveFunction(call)) {
             std::string nm = "?";
             if (const auto *sy = std::get_if<std::shared_ptr<LangAPI::Symbol>>(&call.name); sy && *sy) nm = symbolName(**sy);
             else nm = "ispalib";
@@ -577,7 +605,14 @@ namespace C {
         for (const auto &[t, n] : params) locals.back().insert(n);
         typer->pushScope();
         for (const auto &[t, n] : params) typer->declare(n, t);
-        cur_return = &ret;
+        LangAPI::Type ret_inferred = ret;
+        if (!void_ret && !eret) {      // no expected signature: the type of the first `return`
+            std::optional<LangAPI::Type> found;
+            LangAPI::Traverse::forEach<LangAPI::Return>(lam.statements, [&](const LangAPI::Return &rt) { if (!found && !rt.value.empty()) found = typer->typeOf(rt.value); });
+            if (found) ret_inferred = *found;
+        }
+        const LangAPI::Type &ret_final = ret_inferred;
+        cur_return = &ret_final;
         std::string env_fields, make_params, make_assign, make_args;
         for (const auto &[n, t] : caps) {
             const auto ct = n == "self" && cur_class_decl ? class_cname.at(cur_class_decl) + "*" : typeName(t, d);
@@ -593,22 +628,26 @@ namespace C {
         std::vector<std::string> ps = {"void *env_"};
         for (const auto &[t, n] : params) ps.push_back(typeName(t, d) + " " + cIdent(n));
         std::string def = "typedef struct {\n" + (env_fields.empty() ? std::string("    char unused_;\n") : env_fields) + "} " + id + "_env;\n";
-        def += "static " + typeName(ret, d) + " " + id + "(" + joined(ps, ", ") + ") {\n    " + id + "_env *env = (" + id + "_env *)env_; (void)env;\n" + std::string(body.get()) + "}\n";
+        def += "static " + typeName(ret_final, d) + " " + id + "(" + joined(ps, ", ") + ") {\n    " + id + "_env *env = (" + id + "_env *)env_; (void)env;\n" + std::string(body.get()) + "}\n";
         def += "static ispa_fn " + id + "_make(" + (make_params.empty() ? std::string("void") : make_params) + ") {\n    " + id + "_env *e = ISPA_NEW(" + id + "_env);\n" + make_assign + "    return (ispa_fn){ (void *)" + id + ", e };\n}\n\n";
         lambda_defs += def;
         return id + "_make(" + make_args + ")";
     }
 
-    auto Construct::arrayLiteral(const LangAPI::Array &arr, const LangAPI::Type &type) -> std::string {
-        const auto elem = LangAPI::Typing::Typer::elementType(type);
-        if (!elem) throw Unsupported{"array literal into a non-array"};
+    auto Construct::arrayLiteralValues(const decltype(LangAPI::Array::values) &values, const LangAPI::Typing::MaybeType &type) -> std::string {
+        LangAPI::Typing::MaybeType elem = type ? LangAPI::Typing::Typer::elementType(*type) : std::nullopt;
+        if (!elem && !values.empty()) elem = typer->typeOf(values[0]);
+        if (!elem) throw Unsupported{"array literal of unknown element type"};
         std::vector<std::string> d;
         const auto et = typeName(*elem, d);
         const auto vn = vecName(et);
-        if (arr.values.empty()) return vn + "_new()";
+        if (values.empty()) return vn + "_new()";
         std::vector<std::string> items;
-        for (const auto &v : arr.values) items.push_back(coerce(convertExpr(v), typer->typeOf(v), *elem));
+        for (const auto &v : values) items.push_back(coerce(convertExprAs(v, *elem), typer->typeOf(v), *elem));
         return vn + "_from((" + et + "[]){" + joined(items, ", ") + "}, " + std::to_string(items.size()) + ")";
+    }
+    auto Construct::arrayLiteral(const LangAPI::Array &arr, const LangAPI::Type &type) -> std::string {
+        return arrayLiteralValues(arr.values, type);
     }
 
     // an expression whose expected type is known (initialiser, assignment, return): lets `[]` pick its element type
@@ -617,6 +656,13 @@ namespace C {
         array_hint = expected;
         struct R { LangAPI::Typing::MaybeType &r; LangAPI::Typing::MaybeType v; ~R() { r = v; } } restore{array_hint, saved};
         return convertExpr(e);
+    }
+
+    // call of a TokenCursor method (dispatched when a subclass overrides it)
+    auto Construct::cursorCall(const std::string &method, const std::string &recv, std::vector<std::string> args) -> std::string {
+        const auto *tc = typer->findClass(LangAPI::Symbol(std::vector<std::string>{"python", "ispa_std", "lexer", "TokenCursor"}));
+        if (!tc) throw Unsupported{"TokenCursor is not in the tree"};
+        return methodCall(*tc, method, recv, std::move(args));
     }
 
     auto Construct::methodCall(const LangAPI::Class &recv_cls, const std::string &name, const std::string &recv,
@@ -709,6 +755,7 @@ namespace C {
                 switch (am->method) {
                     case AM::Size: out = "(int64_t)(" + out + ")->len"; cur = LangAPI::Type(LangAPI::ValueType::Int); break;
                     case AM::Push: case AM::PythonAppend:
+                        if (a.empty()) { out = vn + "_push(" + out + ", (" + typeName(elemT, d) + "){0})"; cur = LangAPI::Type(LangAPI::ValueType::Void); break; }
                         if (a.size() != 1) throw Unsupported{"append arity"};
                         out = vn + "_push(" + out + ", " + a[0] + ")"; cur = LangAPI::Type(LangAPI::ValueType::Void); break;
                     case AM::Pop: case AM::SequencePopBack: out = vn + "_pop(" + out + ")"; cur = elemT; break;
@@ -755,13 +802,39 @@ namespace C {
             return convertSymbolValue(sy);
         }
         if (r.isStorageSymbol()) return convertStorage(r.getStorageSymbol());
-        if (r.isArray()) {
-            const auto &arr = r.getArray();
-            if (!arr.template_parameters.empty())
-                if (const auto *t = std::get_if<std::shared_ptr<LangAPI::Type>>(&arr.template_parameters[0]); t && *t)
-                    return arrayLiteral(arr, LangAPI::Type(LangAPI::ValueType::Array, **t));
-            if (arr.values.empty() && array_hint) return arrayLiteral(arr, *array_hint);
-            throw Unsupported{"array literal of unknown element type"};
+        if (r.isArray() || r.isFixedSizeArray()) {
+            const auto &vals = r.isArray() ? r.getArray().values : r.getFixedSizeArray().values;
+            const auto &tps = r.isArray() ? r.getArray().template_parameters : r.getFixedSizeArray().template_parameters;
+            const auto hint = array_hint;
+            array_hint.reset();
+            if (!tps.empty())
+                if (const auto *t = std::get_if<std::shared_ptr<LangAPI::Type>>(&tps[0]); t && *t)
+                    return arrayLiteralValues(vals, LangAPI::Type(LangAPI::ValueType::Array, **t));
+            return arrayLiteralValues(vals, hint);
+        }
+        if (r.type() == LangAPI::RValueType::MakeTuple) {      // (a, b) -> utility::Pair<A, B>
+            const auto &mt = r.getMakeTuple();
+            if (mt.args.size() != 2) throw Unsupported{"tuple of " + std::to_string(mt.args.size()) + " elements"};
+            auto hint = array_hint;
+            array_hint.reset();
+            LangAPI::Type pair_t;
+            if (hint && LangAPI::Typing::Typer::strip(*hint).isSymbol()) pair_t = LangAPI::Typing::Typer::strip(*hint);
+            else {
+                const auto a = typer->typeOf(mt.args[0]), b = typer->typeOf(mt.args[1]);
+                if (!a || !b) throw Unsupported{"tuple of unknown element types"};
+                pair_t = LangAPI::Type(LangAPI::Symbol(std::vector<std::string>{"python", "ispa_std", "utility", "Pair"}), *a, *b);
+            }
+            const auto *cls = typer->classOf(pair_t);
+            if (!cls) throw Unsupported{"tuple type has no class"};
+            const auto *init = typer->findMethod(*cls, "__init__");
+            std::vector<std::string> targs;
+            for (std::size_t k = 0; k < mt.args.size(); ++k) {
+                if (init && k < init->parameters.size()) {
+                    const auto &pt = init->parameters[k].first;
+                    targs.push_back(coerce(convertExprAs(mt.args[k], pt), typer->typeOf(mt.args[k]), pt));
+                } else targs.push_back(convertExpr(mt.args[k]));
+            }
+            return class_cname.at(cls) + "_new(" + joined(targs, ", ") + ")";
         }
         if (r.type() == LangAPI::RValueType::Inheritance) {      // base-class construction inside a constructor
             const auto &in = r.getInheritance();
@@ -804,6 +877,12 @@ namespace C {
             }
             return class_cname.at(owner) + "___init__(" + joined(margs, ", ") + ")";
         }
+        if (r.type() == LangAPI::RValueType::Pos) {
+            const auto &p = r.getPos();
+            const auto cur = "(python_ispa_std_lexer_TokenCursor*)" + counters.back();
+            const auto at = p.offset ? cursorCall("plus", cur, {"INT64_C(" + std::to_string(p.offset) + ")"}) : cur;
+            return p.dereference ? cursorCall("current", at, {}) : at;
+        }
         if (r.type() == LangAPI::RValueType::CharToStringConstructor) return "ispa_str_from_char(" + convertExpr(r.getCharToStringConstructor().what) + ")";
         if (r.type() == LangAPI::RValueType::Instance) {
             if (cur_class.empty()) throw Unsupported{"instance outside a method"};
@@ -811,7 +890,16 @@ namespace C {
         }
         // Box<class> is already the object handle; a Box of a plain value will need a dereference once locals are typed
         if (r.type() == LangAPI::RValueType::GetFromBox) return convertExpr(r.getGetFromBox().what);
-        throw Unsupported{"rvalue kind " + std::to_string(static_cast<int>(r.type()))};
+        if (r.type() == LangAPI::RValueType::IspaLibSymbol) {
+            auto &mr = const_cast<LangAPI::RValue &>(r);
+            switch (mr.getIspaSymbol().exports) {
+                case LangAPI::StdlibExports::DfaNullState: return "python_ispa_std_dfa_api_NULL_STATE";
+                case LangAPI::StdlibExports::DfaDynamicFailState: return "python_ispa_std_dfa_api_DYNAMIC_FAIL_STATE";
+                default: break;
+            }
+        }
+        throw Unsupported{"rvalue kind " + std::to_string(static_cast<int>(r.type())) +
+                          (r.type() == LangAPI::RValueType::IspaLibSymbol ? " export " + std::to_string(static_cast<int>(const_cast<LangAPI::RValue &>(r).getIspaSymbol().exports)) : std::string())};
     }
 
     auto Construct::convertValue(const LangAPI::ExpressionValue &v) -> std::string {
@@ -831,6 +919,23 @@ namespace C {
                             if (a.size() != 2) throw Unsupported{"fail arity"};
                             out += "ispa_fail(" + a[0] + ", " + a[1] + ")"; break;
                         case LangAPI::StdlibExports::FailureMessage: out += "ispa_failure_message()"; break;
+                        case LangAPI::StdlibExports::RawTokenNodeConstruct: case LangAPI::StdlibExports::ParserNodeConstructor: {
+                            if (token_cname.empty() || a.size() != 6) throw Unsupported{"token construction needs the application token class and 6 arguments"};
+                            const auto vt = typer->typeOf(c.args[5]);
+                            out += token_cname + "_create(" + a[0] + ", " + a[1] + ", " + a[2] + ", " + a[3] + ", " + a[4] + ", " +
+                                   coerce(a[5], vt, LangAPI::Type(LangAPI::ValueType::Any)) + ")";
+                            break;
+                        }
+                        case LangAPI::StdlibExports::LookaheadKind:
+                            if (a.size() != 1) throw Unsupported{"lookahead_kind arity"};
+                            out += "python_ispa_std_parser_ll_lookahead_kind((python_ispa_std_lexer_TokenCursor*)" + a[0] + ")"; break;
+                        case LangAPI::StdlibExports::TokenCursor:
+                            if (a.size() != 1) throw Unsupported{"token cursor arity"};
+                            out += "(python_ispa_std_lexer_TokenCursor*)python_ispa_std_lexer_TokenIterator_begin((python_ispa_std_lexer_Lexer_base*)" + a[0] + ")"; break;
+                        case LangAPI::StdlibExports::LazyTokenCursor:
+                            if (a.size() != 2) throw Unsupported{"lazy token cursor arity"};
+                            out += "(python_ispa_std_lexer_Lexer_base_setInput((python_ispa_std_lexer_Lexer_base*)" + a[0] + ", " + a[1] +
+                                   "), (python_ispa_std_lexer_TokenCursor*)python_ispa_std_lexer_LazyIterator_begin((python_ispa_std_lexer_Lexer_base*)" + a[0] + "))"; break;
                         case LangAPI::StdlibExports::CloneSelfBox:
                             if (!cur_class_decl) throw Unsupported{"clone outside a method"};
                             out += "(" + class_cname.at(cur_class_decl) + "*)ispa_clone_obj(self, sizeof(" + class_cname.at(cur_class_decl) + "))"; break;
@@ -849,6 +954,38 @@ namespace C {
                         }
                         default: throw Unsupported{"ispa-lib call " + std::to_string(static_cast<int>(c.symbol.exports))};
                     }
+                    break;
+                }
+                case LangAPI::ExpressionValueType::CounterIncreament:
+                    out += cursorCall("next", "(python_ispa_std_lexer_TokenCursor*)" + counters.back(), {}); break;
+                case LangAPI::ExpressionValueType::CounterAssignment: {
+                    const auto &ca = v.getCounterAssignment();
+                    out += cursorCall("assign", "(python_ispa_std_lexer_TokenCursor*)" + counters.back(), {"(python_ispa_std_lexer_TokenCursor*)(" + convertExpr(*ca.v) + ")"}); break;
+                }
+                case LangAPI::ExpressionValueType::PushPosCounter:
+                    out += v.getPushPosCounter().name + " = " + cursorCall("copy", "(python_ispa_std_lexer_TokenCursor*)" + counters.back(), {});
+                    counters.push_back(v.getPushPosCounter().name); break;
+                case LangAPI::ExpressionValueType::PopPosCounter: {
+                    if (counters.size() < 2) throw Unsupported{"unbalanced counter pop"};
+                    const auto prev = counters[counters.size() - 2], child = counters.back();
+                    counters.pop_back();
+                    out += cursorCall("assign", "(python_ispa_std_lexer_TokenCursor*)" + prev, {"(python_ispa_std_lexer_TokenCursor*)" + child}); break;
+                }
+                case LangAPI::ExpressionValueType::ResetPosCounter:
+                    if (counters.size() < 2) throw Unsupported{"unbalanced counter reset"};
+                    counters.pop_back(); out += "(void)0"; break;
+                case LangAPI::ExpressionValueType::EmptyInitializer: {     // `T{}`: a default-constructed value of the expected type
+                    const auto expected = array_hint;
+                    array_hint.reset();
+                    if (!expected) throw Unsupported{"default initializer without a known type"};
+                    std::vector<std::string> d;
+                    const auto st = LangAPI::Typing::Typer::strip(*expected);
+                    if (const auto *cls = typer->classOf(st)) {
+                        out += handlerName(*cls) + "(ispa_cur)";
+                    } else if (LangAPI::Typing::Typer::isValue(st, LangAPI::ValueType::Array)) out += vecName(typeName(*LangAPI::Typing::Typer::elementType(st), d)) + "_new()";
+                    else if (LangAPI::Typing::Typer::isValue(st, LangAPI::ValueType::String)) out += "ISPA_STR(\"\")";
+                    else if (LangAPI::Typing::Typer::isValue(st, LangAPI::ValueType::Any)) out += "ISPA_ANY_NONE";
+                    else out += "(" + typeName(st, d) + "){0}";
                     break;
                 }
                 case LangAPI::ExpressionValueType::Lambda: {
@@ -1088,7 +1225,9 @@ namespace C {
             std::vector<std::string> d;
             auto declared = v.type;
             if (pending_local_type) { declared = *pending_local_type; pending_local_type.reset(); }
-            if (declared.isValueType() && declared.getValueType() == LangAPI::ValueType::Undef) {
+            const bool is_auto = declared.isSymbol() && declared.getSymbol().path.size() == 1 && std::holds_alternative<std::string>(declared.getSymbol().path[0]) &&
+                                 (std::get<std::string>(declared.getSymbol().path[0]) == "auto" || std::get<std::string>(declared.getSymbol().path[0]) == "auto&");
+            if (is_auto || (declared.isValueType() && declared.getValueType() == LangAPI::ValueType::Undef)) {
                 const auto inferred = typer->typeOf(v.value);
                 if (!inferred) throw Unsupported{"local without a declared type"};
                 declared = *inferred;
@@ -1127,7 +1266,9 @@ namespace C {
             if (tv.size() == 1 && tv[0].type() == LangAPI::ExpressionValueType::IspaLibFunctionCall &&
                 tv[0].getIspaLibFunctionCall().symbol.exports == LangAPI::StdlibExports::Error && tv[0].getIspaLibFunctionCall().args.size() == 1)
                 o.writeln("ispa_fail(python_ispa_std_errors_ErrorKind_RuntimeFailure, {});", convertExpr(tv[0].getIspaLibFunctionCall().args[0]));
-            else throw Unsupported{"throw of something other than Error(message)"};
+            else if (const auto tt = typer->typeOf(tv); tt && LangAPI::Typing::Typer::isValue(*tt, LangAPI::ValueType::String))
+                o.writeln("ispa_fail(python_ispa_std_errors_ErrorKind_RuntimeFailure, {});", convertExpr(tv));
+            else throw Unsupported{"throw of something other than Error(message): n=" + std::to_string(tv.size()) + " t0=" + (tv.empty() ? std::string("-") : std::to_string(static_cast<int>(tv[0].type()))) + (tv.size() && tv[0].type() == LangAPI::ExpressionValueType::IspaLibFunctionCall ? " lib=" + std::to_string(static_cast<int>(tv[0].getIspaLibFunctionCall().symbol.exports)) + " args=" + std::to_string(tv[0].getIspaLibFunctionCall().args.size()) : std::string())};
         } else if (st.isSwitch()) {
             const auto &sw = st.getSwitch();
             const auto st_type = typer->typeOf(sw.expression);
@@ -1182,6 +1323,16 @@ namespace C {
         std::string why;
         try {
             body.increaseIndentation();
+            counters = {"pos"};
+            {   // position counters pushed anywhere in the body are declared up front (Python function scope)
+                std::set<std::string> pushed;
+                LangAPI::Traverse::forEach<LangAPI::PushPosCounter>(fn.statements, [&](const LangAPI::PushPosCounter &pp) { pushed.insert(pp.name); });
+                for (const auto &n : pushed) {
+                    body.writeln("python_ispa_std_lexer_TokenCursor* {} = NULL;", cIdent(n));
+                    typer->declare(n, LangAPI::Type(LangAPI::Symbol(std::vector<std::string>{"python", "ispa_std", "lexer", "TokenCursor"})));
+                    locals.back().insert(n);
+                }
+            }
             convertStatements(fn.statements, body);
         } catch (const Unsupported &u) { why = u.why; }
         if (!lambda_defs.empty()) { if (why.empty()) impls.dwrite("{}", lambda_defs); lambda_defs.clear(); }
@@ -1220,6 +1371,35 @@ namespace C {
                 catch (const Unsupported &u) { diagnostics.push_back(name + ": initialiser pending (" + u.why + ")"); }
             }
         } else impls.writeln("{} {} = {};", t, name, convertExpr(v.value));
+    }
+
+    // The application's token: lowered RawToken + the typed value. `create` is what the lexer's semantic actions call;
+    // `to_node` is the hook through which the value reaches the AST node.
+    auto Construct::emitTokenClass(const LangAPI::Class &cls, Converter::Writer &protos, Converter::Writer &impls) -> void {
+        const auto c = class_cname.at(&cls);
+        const auto raw = std::string("python_ispa_std_raw_token_RawToken");
+        const auto node = std::string("python_ispa_std_node_Node");
+        const auto base = "base_" + raw;
+        protos.writeln("{}* {}_create(int64_t start_pos, ispa_str start, int64_t length, int64_t line, int64_t id, ispa_any value);", c, c);
+        impls.writeln("{}* {}_create(int64_t start_pos, ispa_str start, int64_t length, int64_t line, int64_t id, ispa_any value) {", c, c);
+        impls.increaseIndentation();
+        impls.writeln("ispa_str whole = { start.data - start_pos, (size_t)start_pos + start.len };");
+        impls.writeln("{}* core = {}_create(start_pos, whole, true, length, line, id, id);", raw, raw);
+        impls.writeln("{}* t = {}(ispa_cur);", c, handler_names.at(&cls));
+        impls.writeln("const void* vt = (const void*)t->{}.vt;", base);
+        impls.writeln("t->{} = *core;", base);
+        impls.writeln("t->{}.vt = (const void*)vt;", base);
+        impls.writeln("t->value = value;");
+        impls.writeln("return t;");
+        impls.decreaseIndentation();
+        impls.writeln("}");
+        impls.writeln("{}* {}_to_node({}* self, int64_t type_id) {", node, c, c);
+        impls.increaseIndentation();
+        impls.writeln("{}* n = {}_to_node(&self->{}, type_id);", node, raw, base);
+        impls.writeln("if (self->{}._type_id == type_id) n->_data = self->value;", base);
+        impls.writeln("return n;");
+        impls.decreaseIndentation();
+        impls.writeln("}");
     }
 
     auto Construct::emitClass(const LangAPI::Class &cls, Converter::Writer &types, Converter::Writer &protos,
@@ -1308,6 +1488,13 @@ namespace C {
         impls.writeln("{}* {}_get_{}_handler(ispa_arena* arena) {", c_name, pfx, name);
         impls.increaseIndentation();
         impls.writeln("{}* h = ({}*)ispa_arena_calloc(arena, sizeof({}));", c_name, c_name, c_name);
+        if (!c_name.starts_with("python_ispa_std_"))      // application classes: list fields start as fresh empty lists (Python `= []`)
+            for (const auto &[decl, vis] : cls.data)
+                if (decl->isVariable() && !decl->getVariable().is_static && LangAPI::Typing::Typer::isValue(decl->getVariable().type, LangAPI::ValueType::Array)) {
+                    std::vector<std::string> dd;
+                    const auto tn = typeName(decl->getVariable().type, dd);
+                    impls.writeln("h->{} = {}_new();", cIdent(decl->getVariable().name), tn.substr(0, tn.size() - 1));
+                }
         for (const auto &[root, spec] : installs) {
             const auto cut = spec.find('\x01');
             impls.writeln("h->{} = &{};", spec.substr(cut + 1), spec.substr(0, cut));
@@ -1343,6 +1530,7 @@ namespace C {
         for (const auto &[decl, vis] : cls.data)
             if (decl->isFunction()) emitFunction(decl->getFunction(), name, protos, impls);
         if (cls.constructor) emitFunction(*cls.constructor, name, protos, impls);
+        if (token_classes.contains(name) && !c_name.starts_with("python_ispa_std_")) { token_cname = c_name; emitTokenClass(cls, protos, impls); }
         for (auto &d : diag) diagnostics.push_back(c_name + ": " + d);
     }
 
@@ -1375,9 +1563,126 @@ namespace C {
 
     auto Construct::mapLibrary() -> void {
         owned_tree = *source;
-        LangAPI::Traverse::forEach<LangAPI::Type>(owned_tree, [&](LangAPI::Type &t) {
+        token_classes.clear();
+        {   // `Token = RawToken<...>`: the application's token type becomes a class deriving the lowered RawToken that also carries the
+            // typed value (the lowered core is untyped; RawToken.to_node is the hook through which the value reaches the AST node)
+            const auto fix = [&](auto &&self, LangAPI::Declarations &decls) -> void {
+                for (std::size_t i = 0; i < decls.size(); ++i) {
+                    if (decls[i].isNamespace()) { self(self, decls[i].getNamespace().declarations); continue; }
+                    if (!decls[i].isTypeAlias()) continue;
+                    const auto &al = decls[i].getTypeAlias();
+                    if (!(al.type.isValueType() && al.type.getValueType() == LangAPI::ValueType::RawToken)) continue;
+                    LangAPI::Class cls;
+                    cls.name = LangAPI::Symbol(al.name);
+                    cls.inherit_members.push_back({LangAPI::Visibility::Public, LangAPI::Symbol(std::vector<std::string>{"python", "ispa_std", "raw_token", "RawToken"})});
+                    LangAPI::Variable value;
+                    value.name = "value";
+                    value.type = LangAPI::Type(LangAPI::ValueType::Any);
+                    cls.data.push_back({std::make_shared<LangAPI::Declaration>(value), LangAPI::Visibility::Public});
+                    LangAPI::Function to_node;
+                    to_node.name = "to_node";
+                    to_node.type = LangAPI::Type(LangAPI::Symbol(std::vector<std::string>{"python", "ispa_std", "node", "Node"}));
+                    to_node.parameters.push_back({LangAPI::Type(LangAPI::ValueType::Int), "type_id"});
+                    to_node.is_native = true;       // emitted by hand (emitTokenClass)
+                    cls.data.push_back({std::make_shared<LangAPI::Declaration>(to_node), LangAPI::Visibility::Public});
+                    decls[i] = LangAPI::Declaration(cls);
+                    token_classes.insert(al.name);
+                }
+            };
+            fix(fix, owned_tree);
+        }
+        const auto mapType = [&](LangAPI::Type &t) {
+            if (t.isValueType() && t.getValueType() == LangAPI::ValueType::Tuple && t.template_parameters.size() == 2) {
+                LangAPI::Type pair(LangAPI::Symbol(std::vector<std::string>{"python", "ispa_std", "utility", "Pair"}));
+                pair.template_parameters = t.template_parameters;
+                t = std::move(pair);
+                return;
+            }
+            if (t.isValueType()) {      // Node<T>, RawToken<...>, MatchResult<T> of the lowered library: payloads are erased
+                const auto L = [&](const char *mod, const char *cls) { t = LangAPI::Type(LangAPI::Symbol(std::vector<std::string>{"python", "ispa_std", mod, cls})); };
+                switch (t.getValueType()) {
+                    case LangAPI::ValueType::Token: case LangAPI::ValueType::Rule: L("node", "Node"); return;
+                    case LangAPI::ValueType::RawToken: L("raw_token", "RawToken"); return;
+                    case LangAPI::ValueType::TokenResult: case LangAPI::ValueType::RuleResult: L("match_result", "MatchResult"); return;
+                    case LangAPI::ValueType::Variant: case LangAPI::ValueType::LargeVariant: t = LangAPI::Type(LangAPI::ValueType::Any); return;
+                    default: return;
+                }
+            }
             if (!t.isIspaLibSymbol()) return;
             if (const auto m = libType(t.getIspaLibSymbol())) t = *m;
+        };
+        LangAPI::Traverse::forEach<LangAPI::Type>(owned_tree, mapType);
+        {   // type aliases (Types::X = FlatTypes::X, Token = RawToken<...>) are expanded in place
+            std::unordered_map<std::string, std::vector<std::pair<std::vector<std::string>, LangAPI::Type>>> aliases;
+            const auto gather = [&](auto &&self, const LangAPI::Declarations &decls, std::vector<std::string> ns) -> void {
+                for (const auto &d : decls) {
+                    if (d.isNamespace()) { auto in = ns; in.push_back(d.getNamespace().name); self(self, d.getNamespace().declarations, in); }
+                    else if (d.isTypeAlias() && d.getTypeAlias().template_parameters.empty()) {
+                        auto full = ns; full.push_back(d.getTypeAlias().name);
+                        aliases[d.getTypeAlias().name].emplace_back(full, d.getTypeAlias().type);
+                    }
+                }
+            };
+            gather(gather, owned_tree, {});
+            for (int round = 0; round < 6 && !aliases.empty(); ++round) {
+                bool changed = false;
+                const auto expandAlias = [&](LangAPI::Type &t) {
+                    if (!t.isSymbol()) return;
+                    std::vector<std::string> parts;
+                    for (const auto &pp : t.getSymbol().path) { const auto *x = std::get_if<std::string>(&pp); if (!x) return; parts.push_back(*x); }
+                    if (parts.empty()) return;
+                    // the longest prefix of the path that names an alias (the whole path first)
+                    for (std::size_t n = parts.size(); n >= 1; --n) {
+                        const auto it = aliases.find(parts[n - 1]);
+                        if (it == aliases.end()) continue;
+                        for (const auto &[full, target] : it->second) {
+                            if (n > full.size() || !std::equal(parts.begin(), parts.begin() + static_cast<std::ptrdiff_t>(n), full.end() - static_cast<std::ptrdiff_t>(n))) continue;
+                            if (n == parts.size() && t.template_parameters.empty()) {
+                                if (target.isSymbol() && target.getSymbol() == t.getSymbol()) return;
+                                auto copy = target; t = std::move(copy); changed = true; return;
+                            }
+                            if (n < parts.size() && target.isSymbol()) {       // alias of a namespace: splice its target in front of the rest
+                                std::vector<std::string> np;
+                                for (const auto &pp : target.getSymbol().path) if (const auto *x = std::get_if<std::string>(&pp); x && *x != "_") np.push_back(*x);
+                                np.insert(np.end(), parts.begin() + static_cast<std::ptrdiff_t>(n), parts.end());
+                                auto targs = t.template_parameters;
+                                t = LangAPI::Type(LangAPI::Symbol(np));
+                                t.template_parameters = targs;
+                                changed = true; return;
+                            }
+                        }
+                    }
+                };
+                LangAPI::Traverse::forEach<LangAPI::Type>(owned_tree, expandAlias);
+                // constructor calls `Alias(args)` name their class by a Symbol, not a Type
+                LangAPI::Traverse::forEach<LangAPI::Inheritance>(owned_tree, [&](LangAPI::Inheritance &in) {
+                    const auto *sy = std::get_if<LangAPI::Symbol>(&in.name);
+                    if (!sy) return;
+                    LangAPI::Type tmp(*sy);
+                    const bool before = changed;
+                    changed = false;
+                    expandAlias(tmp);
+                    if (changed) {
+                        mapType(tmp);
+                        if (tmp.isSymbol() && tmp.template_parameters.empty()) in.name = tmp.getSymbol();
+                        else in.name = std::make_shared<LangAPI::Type>(tmp);
+                    }
+                    changed = changed || before;
+                });
+                if (!changed) break;
+            }
+        }
+        // generated rules are templates over the cursor type (`IT: TokenCursor | TokenCursor`): the lowered cursors share one
+        // base class, so a bounded parameter is simply that bound
+        LangAPI::Traverse::forEach<LangAPI::Function>(owned_tree, [&](LangAPI::Function &f) {
+            if (f.template_parameters.empty()) return;
+            std::map<std::string, LangAPI::Type> sub;
+            for (const auto &[n, bounds] : f.template_parameters) {
+                if (bounds.empty()) return;
+                sub.emplace(n, bounds[0]);
+            }
+            substitute(f, sub);
+            f.template_parameters.clear();
         });
         LangAPI::Traverse::forEach<LangAPI::Class>(owned_tree, [&](LangAPI::Class &c) {
             for (auto &[vis, base] : c.inherit_members)

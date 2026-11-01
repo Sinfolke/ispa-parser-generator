@@ -47,6 +47,13 @@ namespace C {
         std::optional<LangAPI::Type> pending_local_type;      // inferred type for the next untyped local
         LangAPI::Declarations owned_tree;                        // working copy of the source with library symbols mapped
         auto mapLibrary() -> void;
+        std::unordered_map<const LangAPI::Class *, std::string> handler_names;
+        auto handlerName(const LangAPI::Class &cls) const -> std::string;
+        std::vector<std::string> counters{"pos"};          // position-counter stack of the rule being emitted
+        auto cursorCall(const std::string &method, const std::string &recv, std::vector<std::string> args) -> std::string;
+        std::string token_cname;
+        std::set<std::string> token_classes;                      // names of synthesized token classes (see mapLibrary)
+        auto emitTokenClass(const LangAPI::Class &cls, ::Converter::Writer &protos, ::Converter::Writer &impls) -> void;
         int switch_counter = 0;
         bool app_mode = false;                                   // the tree holds an application next to the library
         std::unordered_set<std::string> thunks_done;
@@ -56,6 +63,8 @@ namespace C {
         std::size_t lambda_counter = 0;
         auto convertLambda(const LangAPI::Lambda &lam, const LangAPI::Typing::MaybeType &expected, bool void_ret) -> std::string;
         auto invokeCallable(const std::string &code, const LangAPI::Type &callable, const std::vector<std::string> &args) -> std::string;
+        auto arrayLiteralValues(const decltype(LangAPI::Array::values) &values, const LangAPI::Typing::MaybeType &type) -> std::string;
+        auto staticOwner(const LangAPI::Class &cls, const std::string &name) const -> const LangAPI::Class *;
         auto arrayLiteral(const LangAPI::Array &arr, const LangAPI::Type &type) -> std::string;
         auto convertExprAs(const LangAPI::Expression &e, const LangAPI::Type &expected) -> std::string;
         auto coerce(const std::string &code, const LangAPI::Typing::MaybeType &from, const LangAPI::Type &to) const -> std::string;

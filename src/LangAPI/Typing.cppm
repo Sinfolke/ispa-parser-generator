@@ -192,6 +192,9 @@ export namespace LangAPI::Typing {
                     switch (v.getIspaLibFunctionCall().symbol.exports) {
                         case StdlibExports::Attempt: t = Type(ValueType::Int); break;
                         case StdlibExports::Fail: t = Type(ValueType::Void); break;
+                        case StdlibExports::LookaheadKind: t = Type(ValueType::Int); break;
+                        case StdlibExports::TokenCursor: case StdlibExports::LazyTokenCursor:
+                            t = Type(Symbol(std::vector<std::string>{"python", "ispa_std", "lexer", "TokenCursor"})); break;
                         case StdlibExports::FailureMessage: t = Type(ValueType::String); break;
                         default: break;
                     }
@@ -213,6 +216,12 @@ export namespace LangAPI::Typing {
             if (r.isFloat()) return Type(ValueType::Float);
             if (r.isChar()) return Type(ValueType::Char);
             if (r.isString()) return Type(ValueType::String);
+            if (r.isArray() || r.isFixedSizeArray()) {   // [a, b, ...]: element type of the first element
+                const auto &vals = r.isArray() ? r.getArray().values : r.getFixedSizeArray().values;
+                if (vals.empty()) return std::nullopt;
+                const auto et = typeOf(vals[0]);
+                return et ? MaybeType(Type(ValueType::Array, *et)) : std::nullopt;
+            }
             if (r.type() == RValueType::Instance) return cur_class ? MaybeType(classType(*cur_class)) : std::nullopt;
             if (r.type() == RValueType::GetFromBox) {
                 const auto t = typeOf(r.getGetFromBox().what);
@@ -224,6 +233,19 @@ export namespace LangAPI::Typing {
             }
             if (r.type() == RValueType::ToString || r.type() == RValueType::CharToStringConstructor) return Type(ValueType::String);
             if (r.type() == RValueType::CheckVariant) return Type(ValueType::Bool);
+            if (r.type() == RValueType::Inheritance) {      // `Cls(args)` constructs a Cls
+                auto &mr = const_cast<RValue &>(r);
+                const auto &nm = mr.getInheritance().name;
+                if (const auto *sy = std::get_if<Symbol>(&nm)) return Type(*sy);
+                if (const auto *ty = std::get_if<std::shared_ptr<Type>>(&nm); ty && *ty) return **ty;
+                return std::nullopt;
+            }
+            if (r.type() == RValueType::Pos)
+                return Type(Symbol(std::vector<std::string>{"python", "ispa_std", r.getPos().dereference ? "raw_token" : "lexer", r.getPos().dereference ? "RawToken" : "TokenCursor"}));
+            if (r.type() == RValueType::IspaLibSymbol) {
+                auto &mr = const_cast<RValue &>(r);
+                if (mr.getIspaSymbol().exports == StdlibExports::DfaNullState || mr.getIspaSymbol().exports == StdlibExports::DfaDynamicFailState) return Type(ValueType::Int);
+            }
             if (r.isSymbol()) return typeOfSymbol(r.getSymbol());
             if (r.isStorageSymbol()) return typeOfStorageImpl(r.getStorageSymbol());
             return std::nullopt;
@@ -308,6 +330,7 @@ export namespace LangAPI::Typing {
             for (const auto &p : s.path) {
                 const auto *str = std::get_if<std::string>(&p);
                 if (!str) return {};
+                if (parts.empty() && (*str == "_" || str->empty()) && s.path.size() > 1) continue;   // `_::a::b`: rooted path
                 parts.push_back(*str);
             }
             return parts;
