@@ -82,6 +82,15 @@ namespace C {
         return joined(parts, "_");
     }
 
+    // pointer-to-class conversions between different classes (derived -> base: the base struct is the first member)
+    auto Construct::coerce(const std::string &code, const LangAPI::Typing::MaybeType &from, const LangAPI::Type &to) const -> std::string {
+        if (!from) return code;
+        const auto *cf = typer->classOf(*from), *ct = typer->classOf(to);
+        if (!cf || !ct || cf == ct) return code;
+        const auto it = class_cname.find(ct);
+        return it == class_cname.end() ? code : "(" + it->second + "*)" + code;
+    }
+
     auto Construct::vecName(const std::string &elem) const -> std::string {
         std::string m;
         for (const char c : elem) m += std::isalnum(static_cast<unsigned char>(c)) ? c : (c == '*' ? 'P' : '_');
@@ -329,10 +338,10 @@ namespace C {
         throw Unsupported{"rvalue kind " + std::to_string(static_cast<int>(r.type()))};
     }
 
-    auto Construct::convertExpr(const LangAPI::Expression &e) -> std::string {
+    auto Construct::convertValue(const LangAPI::ExpressionValue &v) -> std::string {
         using EE = LangAPI::ExpressionElement;
         std::string out;
-        for (const auto &v : e) {
+        {
             switch (v.type()) {
                 case LangAPI::ExpressionValueType::Empty: break;
                 case LangAPI::ExpressionValueType::RValue: out += convertRValue(v.getRValue()); break;
@@ -340,7 +349,8 @@ namespace C {
                 case LangAPI::ExpressionValueType::Break: out += "break"; break;
                 case LangAPI::ExpressionValueType::Continue: out += "continue"; break;
                 case LangAPI::ExpressionValueType::Return: {
-                    const auto value = convertExpr(v.getReturn().value);
+                    auto value = convertExpr(v.getReturn().value);
+                    if (cur_return && !value.empty()) value = coerce(value, typer->typeOf(v.getReturn().value), *cur_return);
                     out += "return" + (value.empty() ? std::string() : " " + value);
                     break;
                 }
@@ -355,10 +365,36 @@ namespace C {
                         case LangAPI::OperatorType::Divide: op = "/="; break;
                         case LangAPI::OperatorType::Modulo: op = "%="; break;
                     }
-                    const auto lhs = std::holds_alternative<LangAPI::Symbol>(a.name)
-                        ? convertSymbolValue(std::get<LangAPI::Symbol>(a.name))
-                        : convertRValue(LangAPI::RValue(std::get<LangAPI::StorageSymbol>(a.name)));
-                    out += lhs + " " + op + " " + convertExpr(a.value);
+                    const bool sym_lhs = std::holds_alternative<LangAPI::Symbol>(a.name);
+                    LangAPI::Typing::MaybeType lt;
+                    if (sym_lhs) lt = typer->typeOf(LangAPI::RValue(std::get<LangAPI::Symbol>(a.name)));
+                    else lt = typer->typeOf(LangAPI::RValue(std::get<LangAPI::StorageSymbol>(a.name)));
+                    auto rhs = convertExpr(a.value);
+                    if (lt && a.type == LangAPI::OperatorType::Assign) rhs = coerce(rhs, typer->typeOf(a.value), *lt);
+                    // element assignment: v[i] = x  ->  NAME_set(v, i, x)
+                    if (!sym_lhs) {
+                        const auto &st = std::get<LangAPI::StorageSymbol>(a.name);
+                        if (!st.path.empty() && std::holds_alternative<LangAPI::StorageOffset>(st.path.back())) {
+                            auto prefix = st;
+                            const auto idx = convertExpr(std::get<LangAPI::StorageOffset>(st.path.back()).offset);
+                            prefix.path.pop_back();
+                            const auto ct = typer->typeOf(LangAPI::RValue(prefix));
+                            if (!ct || !LangAPI::Typing::Typer::isValue(*ct, LangAPI::ValueType::Array)) throw Unsupported{"element assignment into a map/other container"};
+                            std::vector<std::string> dd;
+                            const auto vn = vecName(typeName(*LangAPI::Typing::Typer::elementType(*ct), dd));
+                            const auto c = convertStorage(prefix);
+                            const char *bin = a.type == LangAPI::OperatorType::Add ? "+" : a.type == LangAPI::OperatorType::Minus ? "-" :
+                                              a.type == LangAPI::OperatorType::Multiply ? "*" : a.type == LangAPI::OperatorType::Divide ? "/" : "%";
+                            if (a.type == LangAPI::OperatorType::Assign) out += vn + "_set(" + c + ", " + idx + ", " + rhs + ")";
+                            else out += vn + "_set(" + c + ", " + idx + ", " + vn + "_get(" + c + ", " + idx + ") " + bin + " " + rhs + ")";
+                            break;
+                        }
+                    }
+                    const auto lhs = sym_lhs ? convertSymbolValue(std::get<LangAPI::Symbol>(a.name))
+                                             : convertRValue(LangAPI::RValue(std::get<LangAPI::StorageSymbol>(a.name)));
+                    if (lt && a.type == LangAPI::OperatorType::Add && LangAPI::Typing::Typer::isValue(*lt, LangAPI::ValueType::String))
+                        out += lhs + " = ISPA_CONCAT(" + lhs + ", " + rhs + ")";
+                    else out += lhs + " " + op + " " + rhs;
                     break;
                 }
                 case LangAPI::ExpressionValueType::ExpressionElement: {
@@ -391,6 +427,100 @@ namespace C {
         return out;
     }
 
+
+    // Precedence-climbing over the flat operand/operator list so operators can be chosen by operand type
+    // (ispa_str has no C operators). Anything unexpected falls back to element-wise text.
+    namespace {
+        auto precOf(LangAPI::ExpressionElement e) -> int {
+            using EE = LangAPI::ExpressionElement;
+            switch (e) {
+                case EE::Or: return 1; case EE::And: return 2;
+                case EE::Equal: case EE::NotEqual: return 3;
+                case EE::Higher: case EE::Lower: case EE::HigherOrEqual: case EE::LowerOrEqual: return 4;
+                case EE::Add: case EE::Minus: return 5;
+                case EE::Multiply: case EE::Divide: case EE::Modulo: return 6;
+                default: return 0;
+            }
+        }
+        auto opText(LangAPI::ExpressionElement e) -> const char * {
+            using EE = LangAPI::ExpressionElement;
+            switch (e) {
+                case EE::Or: return "||"; case EE::And: return "&&"; case EE::Equal: return "=="; case EE::NotEqual: return "!=";
+                case EE::Higher: return ">"; case EE::Lower: return "<"; case EE::HigherOrEqual: return ">="; case EE::LowerOrEqual: return "<=";
+                case EE::Add: return "+"; case EE::Minus: return "-"; case EE::Multiply: return "*"; case EE::Divide: return "/";
+                default: return "%";
+            }
+        }
+    }
+
+    auto Construct::parsePrimary(const LangAPI::Expression &e, std::size_t &i) -> std::string {
+        using EE = LangAPI::ExpressionElement;
+        if (i >= e.size()) throw Unsupported{"truncated expression"};
+        const auto &v = e[i];
+        std::string out;
+        if (v.isExpressionElement()) {
+            const auto el = v.getExpressionElement();
+            if (el == EE::GroupOpen) {
+                ++i;
+                out = "(" + parseBinary(e, i, 1) + ")";
+                if (i >= e.size() || !e[i].isExpressionElement() || e[i].getExpressionElement() != EE::GroupClose) throw Unsupported{"unbalanced group"};
+                ++i;
+                last_type = last_type;  // group keeps the type of its content
+            } else if (el == EE::Not) { ++i; out = "!" + parsePrimary(e, i); last_type = LangAPI::Type(LangAPI::ValueType::Bool); return out; }
+            else if (el == EE::Minus) { ++i; out = "-" + parsePrimary(e, i); return out; }
+            else if (el == EE::PlusPlus || el == EE::MinusMinus) { ++i; out = std::string(el == EE::PlusPlus ? "++" : "--") + parsePrimary(e, i); return out; }
+            else throw Unsupported{"expression element"};
+        } else {
+            out = convertValue(v);
+            if (v.isRvalue()) last_type = typer->typeOf(v.getRValue());
+            else if (v.isFunctionCall()) last_type = typer->typeOf(v.getFunctionCall());
+            else last_type = std::nullopt;
+            ++i;
+        }
+        while (i < e.size() && e[i].isExpressionElement() &&
+               (e[i].getExpressionElement() == EE::PlusPlus || e[i].getExpressionElement() == EE::MinusMinus)) {
+            out += e[i].getExpressionElement() == EE::PlusPlus ? "++" : "--"; ++i;
+        }
+        return out;
+    }
+
+    auto Construct::parseBinary(const LangAPI::Expression &e, std::size_t &i, int min_prec) -> std::string {
+        auto lhs = parsePrimary(e, i);
+        auto lt = last_type;
+        while (i < e.size() && e[i].isExpressionElement()) {
+            const auto el = e[i].getExpressionElement();
+            const int p = precOf(el);
+            if (p == 0 || p < min_prec) break;
+            ++i;
+            auto rhs = parseBinary(e, i, p + 1);
+            const auto rt = last_type;
+            const bool strs = lt && rt && LangAPI::Typing::Typer::isValue(*lt, LangAPI::ValueType::String) &&
+                              LangAPI::Typing::Typer::isValue(*rt, LangAPI::ValueType::String);
+            using EE = LangAPI::ExpressionElement;
+            if (strs && el == EE::Add) { lhs = "ISPA_CONCAT(" + lhs + ", " + rhs + ")"; }
+            else if (strs && el == EE::Equal) { lhs = "ispa_str_eq(" + lhs + ", " + rhs + ")"; lt = LangAPI::Type(LangAPI::ValueType::Bool); }
+            else if (strs && el == EE::NotEqual) { lhs = "!ispa_str_eq(" + lhs + ", " + rhs + ")"; lt = LangAPI::Type(LangAPI::ValueType::Bool); }
+            else {
+                lhs = lhs + " " + opText(el) + " " + rhs;
+                if (p <= 4) lt = LangAPI::Type(LangAPI::ValueType::Bool);
+                if (p <= 4) lhs = "(" + lhs + ")";
+            }
+        }
+        last_type = lt;
+        return lhs;
+    }
+
+    auto Construct::convertExpr(const LangAPI::Expression &e) -> std::string {
+        std::size_t i = 0;
+        std::string out;
+        while (i < e.size()) {
+            if (e[i].type() == LangAPI::ExpressionValueType::Empty) { ++i; continue; }
+            out += parseBinary(e, i, 1);
+            if (i < e.size()) out += " ";
+        }
+        return out;
+    }
+
     auto Construct::convertStatements(const LangAPI::Statements &st, Converter::Writer &o) -> void {
         locals.emplace_back();
         typer->pushScope();
@@ -414,7 +544,7 @@ namespace C {
             if (!d.empty()) throw Unsupported{"local type: " + d.front()};
             locals.back().insert(v.name);
             if (v.value.empty()) o.writeln("{} {} = {0};", t, cIdent(v.name));
-            else o.writeln("{} {} = {};", t, cIdent(v.name), convertExpr(v.value));
+            else o.writeln("{} {} = {};", t, cIdent(v.name), coerce(convertExpr(v.value), typer->typeOf(v.value), declared));
         } else if (st.isIf()) {
             const auto &i = st.getIf();
             o.writeln("if ({}) {", convertExpr(i.expr));

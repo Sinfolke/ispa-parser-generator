@@ -26,6 +26,7 @@ namespace C {
         std::unordered_map<const LangAPI::Class *, std::string> class_cname;
         mutable std::vector<std::pair<std::string, std::string>> vec_defs;   // (vector type name, element C type) in dependency order
         mutable std::unordered_set<std::string> vec_seen;
+        auto coerce(const std::string &code, const LangAPI::Typing::MaybeType &from, const LangAPI::Type &to) const -> std::string;
         auto vecName(const std::string &elem) const -> std::string;
         auto convertStorage(const LangAPI::StorageSymbol &ss) -> std::string;
         auto methodCall(const LangAPI::Class &recv_cls, const std::string &name, const std::string &recv,
@@ -50,6 +51,10 @@ namespace C {
 
         auto convertStatements(const LangAPI::Statements &st, ::Converter::Writer &o) -> void;
         auto convertStatement(const LangAPI::Statement &st, ::Converter::Writer &o) -> void;
+        LangAPI::Typing::MaybeType last_type;                    // type of the operand parsed last (see parseBinary)
+        auto convertValue(const LangAPI::ExpressionValue &v) -> std::string;
+        auto parsePrimary(const LangAPI::Expression &e, std::size_t &i) -> std::string;
+        auto parseBinary(const LangAPI::Expression &e, std::size_t &i, int min_prec) -> std::string;
         auto convertExpr(const LangAPI::Expression &e) -> std::string;
         auto convertRValue(const LangAPI::RValue &r) -> std::string;
         auto convertSymbolValue(const LangAPI::Symbol &s) -> std::string;
