@@ -24,6 +24,8 @@ def build(ispa, work, grammar, sanitize):
     gen.mkdir(parents=True, exist_ok=True)
     gen_cpp.mkdir(parents=True, exist_ok=True)
     directory, entry = GRAMMARS[grammar][0], GRAMMARS[grammar][1]
+    global WRAPPED
+    WRAPPED = not (directory / entry).read_text().startswith('module ')
     algorithm = LR_ALGORITHMS[grammar][1] if grammar in LR_ALGORITHMS else 'LL'
     common = ['-a', algorithm, '--no-incremental', '--no-ai-recovery', '--no-debug-instrumentation']
     # the application is lowered together with the library it runs on (the library itself is compiled separately)
@@ -43,13 +45,16 @@ def build(ispa, work, grammar, sanitize):
     return binary, reference
 
 
+WRAPPED = True      # False for grammars that declare their own `module` (no wrapper root)
+
+
 def normalize(out):
     """The import lines make the grammar a module: rules are named modules::parser::x, and the root is a wrapper
     `main -> value -> <the user's main rule>`. Strip both so the output reads like the plain C++ parser's."""
     out = out.replace('modules::parser::', '').replace('modules_parser_', '').replace('modules.parser.', '')
     out = out.replace('in main > main >', 'in main >')      # the wrapper's own recovery frame
     lines = out.splitlines(keepends=True)
-    if len(lines) > 2 and lines[0] == 'main\n' and lines[1] == '\u2514\u2500\u2500 value\n' and lines[2].startswith('    '):
+    if WRAPPED and len(lines) > 2 and lines[0] == 'main\n' and lines[1] == '\u2514\u2500\u2500 value\n' and lines[2].startswith('    '):
         body = [line[8:] if line[:1] in ' \u2502' and not line.startswith('ERR') else line for line in lines[2:]]
         return ''.join(body)
     return out
