@@ -939,7 +939,39 @@ namespace C {
     auto Construct::convertStatements(const LangAPI::Statements &st, Converter::Writer &o) -> void {
         locals.emplace_back();
         typer->pushScope();
-        for (const auto &s : st) convertStatement(s, o);
+        for (std::size_t i = 0; i < st.size(); ++i) {
+            const auto &s = st[i];
+            pending_local_type.reset();
+            if (s.isVariable()) {
+                const auto &v = s.getVariable();
+                const bool untyped = v.type.isValueType() && v.type.getValueType() == LangAPI::ValueType::Undef;
+                if (untyped && v.value.size() == 1 && v.value[0].isRvalue() && v.value[0].getRValue().isArray() &&
+                    v.value[0].getRValue().getArray().values.empty() && v.value[0].getRValue().getArray().template_parameters.empty()) {
+                    // `x = []` : the element type is whatever the first x.append(...) adds
+                    LangAPI::Statements tail(st.begin() + static_cast<std::ptrdiff_t>(i) + 1, st.end());
+                    std::optional<LangAPI::Type> elem;
+                    LangAPI::Traverse::forEach<LangAPI::StorageSymbol>(tail, [&](const LangAPI::StorageSymbol &ss) {
+                        if (elem) return;
+                        bool mine = false;
+                        if (ss.what.size() == 1 && ss.what[0].isRvalue() && ss.what[0].getRValue().isSymbol()) {
+                            const auto &p = ss.what[0].getRValue().getSymbol().path;
+                            mine = p.size() == 1 && std::holds_alternative<std::string>(p[0]) && std::get<std::string>(p[0]) == v.name;
+                        } else if (ss.what.empty() && !ss.path.empty()) {
+                            const auto *n = std::get_if<std::string>(&ss.path[0]);
+                            mine = n && *n == v.name;
+                        }
+                        if (!mine) return;
+                        for (const auto &part : ss.path)
+                            if (const auto *am = std::get_if<LangAPI::ArrayMethodCall>(&part))
+                                if ((am->method == LangAPI::ArrayMethods::Push || am->method == LangAPI::ArrayMethods::PythonAppend) && am->args.size() == 1)
+                                    if (const auto t = typer->typeOf(am->args[0])) { elem = LangAPI::Typing::Typer::strip(*t); return; }
+                    });
+                    if (elem) pending_local_type = LangAPI::Type(LangAPI::ValueType::Array, *elem);
+                }
+            }
+            convertStatement(s, o);
+        }
+        pending_local_type.reset();
         typer->popScope();
         locals.pop_back();
     }
@@ -949,6 +981,7 @@ namespace C {
             const auto &v = st.getVariable();
             std::vector<std::string> d;
             auto declared = v.type;
+            if (pending_local_type) { declared = *pending_local_type; pending_local_type.reset(); }
             if (declared.isValueType() && declared.getValueType() == LangAPI::ValueType::Undef) {
                 const auto inferred = typer->typeOf(v.value);
                 if (!inferred) throw Unsupported{"local without a declared type"};

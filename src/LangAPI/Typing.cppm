@@ -188,7 +188,15 @@ export namespace LangAPI::Typing {
                     continue;
                 }
                 MaybeType t;
-                if (v.isRvalue()) t = typeOf(v.getRValue());
+                if (v.type() == ExpressionValueType::IspaLibFunctionCall) {
+                    switch (v.getIspaLibFunctionCall().symbol.exports) {
+                        case StdlibExports::Attempt: t = Type(ValueType::Int); break;
+                        case StdlibExports::Fail: t = Type(ValueType::Void); break;
+                        case StdlibExports::FailureMessage: t = Type(ValueType::String); break;
+                        default: break;
+                    }
+                }
+                else if (v.isRvalue()) t = typeOf(v.getRValue());
                 else if (v.isFunctionCall()) t = typeOf(v.getFunctionCall());
                 else if (v.type() == ExpressionValueType::Return || v.type() == ExpressionValueType::Break ||
                          v.type() == ExpressionValueType::Continue) return std::nullopt;

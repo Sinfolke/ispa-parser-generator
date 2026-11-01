@@ -44,6 +44,7 @@ namespace C {
         std::map<const LangAPI::Class *, std::vector<std::string>> root_slots;                        // root -> its slot names in declaration order
         auto analyzeVirtuals() -> void;
         auto pathToBase(const LangAPI::Class &from, const LangAPI::Class *target) const -> std::optional<std::vector<std::string>>;
+        std::optional<LangAPI::Type> pending_local_type;      // inferred type for the next untyped local
         std::unordered_set<std::string> thunks_done;
         auto functionValue(const LangAPI::Symbol &sy, const LangAPI::Function &fn) -> std::string;
         LangAPI::Typing::MaybeType array_hint;                   // expected type of the sole operand being converted

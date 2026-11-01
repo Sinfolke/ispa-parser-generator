@@ -4366,9 +4366,74 @@ python_ispa_std_recovery_RequiredResult* python_ispa_std_parser_ll_LLParser_requ
 		}
 	}
 }
+typedef struct {
+    ispa_vec_python_ispa_std_match_result_MatchResultP* holder;
+    ispa_fn rec;
+    python_ispa_std_lexer_TokenCursor* attempt;
+    python_ispa_std_parser_ll_LLParser* self;
+} python_ispa_std_parser_ll_lam0_env;
+static void python_ispa_std_parser_ll_lam0(void *env_) {
+    python_ispa_std_parser_ll_lam0_env *env = (python_ispa_std_parser_ll_lam0_env *)env_; (void)env;
+	ispa_vec_python_ispa_std_match_result_MatchResultP* holder = env->holder;
+	ispa_fn rec = env->rec;
+	python_ispa_std_lexer_TokenCursor* attempt = env->attempt;
+	python_ispa_std_parser_ll_LLParser* self = env->self;
+	{ (void)(ispa_vec_python_ispa_std_match_result_MatchResultP_push((holder), ((python_ispa_std_match_result_MatchResult* (*)(void*, python_ispa_std_lexer_TokenCursor*))(rec).fn)((rec).env, attempt))); return; };
+}
+static ispa_fn python_ispa_std_parser_ll_lam0_make(ispa_vec_python_ispa_std_match_result_MatchResultP* holder, ispa_fn rec, python_ispa_std_lexer_TokenCursor* attempt, python_ispa_std_parser_ll_LLParser* self) {
+    python_ispa_std_parser_ll_lam0_env *e = ISPA_NEW(python_ispa_std_parser_ll_lam0_env);
+    e->holder = holder;
+    e->rec = rec;
+    e->attempt = attempt;
+    e->self = self;
+    return (ispa_fn){ (void *)python_ispa_std_parser_ll_lam0, e };
+}
+
+typedef struct {
+    ispa_vec_python_ispa_std_match_result_MatchResultP* holder;
+    ispa_fn rec;
+    python_ispa_std_lexer_TokenCursor* attempt;
+    python_ispa_std_parser_ll_LLParser* self;
+} python_ispa_std_parser_ll_lam1_env;
+static void python_ispa_std_parser_ll_lam1(void *env_) {
+    python_ispa_std_parser_ll_lam1_env *env = (python_ispa_std_parser_ll_lam1_env *)env_; (void)env;
+	ispa_vec_python_ispa_std_match_result_MatchResultP* holder = env->holder;
+	ispa_fn rec = env->rec;
+	python_ispa_std_lexer_TokenCursor* attempt = env->attempt;
+	python_ispa_std_parser_ll_LLParser* self = env->self;
+	{ (void)(ispa_vec_python_ispa_std_match_result_MatchResultP_push((holder), ((python_ispa_std_match_result_MatchResult* (*)(void*, python_ispa_std_lexer_TokenCursor*))(rec).fn)((rec).env, attempt))); return; };
+}
+static ispa_fn python_ispa_std_parser_ll_lam1_make(ispa_vec_python_ispa_std_match_result_MatchResultP* holder, ispa_fn rec, python_ispa_std_lexer_TokenCursor* attempt, python_ispa_std_parser_ll_LLParser* self) {
+    python_ispa_std_parser_ll_lam1_env *e = ISPA_NEW(python_ispa_std_parser_ll_lam1_env);
+    e->holder = holder;
+    e->rec = rec;
+    e->attempt = attempt;
+    e->self = self;
+    return (ispa_fn){ (void *)python_ispa_std_parser_ll_lam1, e };
+}
+
 python_ispa_std_match_result_MatchResult* python_ispa_std_parser_ll_LLParser__attempt_rule(python_ispa_std_parser_ll_LLParser* self, ispa_fn rec, python_ispa_std_lexer_TokenCursor* attempt) {
-	/* ISPA-C-TODO: local without a declared type */
-	ISPA_UNIMPLEMENTED("python_ispa_std_parser_ll._attempt_rule");
+	ISPA_STR("Run `rec(attempt)` inside a probe. An absent rule (take_absent) and an\n        ExternalParse error both make the attempt fail, so an explicitly bound\n        parent handler can run. This is the only place that still catches: foreign\n        syntax errors are real exceptions (rare), the absent rule is not.");
+	if (((((self)->unwind_) < (INT64_C(0))))) {
+		return python_ispa_std_match_result_MatchResult_failed(attempt);
+	}
+	ispa_vec_python_ispa_std_match_result_MatchResultP* holder = ispa_vec_python_ispa_std_match_result_MatchResultP_new();
+	python_ispa_std_parser_ll_RuleProbe* probe = python_ispa_std_parser_ll_LLParser_begin_probe((self), attempt);
+	int64_t scope = python_ispa_std_debug_scope_depth();
+	int64_t failed = ispa_attempt_fn(python_ispa_std_parser_ll_lam1_make(holder, rec, attempt, self));
+	python_ispa_std_parser_ll_RuleProbe_close((probe));
+	if ((((failed) == (INT64_C(0))))) {
+		if (python_ispa_std_parser_ll_LLParser_take_absent((self))) {
+			return python_ispa_std_match_result_MatchResult_failed(attempt);
+		}
+		return ispa_vec_python_ispa_std_match_result_MatchResultP_get((holder), INT64_C(0));
+	}
+	python_ispa_std_debug_unwind_to(scope);
+	if ((((failed) == (python_ispa_std_errors_ErrorKind_ExternalParse)))) {
+		return python_ispa_std_match_result_MatchResult_failed(attempt);
+	}
+	python_ispa_std_failures_rethrow(failed, ispa_failure_message());
+	return python_ispa_std_match_result_MatchResult_failed(attempt);
 }
 python_ispa_std_recovery_RequiredResult* python_ispa_std_parser_ll_LLParser_required_rule_recovering(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor* pos, ispa_fn rec, python_ispa_std_recovery_FailHandler* fail) {
 	return python_ispa_std_parser_ll_LLParser__rule_recovery((self), pos, rec, fail, python_ispa_std_match_result_MatchResult_failed(pos), false);
@@ -4673,60 +4738,6 @@ ispa_vec_python_ispa_std_node_NodeP* python_ispa_std_parser_ll_LLParser_counted_
 typedef struct {
     int64_t type_id;
     python_ispa_std_parser_ll_LLParser* self;
-} python_ispa_std_parser_ll_lam0_env;
-static python_ispa_std_node_Node* python_ispa_std_parser_ll_lam0(void *env_, python_ispa_std_lexer_TokenCursor* attempt) {
-    python_ispa_std_parser_ll_lam0_env *env = (python_ispa_std_parser_ll_lam0_env *)env_; (void)env;
-	int64_t type_id = env->type_id;
-	python_ispa_std_parser_ll_LLParser* self = env->self;
-	return python_ispa_std_parser_ll_LLParser_optional_token((self), attempt, type_id);
-}
-static ispa_fn python_ispa_std_parser_ll_lam0_make(int64_t type_id, python_ispa_std_parser_ll_LLParser* self) {
-    python_ispa_std_parser_ll_lam0_env *e = ISPA_NEW(python_ispa_std_parser_ll_lam0_env);
-    e->type_id = type_id;
-    e->self = self;
-    return (ispa_fn){ (void *)python_ispa_std_parser_ll_lam0, e };
-}
-
-ispa_vec_python_ispa_std_node_NodeP* python_ispa_std_parser_ll_LLParser_counted_token(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor* pos, int64_t type_id, python_ispa_std_counter_CountSpec* spec) {
-	return python_ispa_std_parser_ll_LLParser_counted_impl((self), pos, spec, python_ispa_std_parser_ll_lam0_make(type_id, self));
-}
-typedef struct {
-    ispa_fn rec;
-    python_ispa_std_parser_ll_LLParser* self;
-} python_ispa_std_parser_ll_lam1_env;
-static python_ispa_std_node_Node* python_ispa_std_parser_ll_lam1(void *env_, python_ispa_std_lexer_TokenCursor* attempt) {
-    python_ispa_std_parser_ll_lam1_env *env = (python_ispa_std_parser_ll_lam1_env *)env_; (void)env;
-	ispa_fn rec = env->rec;
-	python_ispa_std_parser_ll_LLParser* self = env->self;
-	return python_ispa_std_parser_ll_LLParser_optional_rule((self), attempt, rec);
-}
-static ispa_fn python_ispa_std_parser_ll_lam1_make(ispa_fn rec, python_ispa_std_parser_ll_LLParser* self) {
-    python_ispa_std_parser_ll_lam1_env *e = ISPA_NEW(python_ispa_std_parser_ll_lam1_env);
-    e->rec = rec;
-    e->self = self;
-    return (ispa_fn){ (void *)python_ispa_std_parser_ll_lam1, e };
-}
-
-ispa_vec_python_ispa_std_node_NodeP* python_ispa_std_parser_ll_LLParser_counted_rule(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor* pos, ispa_fn rec, python_ispa_std_counter_CountSpec* spec) {
-	return python_ispa_std_parser_ll_LLParser_counted_impl((self), pos, spec, python_ispa_std_parser_ll_lam1_make(rec, self));
-}
-python_ispa_std_node_Node* python_ispa_std_parser_ll_LLParser_repeat_optional(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor* pos, ispa_fn match, bool separated) {
-	ISPA_STR("Separators belong to a successful next iteration, not to the end of\n        the list: leave pos (including whitespace) intact on absence.");
-	python_ispa_std_lexer_TokenCursor* attempt = python_ispa_std_lexer_TokenCursor_copy_v((pos));
-	if (((((self)->has_space_token_) && (separated)))) {
-		python_ispa_std_parser_ll_LLParser_skip_spaces((self), attempt);
-	}
-	int64_t start = python_ispa_std_parser_ll_cursor_position(attempt);
-	python_ispa_std_node_Node* node = ((python_ispa_std_node_Node* (*)(void*, python_ispa_std_lexer_TokenCursor*))(match).fn)((match).env, attempt);
-	if ((((python_ispa_std_node_Node_empty((node))) || ((((python_ispa_std_parser_ll_cursor_position(attempt)) == (start))))))) {
-		return python_ispa_std_node_Node_blank();
-	}
-	python_ispa_std_lexer_TokenCursor_assign((pos), attempt);
-	return node;
-}
-typedef struct {
-    int64_t type_id;
-    python_ispa_std_parser_ll_LLParser* self;
 } python_ispa_std_parser_ll_lam2_env;
 static python_ispa_std_node_Node* python_ispa_std_parser_ll_lam2(void *env_, python_ispa_std_lexer_TokenCursor* attempt) {
     python_ispa_std_parser_ll_lam2_env *env = (python_ispa_std_parser_ll_lam2_env *)env_; (void)env;
@@ -4741,31 +4752,8 @@ static ispa_fn python_ispa_std_parser_ll_lam2_make(int64_t type_id, python_ispa_
     return (ispa_fn){ (void *)python_ispa_std_parser_ll_lam2, e };
 }
 
-ispa_vec_python_ispa_std_node_NodeP* python_ispa_std_parser_ll_LLParser_range_token(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor* pos, int64_t type_id, python_ispa_std_recovery_FailHandler* fail) {
-	ispa_vec_python_ispa_std_node_NodeP* result = ispa_vec_python_ispa_std_node_NodeP_new();
-	if (python_ispa_std_recovery_FailHandler_is_recovering_v((fail))) {
-		python_ispa_std_recovery_RequiredResult* first = python_ispa_std_parser_ll_LLParser_required_recovering((self), pos, type_id, fail);
-		if ((!((first)->has_node))) {
-			return result;
-		}
-		ispa_vec_python_ispa_std_node_NodeP_push((result), (first)->node);
-	} else {
-		ispa_vec_python_ispa_std_node_NodeP_push((result), python_ispa_std_parser_ll_LLParser_required_token((self), pos, type_id, fail));
-	}
-	if (python_ispa_std_parser_ll_LLParser_unwinding((self))) {
-		return result;
-	}
-	bool repeating = true;
-	while (((((((repeating) && ((!(python_ispa_std_lexer_TokenCursor_isEnd_v((pos)))))))) && ((!(python_ispa_std_parser_ll_LLParser_unwinding((self)))))))) {
-		python_ispa_std_node_Node* node = python_ispa_std_parser_ll_LLParser_repeat_optional((self), pos, python_ispa_std_parser_ll_lam2_make(type_id, self), true);
-		if (python_ispa_std_node_Node_empty((node))) {
-			repeating = false;
-		} else {
-			ispa_vec_python_ispa_std_node_NodeP_push((result), node);
-		}
-	}
-	python_ispa_std_parser_ll_LLParser_sync_loop((self), pos);
-	return result;
+ispa_vec_python_ispa_std_node_NodeP* python_ispa_std_parser_ll_LLParser_counted_token(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor* pos, int64_t type_id, python_ispa_std_counter_CountSpec* spec) {
+	return python_ispa_std_parser_ll_LLParser_counted_impl((self), pos, spec, python_ispa_std_parser_ll_lam2_make(type_id, self));
 }
 typedef struct {
     ispa_fn rec;
@@ -4784,32 +4772,22 @@ static ispa_fn python_ispa_std_parser_ll_lam3_make(ispa_fn rec, python_ispa_std_
     return (ispa_fn){ (void *)python_ispa_std_parser_ll_lam3, e };
 }
 
-ispa_vec_python_ispa_std_node_NodeP* python_ispa_std_parser_ll_LLParser_range_rule(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor* pos, ispa_str rule_name, ispa_fn rec, python_ispa_std_recovery_FailHandler* fail) {
-	int64_t start = python_ispa_std_parser_ll_cursor_position(pos);
-	ispa_vec_python_ispa_std_node_NodeP* result = ispa_vec_python_ispa_std_node_NodeP_new();
-	if (python_ispa_std_recovery_FailHandler_is_recovering_v((fail))) {
-		python_ispa_std_recovery_RequiredResult* first = python_ispa_std_parser_ll_LLParser_required_rule_recovering((self), pos, rec, fail);
-		if ((!((first)->has_node))) {
-			return result;
-		}
-		ispa_vec_python_ispa_std_node_NodeP_push((result), (first)->node);
-	} else {
-		ispa_vec_python_ispa_std_node_NodeP_push((result), python_ispa_std_parser_ll_LLParser_required_rule((self), pos, rule_name, rec, fail));
+ispa_vec_python_ispa_std_node_NodeP* python_ispa_std_parser_ll_LLParser_counted_rule(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor* pos, ispa_fn rec, python_ispa_std_counter_CountSpec* spec) {
+	return python_ispa_std_parser_ll_LLParser_counted_impl((self), pos, spec, python_ispa_std_parser_ll_lam3_make(rec, self));
+}
+python_ispa_std_node_Node* python_ispa_std_parser_ll_LLParser_repeat_optional(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor* pos, ispa_fn match, bool separated) {
+	ISPA_STR("Separators belong to a successful next iteration, not to the end of\n        the list: leave pos (including whitespace) intact on absence.");
+	python_ispa_std_lexer_TokenCursor* attempt = python_ispa_std_lexer_TokenCursor_copy_v((pos));
+	if (((((self)->has_space_token_) && (separated)))) {
+		python_ispa_std_parser_ll_LLParser_skip_spaces((self), attempt);
 	}
-	if (((((((python_ispa_std_parser_ll_cursor_position(pos)) == (start)))) || (python_ispa_std_parser_ll_LLParser_unwinding((self)))))) {
-		return result;
+	int64_t start = python_ispa_std_parser_ll_cursor_position(attempt);
+	python_ispa_std_node_Node* node = ((python_ispa_std_node_Node* (*)(void*, python_ispa_std_lexer_TokenCursor*))(match).fn)((match).env, attempt);
+	if ((((python_ispa_std_node_Node_empty((node))) || ((((python_ispa_std_parser_ll_cursor_position(attempt)) == (start))))))) {
+		return python_ispa_std_node_Node_blank();
 	}
-	bool repeating = true;
-	while (((((((repeating) && ((!(python_ispa_std_lexer_TokenCursor_isEnd_v((pos)))))))) && ((!(python_ispa_std_parser_ll_LLParser_unwinding((self)))))))) {
-		python_ispa_std_node_Node* node = python_ispa_std_parser_ll_LLParser_repeat_optional((self), pos, python_ispa_std_parser_ll_lam3_make(rec, self), true);
-		if (python_ispa_std_node_Node_empty((node))) {
-			repeating = false;
-		} else {
-			ispa_vec_python_ispa_std_node_NodeP_push((result), node);
-		}
-	}
-	python_ispa_std_parser_ll_LLParser_sync_loop((self), pos);
-	return result;
+	python_ispa_std_lexer_TokenCursor_assign((pos), attempt);
+	return node;
 }
 typedef struct {
     int64_t type_id;
@@ -4828,11 +4806,23 @@ static ispa_fn python_ispa_std_parser_ll_lam4_make(int64_t type_id, python_ispa_
     return (ispa_fn){ (void *)python_ispa_std_parser_ll_lam4, e };
 }
 
-ispa_vec_python_ispa_std_node_NodeP* python_ispa_std_parser_ll_LLParser_range_optional_token(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor* pos, int64_t type_id) {
+ispa_vec_python_ispa_std_node_NodeP* python_ispa_std_parser_ll_LLParser_range_token(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor* pos, int64_t type_id, python_ispa_std_recovery_FailHandler* fail) {
 	ispa_vec_python_ispa_std_node_NodeP* result = ispa_vec_python_ispa_std_node_NodeP_new();
+	if (python_ispa_std_recovery_FailHandler_is_recovering_v((fail))) {
+		python_ispa_std_recovery_RequiredResult* first = python_ispa_std_parser_ll_LLParser_required_recovering((self), pos, type_id, fail);
+		if ((!((first)->has_node))) {
+			return result;
+		}
+		ispa_vec_python_ispa_std_node_NodeP_push((result), (first)->node);
+	} else {
+		ispa_vec_python_ispa_std_node_NodeP_push((result), python_ispa_std_parser_ll_LLParser_required_token((self), pos, type_id, fail));
+	}
+	if (python_ispa_std_parser_ll_LLParser_unwinding((self))) {
+		return result;
+	}
 	bool repeating = true;
 	while (((((((repeating) && ((!(python_ispa_std_lexer_TokenCursor_isEnd_v((pos)))))))) && ((!(python_ispa_std_parser_ll_LLParser_unwinding((self)))))))) {
-		python_ispa_std_node_Node* node = python_ispa_std_parser_ll_LLParser_repeat_optional((self), pos, python_ispa_std_parser_ll_lam4_make(type_id, self), ((((int64_t)(result)->len) > (INT64_C(0)))));
+		python_ispa_std_node_Node* node = python_ispa_std_parser_ll_LLParser_repeat_optional((self), pos, python_ispa_std_parser_ll_lam4_make(type_id, self), true);
 		if (python_ispa_std_node_Node_empty((node))) {
 			repeating = false;
 		} else {
@@ -4859,11 +4849,86 @@ static ispa_fn python_ispa_std_parser_ll_lam5_make(ispa_fn rec, python_ispa_std_
     return (ispa_fn){ (void *)python_ispa_std_parser_ll_lam5, e };
 }
 
+ispa_vec_python_ispa_std_node_NodeP* python_ispa_std_parser_ll_LLParser_range_rule(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor* pos, ispa_str rule_name, ispa_fn rec, python_ispa_std_recovery_FailHandler* fail) {
+	int64_t start = python_ispa_std_parser_ll_cursor_position(pos);
+	ispa_vec_python_ispa_std_node_NodeP* result = ispa_vec_python_ispa_std_node_NodeP_new();
+	if (python_ispa_std_recovery_FailHandler_is_recovering_v((fail))) {
+		python_ispa_std_recovery_RequiredResult* first = python_ispa_std_parser_ll_LLParser_required_rule_recovering((self), pos, rec, fail);
+		if ((!((first)->has_node))) {
+			return result;
+		}
+		ispa_vec_python_ispa_std_node_NodeP_push((result), (first)->node);
+	} else {
+		ispa_vec_python_ispa_std_node_NodeP_push((result), python_ispa_std_parser_ll_LLParser_required_rule((self), pos, rule_name, rec, fail));
+	}
+	if (((((((python_ispa_std_parser_ll_cursor_position(pos)) == (start)))) || (python_ispa_std_parser_ll_LLParser_unwinding((self)))))) {
+		return result;
+	}
+	bool repeating = true;
+	while (((((((repeating) && ((!(python_ispa_std_lexer_TokenCursor_isEnd_v((pos)))))))) && ((!(python_ispa_std_parser_ll_LLParser_unwinding((self)))))))) {
+		python_ispa_std_node_Node* node = python_ispa_std_parser_ll_LLParser_repeat_optional((self), pos, python_ispa_std_parser_ll_lam5_make(rec, self), true);
+		if (python_ispa_std_node_Node_empty((node))) {
+			repeating = false;
+		} else {
+			ispa_vec_python_ispa_std_node_NodeP_push((result), node);
+		}
+	}
+	python_ispa_std_parser_ll_LLParser_sync_loop((self), pos);
+	return result;
+}
+typedef struct {
+    int64_t type_id;
+    python_ispa_std_parser_ll_LLParser* self;
+} python_ispa_std_parser_ll_lam6_env;
+static python_ispa_std_node_Node* python_ispa_std_parser_ll_lam6(void *env_, python_ispa_std_lexer_TokenCursor* attempt) {
+    python_ispa_std_parser_ll_lam6_env *env = (python_ispa_std_parser_ll_lam6_env *)env_; (void)env;
+	int64_t type_id = env->type_id;
+	python_ispa_std_parser_ll_LLParser* self = env->self;
+	return python_ispa_std_parser_ll_LLParser_optional_token((self), attempt, type_id);
+}
+static ispa_fn python_ispa_std_parser_ll_lam6_make(int64_t type_id, python_ispa_std_parser_ll_LLParser* self) {
+    python_ispa_std_parser_ll_lam6_env *e = ISPA_NEW(python_ispa_std_parser_ll_lam6_env);
+    e->type_id = type_id;
+    e->self = self;
+    return (ispa_fn){ (void *)python_ispa_std_parser_ll_lam6, e };
+}
+
+ispa_vec_python_ispa_std_node_NodeP* python_ispa_std_parser_ll_LLParser_range_optional_token(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor* pos, int64_t type_id) {
+	ispa_vec_python_ispa_std_node_NodeP* result = ispa_vec_python_ispa_std_node_NodeP_new();
+	bool repeating = true;
+	while (((((((repeating) && ((!(python_ispa_std_lexer_TokenCursor_isEnd_v((pos)))))))) && ((!(python_ispa_std_parser_ll_LLParser_unwinding((self)))))))) {
+		python_ispa_std_node_Node* node = python_ispa_std_parser_ll_LLParser_repeat_optional((self), pos, python_ispa_std_parser_ll_lam6_make(type_id, self), ((((int64_t)(result)->len) > (INT64_C(0)))));
+		if (python_ispa_std_node_Node_empty((node))) {
+			repeating = false;
+		} else {
+			ispa_vec_python_ispa_std_node_NodeP_push((result), node);
+		}
+	}
+	python_ispa_std_parser_ll_LLParser_sync_loop((self), pos);
+	return result;
+}
+typedef struct {
+    ispa_fn rec;
+    python_ispa_std_parser_ll_LLParser* self;
+} python_ispa_std_parser_ll_lam7_env;
+static python_ispa_std_node_Node* python_ispa_std_parser_ll_lam7(void *env_, python_ispa_std_lexer_TokenCursor* attempt) {
+    python_ispa_std_parser_ll_lam7_env *env = (python_ispa_std_parser_ll_lam7_env *)env_; (void)env;
+	ispa_fn rec = env->rec;
+	python_ispa_std_parser_ll_LLParser* self = env->self;
+	return python_ispa_std_parser_ll_LLParser_optional_rule((self), attempt, rec);
+}
+static ispa_fn python_ispa_std_parser_ll_lam7_make(ispa_fn rec, python_ispa_std_parser_ll_LLParser* self) {
+    python_ispa_std_parser_ll_lam7_env *e = ISPA_NEW(python_ispa_std_parser_ll_lam7_env);
+    e->rec = rec;
+    e->self = self;
+    return (ispa_fn){ (void *)python_ispa_std_parser_ll_lam7, e };
+}
+
 ispa_vec_python_ispa_std_node_NodeP* python_ispa_std_parser_ll_LLParser_range_optional_rule(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor* pos, ispa_fn rec) {
 	ispa_vec_python_ispa_std_node_NodeP* result = ispa_vec_python_ispa_std_node_NodeP_new();
 	bool repeating = true;
 	while (((((((repeating) && ((!(python_ispa_std_lexer_TokenCursor_isEnd_v((pos)))))))) && ((!(python_ispa_std_parser_ll_LLParser_unwinding((self)))))))) {
-		python_ispa_std_node_Node* node = python_ispa_std_parser_ll_LLParser_repeat_optional((self), pos, python_ispa_std_parser_ll_lam5_make(rec, self), ((((int64_t)(result)->len) > (INT64_C(0)))));
+		python_ispa_std_node_Node* node = python_ispa_std_parser_ll_LLParser_repeat_optional((self), pos, python_ispa_std_parser_ll_lam7_make(rec, self), ((((int64_t)(result)->len) > (INT64_C(0)))));
 		if (python_ispa_std_node_Node_empty((node))) {
 			repeating = false;
 		} else {
@@ -5198,9 +5263,77 @@ bool python_ispa_std_external_external_starts(python_ispa_std_external_ExternalB
 	python_ispa_std_external__require_lazy(pos);
 	return python_ispa_std_external_ExternalBinding_starts((binding), python_ispa_std_lexer_TokenCursor_sourceOrigin_v((pos)), python_ispa_std_lexer_TokenCursor_sourcePosition_v((pos)));
 }
+typedef struct {
+    ispa_vec_python_ispa_std_external_ExternalResultP* holder;
+    python_ispa_std_external_ExternalBinding* binding;
+    ispa_str origin;
+    int64_t begin;
+} python_ispa_std_external_lam8_env;
+static void python_ispa_std_external_lam8(void *env_) {
+    python_ispa_std_external_lam8_env *env = (python_ispa_std_external_lam8_env *)env_; (void)env;
+	ispa_vec_python_ispa_std_external_ExternalResultP* holder = env->holder;
+	python_ispa_std_external_ExternalBinding* binding = env->binding;
+	ispa_str origin = env->origin;
+	int64_t begin = env->begin;
+	{ (void)(ispa_vec_python_ispa_std_external_ExternalResultP_push((holder), python_ispa_std_external_ExternalBinding_parse((binding), origin, begin))); return; };
+}
+static ispa_fn python_ispa_std_external_lam8_make(ispa_vec_python_ispa_std_external_ExternalResultP* holder, python_ispa_std_external_ExternalBinding* binding, ispa_str origin, int64_t begin) {
+    python_ispa_std_external_lam8_env *e = ISPA_NEW(python_ispa_std_external_lam8_env);
+    e->holder = holder;
+    e->binding = binding;
+    e->origin = origin;
+    e->begin = begin;
+    return (ispa_fn){ (void *)python_ispa_std_external_lam8, e };
+}
+
+typedef struct {
+    ispa_vec_python_ispa_std_external_ExternalResultP* holder;
+    python_ispa_std_external_ExternalBinding* binding;
+    ispa_str origin;
+    int64_t begin;
+} python_ispa_std_external_lam9_env;
+static void python_ispa_std_external_lam9(void *env_) {
+    python_ispa_std_external_lam9_env *env = (python_ispa_std_external_lam9_env *)env_; (void)env;
+	ispa_vec_python_ispa_std_external_ExternalResultP* holder = env->holder;
+	python_ispa_std_external_ExternalBinding* binding = env->binding;
+	ispa_str origin = env->origin;
+	int64_t begin = env->begin;
+	{ (void)(ispa_vec_python_ispa_std_external_ExternalResultP_push((holder), python_ispa_std_external_ExternalBinding_parse((binding), origin, begin))); return; };
+}
+static ispa_fn python_ispa_std_external_lam9_make(ispa_vec_python_ispa_std_external_ExternalResultP* holder, python_ispa_std_external_ExternalBinding* binding, ispa_str origin, int64_t begin) {
+    python_ispa_std_external_lam9_env *e = ISPA_NEW(python_ispa_std_external_lam9_env);
+    e->holder = holder;
+    e->binding = binding;
+    e->origin = origin;
+    e->begin = begin;
+    return (ispa_fn){ (void *)python_ispa_std_external_lam9, e };
+}
+
 python_ispa_std_match_result_MatchResult* python_ispa_std_external_external_match(python_ispa_std_external_ExternalBinding* binding, python_ispa_std_lexer_TokenCursor* pos) {
-	/* ISPA-C-TODO: local without a declared type */
-	ISPA_UNIMPLEMENTED("python_ispa_std_external.external_match");
+	ISPA_STR("Try the binding at pos. On success `pos` is advanced past the foreign text.");
+	python_ispa_std_external__require_lazy(pos);
+	if ((!(python_ispa_std_external_ExternalBinding_starts((binding), python_ispa_std_lexer_TokenCursor_sourceOrigin_v((pos)), python_ispa_std_lexer_TokenCursor_sourcePosition_v((pos)))))) {
+		return python_ispa_std_match_result_MatchResult_failed(python_ispa_std_lexer_TokenCursor_copy_v((pos)));
+	}
+	ispa_vec_python_ispa_std_external_ExternalResultP* holder = ispa_vec_python_ispa_std_external_ExternalResultP_new();
+	ispa_str origin = python_ispa_std_lexer_TokenCursor_sourceOrigin_v((pos));
+	int64_t begin = python_ispa_std_lexer_TokenCursor_sourcePosition_v((pos));
+	int64_t failed = ispa_attempt_fn(python_ispa_std_external_lam9_make(holder, binding, origin, begin));
+	if ((((failed) != (INT64_C(0))))) {
+		ispa_str message = ispa_failure_message();
+		if ((((failed) == (python_ispa_std_errors_ErrorKind_RuntimeFailure)))) {
+			python_ispa_std_failures_external_parse_error(message);
+		} else {
+			python_ispa_std_failures_rethrow(failed, message);
+		}
+		return python_ispa_std_match_result_MatchResult_failed(python_ispa_std_lexer_TokenCursor_copy_v((pos)));
+	}
+	python_ispa_std_external_ExternalResult* result = ispa_vec_python_ispa_std_external_ExternalResultP_get((holder), INT64_C(0));
+	if ((!((result)->status))) {
+		return python_ispa_std_match_result_MatchResult_failed(python_ispa_std_lexer_TokenCursor_copy_v((pos)));
+	}
+	python_ispa_std_lexer_TokenCursor_consumeExternal_v((pos), (result)->end);
+	return python_ispa_std_match_result_MatchResult_new(true, (result)->node, python_ispa_std_lexer_TokenCursor_copy_v((pos)));
 }
 python_ispa_std_ast_printer_ASTPrinter* python_ispa_std_ast_printer_get_ASTPrinter_handler(ispa_arena* arena) {
 	python_ispa_std_ast_printer_ASTPrinter* h = (python_ispa_std_ast_printer_ASTPrinter*)ispa_arena_calloc(arena, sizeof(python_ispa_std_ast_printer_ASTPrinter));
