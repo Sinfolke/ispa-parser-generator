@@ -25,7 +25,7 @@ def build(ispa, work, grammar, sanitize):
     gen_cpp.mkdir(parents=True, exist_ok=True)
     directory, entry = GRAMMARS[grammar][0], GRAMMARS[grammar][1]
     global WRAPPED
-    WRAPPED = not (directory / entry).read_text().startswith('module ')
+    WRAPPED = False
     algorithm = LR_ALGORITHMS[grammar][1] if grammar in LR_ALGORITHMS else 'LL'
     common = ['-a', algorithm, '--no-incremental', '--no-ai-recovery', '--no-debug-instrumentation']
     # the application is lowered together with the library it runs on (the library itself is compiled separately)
@@ -33,9 +33,12 @@ def build(ispa, work, grammar, sanitize):
     # sibling grammar files (token lists) are merged in front of the entry; a leading `module ...;` line stays first
     body = ''.join(f.read_text() for f in sorted(directory.glob('*.isc')) if f.name != entry) + (directory / entry).read_text()
     head, _, rest = body.partition('\n')
-    (gen / 'parser.isc').write_text(head + '\n' + imports + rest if head.startswith('module ') else imports + body)
+    # a plain grammar is declared as the root module, so the imports do not add a wrapper `main` rule above it
+    (gen / 'parser.isc').write_text(head + '\n' + imports + rest if head.startswith('module ') else 'module main -> main;\n' + imports + body)
     run([ispa, '-l', 'c', *common, '--dir', str(LIBRARY), str(gen / 'parser.isc'), '-o', str(gen / 'parser')], env=env)
-    run([ispa, '-l', 'cpp', *common, '--dir', str(directory), str(directory / entry), '-o', str(gen_cpp / 'generated')], env=env)
+    # the reference is the same module-wrapped grammar without the library imports, so both sides have the same root structure
+    (gen_cpp / 'ref.isc').write_text(head + '\n' + rest if head.startswith('module ') else 'module main -> main;\n' + body)
+    run([ispa, '-l', 'cpp', *common, str(gen_cpp / 'ref.isc'), '-o', str(gen_cpp / 'generated')], env=env)
     flags = ['-std=c11', '-O1', '-g', '-w'] + (['-fsanitize=address,undefined'] if sanitize else [])
     sources = [gen / 'parser.c', HERE / 'c' / 'run.c', RUNTIME / 'ispa_lexer.c', RUNTIME / 'ispa_print.c', RUNTIME / 'ispa_c.c', RUNTIME / 'lowered' / 'ispa_std.c']
     binary = work / 'run_c'
@@ -51,8 +54,8 @@ WRAPPED = True      # False for grammars that declare their own `module` (no wra
 def normalize(out):
     """The import lines make the grammar a module: rules are named modules::parser::x, and the root is a wrapper
     `main -> value -> <the user's main rule>`. Strip both so the output reads like the plain C++ parser's."""
-    out = out.replace('modules::parser::', '').replace('modules_parser_', '').replace('modules.parser.', '')
-    out = out.replace('in main > main >', 'in main >')      # the wrapper's own recovery frame
+    for prefix in ('parser', 'main'):
+        out = out.replace(f'modules::{prefix}::', '').replace(f'modules_{prefix}_', '').replace(f'modules.{prefix}.', '')
     lines = out.splitlines(keepends=True)
     if WRAPPED and len(lines) > 2 and lines[0] == 'main\n' and lines[1] == '\u2514\u2500\u2500 value\n' and lines[2].startswith('    '):
         body = [line[8:] if line[:1] in ' \u2502' and not line.startswith('ERR') else line for line in lines[2:]]
@@ -76,7 +79,7 @@ def main():
         environment = {**os.environ, **({'LAZY': '1'} if lazy else {})}
         # the `import py` lines that bring the library in make the grammar a module: rules are named modules::parser::x
         got = subprocess.run([str(ours), text], capture_output=True, text=True, env=environment).stdout
-        return subprocess.run([str(cpp), text], capture_output=True, text=True, env=environment).stdout, normalize(got)
+        return normalize(subprocess.run([str(cpp), text], capture_output=True, text=True, env=environment).stdout), normalize(got)
 
     failing = [(text, lazy) for text in inputs for lazy in (False, True) if len(set(outputs(text, lazy))) != 1]
     for text, lazy in failing:
