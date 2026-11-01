@@ -794,6 +794,8 @@ namespace C {
     // lowered library only reads captured names inside lambdas, or mutates the objects they point to).
     auto Construct::convertLambda(const LangAPI::Lambda &lam, const LangAPI::Typing::MaybeType &expected, bool void_ret) -> std::string {
         const auto id = prefix() + "_lam" + std::to_string(lambda_counter++);
+        const auto saved_guards = std::exchange(frame_guards, {});      // a lambda's returns do not close the enclosing function's frames
+        struct GuardRestore { std::vector<std::pair<std::string, std::string>> &g, saved; ~GuardRestore() { g = std::move(saved); } } guard_restore{frame_guards, saved_guards};
         std::vector<std::string> d;
         std::vector<LangAPI::Type> eparams; std::optional<LangAPI::Type> eret;
         if (expected) if (auto sig = LangAPI::Typing::Typer::callableSignature(*expected)) { eparams = sig->first; eret = sig->second; }
@@ -1130,9 +1132,10 @@ namespace C {
         }
         if (r.type() == LangAPI::RValueType::MakeTuple) {      // (a, b) -> utility::Pair<A, B>
             const auto &mt = r.getMakeTuple();
-            if (mt.args.size() != 2) throw Unsupported{"tuple of " + std::to_string(mt.args.size()) + " elements"};
             auto hint = array_hint;
             array_hint.reset();
+            if (mt.args.size() != 2)      // wider tuples (capture groups) are lists of boxed members
+                return arrayLiteralValues(mt.args, LangAPI::Type(LangAPI::ValueType::Array, LangAPI::Type(LangAPI::ValueType::Any)));
             LangAPI::Type pair_t;
             if (hint && LangAPI::Typing::Typer::strip(*hint).isSymbol()) pair_t = LangAPI::Typing::Typer::strip(*hint);
             else {
@@ -1349,11 +1352,20 @@ namespace C {
                 case LangAPI::ExpressionValueType::Continue: out += "continue"; break;
                 case LangAPI::ExpressionValueType::Return: {
                     auto value = cur_return ? convertExprAs(v.getReturn().value, *cur_return) : convertExpr(v.getReturn().value);
+                    std::string closes;      // RAII guards (recovery_frame / counter_scope) of the function are closed on every return
+                    for (auto g = frame_guards.rbegin(); g != frame_guards.rend(); ++g) closes += g->second + "(" + g->first + "); ";
                     if (cur_return && cur_return->isValueType() && cur_return->getValueType() == LangAPI::ValueType::Void && !value.empty()) {
-                        out += "{ (void)(" + value + "); return; }";
+                        out += "{ (void)(" + value + "); " + closes + "return; }";
                         break;
                     }
                     if (cur_return && !value.empty()) value = coerce(value, typer->typeOf(v.getReturn().value), *cur_return);
+                    if (!closes.empty()) {
+                        std::vector<std::string> rd;
+                        const auto rt = cur_return && !value.empty() ? typeName(*cur_return, rd) : std::string("void");
+                        if (value.empty() || rt == "void") out += "{ " + closes + "return; }";
+                        else out += "{ " + rt + " ispa_ret_ = " + value + "; " + closes + "return ispa_ret_; }";
+                        break;
+                    }
                     out += "return" + (value.empty() ? std::string() : " " + value);
                     break;
                 }
@@ -1587,6 +1599,8 @@ namespace C {
             const auto t = typeName(declared, d);
             if (!d.empty()) throw Unsupported{"local type: " + d.front()};
             locals.back().insert(v.name);
+            if (t.ends_with("_FrameGuard*")) frame_guards.emplace_back(cIdent(v.name), t.substr(0, t.size() - 1) + "_close");
+            else if (t.ends_with("_CounterScope*")) frame_guards.emplace_back(cIdent(v.name), t.substr(0, t.size() - 1) + "_close");
             if (v.value.empty()) {
                 const auto *dcls = declared.isSymbol() ? typer->classOf(declared) : nullptr;
                 if (LangAPI::Typing::Typer::isValue(declared, LangAPI::ValueType::Array) && declared.isValueType())   // `x: list` starts as []
@@ -1676,6 +1690,7 @@ namespace C {
         for (const auto &[t, n] : fn.parameters) locals.back().insert(n);
         typer->beginFunction(owner.empty() ? nullptr : cur_class_decl, fn);
         cur_return = &fn.type;
+        frame_guards.clear();
         Converter::Writer body;
         std::string why;
         try {
@@ -1691,6 +1706,7 @@ namespace C {
                 }
             }
             convertStatements(fn.statements, body);
+            for (auto g = frame_guards.rbegin(); g != frame_guards.rend(); ++g) body.writeln("{}({});", g->second, g->first);
             // generated `print(os)`: the lowered printer buffers text, so it is written out at the end
             if (fn.name == "print" && fn.parameters.size() == 1 && fn.parameters[0].first.isIspaLibSymbol() &&
                 fn.parameters[0].first.getIspaLibSymbol().exports == LangAPI::StdlibExports::TextOutput)
@@ -1852,10 +1868,11 @@ namespace C {
         impls.writeln("{}* {}_get_{}_handler(ispa_arena* arena) {", c_name, pfx, name);
         impls.increaseIndentation();
         impls.writeln("{}* h = ({}*)ispa_arena_calloc(arena, sizeof({}));", c_name, c_name, c_name);
+        std::string post_init;
         if (const auto flag = memberPath(c_name, "has_space_token_"), id = memberPath(c_name, "space_token_");
             flag && id && !c_name.starts_with("python_ispa_std_") && functions.contains(pfx + "_Tokens___WS_id")) {
-            impls.writeln("h->{} = true;", *flag);          // the implicit whitespace token (`__WS`) is skipped between members
-            impls.writeln("h->{} = (int64_t){}_Tokens___WS_id;", *id, pfx);
+            // the implicit whitespace token (`__WS`) is skipped between members; set again after __init__ (which resets it)
+            post_init = std::format("o->{} = true; o->{} = (int64_t){}_Tokens___WS_id;", *flag, *id, pfx);
         }
         for (const auto &[decl, vis] : cls.data)      // TdfaLayout<R, O> fields are born with their sizes
             if (decl->isVariable() && !decl->getVariable().is_static && decl->getVariable().type.isSymbol() && decl->getVariable().value.empty() && !ancestorHasField(cls, decl->getVariable().name)) {
@@ -1902,6 +1919,7 @@ namespace C {
                     impls.writeln("{}_{}({});", oc->second, cIdent(init->name), joined(as, ", "));
                 }
             }
+            if (!post_init.empty()) impls.writeln("{}", post_init);
             impls.writeln("return o;");
             impls.decreaseIndentation();
             impls.writeln("}");
@@ -1998,6 +2016,10 @@ namespace C {
             fix(fix, owned_tree);
         }
         const auto mapType = [&](LangAPI::Type &t) {
+            if (t.isValueType() && t.getValueType() == LangAPI::ValueType::Tuple && t.template_parameters.size() != 2) {
+                t = LangAPI::Type(LangAPI::ValueType::Array, LangAPI::Type(LangAPI::ValueType::Any));
+                return;
+            }
             if (t.isValueType() && t.getValueType() == LangAPI::ValueType::Tuple && t.template_parameters.size() == 2) {
                 LangAPI::Type pair(LangAPI::Symbol(std::vector<std::string>{"python", "ispa_std", "utility", "Pair"}));
                 pair.template_parameters = t.template_parameters;

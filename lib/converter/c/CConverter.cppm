@@ -107,6 +107,7 @@ namespace C {
         std::string cur_class;                                               // C name of the class owning `self`, or empty
         std::vector<std::unordered_set<std::string>> locals;
         const LangAPI::Type *cur_return = nullptr;
+        std::vector<std::pair<std::string, std::string>> frame_guards;      // (variable, close function) of RAII guards in scope
         std::map<std::string, std::size_t> reasons;                          // survey: why a body stayed a placeholder
 
         auto convertStatements(const LangAPI::Statements &st, ::Converter::Writer &o) -> void;
