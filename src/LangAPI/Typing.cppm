@@ -182,6 +182,9 @@ export namespace LangAPI::Typing {
             if (!sym || !*sym) return std::nullopt;
             const auto parts = literalParts(**sym);
             if (parts.empty()) return std::nullopt;
+            if (parts.size() == 2 && parts[0] == "ISPA_STD" && (parts[1] == "construct" || parts[1] == "make_value") &&
+                c.template_parameters.size() == 1)
+                if (const auto *t = std::get_if<std::shared_ptr<Type>>(&c.template_parameters[0]); t && *t) return **t;
             if (parts.size() == 1 && cur_class)
                 if (const auto *m = findMethod(*cur_class, parts[0])) return m->type;
             if (const auto *cls = findClass(**sym)) return classType(*cls);   // constructor call

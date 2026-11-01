@@ -212,7 +212,40 @@ namespace C {
     }
 
     auto Construct::convertCall(const LangAPI::FunctionCall &call) -> std::string {
-        if (!call.template_parameters.empty()) throw Unsupported{"call with template arguments"};
+        if (const auto *sy = std::get_if<std::shared_ptr<LangAPI::Symbol>>(&call.name); sy && *sy && (*sy)->path.size() == 2 &&
+            std::holds_alternative<std::string>((*sy)->path[0]) && std::get<std::string>((*sy)->path[0]) == "ISPA_STD" &&
+            std::holds_alternative<std::string>((*sy)->path[1]) &&
+            (std::get<std::string>((*sy)->path[1]) == "construct" || std::get<std::string>((*sy)->path[1]) == "make_value") &&
+            call.template_parameters.size() == 1) {
+            const auto *tp = std::get_if<std::shared_ptr<LangAPI::Type>>(&call.template_parameters[0]);
+            if (!tp || !*tp) throw Unsupported{"construct with a non-type argument"};
+            const auto &T = **tp;
+            const auto *cls = typer->classOf(T);
+            std::vector<std::string> d;
+            if (cls) {
+                const LangAPI::Function *init = typer->findMethod(*cls, "__init__");
+                if (!init && cls->constructor) init = &*cls->constructor;
+                std::vector<std::string> args;
+                for (std::size_t k = 0; k < call.args.size(); ++k) {
+                    if (init && k < init->parameters.size()) {
+                        const auto &pt = init->parameters[k].first;
+                        args.push_back(coerce(convertExprAs(call.args[k], pt), typer->typeOf(call.args[k]), pt));
+                    } else args.push_back(convertExpr(call.args[k]));
+                }
+                return class_cname.at(cls) + "_new(" + joined(args, ", ") + ")";
+            }
+            if (LangAPI::Typing::Typer::isValue(T, LangAPI::ValueType::Array) && call.args.empty()) {
+                const auto elem = LangAPI::Typing::Typer::elementType(T);
+                if (elem) return vecName(typeName(*elem, d)) + "_new()";
+            }
+            throw Unsupported{"construct of a non-class type"};
+        }
+        if (!call.template_parameters.empty()) {
+            std::string nm = "?";
+            if (const auto *sy = std::get_if<std::shared_ptr<LangAPI::Symbol>>(&call.name); sy && *sy) nm = symbolName(**sy);
+            else nm = "ispalib";
+            throw Unsupported{"call with template arguments: " + nm};
+        }
         const auto *sym = std::get_if<std::shared_ptr<LangAPI::Symbol>>(&call.name);
         if (!sym || !*sym) throw Unsupported{"library function call"};
         std::vector<std::string> args;
@@ -755,6 +788,27 @@ namespace C {
         impls.decreaseIndentation();
         impls.writeln("}");
         impls.writeln("void {}_free_{}_handler({}* handler) { (void)handler; }", pfx, name, c_name);
+        {   // <Class>_new(args): allocate + __init__ (what ISPA_STD::construct<Class>(args) lowers to)
+            const LangAPI::Function *init = typer->findMethod(cls, "__init__");
+            const LangAPI::Class *init_owner = init ? typer->methodOwner(cls, "__init__") : &cls;
+            if (!init && cls.constructor) init = &*cls.constructor;
+            std::vector<std::string> ps, as;
+            if (init) for (const auto &[t, n] : init->parameters) { ps.push_back(typeName(t, diag) + " " + cIdent(n)); as.push_back(cIdent(n)); }
+            protos.writeln("{}* {}_new({});", c_name, c_name, ps.empty() ? "void" : joined(ps, ", "));
+            impls.writeln("{}* {}_new({}) {", c_name, c_name, ps.empty() ? "void" : joined(ps, ", "));
+            impls.increaseIndentation();
+            impls.writeln("{}* o = {}_get_{}_handler(ispa_cur);", c_name, pfx, name);
+            if (init) {
+                const auto oc = class_cname.find(init_owner);
+                if (oc != class_cname.end()) {
+                    as.insert(as.begin(), oc->second == c_name ? "o" : "(" + oc->second + "*)o");
+                    impls.writeln("{}_{}({});", oc->second, cIdent(init->name), joined(as, ", "));
+                }
+            }
+            impls.writeln("return o;");
+            impls.decreaseIndentation();
+            impls.writeln("}");
+        }
 
         for (const auto &[decl, vis] : cls.data)
             if (decl->isVariable() && decl->getVariable().is_static) emitGlobal(decl->getVariable(), types, protos, impls, c_name);
