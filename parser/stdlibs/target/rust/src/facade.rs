@@ -153,7 +153,9 @@ impl<Token: Clone + Default + 'static + TokenEnd> LazyIterator<Token> {
         let lexer = unsafe { &*state.borrow().lexer };
         lexer.input
     }
-    pub fn token(&self) -> Option<Token> { self.ensure()?.tokens.get(self.index).cloned() }
+    pub fn token(&self) -> Option<Token> { self.token_ref().cloned() }
+    /// The token at the cursor, borrowed from the lexer's list (made first if the cursor is ahead of the lexing).
+    pub fn token_ref(&self) -> Option<&Token> { self.ensure()?.tokens.get(self.index) }
     pub fn at_end(&self) -> bool { self.token().map_or(true, |token| token.is_end()) }
     /// Past the last token (the end marker included).
     pub fn is_end_lazy(&self) -> bool { self.at_end() }

@@ -11,6 +11,21 @@ import std;
 // helpers
 // ============================================================================
 namespace {
+    // `String::from("text")` of a lone literal as the plain `"text"` (a &str costs nothing); other expressions are left
+    // alone, or (as_str) turned into a &str when the context needs one
+    auto bareStringLiteral(const std::string &text, bool as_str = false) -> std::string {
+        static const std::string head = "String::from(\"";
+        if (text.starts_with(head) && text.ends_with("\")")) {
+            bool lone = true;
+            for (std::size_t i = head.size(); i + 2 < text.size() && lone; ++i) {
+                if (text[i] == '\\') ++i;
+                else if (text[i] == '"') lone = false;
+            }
+            if (lone) return text.substr(head.size() - 1, text.size() - head.size() + 1 - 1);
+        }
+        return as_str ? "(" + text + ").as_str()" : text;
+    }
+
     auto joinStrings(const std::vector<std::string> &items, std::string_view sep) -> std::string {
         std::string out;
         for (std::size_t i = 0; i < items.size(); ++i) {
@@ -1218,6 +1233,10 @@ auto RustCore::convertFunctionCall(const LangAPI::FunctionCall &call, bool membe
             const auto cursor = args[0].starts_with("&mut ") ? args[0] : "&mut " + args[0];
             return "::ispa_std::rule_context(" + cursor + ", &mut " + ast + ", " + args[2] + ", " + args[3] + ", " + args[4] + ")";
         }
+        if (symbol_name == "recovery_frame" && args.size() == 1) {
+            const auto object = receiver.empty() ? std::string("self") : receiver;
+            return object + ".recovery_frame(" + bareStringLiteral(args.front()) + ")";
+        }
         if (symbol_name == "recovery_at" || symbol_name == "recover_choice") {
             std::vector<std::string> sets;
             for (const auto& parameter : call.template_parameters) sets.push_back(recovery_set(parameter));
@@ -1226,8 +1245,11 @@ auto RustCore::convertFunctionCall(const LangAPI::FunctionCall &call, bool membe
             if (symbol_name == "recovery_at") {
                 // (expected text, claim labels...) -> (expected text, [labels])
                 std::vector<std::string> labels(args.begin() + (args.empty() ? 0 : 1), args.end());
-                return object + ".recovery_at(&[" + joinStrings(sets, ", ") + "], " + (args.empty() ? "String::new()" : args.front()) +
-                       ", &[" + joinStrings(labels, ", ") + "])";
+                for (auto& label : labels) label = bareStringLiteral(label, true);
+                // the claims of a site are constants of the generated parser: built once per site, then only shared
+                return object + ".recovery_at_site({ ::std::thread_local! { static SITE: ::ispa_std::ClaimSite = ::ispa_std::ClaimSite::new(&[" +
+                       joinStrings(sets, ", ") + "], " + (args.empty() ? "\"\"" : bareStringLiteral(args.front())) + ", &[" +
+                       joinStrings(labels, ", ") + "] as &[&str]); } SITE.with(|site| site.clone()) })";
             }
             // recover_choice(pos, rule, expected): the cursor is advanced in place
             if (!args.empty()) args[0] = "&mut " + args[0];
@@ -1272,6 +1294,22 @@ auto RustCore::convertFunctionCall(const LangAPI::FunctionCall &call, bool membe
             if (symbol_name == "ISPA_STD::construct" || shared_class)
                 return "{ let __object = <" + cls + ">::shared_default(); __object.borrow_mut()." + init + "; __object }";
             return "{ let mut __value = <" + cls + ">::default(); __value." + init + "; __value }";
+        }
+        if (symbol_name == "ISPA_STD::python_char_code" && args.size() == 1) {
+            // `prim.char_code(s[i])`: the code of the unit at i, without building the one-unit string
+            static const std::string head = "::ispa_std::pycoll::CharLike::char_string(&(::ispa_std::pycoll::PyIndex::py_index(&";
+            if (args[0].starts_with(head) && args[0].ends_with("))))")) {
+                const auto inner = args[0].substr(head.size(), args[0].size() - head.size() - 3);
+                int depth = 0;
+                for (std::size_t i = 0; i < inner.size(); ++i) {
+                    const char c = inner[i];
+                    if (c == '(' || c == '[' || c == '{') ++depth;
+                    else if (c == ')' || c == ']' || c == '}') --depth;
+                    else if (c == '"') { for (++i; i < inner.size() && inner[i] != '"'; ++i) if (inner[i] == '\\') ++i; }
+                    else if (c == ',' && depth == 0 && inner.compare(i, 4, ", &(") == 0)
+                        return "::ispa_std::pycoll::char_code_at(&" + inner.substr(0, i) + ", " + inner.substr(i + 2) + ")";
+                }
+            }
         }
         if (symbol_name.starts_with("ISPA_STD::python_"))
             return "::ispa_std::pycoll::" + symbol_name.substr(std::string("ISPA_STD::python_").size()) + "(" +

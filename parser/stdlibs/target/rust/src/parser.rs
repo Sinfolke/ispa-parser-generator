@@ -24,7 +24,7 @@ pub mod recovery {
     /// The core handler for one call site (cached: the sets are constants of the generated parser).
     pub fn handler(expected: &[usize], continuation: &[usize], follow: &[usize], synchronization: &[usize], insertion: bool,
                    deletion: bool, replacement: bool, max_skip: i64, rule: impl AsRef<str>, expected_text: impl AsRef<str>) -> CoreFail {
-        thread_local! { static CACHE: std::cell::RefCell<HashMap<String, CoreFail>> = Default::default(); }
+        thread_local! { static CACHE: std::cell::RefCell<HashMap<String, CoreFail, std::hash::BuildHasherDefault<crate::parser::FxHasher>>> = Default::default(); }
         let key = format!("{:?}|{:?}|{:?}|{:?}|{insertion}{deletion}{replacement}{max_skip}|{}|{}", expected, continuation, follow,
                           synchronization, rule.as_ref(), expected_text.as_ref());
         if let Some(found) = CACHE.with(|cache| cache.borrow().get(&key).cloned()) { return found; }
@@ -40,49 +40,64 @@ pub mod recovery {
 }
 pub use recovery::CoreFail;
 
-// Generated recovery positions repeat the same immutable claims. Hash borrowed
-// inputs on hits, and compare their contents too: a hash collision must never
-// change where error recovery resumes. Keep storage local to the parser and
-// bounded for callers that supply dynamically changing sets or labels.
+// Generated recovery positions repeat the same immutable claims, so the prepared `ClaimSet` of a site is cached
+// (the core's `recovery_at_set`, as the C++ facade does per call site). Lookup hashes the borrowed inputs with a cheap
+// hasher and compares their contents too: a hash collision must never change where error recovery resumes. Storage is
+// local to the parser and bounded for callers that supply dynamically changing sets or labels.
 #[derive(Clone, Default)]
 struct ClaimsCache {
-    entries: HashMap<u64, Vec<CachedClaims>>,
+    entries: HashMap<u64, Vec<CachedClaims>, std::hash::BuildHasherDefault<FxHasher>>,
     count: usize,
 }
 #[derive(Clone)]
 struct CachedClaims {
     sets: Vec<Vec<usize>>,
     labels: Vec<String>,
-    claims: std::rc::Rc<Vec<Shared<core_recovery::ContextClaim>>>,
+    expecting: String,
+    set: Shared<core_recovery::ClaimSet>,
+}
+/// FxHash: the ids hashed are small integers and short labels; SipHash costs more than the rest of the lookup.
+#[derive(Default, Clone, Copy)]
+pub(crate) struct FxHasher(pub u64);
+impl std::hash::Hasher for FxHasher {
+    fn finish(&self) -> u64 { self.0 }
+    fn write(&mut self, bytes: &[u8]) { for byte in bytes { self.write_u64(*byte as u64); } }
+    fn write_u64(&mut self, value: u64) { self.0 = (self.0.rotate_left(5) ^ value).wrapping_mul(0x517c_c1b7_2722_0a95); }
+    fn write_usize(&mut self, value: usize) { self.write_u64(value as u64) }
 }
 impl ClaimsCache {
     const LIMIT: usize = 256;
 
-    fn get(&mut self, sets: &[&[usize]], labels: &[String]) -> std::rc::Rc<Vec<Shared<core_recovery::ContextClaim>>> {
-        use std::hash::{Hash, Hasher};
-        let mut hash = std::collections::hash_map::DefaultHasher::new();
-        sets.hash(&mut hash);
-        for i in 0..sets.len() { labels.get(i).map_or("", String::as_str).hash(&mut hash); }
+    fn get<L: AsRef<str>>(&mut self, sets: &[&[usize]], labels: &[L], expecting: &str) -> Shared<core_recovery::ClaimSet> {
+        use std::hash::Hasher;
+        let mut hash = FxHasher::default();
+        for set in sets { hash.write_usize(set.len()); for id in *set { hash.write_usize(*id); } }
+        for label in labels { hash.write(label.as_ref().as_bytes()); hash.write_u64(0xff); }
+        hash.write(expecting.as_bytes());
         let key = hash.finish();
+        let label_of = |i: usize| labels.get(i).map_or("", |label| label.as_ref());
         if let Some(found) = self.entries.get(&key).and_then(|bucket| bucket.iter().find(|entry| {
-            entry.sets.len() == sets.len() && entry.sets.iter().zip(sets).all(|(a, b)| a.as_slice() == *b) &&
-                entry.labels.iter().enumerate().all(|(i, label)| label == labels.get(i).map_or("", String::as_str))
-        })) { return found.claims.clone(); }
+            entry.sets.len() == sets.len() && entry.expecting == expecting && entry.sets.iter().zip(sets).all(|(a, b)| a.as_slice() == *b) &&
+                entry.labels.iter().enumerate().all(|(i, label)| label == label_of(i))
+        })) { return found.set.clone(); }
 
-        let claims = std::rc::Rc::new(sets.iter().enumerate().map(|(i, set)| {
+        let claims: Vec<_> = sets.iter().enumerate().map(|(i, set)| {
             let claim = core_recovery::ContextClaim::shared_default();
-            claim.borrow_mut().__init__(labels.get(i).unwrap_or(&String::new()), recovery::token_set(set));
+            claim.borrow_mut().__init__(&label_of(i).to_string(), recovery::token_set(set));
             claim
-        }).collect());
+        }).collect();
+        let set = core_recovery::ClaimSet::shared_default();
+        set.borrow_mut().__init__(&claims);
         if self.count < Self::LIMIT {
             self.entries.entry(key).or_default().push(CachedClaims {
                 sets: sets.iter().map(|set| set.to_vec()).collect(),
-                labels: (0..sets.len()).map(|i| labels.get(i).cloned().unwrap_or_default()).collect(),
-                claims: std::rc::Rc::clone(&claims),
+                labels: (0..sets.len()).map(|i| label_of(i).to_string()).collect(),
+                expecting: expecting.to_string(),
+                set: set.clone(),
             });
             self.count += 1;
         }
-        claims
+        set
     }
 }
 
@@ -93,34 +108,59 @@ mod claims_cache_tests {
     #[test]
     fn repeated_claims_share_storage_but_different_contents_do_not() {
         let mut cache = ClaimsCache::default();
-        let original = cache.get(&[&[1, 2], &[3]], &["value".into()]);
-        let repeated = cache.get(&[&[1, 2], &[3]], &["value".into(), "".into(), "ignored".into()]);
-        assert!(std::rc::Rc::ptr_eq(&original, &repeated));
-        assert_eq!(original[1].borrow().name, "");
-        let changed_label = cache.get(&[&[1, 2], &[3]], &["other".into()]);
-        let changed_set = cache.get(&[&[1], &[2, 3]], &["value".into()]);
-        assert!(!std::rc::Rc::ptr_eq(&original, &changed_label));
-        assert!(!std::rc::Rc::ptr_eq(&original, &changed_set));
-        assert_eq!(changed_label[0].borrow().name, "other");
-        assert_eq!(changed_set[1].borrow().tokens.borrow_mut().values().as_slice(), &[2, 3]);
+        let original = cache.get(&[&[1, 2], &[3]], &["value".to_string()], "e");
+        let repeated = cache.get(&[&[1, 2], &[3]], &["value", "", "ignored"][..1], "e");
+        assert!(Shared::ptr_eq(&original, &repeated));
+        assert_eq!(original.borrow().claims[1].borrow().name, "");
+        let changed_label = cache.get(&[&[1, 2], &[3]], &["other"], "e");
+        let changed_set = cache.get(&[&[1], &[2, 3]], &["value"], "e");
+        let changed_text = cache.get(&[&[1, 2], &[3]], &["value"], "f");
+        assert!(!Shared::ptr_eq(&original, &changed_label));
+        assert!(!Shared::ptr_eq(&original, &changed_set));
+        assert!(!Shared::ptr_eq(&original, &changed_text));
+        assert_eq!(changed_label.borrow().claims[0].borrow().name, "other");
+        assert_eq!(changed_set.borrow().claims[1].borrow().tokens.borrow_mut().values().as_slice(), &[2, 3]);
     }
 
     #[test]
     fn dynamic_claims_do_not_grow_the_cache_without_bound() {
         let mut cache = ClaimsCache::default();
         for i in 0..ClaimsCache::LIMIT + 10 {
-            let claims = cache.get(&[&[i]], &[]);
-            assert_eq!(claims[0].borrow().tokens.borrow_mut().values().as_slice(), &[i as i64]);
+            let claims = cache.get(&[&[i]], &[] as &[&str], "");
+            assert_eq!(claims.borrow().claims[0].borrow().tokens.borrow_mut().values().as_slice(), &[i as i64]);
         }
         assert_eq!(cache.count, ClaimsCache::LIMIT);
-        let first = cache.get(&[&[0]], &[]);
-        assert!(std::rc::Rc::ptr_eq(&first, &cache.get(&[&[0]], &[])));
+        let first = cache.get(&[&[0]], &[] as &[&str], "");
+        assert!(Shared::ptr_eq(&first, &cache.get(&[&[0]], &[] as &[&str], "")));
+    }
+}
+
+/// The claims of one `recovery_at` call site: built once (they are constants of the generated parser), then shared.
+#[derive(Clone)]
+pub struct ClaimSite(std::rc::Rc<(String, Shared<core_recovery::ClaimSet>)>);
+impl ClaimSite {
+    pub fn new(sets: &[&[usize]], expecting: impl AsRef<str>, labels: &[&str]) -> Self {
+        let claims: Vec<_> = sets.iter().enumerate().map(|(i, set)| {
+            let claim = core_recovery::ContextClaim::shared_default();
+            claim.borrow_mut().__init__(&labels.get(i).copied().unwrap_or("").to_string(), recovery::token_set(set));
+            claim
+        }).collect();
+        let set = core_recovery::ClaimSet::shared_default();
+        set.borrow_mut().__init__(&claims);
+        ClaimSite(std::rc::Rc::new((expecting.as_ref().to_string(), set)))
     }
 }
 
 /// What stands for the failure behaviour of a required element.
-pub trait IntoFail<IT> { fn into_handler(self, core: &Shared<parser_ll::LLParser>) -> Shared<core_recovery::FailHandler>; }
-impl<IT> IntoFail<IT> for CoreFail { fn into_handler(self, _core: &Shared<parser_ll::LLParser>) -> Shared<core_recovery::FailHandler> { self.handler } }
+pub trait IntoFail<IT> {
+    fn into_handler(self, core: &Shared<parser_ll::LLParser>) -> Shared<core_recovery::FailHandler>;
+    /// The handler when it already exists (a grammar-written fail block has to be built first): the fast paths need it.
+    fn existing_handler(&self) -> Option<&Shared<core_recovery::FailHandler>> { None }
+}
+impl<IT> IntoFail<IT> for CoreFail {
+    fn into_handler(self, _core: &Shared<parser_ll::LLParser>) -> Shared<core_recovery::FailHandler> { self.handler }
+    fn existing_handler(&self) -> Option<&Shared<core_recovery::FailHandler>> { Some(&self.handler) }
+}
 
 /// The state recovery is in while a fail block runs (the typed blocks do not read it).
 #[derive(Default)]
@@ -288,7 +328,7 @@ impl<Main, Token> LLParser<Main, Token> {
     where Action: FnMut(&mut IT, &mut RecoveryState) -> Shared<core_recovery::Decision> { CustomFail { action } }
 }
 
-thread_local! { static TOKEN_NAMES: std::cell::RefCell<HashMap<usize, Shared<parser_ll::TokenNames>>> = Default::default(); }
+thread_local! { static TOKEN_NAMES: std::cell::RefCell<HashMap<usize, Shared<parser_ll::TokenNames>, std::hash::BuildHasherDefault<FxHasher>>> = Default::default(); }
 /// The core's table of token names, asking the generated function (token ids are hashes, there is no table to index).
 #[repr(C)]
 struct FnNames { base_0: parser_ll::TokenNames, spell: fn(usize) -> Ptr }
@@ -353,14 +393,14 @@ impl<Main, Token> LLParser<Main, Token> {
     pub fn lazyParse(&mut self) -> MatchResult<Main, LazyIterator<Token>> { (self.__vt_lazyParse)(self) }
     /// Parse the tokens of `self.lexer`; the tree is `self.tree`.
     pub fn parse_tokens(&mut self) -> &Main where Main: 'static, Token: 'static {
-        self.core().borrow_mut().reset_recovery();
+        { let core = self.core(); let mut core = core.borrow_mut(); core.reset_recovery(); core.reset_probes(); }
         self.trailing.clear();
         self.parseFromTokens();
         &self.tree
     }
     /// Parse `text`, lexing it on demand; the tree is `self.tree`. The text is kept for the life of the program.
     pub fn parse_text(&mut self, text: &str) -> &Main where Main: Clone, Token: Clone + Default + 'static + TokenEnd {
-        self.core().borrow_mut().reset_recovery();
+        { let core = self.core(); let mut core = core.borrow_mut(); core.reset_recovery(); core.reset_probes(); }
         self.trailing.clear();
         self.text = Ptr::new(Box::leak(text.to_string().into_boxed_str()));
         let result = self.lazyParse();
@@ -375,13 +415,25 @@ impl<Main, Token> LLParser<Main, Token> {
     pub fn unwinding(&mut self) -> bool { self.core().borrow_mut().unwinding() }
     pub fn recovery_frame(&mut self, rule: impl AsRef<str>) -> FrameGuard {
         let core = self.core();
-        core.borrow_mut().enter_frame(&rule.as_ref().to_string());
+        // rule names repeat on every call: the String the core takes is made once per name
+        thread_local! { static NAMES: std::cell::RefCell<HashMap<String, String, std::hash::BuildHasherDefault<FxHasher>>> = Default::default(); }
+        let name = rule.as_ref();
+        NAMES.with(|names| {
+            let mut names = names.borrow_mut();
+            if !names.contains_key(name) { names.insert(name.to_string(), name.to_string()); }
+            core.borrow_mut().enter_frame(&names[name]);
+        });
         FrameGuard { core }
     }
     /// Where recovery may resume inside this rule: one claim (a label and a set of token ids) per set.
-    pub fn recovery_at(&mut self, sets: &[&[usize]], expecting: impl AsRef<str>, labels: &[String]) {
-        let claims = self.claims_cache.get(sets, labels);
-        self.core().borrow_mut().recovery_at(&expecting.as_ref().to_string(), &claims);
+    pub fn recovery_at<L: AsRef<str>>(&mut self, sets: &[&[usize]], expecting: impl AsRef<str>, labels: &[L]) {
+        let expecting = expecting.as_ref();
+        let set = self.claims_cache.get(sets, labels, expecting);
+        self.core().borrow_mut().recovery_at_set(&expecting.to_string(), set);
+    }
+    /// `recovery_at` for a call site whose claims were prepared once (see `ClaimSite`).
+    pub fn recovery_at_site(&mut self, site: ClaimSite) {
+        self.core().borrow_mut().recovery_at_set(&site.0 .0, site.0 .1.clone());
     }
     /// Which alternative to continue in after a failed choice; the cursor ends where recovery left it.
     pub fn recover_choice<IT: BridgeCursor>(&mut self, sets: &[&[usize]], pos: &mut IT, rule: impl AsRef<str>, expected: impl AsRef<str>) -> i64 {
@@ -410,6 +462,8 @@ impl<Main, Token> LLParser<Main, Token> {
     }
     /// A matched result made from an action's value (the rule short-circuits on an unwinding recovery).
     pub fn action_result<R, IT>(&mut self, value: R, pos: IT) -> MatchResult<R, IT> {
+        // a rule abandoned because a required descendant never started is not a match (see the core's reject_absent_rule)
+        if self.core().borrow_mut().absent_pending() { return MatchResult { status: false, node: Node { value, start_pos: 0, length: 0, line: 0, column: 0, name: 0, filled: false }, it: pos }; }
         MatchResult { status: true, node: Node::create(value), it: pos }
     }
 }
@@ -501,6 +555,15 @@ where
 {
     fn required<T: Clone + Default + 'static>(&mut self, pos: &mut IT, fail: impl IntoFail<IT>) -> Node<T> {
         let core = self.core();
+        // A matched terminal with nothing observing the core: no cursor, raw token or core node is built.
+        if let Some(handler) = fail.existing_handler() {
+            if pos.with_token(|token| token.alt_index()) == Some(token_id::<IT, T>()) && core.borrow_mut().fast_path_ok(handler.clone(), true) {
+                let node = pos.with_token(|token| token.typed_node::<T>()).unwrap_or_default();
+                pos.advance();
+                core.borrow_mut().accept_at(pos.distance());
+                return node;
+            }
+        }
         let cursor = bridge::<IT, T>(pos.clone(), true);
         let node = core.borrow_mut().required_token(cursor.clone().upcast(), token_id::<IT, T>(), fail.into_handler(&core));
         take(&cursor, pos);
@@ -509,6 +572,25 @@ where
     fn required_rule<T: Clone + Default + 'static>(&mut self, pos: &mut IT, rec: impl FnMut(&mut Self, IT) -> MatchResult<T, IT>,
                                                    fail: impl IntoFail<IT>) -> Node<T> {
         let core = self.core();
+        let mut rec = rec;
+        // Same shape as the core's required_rule when nothing observes it; only a failed first attempt enters the core.
+        if let Some(handler) = fail.existing_handler() {
+            if core.borrow_mut().fast_path_ok(handler.clone(), false) {
+                let matched = rec(self, pos.clone());
+                if matched.status {
+                    *pos = matched.it;
+                    core.borrow_mut().accept_at(pos.distance());
+                    return matched.node;
+                }
+                let first = CoreMatch::shared_default();
+                first.borrow_mut().__init__(false, CoreNode::blank(), bridge::<IT, T>(matched.it, false).upcast());
+                let cursor = bridge::<IT, T>(pos.clone(), false);
+                let callback = rule_callback::<Self, IT, T>(self as *mut Self, rec);
+                let node = core.borrow_mut().required_rule_resume(cursor.clone().upcast(), callback, handler.clone(), first);
+                take(&cursor, pos);
+                return typed_node::<T>(&node);
+            }
+        }
         let cursor = bridge::<IT, T>(pos.clone(), false);
         let callback = rule_callback::<Self, IT, T>(self as *mut Self, rec);
         let node = core.borrow_mut().required_rule(cursor.clone().upcast(), &String::new(), callback, fail.into_handler(&core));

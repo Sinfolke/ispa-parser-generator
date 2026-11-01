@@ -138,22 +138,24 @@ The input is a corpus of top-level statements taken from the Python standard lib
 
 | Target | Algorithm | 8 KB | 32 KB | 262 KB |
 |---|---|---:|---:|---:|
-| C++ | LL | 63.7 | 243.6 | 1751 |
+| C++ | LL | 21.9 | 63.5 | 454 |
 | C++ | LALR (generalized) | 796.5 | 7788 | n/a |
-| Rust | LL | 79.8 | 296.2 | 2129 |
+| Rust | LL | 21.8 | 74.7 | 535 |
 | Rust | LALR (generalized) | 395.5 | 3316 | n/a |
 | Python | LL | 424.6 | 1642 | 12483 |
 | Python | LALR (generalized) | 855.7 | n/a | n/a |
 | ANTLR 4 (C++), no tree | | 9.9 | 28.4 | 74.7 |
 | ANTLR 4 (C++), parse tree | | 10.0 | 29.1 | 83.6 |
 
-Lexing time at 8 KB / 32 KB / 262 KB: C++ 0.8 / 5.5 / 294 ms, Rust 2.4 / 5.5 / 44 ms, Python 85 / 324 / 3231 ms, ANTLR 98 / 363 / 2799 ms.
+Lexing time at 8 KB / 32 KB / 262 KB: C++ 1.3 / 8.0 / 295 ms, Rust 1.2 / 2.7 / 19 ms, Python 85 / 324 / 3231 ms, ANTLR 98 / 363 / 2799 ms.
+
+The C++ LL and Rust LL rows were re-measured after the parser-speed work (failure signalled by a flag instead of a C++ exception, shared recovery claim sets, terminal and rule fast paths, no per-character allocations in the Rust lexer). The LALR, Python-target and ANTLR rows are carried over from the earlier run and were not re-measured, so compare them with the LL rows only roughly (the machine was about 15% slower in the later session, judging by ANTLR on JSON).
 
 Caveats:
 - ANTLR parses faster than ISPA here, and its lexer is slower. ISPA's figures include building the typed AST and recovery bookkeeping; the ANTLR figures use the full Python 3 grammar from grammars-v4, ISPA's is a subset.
 - The Python grammar has LALR conflicts, so LALR uses the generalized parser (runtime branching). It hits its resource limit above ~32 KB ("n/a"). Use LL for this grammar.
-- Rust and Python targets are not optimized yet.
-- **Known bottleneck: exception-based backtracking.** A `perf` profile of the C++ LL parser on the 262 KB input shows about 60% of the time spent in C++ exception unwinding (`ISPA_STD::fail` throws on every failed alternative; the unwinder and personality routines dominate). The Python grammar fails alternatives constantly because statements and expressions share long prefixes, while JSON rarely does, which is why ISPA is close to ANTLR on JSON but far behind on Python. Returning failure by status instead of throwing, and rejecting alternatives by first-token lookahead, are planned.
+- The Python target and Rust LALR are not optimized yet. The Rust LL build used `codegen-units=8` for this grammar (a single unit ran out of memory while compiling it).
+- **Backtracking no longer throws.** Failed alternatives used to cost a C++ exception each (about 60% of the C++ LL time on the 262 KB input). The core now signals an absent rule by a flag that the generated rules check and return on, which is what made C++ LL about 3.9x faster on this grammar.
 - No bison grammar for Python exists that we could use, so bison is compared on JSON below.
 
 Reproduce: `python3 tools/core-parity/benchmark_python.py --targets cpp rust python --algorithms LL LALR`.
@@ -162,15 +164,17 @@ Reproduce: `python3 tools/core-parity/benchmark_python.py --targets cpp rust pyt
 
 | Configuration | Lex | Parse |
 |---|---:|---:|
-| flex + bison, recognition only | | 40 ms |
-| ANTLR 4 (C++), no tree | | 972 ms |
-| ANTLR 4 (C++), parse tree | | 1209 ms |
-| **ISPA** C++ LL | 768 ms | 1019 ms |
-| **ISPA** C++ LALR | 756 ms | 1984 ms |
-| **ISPA** Rust LL | 2064 ms | 5892 ms |
-| **ISPA** Rust LALR | 2084 ms | 3622 ms |
+| flex + bison, recognition only | | 60 ms |
+| ANTLR 4 (C++), no tree (lex + parse) | | 1130 ms |
+| ANTLR 4 (C++), parse tree (lex + parse) | | 1394 ms |
+| **ISPA** C++ LL | 892 ms | 1154 ms |
+| **ISPA** C++ LALR | 881 ms | 2255 ms |
+| **ISPA** Rust LL | 998 ms | 1671 ms |
+| **ISPA** Rust LALR | 1084 ms | 4021 ms |
 
-flex + bison is far faster, about 25x the C++ LL parse, but it only recognizes the input and builds no AST. ISPA's C++ LL parse builds a full typed AST. On this grammar LR is about 2x slower than LL in C++ and faster than LL in Rust. Sources: [`parser/ispa/bench`](parser/ispa/bench) and `tools/core-parity/benchmark_json.py`.
+Medians of 5 interleaved runs on a 10 MB compact JSON file. For reference, the Rust LL target took 2064 ms to lex and 5892 ms to parse before the Rust speed-up work (3.5x faster parse, 2.1x faster lex now).
+
+flex + bison is far faster, about 19x the C++ LL parse, but it only recognizes the input and builds no AST. ISPA's C++ LL parse builds a full typed AST. On this grammar LR is about 2x slower than LL in C++ and about 2.4x slower in Rust, whose LR driver has not been optimized yet. Sources: [`parser/ispa/bench`](parser/ispa/bench) and `tools/core-parity/benchmark_json.py`.
 
 ## Limitations
 

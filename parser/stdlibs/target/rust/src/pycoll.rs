@@ -28,6 +28,15 @@ impl StrSubstr for String {
         bytes[from..to].iter().map(|b| *b as char).collect()
     }
 }
+/// `string.substr(s, pos, count)` of the lowered library (count < 0 means "to the end"), over the 8-bit units of `s`.
+pub fn substr_units(s: &String, pos: i64, count: i64) -> String {
+    let n = s.len() as i64;
+    if pos < 0 || pos > n { crate::fail(1, "string.substr: pos out of range"); }
+    let end = if count >= 0 && pos + count < n { pos + count } else { n };
+    let bytes = &s.as_bytes()[pos as usize..end as usize];
+    if bytes.is_ascii() { return unsafe { std::str::from_utf8_unchecked(bytes) }.to_string(); }
+    bytes.iter().map(|b| *b as char).collect()
+}
 pub trait VecAt<T> { fn at(&self, index: usize) -> T; }
 impl<T: Clone> VecAt<T> for Vec<T> {
     fn at(&self, index: usize) -> T { self.get(index).cloned().unwrap_or_else(|| crate::fail(1, "vector::at")) }
@@ -50,6 +59,8 @@ impl<K: Eq + Hash, V> PyPop<K> for HashMap<K, V> {
 
 // One-unit strings: the lexer classifies single bytes 0..255, which a Rust String holds as the Latin-1 character.
 pub fn char_code(ch: &String) -> i64 { ch.chars().next().map_or(0, |c| (c as u32).min(255) as i64) }
+/// `char_code(s[index])` without building the one-unit string: the code of unit `index` (Python indexing rules).
+pub fn char_code_at<I: PyIdx>(s: &String, index: &I) -> i64 { s.as_bytes()[py_position(index.idx(), s.len())] as i64 }
 pub fn char_from_code(code: &i64) -> String { if (0..256).contains(code) { (*code as u8 as char).to_string() } else { String::new() } }
 
 /// What lowered Python generics assume of a type parameter: copyable by value, defaultable, comparable.
