@@ -52,6 +52,14 @@ namespace C {
         std::vector<std::string> counters{"pos"};          // position-counter stack of the rule being emitted
         auto cursorCall(const std::string &method, const std::string &recv, std::vector<std::string> args) -> std::string;
         auto boundMethodValue(const std::string &name, const LangAPI::Function &fn) -> std::string;
+        struct RuleOrToken { bool token = false; std::string id, name; };
+        auto siteStatic(const std::string &type, const std::string &init) -> std::string;
+        auto tokenIdOf(const std::variant<std::shared_ptr<LangAPI::Type>, std::shared_ptr<LangAPI::RValue>> &item) -> std::string;
+        auto tokenSetExpr(const LangAPI::Type &set) -> std::string;
+        auto policyExpr(const LangAPI::Type &policy) -> std::string;
+        auto ruleOrToken(const LangAPI::Type &t) -> RuleOrToken;
+        auto convertLibCall(const LangAPI::FunctionCall &call, const LangAPI::IspaLibSymbol &lib) -> std::string;
+        auto convertRecoveryCall(const LangAPI::FunctionCall &call, const std::string &name) -> std::string;
         std::string token_cname;
         std::set<std::string> token_classes;                      // names of synthesized token classes (see mapLibrary)
         auto emitTokenClass(const LangAPI::Class &cls, ::Converter::Writer &protos, ::Converter::Writer &impls) -> void;

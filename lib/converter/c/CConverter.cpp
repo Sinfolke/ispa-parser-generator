@@ -366,8 +366,6 @@ namespace C {
                 case S::ASTPrinter: return P({"ast_printer", "ASTPrinter"});
                 case S::RecoveryDecision: return P({"recovery", "Decision"});
                 case S::RecoveryState: return P({"recovery", "State"});
-                case S::RecoveryTokenSet: return P({"recovery", "TokenSet"});
-                case S::RecoveryPolicy: return P({"recovery", "Policy"});
                 case S::RecoveryHandler: return P({"recovery", "Handler"});
                 default: return std::nullopt;
             }
@@ -428,7 +426,158 @@ namespace C {
         throw Unsupported{"unresolved name " + joined(parts, "::")};
     }
 
+    // ------------------------------------------------------------------ parser rule layer
+    // Values built from C++ template arguments (token sets, policies, claims) never change: they are made once per call site.
+    auto Construct::siteStatic(const std::string &type, const std::string &init) -> std::string {
+        const auto name = prefix() + "_site" + std::to_string(lambda_counter++);
+        lambda_defs += "static " + type + " " + name + "(void) { static " + type + " v; if (!v) v = " + init + "; return v; }\n\n";
+        return name + "()";
+    }
+
+    auto Construct::tokenIdOf(const std::variant<std::shared_ptr<LangAPI::Type>, std::shared_ptr<LangAPI::RValue>> &item) -> std::string {
+        if (const auto *t = std::get_if<std::shared_ptr<LangAPI::Type>>(&item); t && *t) {
+            if ((*t)->isIspaLibSymbol() && (*t)->getIspaLibSymbol().exports == LangAPI::StdlibExports::RecoveryEndOfInput) return "python_ispa_std_recovery_EOF_TOKEN";
+            if ((*t)->isSymbol()) return "(int64_t)" + convertSymbolValue((*t)->getSymbol());
+            throw Unsupported{"recovery token set item is not a token id"};
+        }
+        const auto *r = std::get_if<std::shared_ptr<LangAPI::RValue>>(&item);
+        if (!r || !*r) throw Unsupported{"empty recovery token set item"};
+        return "(int64_t)" + convertRValue(**r);
+    }
+
+    auto Construct::tokenSetExpr(const LangAPI::Type &set) -> std::string {
+        if (!set.isIspaLibSymbol() || set.getIspaLibSymbol().exports != LangAPI::StdlibExports::RecoveryTokenSet) throw Unsupported{std::string("recovery token set expected, got ") + (set.isValueType() ? "valuetype " + std::to_string(static_cast<int>(set.getValueType())) : set.isSymbol() ? "symbol " + symbolName(set.getSymbol()) : "ispalib " + std::to_string(static_cast<int>(set.getIspaLibSymbol().exports)))};
+        std::vector<std::string> ids;
+        for (const auto &item : set.getIspaLibSymbol().template_parameters) ids.push_back(tokenIdOf(item));
+        const auto vec = ids.empty() ? std::string("ispa_vec_int64_t_new()")
+                                     : "ispa_vec_int64_t_from((int64_t[]){" + joined(ids, ", ") + "}, " + std::to_string(ids.size()) + ")";
+        return "python_ispa_std_recovery_TokenSet_new(" + vec + ")";
+    }
+
+    auto Construct::policyExpr(const LangAPI::Type &policy) -> std::string {
+        if (!policy.isIspaLibSymbol() || policy.getIspaLibSymbol().exports != LangAPI::StdlibExports::RecoveryPolicy) throw Unsupported{"recovery policy expected"};
+        std::vector<std::string> v;
+        for (const auto &item : policy.getIspaLibSymbol().template_parameters) {
+            if (const auto *r = std::get_if<std::shared_ptr<LangAPI::RValue>>(&item); r && *r) v.push_back(convertRValue(**r));
+            else if (const auto *t = std::get_if<std::shared_ptr<LangAPI::Type>>(&item); t && *t && (*t)->isSymbol()) v.push_back(convertSymbolValue((*t)->getSymbol()));
+            else throw Unsupported{"recovery policy item"};
+        }
+        static const char *const defaults[] = {"true", "true", "true", "INT64_C(64)"};
+        for (std::size_t i = v.size(); i < 4; ++i) v.emplace_back(defaults[i]);
+        return "python_ispa_std_recovery_Policy_new(" + joined(v, ", ") + ")";
+    }
+
+    // The class a rule/token type names, and whether it is a token (has a Tokens id) or a rule.
+    auto Construct::ruleOrToken(const LangAPI::Type &t) -> RuleOrToken {
+        const auto *cls = typer->classOf(t);
+        if (!cls) throw Unsupported{std::string("parser combinator over an unknown type: ") + (t.isSymbol() ? symbolName(t.getSymbol()) : t.isValueType() ? "valuetype " + std::to_string(static_cast<int>(t.getValueType())) : "ispalib")};
+        const auto cn = class_cname.at(cls);
+        const auto at = cn.find("_FlatTypes_");
+        if (at == std::string::npos) throw Unsupported{"parser combinator over a type outside FlatTypes: " + cn};
+        const auto ns = cn.substr(0, at), suffix = cn.substr(at + std::string("_FlatTypes_").size());
+        RuleOrToken out;
+        const auto tok = ns + "_Tokens_" + suffix + "_id";
+        if (functions.contains(tok)) { out.token = true; out.id = "(int64_t)" + tok; }
+        else out.name = ns + "_RulesStr_" + suffix + "_id";
+        return out;
+    }
+
+    auto Construct::convertLibCall(const LangAPI::FunctionCall &call, const LangAPI::IspaLibSymbol &lib) -> std::string {
+        using S = LangAPI::StdlibExports;
+        if (!cur_class_decl) throw Unsupported{"parser combinator outside a class"};
+        const auto typeArg = [&](std::size_t i) -> const LangAPI::Type & {
+            if (i >= call.template_parameters.size()) throw Unsupported{"missing template argument"};
+            const auto *t = std::get_if<std::shared_ptr<LangAPI::Type>>(&call.template_parameters[i]);
+            if (!t || !*t) throw Unsupported{"template argument is not a type"};
+            return **t;
+        };
+        const auto param = [&](const char *method, std::size_t idx) -> LangAPI::Type {
+            const auto *m = typer->findMethod(*cur_class_decl, method);
+            if (!m || idx >= m->parameters.size()) throw Unsupported{std::string("library method ") + method + " not found"};
+            return m->parameters[idx].first;
+        };
+        const auto arg = [&](std::size_t i) { return convertExpr(call.args.at(i)); };
+        switch (lib.exports) {
+            case S::RecoveryHandler: {
+                if (call.template_parameters.size() != 5 || call.args.size() != 2) throw Unsupported{"recovery handler needs 5 template and 2 call arguments"};
+                const auto r = arg(0), e = arg(1);
+                const auto init = "python_ispa_std_recovery_Handler_new(" + r + ", " + e + ", " + tokenSetExpr(typeArg(0)) + ", " + tokenSetExpr(typeArg(1)) + ", " +
+                                  tokenSetExpr(typeArg(2)) + ", " + tokenSetExpr(typeArg(3)) + ", " + policyExpr(typeArg(4)) + ")";
+                const bool constant = r.starts_with("ISPA_STR(") && e.starts_with("ISPA_STR(");
+                return constant ? siteStatic("python_ispa_std_recovery_Handler*", init) : init;
+            }
+            case S::ParserRequired: case S::ParserRange: case S::ParserOptional: case S::ParserRangeOptional: case S::ParserCounted: {
+                const auto rt = ruleOrToken(typeArg(0));
+                const bool has_fail = lib.exports == S::ParserRequired || lib.exports == S::ParserRange;
+                const char *base = lib.exports == S::ParserRequired ? "required" : lib.exports == S::ParserRange ? "range" :
+                                   lib.exports == S::ParserOptional ? "optional" : lib.exports == S::ParserRangeOptional ? "range_optional" : "counted";
+                const std::string method = std::string(base) + (rt.token ? "_token" : "_rule");
+                std::vector<std::string> a = {arg(0)};
+                const auto cb = [&](std::size_t call_index, std::size_t param_index) {
+                    return convertExprAs(call.args.at(call_index), param(method.c_str(), param_index));
+                };
+                if (lib.exports == S::ParserCounted) {
+                    const auto spec = arg(1);
+                    if (rt.token) a.insert(a.end(), {rt.id, spec});
+                    else a.insert(a.end(), {cb(2, 1), spec});
+                } else if (rt.token) {
+                    a.push_back(rt.id);
+                    if (has_fail) a.push_back(arg(1));
+                } else {
+                    if (has_fail) a.push_back(rt.name);       // rule name
+                    a.push_back(cb(1, has_fail ? 2 : 1));
+                    if (has_fail) a.push_back(arg(2));
+                }
+                return methodCall(*cur_class_decl, method, "self", a);
+            }
+            default: break;
+        }
+        throw Unsupported{"library call " + std::to_string(static_cast<int>(lib.exports))};
+    }
+
+    // recovery_at<Sets...>(expecting, labels...) and recover_choice<Sets...>(pos, rule, expected)
+    auto Construct::convertRecoveryCall(const LangAPI::FunctionCall &call, const std::string &name) -> std::string {
+        if (!cur_class_decl) throw Unsupported{"recovery call outside a class"};
+        std::vector<LangAPI::Type> sets;
+        for (const auto &tp : call.template_parameters) {
+            const auto *t = std::get_if<std::shared_ptr<LangAPI::Type>>(&tp);
+            if (!t || !*t) throw Unsupported{"recovery set argument"};
+            sets.push_back(**t);
+        }
+        if (name == "recovery_at") {
+            if (call.args.size() != sets.size() + 1) throw Unsupported{"recovery_at needs an expectation and one label per set"};
+            const auto expecting = convertExpr(call.args[0]);
+            std::vector<std::string> claims;
+            bool constant = expecting.starts_with("ISPA_STR(");
+            for (std::size_t i = 0; i < sets.size(); ++i) {
+                const auto label = convertExpr(call.args[i + 1]);
+                constant = constant && label.starts_with("ISPA_STR(");
+                claims.push_back("python_ispa_std_recovery_ContextClaim_new(" + label + ", " + tokenSetExpr(sets[i]) + ")");
+            }
+            const auto vn = vecName("python_ispa_std_recovery_ContextClaim*");
+            const auto vec = claims.empty() ? vn + "_new()" : vn + "_from((python_ispa_std_recovery_ContextClaim*[]){" + joined(claims, ", ") + "}, " + std::to_string(claims.size()) + ")";
+            const auto init = "python_ispa_std_recovery_ClaimSet_new(" + vec + ")";
+            const auto set = constant ? siteStatic("python_ispa_std_recovery_ClaimSet*", init) : init;
+            return methodCall(*cur_class_decl, "recovery_at_set", "self", {expecting, set});
+        }
+        // recover_choice: even template arguments are the alternatives' first sets, odd ones their inner sets
+        if (call.args.size() != 3 || sets.size() % 2 != 0) throw Unsupported{"invalid recover_choice"};
+        std::vector<std::string> first, inner;
+        for (std::size_t i = 0; i < sets.size(); ++i) (i % 2 == 0 ? first : inner).push_back(tokenSetExpr(sets[i]));
+        const auto vn = vecName("python_ispa_std_recovery_TokenSet*");
+        const auto mk = [&](const std::vector<std::string> &v) {
+            const auto init = v.empty() ? vn + "_new()" : vn + "_from((python_ispa_std_recovery_TokenSet*[]){" + joined(v, ", ") + "}, " + std::to_string(v.size()) + ")";
+            return siteStatic(vn + "*", init);
+        };
+        return methodCall(*cur_class_decl, "recover_choice", "self", {convertExpr(call.args[0]), convertExpr(call.args[1]), convertExpr(call.args[2]), mk(first), mk(inner)});
+    }
+
     auto Construct::convertCall(const LangAPI::FunctionCall &call) -> std::string {
+        if (const auto *lib = std::get_if<std::shared_ptr<LangAPI::IspaLibSymbol>>(&call.name); lib && *lib) return convertLibCall(call, **lib);
+        if (const auto *rs = std::get_if<std::shared_ptr<LangAPI::Symbol>>(&call.name); rs && *rs && (*rs)->path.size() == 1 &&
+            std::holds_alternative<std::string>((*rs)->path[0]) && !call.template_parameters.empty() &&
+            (std::get<std::string>((*rs)->path[0]) == "recovery_at" || std::get<std::string>((*rs)->path[0]) == "recover_choice"))
+            return convertRecoveryCall(call, std::get<std::string>((*rs)->path[0]));
         if (const auto *sy = std::get_if<std::shared_ptr<LangAPI::Symbol>>(&call.name); sy && *sy && (*sy)->path.size() == 2 &&
             std::holds_alternative<std::string>((*sy)->path[0]) && std::get<std::string>((*sy)->path[0]) == "ISPA_STD" &&
             std::holds_alternative<std::string>((*sy)->path[1]) &&
@@ -947,6 +1096,16 @@ namespace C {
                         case LangAPI::StdlibExports::LookaheadKind:
                             if (a.size() != 1) throw Unsupported{"lookahead_kind arity"};
                             out += "python_ispa_std_parser_ll_lookahead_kind((python_ispa_std_lexer_TokenCursor*)" + a[0] + ")"; break;
+                        case LangAPI::StdlibExports::AssignCompatible: {       // the value, converted to the target's type
+                            if (c.args.size() != 2) throw Unsupported{"assign_compatible arity"};
+                            const auto tt = typer->typeOf(c.args[0]), st = typer->typeOf(c.args[1]);
+                            if (!tt || !st) throw Unsupported{"assign_compatible between unknown types"};
+                            std::vector<std::string> dd;
+                            const auto tn = typeName(*tt, dd), sn = typeName(*st, dd);
+                            const auto v = coerce(a[1], st, *tt);
+                            if (tn != sn && !v.starts_with("(")) throw Unsupported{"assign_compatible converts " + sn + " to " + tn};
+                            out += v; break;
+                        }
                         case LangAPI::StdlibExports::TokenCursor:
                             if (a.size() != 1) throw Unsupported{"token cursor arity"};
                             out += "(python_ispa_std_lexer_TokenCursor*)python_ispa_std_lexer_TokenIterator_begin((python_ispa_std_lexer_Lexer_base*)" + a[0] + ")"; break;
@@ -970,10 +1129,22 @@ namespace C {
                                 throw Unsupported{"attempt of a non-lambda"};
                             out += "ispa_attempt_fn(" + convertLambda(c.args[0][0].getLambda(), std::nullopt, true) + ")"; break;
                         }
+                        case LangAPI::StdlibExports::ParserRequired: case LangAPI::StdlibExports::ParserOptional: case LangAPI::StdlibExports::ParserRange:
+                        case LangAPI::StdlibExports::ParserRangeOptional: case LangAPI::StdlibExports::ParserCounted: case LangAPI::StdlibExports::RecoveryHandler: {
+                            LangAPI::FunctionCall fc;
+                            fc.name = std::make_shared<LangAPI::IspaLibSymbol>(c.symbol);
+                            fc.template_parameters = c.template_parameters;
+                            fc.args = c.args;
+                            out += convertLibCall(fc, c.symbol);
+                            break;
+                        }
                         default: throw Unsupported{"ispa-lib call " + std::to_string(static_cast<int>(c.symbol.exports))};
                     }
                     break;
                 }
+                case LangAPI::ExpressionValueType::SkipSpaces:
+                    if (!cur_class_decl) throw Unsupported{"skip_spaces outside a class"};
+                    out += methodCall(*cur_class_decl, "skip_spaces", "self", {"(python_ispa_std_lexer_TokenCursor*)" + counters.back()}); break;
                 case LangAPI::ExpressionValueType::CounterIncreament:
                     out += cursorCall("next", "(python_ispa_std_lexer_TokenCursor*)" + counters.back(), {}); break;
                 case LangAPI::ExpressionValueType::CounterAssignment: {

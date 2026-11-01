@@ -204,6 +204,11 @@ export namespace LangAPI::Typing {
                 if (v.type() == ExpressionValueType::IspaLibFunctionCall) {
                     switch (v.getIspaLibFunctionCall().symbol.exports) {
                         case StdlibExports::Attempt: t = Type(ValueType::Int); break;
+                        case StdlibExports::ParserRequired: case StdlibExports::ParserOptional:
+                            t = Type(Symbol(std::vector<std::string>{"python", "ispa_std", "node", "Node"})); break;
+                        case StdlibExports::ParserRange: case StdlibExports::ParserRangeOptional: case StdlibExports::ParserCounted:
+                            t = Type(ValueType::Array, Type(Symbol(std::vector<std::string>{"python", "ispa_std", "node", "Node"}))); break;
+                        case StdlibExports::AssignCompatible: if (!v.getIspaLibFunctionCall().args.empty()) t = typeOf(v.getIspaLibFunctionCall().args[0]); break;
                         case StdlibExports::Fail: t = Type(ValueType::Void); break;
                         case StdlibExports::LookaheadKind: t = Type(ValueType::Int); break;
                         case StdlibExports::TokenCursor: case StdlibExports::LazyTokenCursor:
@@ -291,6 +296,14 @@ export namespace LangAPI::Typing {
             return findFunction(parts);
         }
         auto typeOf(const FunctionCall &c) const -> MaybeType {
+            if (const auto *lib = std::get_if<std::shared_ptr<IspaLibSymbol>>(&c.name); lib && *lib) {
+                const Type node(Symbol(std::vector<std::string>{"python", "ispa_std", "node", "Node"}));
+                switch ((*lib)->exports) {
+                    case StdlibExports::ParserRequired: case StdlibExports::ParserOptional: return node;
+                    case StdlibExports::ParserRange: case StdlibExports::ParserRangeOptional: case StdlibExports::ParserCounted: return Type(ValueType::Array, node);
+                    default: return std::nullopt;
+                }
+            }
             const auto *sym = std::get_if<std::shared_ptr<Symbol>>(&c.name);
             if (!sym || !*sym) return std::nullopt;
             const auto parts = literalParts(**sym);

@@ -148,6 +148,7 @@ template<> struct Children<LangAPI::IspaLibFunctionCall> {
     template<class N, class F> static void each(N& node, F& f) {
                 detail::descend(node.symbol, f);
         detail::descend(node.args, f);
+        detail::descend(node.template_parameters, f);
     }
 };
 
