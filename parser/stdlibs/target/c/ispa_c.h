@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <setjmp.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -65,6 +66,12 @@ void *ispa_vec_push(ispa_vec *v);                 /* returns the new (zeroed) sl
 void *ispa_vec_at(const ispa_vec *v, size_t i);
 void ispa_vec_clear(ispa_vec *v);                 /* just resets the length */
 
+/* ---- errors: fail() jumps to the innermost attempt(); with none installed the process aborts. Arena memory needs no cleanup. ---- */
+typedef struct ispa_jmp { jmp_buf buf; struct ispa_jmp *prev; } ispa_jmp;
+_Noreturn void ispa_fail(int64_t kind, ispa_str message);
+int64_t ispa_attempt(void (*fn)(void *env), void *env);   /* 0 on completion, else the kind passed to ispa_fail */
+ispa_str ispa_failure_message(void);
+
 /* ---- current arena: allocation sites in lowered code take it from here (set by the parser facade per parse) ---- */
 extern _Thread_local ispa_arena *ispa_cur;
 #define ISPA_NEW(T) ((T *)ispa_arena_calloc(ispa_cur, sizeof(T)))
@@ -100,7 +107,7 @@ static inline char ispa_str_at(ispa_str s, int64_t i) { return s.data[ispa_idx(i
     static inline void NAME##_set(NAME *v, int64_t i, T x) { v->data[ispa_idx(i, v->len)] = x; }               \
     static inline void NAME##_extend(NAME *v, const NAME *o) { for (size_t k = 0; k < o->len; ++k) NAME##_push(v, o->data[k]); } \
     static inline void NAME##_insert(NAME *v, int64_t i, T x) {                                                \
-        if (i < 0) i += (int64_t)v->len; if (i < 0) i = 0; if ((size_t)i > v->len) i = (int64_t)v->len;      \
+        if (i < 0) { i += (int64_t)v->len; } if (i < 0) { i = 0; } if ((size_t)i > v->len) { i = (int64_t)v->len; }\
         NAME##_reserve(v, v->len + 1);                                                                         \
         memmove(v->data + i + 1, v->data + i, (v->len - (size_t)i) * sizeof(T)); v->data[i] = x; v->len++;     \
     }                                                                                                          \

@@ -55,13 +55,14 @@ namespace C {
                     if (const auto *bs = std::get_if<LangAPI::Symbol>(&base)) { info.bases.emplace_back(symbolName(*bs), symbolName(*bs)); }
                 for (const auto &[decl, vis] : d.getClass().data) {
                     if (decl->isVariable()) info.fields.insert(cIdent(decl->getVariable().name));
-                    else if (decl->isFunction()) info.methods[decl->getFunction().name] = &decl->getFunction();
+                    else if (decl->isFunction()) { info.methods[decl->getFunction().name] = &decl->getFunction(); functions.insert(n + "_" + cIdent(decl->getFunction().name)); }
                 }
                 classes[n] = std::move(info);
             } else if (d.isEnum()) {
                 defined.insert(prefix() + "_" + cIdent(d.getEnum().name));
                 for (const auto &v : d.getEnum().value) functions.insert(prefix() + "_" + cIdent(d.getEnum().name) + "_" + cIdent(v));
-            } else if (d.isVariable()) functions.insert(prefix() + "_" + cIdent(d.getVariable().name));
+            } else if (d.isFunction()) functions.insert(prefix() + "_" + cIdent(d.getFunction().name));
+            else if (d.isVariable()) functions.insert(prefix() + "_" + cIdent(d.getVariable().name));
             else if (d.isTypeAlias()) defined.insert(prefix() + "_" + cIdent(d.getTypeAlias().name));
         }
     }
@@ -214,7 +215,13 @@ namespace C {
         const auto *sym = std::get_if<std::shared_ptr<LangAPI::Symbol>>(&call.name);
         if (!sym || !*sym) throw Unsupported{"library function call"};
         std::vector<std::string> args;
-        for (const auto &a : call.args) args.push_back(convertExpr(a));
+        const auto *decl = typer->resolveFunction(call);
+        for (std::size_t k = 0; k < call.args.size(); ++k) {
+            if (decl && k < decl->parameters.size()) {
+                const auto &pt = decl->parameters[k].first;
+                args.push_back(coerce(convertExprAs(call.args[k], pt), typer->typeOf(call.args[k]), pt));
+            } else args.push_back(convertExpr(call.args[k]));
+        }
         const auto &path = (*sym)->path;
         if (path.size() == 1 && std::holds_alternative<std::string>(path[0]) && !cur_class.empty()) {
             // implicit-self method call
@@ -302,8 +309,13 @@ namespace C {
                 if (!sym || !*sym || !cls || (*sym)->path.size() != 1 || !std::holds_alternative<std::string>((*sym)->path[0]))
                     throw Unsupported{"storage call on a non-class or library member"};
                 const auto &mname = std::get<std::string>((*sym)->path[0]);
-                out = methodCall(*cls, mname, out, args_of(call->args));
                 const auto *fn = typer->findMethod(*cls, mname);
+                std::vector<std::string> margs;
+                for (std::size_t k = 0; k < call->args.size(); ++k) {
+                    if (fn && k < fn->parameters.size()) margs.push_back(coerce(convertExprAs(call->args[k], fn->parameters[k].first), typer->typeOf(call->args[k]), fn->parameters[k].first));
+                    else margs.push_back(convertExpr(call->args[k]));
+                }
+                out = methodCall(*cls, mname, out, margs);
                 cur = fn ? LangAPI::Typing::MaybeType(fn->type) : std::nullopt;
             } else if (const auto *am = std::get_if<LangAPI::ArrayMethodCall>(&part)) {
                 if (stripped.isValueType() && (stripped.getValueType() == LangAPI::ValueType::String || stripped.getValueType() == LangAPI::ValueType::NonOwnedString) &&
@@ -315,7 +327,9 @@ namespace C {
                 std::vector<std::string> d;
                 const auto elemT = *LangAPI::Typing::Typer::elementType(stripped);
                 const auto vn = vecName(typeName(elemT, d));
-                const auto a = args_of(am->args);
+                auto a = args_of(am->args);
+                if (am->method == LangAPI::ArrayMethods::Push || am->method == LangAPI::ArrayMethods::PythonAppend)
+                    if (am->args.size() == 1) a[0] = coerce(convertExprAs(am->args[0], elemT), typer->typeOf(am->args[0]), elemT);
                 using AM = LangAPI::ArrayMethods;
                 switch (am->method) {
                     case AM::Size: out = "(int64_t)(" + out + ")->len"; cur = LangAPI::Type(LangAPI::ValueType::Int); break;
@@ -382,6 +396,20 @@ namespace C {
                 case LangAPI::ExpressionValueType::Empty: break;
                 case LangAPI::ExpressionValueType::RValue: out += convertRValue(v.getRValue()); break;
                 case LangAPI::ExpressionValueType::FunctionCall: out += convertCall(v.getFunctionCall()); break;
+                case LangAPI::ExpressionValueType::IspaLibFunctionCall: {
+                    const auto &c = v.getIspaLibFunctionCall();
+                    std::vector<std::string> a;
+                    for (const auto &x : c.args) a.push_back(convertExpr(x));
+                    switch (c.symbol.exports) {
+                        case LangAPI::StdlibExports::Fail:
+                            if (a.size() != 2) throw Unsupported{"fail arity"};
+                            out += "ispa_fail(" + a[0] + ", " + a[1] + ")"; break;
+                        case LangAPI::StdlibExports::FailureMessage: out += "ispa_failure_message()"; break;
+                        case LangAPI::StdlibExports::Attempt: throw Unsupported{"attempt (needs lambda hoisting)"};
+                        default: throw Unsupported{"ispa-lib call " + std::to_string(static_cast<int>(c.symbol.exports))};
+                    }
+                    break;
+                }
                 case LangAPI::ExpressionValueType::Break: out += "break"; break;
                 case LangAPI::ExpressionValueType::Continue: out += "continue"; break;
                 case LangAPI::ExpressionValueType::Return: {
@@ -510,6 +538,8 @@ namespace C {
             out = convertValue(v);
             if (v.isRvalue()) last_type = typer->typeOf(v.getRValue());
             else if (v.isFunctionCall()) last_type = typer->typeOf(v.getFunctionCall());
+            else if (v.type() == LangAPI::ExpressionValueType::IspaLibFunctionCall &&
+                     v.getIspaLibFunctionCall().symbol.exports == LangAPI::StdlibExports::FailureMessage) last_type = LangAPI::Type(LangAPI::ValueType::String);
             else last_type = std::nullopt;
             ++i;
         }

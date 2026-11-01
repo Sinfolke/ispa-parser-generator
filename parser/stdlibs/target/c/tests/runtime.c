@@ -1,6 +1,7 @@
 #include "../ispa_c.h"
 #include <assert.h>
 ISPA_DEFINE_VEC(vec_i64, int64_t)
+static void boom(void *env) { (void)env; ispa_fail(7, ISPA_STR("bad")); }
 int main(void) {
     ispa_arena a; ispa_arena_init(&a, 256, NULL);
     ispa_vec v; ispa_vec_init(&v, &a, sizeof(int64_t));
@@ -17,6 +18,11 @@ int main(void) {
     vec_i64 *w = vec_i64_new();
     for (int64_t i = 0; i < 50; ++i) vec_i64_push(w, i);
     assert(vec_i64_get(w, -1) == 49 && vec_i64_pop(w) == 49 && w->len == 49);
+    {
+        
+
+        assert(ispa_attempt(boom, NULL) == 7 && ispa_str_eq(ispa_failure_message(), ISPA_STR("bad")));
+    }
     puts("runtime ok");
     return 0;
 }

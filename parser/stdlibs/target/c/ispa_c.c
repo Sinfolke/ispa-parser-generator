@@ -71,3 +71,19 @@ void *ispa_vec_at(const ispa_vec *v, size_t i) { return i < v->len ? (char *)v->
 void ispa_vec_clear(ispa_vec *v) { v->len = 0; }
 
 _Thread_local ispa_arena *ispa_cur;
+
+static _Thread_local ispa_jmp *ispa_jmp_top;
+static _Thread_local int64_t ispa_fail_kind;
+static _Thread_local ispa_str ispa_fail_message;
+_Noreturn void ispa_fail(int64_t kind, ispa_str message) {
+    if (!ispa_jmp_top) { fprintf(stderr, "ispa: error %lld: %.*s\n", (long long)kind, (int)message.len, message.data); abort(); }
+    ispa_fail_kind = kind; ispa_fail_message = message;
+    longjmp(ispa_jmp_top->buf, 1);
+}
+int64_t ispa_attempt(void (*fn)(void *env), void *env) {
+    ispa_jmp j; j.prev = ispa_jmp_top; ispa_jmp_top = &j;
+    if (setjmp(j.buf) == 0) { fn(env); ispa_jmp_top = j.prev; return 0; }
+    ispa_jmp_top = j.prev;
+    return ispa_fail_kind;
+}
+ispa_str ispa_failure_message(void) { return ispa_fail_message; }

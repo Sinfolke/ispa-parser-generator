@@ -163,6 +163,20 @@ export namespace LangAPI::Typing {
         }
 
         auto typeOfStorage(const StorageSymbol &st) const -> MaybeType { return typeOfStorageImpl(st); }
+        // declaration a call resolves to (implicit-self method, qualified/free function, `Class::static`); nullptr = unknown/constructor
+        auto resolveFunction(const FunctionCall &c) const -> const Function * {
+            const auto *sym = std::get_if<std::shared_ptr<Symbol>>(&c.name);
+            if (!sym || !*sym) return nullptr;
+            const auto parts = literalParts(**sym);
+            if (parts.empty()) return nullptr;
+            if (parts.size() == 1 && cur_class)
+                if (const auto *m = findMethod(*cur_class, parts[0])) return m;
+            if (parts.size() >= 2) {
+                Symbol cls_sym(std::vector<std::string>(parts.begin(), parts.end() - 1));
+                if (const auto *cls = findClass(cls_sym)) if (const auto *m = findMethod(*cls, parts.back())) return m;
+            }
+            return findFunction(parts);
+        }
         auto typeOf(const FunctionCall &c) const -> MaybeType {
             const auto *sym = std::get_if<std::shared_ptr<Symbol>>(&c.name);
             if (!sym || !*sym) return std::nullopt;
