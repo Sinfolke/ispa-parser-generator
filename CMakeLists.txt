@@ -248,6 +248,7 @@ else()
     add_converter(cpp)
     add_converter(python)
     add_converter(rust)
+    add_converter(c)
 endif()
 # =============================================
 # Algorithms Shared Library

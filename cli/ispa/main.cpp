@@ -1023,7 +1023,7 @@ int generate(Args args) {
     const auto manifest_path = dir_path / (".codegen-manifest." + name);
     const auto previous_hashes = loadKeyHashMap(manifest_path);
     auto generated = converter.get();
-    if (!args.library_only && args.algorithm == Args::Algorithm::LL) {
+    if (!args.library_only && args.algorithm == Args::Algorithm::LL && args.language != Args::Language::C) {   // (the export glue is C++/Python)
         auto exports = External::exports(ast, module_project, name, args.language == Args::Language::Python);
         for (auto& [file, code] : exports) {
             auto target = std::ranges::find_if(generated, [&](const auto& item) { return item.first == file; });

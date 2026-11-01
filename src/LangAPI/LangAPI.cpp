@@ -248,6 +248,7 @@ namespace LangAPI {
     auto operator<<(std::ostream &os, Language l) -> std::ostream& {
         switch (l) {
             case Language::Cpp: os << "Cpp"; break;
+            case Language::C: os << "C"; break;
         }
         return os;
     }
