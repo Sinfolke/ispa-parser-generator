@@ -47,6 +47,7 @@ namespace C {
                 scope.pop_back();
             } else if (d.isClass()) {
                 const auto n = prefix() + "_" + symbolName(d.getClass().name);
+                class_cname[&d.getClass()] = n;
                 defined.insert(n);
                 if (!d.getClass().template_parameters.empty()) generic_classes.insert(n);
                 ClassInfo info; info.c_name = n;
@@ -81,6 +82,14 @@ namespace C {
         return joined(parts, "_");
     }
 
+    auto Construct::vecName(const std::string &elem) const -> std::string {
+        std::string m;
+        for (const char c : elem) m += std::isalnum(static_cast<unsigned char>(c)) ? c : (c == '*' ? 'P' : '_');
+        const auto name = "ispa_vec_" + m;
+        if (vec_seen.insert(name).second) vec_defs.emplace_back(name, elem);
+        return name;
+    }
+
     // C type of a lowered type. Anything without a direct C spelling is reported and degraded to a void pointer so the
     // header still compiles and the survey counts it.
     auto Construct::typeName(const LangAPI::Type &type, std::vector<std::string> &diag) const -> std::string {
@@ -100,7 +109,7 @@ namespace C {
                 case VT::Bool: return "bool";
                 case VT::Float: return "double";
                 case VT::String: case VT::NonOwnedString: return "ispa_str";
-                case VT::Array: return "ispa_vec";
+                case VT::Array: return vecName(inner(0)) + "*";
                 case VT::Map: return "ispa_map";
                 case VT::Callable: return "ispa_fn";
                 case VT::Any: return "ispa_any";
@@ -214,6 +223,86 @@ namespace C {
         return fn + "(" + joined(args, ", ") + ")";
     }
 
+    auto Construct::methodCall(const LangAPI::Class &recv_cls, const std::string &name, const std::string &recv,
+                               std::vector<std::string> args) -> std::string {
+        const auto *owner = typer->methodOwner(recv_cls, name);
+        if (!owner) throw Unsupported{"method " + name + " not found"};
+        const auto it = class_cname.find(owner);
+        if (it == class_cname.end()) throw Unsupported{"class of method " + name + " unknown"};
+        // TODO(vtable): Python methods are virtual; dispatch through the vtable once registration exists
+        const auto cast = owner == &recv_cls ? recv : "(" + it->second + "*)" + recv;
+        args.insert(args.begin(), cast);
+        return it->second + "_" + cIdent(name) + "(" + joined(args, ", ") + ")";
+    }
+
+    // x.a.b[i].m(args) ... walked with the static type of the value built so far
+    auto Construct::convertStorage(const LangAPI::StorageSymbol &ss) -> std::string {
+        std::string out;
+        LangAPI::Typing::MaybeType cur;
+        if (ss.what.empty()) {
+            if (!cur_class_decl) throw Unsupported{"storage path without a receiver"};
+            out = "self"; cur = typer->classType(*cur_class_decl);
+        } else { out = convertExpr(ss.what); cur = typer->typeOf(ss.what); }
+        const auto args_of = [&](const auto &as) {
+            std::vector<std::string> v; for (const auto &a : as) v.push_back(convertExpr(a)); return v;
+        };
+        for (const auto &part : ss.path) {
+            if (!cur) throw Unsupported{"storage path of unknown type"};
+            const auto *name = std::get_if<std::string>(&part);
+            if (!name) if (const auto *p = std::get_if<LangAPI::Property>(&part)) name = &p->name;
+            const auto stripped = LangAPI::Typing::Typer::strip(*cur);
+            if (name) {
+                const auto *cls = typer->classOf(*cur);
+                if (!cls) throw Unsupported{"member " + *name + " of a non-class"};
+                const auto m = memberPath(class_cname.at(cls), *name);
+                if (!m) throw Unsupported{"unknown member " + *name};
+                out += "->" + *m; cur = typer->fieldType(*cls, *name);
+            } else if (const auto *off = std::get_if<LangAPI::StorageOffset>(&part)) {
+                const auto idx = convertExpr(off->offset);
+                if (stripped.isValueType() && stripped.getValueType() == LangAPI::ValueType::Array) {
+                    std::vector<std::string> dd;
+                    out = vecName(typeName(*LangAPI::Typing::Typer::elementType(stripped), dd)) + "_get(" + out + ", " + idx + ")";
+                } else if (stripped.isValueType() && (stripped.getValueType() == LangAPI::ValueType::String ||
+                                                       stripped.getValueType() == LangAPI::ValueType::NonOwnedString)) {
+                    out = "ispa_str_at(" + out + ", " + idx + ")";
+                } else throw Unsupported{"index into a map/other container"};
+                cur = LangAPI::Typing::Typer::elementType(stripped);
+            } else if (const auto *call = std::get_if<LangAPI::FunctionCall>(&part)) {
+                const auto *sym = std::get_if<std::shared_ptr<LangAPI::Symbol>>(&call->name);
+                const auto *cls = typer->classOf(*cur);
+                if (!sym || !*sym || !cls || (*sym)->path.size() != 1 || !std::holds_alternative<std::string>((*sym)->path[0]))
+                    throw Unsupported{"storage call on a non-class or library member"};
+                const auto &mname = std::get<std::string>((*sym)->path[0]);
+                out = methodCall(*cls, mname, out, args_of(call->args));
+                const auto *fn = typer->findMethod(*cls, mname);
+                cur = fn ? LangAPI::Typing::MaybeType(fn->type) : std::nullopt;
+            } else if (const auto *am = std::get_if<LangAPI::ArrayMethodCall>(&part)) {
+                if (!stripped.isValueType() || stripped.getValueType() != LangAPI::ValueType::Array)
+                    throw Unsupported{"array method on a non-array"};
+                std::vector<std::string> d;
+                const auto elemT = *LangAPI::Typing::Typer::elementType(stripped);
+                const auto vn = vecName(typeName(elemT, d));
+                const auto a = args_of(am->args);
+                using AM = LangAPI::ArrayMethods;
+                switch (am->method) {
+                    case AM::Size: out = "(int64_t)(" + out + ")->len"; cur = LangAPI::Type(LangAPI::ValueType::Int); break;
+                    case AM::Push: case AM::PythonAppend:
+                        if (a.size() != 1) throw Unsupported{"append arity"};
+                        out = vn + "_push(" + out + ", " + a[0] + ")"; cur = LangAPI::Type(LangAPI::ValueType::Void); break;
+                    case AM::Pop: case AM::SequencePopBack: out = vn + "_pop(" + out + ")"; cur = elemT; break;
+                    case AM::PythonPop:
+                        if (!a.empty()) throw Unsupported{"pop(index)"};
+                        out = vn + "_pop(" + out + ")"; cur = elemT; break;
+                    case AM::Clear: case AM::PythonClear: out = vn + "_clear(" + out + ")"; cur = LangAPI::Type(LangAPI::ValueType::Void); break;
+                    case AM::Extend: case AM::PythonExtend:
+                        out = vn + "_extend(" + out + ", " + a.at(0) + ")"; cur = LangAPI::Type(LangAPI::ValueType::Void); break;
+                    default: throw Unsupported{"array method " + std::to_string(static_cast<int>(am->method))};
+                }
+            } else throw Unsupported{"storage path with library member"};
+        }
+        return out;
+    }
+
     auto Construct::convertRValue(const LangAPI::RValue &r) -> std::string {
         if (r.isInt()) return "INT64_C(" + std::to_string(r.getInt().value) + ")";
         if (r.isBool()) return r.getBool().value ? "true" : "false";
@@ -230,24 +319,7 @@ namespace C {
         }
         if (r.isString()) return "ISPA_STR(" + cString(r.getString().value) + ")";
         if (r.isSymbol()) return convertSymbolValue(r.getSymbol());
-        if (r.isStorageSymbol()) {
-            const auto &ss = r.getStorageSymbol();
-            std::string out = ss.what.empty() ? std::string() : convertExpr(ss.what);
-            std::string recvClass = ss.what.size() == 1 && ss.what[0].isRvalue() && ss.what[0].getRValue().isSymbol() &&
-                                        ss.what[0].getRValue().getSymbol().path.size() == 1 && out == "self" ? cur_class : std::string();
-            for (const auto &part : ss.path) {
-                std::string field;
-                if (const auto *prop = std::get_if<LangAPI::Property>(&part)) field = prop->name;
-                else if (const auto *str = std::get_if<std::string>(&part)) field = *str;
-                else throw Unsupported{"storage path with index/call"};
-                if (!recvClass.empty()) {
-                    const auto m = memberPath(recvClass, field);
-                    if (!m) throw Unsupported{"unknown member " + field + " of " + recvClass};
-                    out += "->" + *m; recvClass.clear();
-                } else out += "->" + cIdent(field);
-            }
-            return out;
-        }
+        if (r.isStorageSymbol()) return convertStorage(r.getStorageSymbol());
         if (r.type() == LangAPI::RValueType::Instance) {
             if (cur_class.empty()) throw Unsupported{"instance outside a method"};
             return "self";
@@ -498,7 +570,7 @@ namespace C {
         for (const auto &d : decls)
             if (d.isClass() && d.getClass().template_parameters.empty()) {
                 const auto n = prefix() + "_" + symbolName(d.getClass().name);
-                types.writeln("typedef struct {} {};", n, n);
+                fwd_w.writeln("typedef struct {} {};", n, n);
             }
         for (const auto &d : decls) {
             if (d.isNamespace()) {
@@ -511,7 +583,7 @@ namespace C {
             else if (d.isEnum()) {
                 std::vector<std::string> items;
                 for (const auto &v : d.getEnum().value) items.push_back(prefix() + "_" + cIdent(d.getEnum().name) + "_" + cIdent(v));
-                types.writeln("typedef enum { {} } {}_{};", joined(items, ", "), prefix(), cIdent(d.getEnum().name));
+                fwd_w.writeln("typedef enum { {} } {}_{};", joined(items, ", "), prefix(), cIdent(d.getEnum().name));
             }
         }
     }
@@ -525,6 +597,7 @@ namespace C {
         generic_classes.clear();
         diagnostics.clear();
         init_globals.clear();
+        vec_defs.clear(); vec_seen.clear(); class_cname.clear(); fwd_w = {};
         typer = std::make_unique<LangAPI::Typing::Typer>(*source);
         collect(*source);
         emitted_functions = skipped_functions = 0;
@@ -534,7 +607,9 @@ namespace C {
         const auto stem = std::string(namespace_name);
         std::string header = "/* @generated by the ISPA C backend. Needs ispa_c.h (parser/stdlibs/target/c). */\n"
                              "#pragma once\n#include \"ispa_c.h\"\n\n";
-        header += std::string(types.get()) + "\n" + std::string(protos.get());
+        std::string vecs;
+        for (const auto &[n, e] : vec_defs) vecs += "ISPA_DEFINE_VEC(" + n + ", " + e + ")\n";
+        header += std::string(fwd_w.get()) + "\n" + vecs + "\n" + std::string(types.get()) + "\n" + std::string(protos.get());
         std::string source_text = "/* @generated by the ISPA C backend. */\n#include \"" + stem + ".h\"\n\n";
         for (const auto &d : diagnostics) source_text += "/* ISPA-C-WARNING: " + d + " */\n";
         source_text += "\n" + std::string(impls.get());

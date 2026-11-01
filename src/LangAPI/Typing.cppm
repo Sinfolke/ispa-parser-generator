@@ -93,6 +93,16 @@ export namespace LangAPI::Typing {
                         if (const auto *m = findMethod(*b, name)) return m;
             return nullptr;
         }
+        // class that declares `name` (cls itself or a base)
+        auto methodOwner(const Class &cls, const std::string &name) const -> const Class * {
+            for (const auto &[decl, vis] : cls.data)
+                if (decl->isFunction() && decl->getFunction().name == name) return &cls;
+            for (const auto &[vis, base] : cls.inherit_members)
+                if (const auto *s = std::get_if<Symbol>(&base))
+                    if (const auto *b = findClass(*s); b && b != &cls)
+                        if (const auto *o = methodOwner(*b, name)) return o;
+            return nullptr;
+        }
         auto fieldType(const Class &cls, const std::string &name) const -> MaybeType {
             for (const auto &[decl, vis] : cls.data)
                 if (decl->isVariable() && decl->getVariable().name == name) return decl->getVariable().type;

@@ -65,6 +65,36 @@ void *ispa_vec_push(ispa_vec *v);                 /* returns the new (zeroed) sl
 void *ispa_vec_at(const ispa_vec *v, size_t i);
 void ispa_vec_clear(ispa_vec *v);                 /* just resets the length */
 
+/* ---- current arena: allocation sites in lowered code take it from here (set by the parser facade per parse) ---- */
+extern _Thread_local ispa_arena *ispa_cur;
+#define ISPA_NEW(T) ((T *)ispa_arena_calloc(ispa_cur, sizeof(T)))
+#define ISPA_CONCAT(a, b) ispa_str_concat(ispa_cur, (a), (b))
+static inline int64_t ispa_idx(int64_t i, size_t len) {
+    if (i < 0) i += (int64_t)len;
+    if (i < 0 || (size_t)i >= len) { fprintf(stderr, "ispa: index out of range\n"); abort(); }
+    return i;
+}
+static inline char ispa_str_at(ispa_str s, int64_t i) { return s.data[ispa_idx(i, s.len)]; }
+
+/* ---- typed vector (Python list: reference semantics, so always handled through NAME*) ----
+ * ISPA_DEFINE_VEC(ispa_vec_int64_t, int64_t) defines the struct and NAME_new/_push/_pop/_get/_set/_extend/_clear. */
+#define ISPA_DEFINE_VEC(NAME, T)                                                                              \
+    typedef struct NAME { T *data; size_t len, cap; } NAME;                                                    \
+    static inline NAME *NAME##_new(void) { return ISPA_NEW(NAME); }                                            \
+    static inline void NAME##_reserve(NAME *v, size_t n) {                                                     \
+        if (n <= v->cap) return;                                                                               \
+        size_t nc = v->cap ? v->cap : 4; while (nc < n) nc *= 2;                                               \
+        T *nd = (T *)ispa_arena_alloc(ispa_cur, nc * sizeof(T));                                               \
+        if (v->len) memcpy(nd, v->data, v->len * sizeof(T));                                                   \
+        v->data = nd; v->cap = nc;                                                                             \
+    }                                                                                                          \
+    static inline void NAME##_push(NAME *v, T x) { NAME##_reserve(v, v->len + 1); v->data[v->len++] = x; }     \
+    static inline T NAME##_pop(NAME *v) { if (!v->len) { fprintf(stderr, "ispa: pop from empty\n"); abort(); } return v->data[--v->len]; } \
+    static inline T NAME##_get(const NAME *v, int64_t i) { return v->data[ispa_idx(i, v->len)]; }              \
+    static inline void NAME##_set(NAME *v, int64_t i, T x) { v->data[ispa_idx(i, v->len)] = x; }               \
+    static inline void NAME##_extend(NAME *v, const NAME *o) { for (size_t k = 0; k < o->len; ++k) NAME##_push(v, o->data[k]); } \
+    static inline void NAME##_clear(NAME *v) { v->len = 0; }
+
 /* ---- map: open addressing keyed by byte strings or integers (filled in with the lowered dict users) ---- */
 typedef struct ispa_map { void *impl; ispa_arena *arena; } ispa_map;
 

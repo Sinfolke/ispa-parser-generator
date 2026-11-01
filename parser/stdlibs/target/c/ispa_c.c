@@ -69,3 +69,5 @@ void *ispa_vec_push(ispa_vec *v) {
 }
 void *ispa_vec_at(const ispa_vec *v, size_t i) { return i < v->len ? (char *)v->data + i * v->elem : NULL; }
 void ispa_vec_clear(ispa_vec *v) { v->len = 0; }
+
+_Thread_local ispa_arena *ispa_cur;

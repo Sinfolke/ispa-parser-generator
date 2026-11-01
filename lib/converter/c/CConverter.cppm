@@ -23,6 +23,14 @@ namespace C {
         std::unordered_set<std::string> defined;                 // C names of every class/enum/alias, filled before emission
         std::unique_ptr<LangAPI::Typing::Typer> typer;           // shared static typing (LangAPI.Typing)
         const LangAPI::Class *cur_class_decl = nullptr;
+        std::unordered_map<const LangAPI::Class *, std::string> class_cname;
+        mutable std::vector<std::pair<std::string, std::string>> vec_defs;   // (vector type name, element C type) in dependency order
+        mutable std::unordered_set<std::string> vec_seen;
+        auto vecName(const std::string &elem) const -> std::string;
+        auto convertStorage(const LangAPI::StorageSymbol &ss) -> std::string;
+        auto methodCall(const LangAPI::Class &recv_cls, const std::string &name, const std::string &recv,
+                        std::vector<std::string> args) -> std::string;
+        ::Converter::Writer fwd_w;                               // forward typedefs + enums (before vector definitions)
         std::vector<std::string> init_globals;                   // non-literal global initialisers, run by <stem>_init_globals()
         std::unordered_set<std::string> generic_classes;         // classes with type parameters (instantiated on demand)
 
