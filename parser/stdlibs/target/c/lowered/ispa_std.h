@@ -71,15 +71,11 @@ typedef struct python_ispa_std_parser_ll_CounterScope python_ispa_std_parser_ll_
 typedef struct python_ispa_std_parser_ll_RuleProbe python_ispa_std_parser_ll_RuleProbe;
 typedef struct python_ispa_std_parser_ll_Resume python_ispa_std_parser_ll_Resume;
 typedef struct python_ispa_std_parser_ll_LLParser python_ispa_std_parser_ll_LLParser;
-typedef struct python_ispa_std_parser_ll_RuleContext__voidP python_ispa_std_parser_ll_RuleContext__voidP;
-typedef struct python_ispa_std_parser_ll_FailContext__voidP python_ispa_std_parser_ll_FailContext__voidP;
 typedef struct python_ispa_std_lr_LRControlPhase python_ispa_std_lr_LRControlPhase;
 typedef struct python_ispa_std_lr_LRControlState python_ispa_std_lr_LRControlState;
 typedef struct python_ispa_std_lr_LRRuleSpan python_ispa_std_lr_LRRuleSpan;
 typedef struct python_ispa_std_lr_LRTokenValue python_ispa_std_lr_LRTokenValue;
 typedef struct python_ispa_std_lr_LRParser python_ispa_std_lr_LRParser;
-typedef struct python_ispa_std_lr_LRGrammar__voidP python_ispa_std_lr_LRGrammar__voidP;
-typedef struct python_ispa_std_lr_LRRegionFrame__voidP python_ispa_std_lr_LRRegionFrame__voidP;
 typedef struct python_ispa_std_lr_conflicts__Span python_ispa_std_lr_conflicts__Span;
 typedef struct python_ispa_std_lr_conflicts__Alternative python_ispa_std_lr_conflicts__Alternative;
 typedef struct python_ispa_std_lr_conflicts__Visit python_ispa_std_lr_conflicts__Visit;
@@ -105,42 +101,28 @@ ISPA_DEFINE_VEC(ispa_vec_python_ispa_std_recovery_ClaimSetP, python_ispa_std_rec
 ISPA_DEFINE_VEC(ispa_vec_python_ispa_std_recovery_ContextClaimP, python_ispa_std_recovery_ContextClaim*)
 ISPA_DEFINE_VEC(ispa_vec_python_ispa_std_lexer_TokenCursorP, python_ispa_std_lexer_TokenCursor*)
 ISPA_DEFINE_VEC(ispa_vec_python_ispa_std_parser_ll_RuleProbeP, python_ispa_std_parser_ll_RuleProbe*)
+ISPA_DEFINE_VEC(ispa_vec_python_ispa_std_parser_ll_FrameP, python_ispa_std_parser_ll_Frame*)
 ISPA_DEFINE_VEC(ispa_vec_python_ispa_std_recovery_ContextDiagnosticP, python_ispa_std_recovery_ContextDiagnostic*)
 ISPA_DEFINE_VEC(ispa_vec_python_ispa_std_node_NodeP, python_ispa_std_node_Node*)
 ISPA_DEFINE_VEC(ispa_vec_python_ispa_std_recovery_TokenSetP, python_ispa_std_recovery_TokenSet*)
-ISPA_DEFINE_VEC(ispa_vec_python_ispa_std_parser_ll_FrameP, python_ispa_std_parser_ll_Frame*)
 ISPA_DEFINE_VEC(ispa_vec_python_ispa_std_match_result_MatchResultP, python_ispa_std_match_result_MatchResult*)
 ISPA_DEFINE_VEC(ispa_vec_python_ispa_std_lr_conflicts__AlternativeP, python_ispa_std_lr_conflicts__Alternative*)
 ISPA_DEFINE_VEC(ispa_vec_python_ispa_std_lr_conflicts__ForestP, python_ispa_std_lr_conflicts__Forest*)
 ISPA_DEFINE_VEC(ispa_vec_python_ispa_std_lr_conflicts__StackP, python_ispa_std_lr_conflicts__Stack*)
 ISPA_DEFINE_VEC(ispa_vec_python_ispa_std_external_ExternalResultP, python_ispa_std_external_ExternalResult*)
-ISPA_DEFINE_VEC(ispa_vec_voidP, void*)
-ISPA_DEFINE_VEC(ispa_vec_python_ispa_std_parser_ll_TokenBoundaryP, python_ispa_std_parser_ll_TokenBoundary*)
 
 struct python_ispa_std_errors_ErrorKind {
 };
 struct python_ispa_std_debug_Kind {
 };
-typedef struct python_ispa_std_debug_Location_vt {
-	python_ispa_std_debug_Location* (*copy)(python_ispa_std_debug_Location* self);
-} python_ispa_std_debug_Location_vt;
 struct python_ispa_std_debug_Location {
-	const python_ispa_std_debug_Location_vt* vt;
 	ispa_str file;
 	int64_t line;
 	int64_t column;
 };
-typedef struct python_ispa_std_debug_DebugSink_vt {
-	bool (*write)(python_ispa_std_debug_DebugSink* self, ispa_str);
-} python_ispa_std_debug_DebugSink_vt;
 struct python_ispa_std_debug_DebugSink {
-	const python_ispa_std_debug_DebugSink_vt* vt;
 };
-typedef struct python_ispa_std_debug_DebugControl_vt {
-	int64_t (*read_byte)(python_ispa_std_debug_DebugControl* self);
-} python_ispa_std_debug_DebugControl_vt;
 struct python_ispa_std_debug_DebugControl {
-	const python_ispa_std_debug_DebugControl_vt* vt;
 };
 typedef struct python_ispa_std_debug_ScopeBase_vt {
 	void (*close)(python_ispa_std_debug_ScopeBase* self);
@@ -164,44 +146,25 @@ struct python_ispa_std_debug_DebugState {
 	ispa_vec_python_ispa_std_debug_ScopeBaseP* scopes;
 	int64_t serial;
 };
-typedef struct python_ispa_std_debug_Snapshot_vt {
-	python_ispa_std_debug_Snapshot* (*add)(python_ispa_std_debug_Snapshot* self, ispa_str, ispa_str);
-	ispa_str (*json)(python_ispa_std_debug_Snapshot* self);
-} python_ispa_std_debug_Snapshot_vt;
 struct python_ispa_std_debug_Snapshot {
-	const python_ispa_std_debug_Snapshot_vt* vt;
 	ispa_vec_ispa_str* _values;
 };
-typedef struct python_ispa_std_debug_RuleScope_vt {
-	void (*close)(python_ispa_std_debug_RuleScope* self);
-} python_ispa_std_debug_RuleScope_vt;
 struct python_ispa_std_debug_RuleScope {
 	python_ispa_std_debug_ScopeBase base_python_ispa_std_debug_ScopeBase;
-	const python_ispa_std_debug_RuleScope_vt* vt;
 	ispa_str name;
 	python_ispa_std_debug_Location* loc;
 	python_ispa_std_debug_Location* previous;
 	bool open;
 };
-typedef struct python_ispa_std_debug_ProductionScope_vt {
-	void (*close)(python_ispa_std_debug_ProductionScope* self);
-} python_ispa_std_debug_ProductionScope_vt;
 struct python_ispa_std_debug_ProductionScope {
 	python_ispa_std_debug_ScopeBase base_python_ispa_std_debug_ScopeBase;
-	const python_ispa_std_debug_ProductionScope_vt* vt;
 	ispa_str name;
 	python_ispa_std_debug_Location* loc;
 	python_ispa_std_debug_Location* previous;
 	bool open;
 };
-typedef struct python_ispa_std_debug_MatchScope_vt {
-	void (*success)(python_ispa_std_debug_MatchScope* self);
-	void (*outcome)(python_ispa_std_debug_MatchScope* self, ispa_str);
-	void (*close)(python_ispa_std_debug_MatchScope* self);
-} python_ispa_std_debug_MatchScope_vt;
 struct python_ispa_std_debug_MatchScope {
 	python_ispa_std_debug_ScopeBase base_python_ispa_std_debug_ScopeBase;
-	const python_ispa_std_debug_MatchScope_vt* vt;
 	ispa_str expected;
 	ispa_str actual;
 	ispa_str reason;
@@ -210,25 +173,7 @@ struct python_ispa_std_debug_MatchScope {
 	bool active;
 	bool open;
 };
-typedef struct python_ispa_std_node_Node_vt {
-	python_ispa_std_node_Node* (*copy)(python_ispa_std_node_Node* self);
-	void (*assign)(python_ispa_std_node_Node* self, python_ispa_std_node_Node*);
-	int64_t (*endpos)(python_ispa_std_node_Node* self);
-	void (*clear)(python_ispa_std_node_Node* self);
-	bool (*empty)(python_ispa_std_node_Node* self);
-	int64_t (*startpos)(python_ispa_std_node_Node* self);
-	int64_t (*line)(python_ispa_std_node_Node* self);
-	int64_t (*column)(python_ispa_std_node_Node* self);
-	int64_t (*length)(python_ispa_std_node_Node* self);
-	ispa_str (*source)(python_ispa_std_node_Node* self);
-	bool (*has_source)(python_ispa_std_node_Node* self);
-	int64_t (*name)(python_ispa_std_node_Node* self);
-	ispa_any (*data)(python_ispa_std_node_Node* self);
-	void (*set_data)(python_ispa_std_node_Node* self, ispa_any);
-	ispa_str (*text)(python_ispa_std_node_Node* self);
-} python_ispa_std_node_Node_vt;
 struct python_ispa_std_node_Node {
-	const python_ispa_std_node_Node_vt* vt;
 	int64_t _startpos;
 	int64_t _length;
 	int64_t _line;
@@ -239,19 +184,7 @@ struct python_ispa_std_node_Node {
 	bool _empty;
 	ispa_any _data;
 };
-typedef struct python_ispa_std_raw_token_RawTokenMeta_vt {
-	int64_t (*startpos)(python_ispa_std_raw_token_RawTokenMeta* self);
-	int64_t (*length)(python_ispa_std_raw_token_RawTokenMeta* self);
-	int64_t (*line)(python_ispa_std_raw_token_RawTokenMeta* self);
-	int64_t (*column)(python_ispa_std_raw_token_RawTokenMeta* self);
-	int64_t (*name)(python_ispa_std_raw_token_RawTokenMeta* self);
-	ispa_str (*source)(python_ispa_std_raw_token_RawTokenMeta* self);
-	bool (*has_source)(python_ispa_std_raw_token_RawTokenMeta* self);
-	int64_t (*end_pos)(python_ispa_std_raw_token_RawTokenMeta* self);
-	ispa_str (*text)(python_ispa_std_raw_token_RawTokenMeta* self);
-} python_ispa_std_raw_token_RawTokenMeta_vt;
 struct python_ispa_std_raw_token_RawTokenMeta {
-	const python_ispa_std_raw_token_RawTokenMeta_vt* vt;
 	int64_t _startpos;
 	int64_t _length;
 	int64_t _line;
@@ -260,19 +193,7 @@ struct python_ispa_std_raw_token_RawTokenMeta {
 	bool _has_source;
 	int64_t _name;
 };
-typedef struct python_ispa_std_raw_token_RawToken_vt {
-	python_ispa_std_raw_token_RawToken* (*copy)(python_ispa_std_raw_token_RawToken* self);
-	bool (*empty)(python_ispa_std_raw_token_RawToken* self);
-	bool (*isAmbiguous)(python_ispa_std_raw_token_RawToken* self);
-	python_ispa_std_raw_token_RawTokenMeta* (*meta)(python_ispa_std_raw_token_RawToken* self);
-	int64_t (*kind)(python_ispa_std_raw_token_RawToken* self);
-	int64_t (*index)(python_ispa_std_raw_token_RawToken* self);
-	bool (*holds)(python_ispa_std_raw_token_RawToken* self, int64_t);
-	python_ispa_std_node_Node* (*to_node)(python_ispa_std_raw_token_RawToken* self, int64_t);
-	ispa_str (*text)(python_ispa_std_raw_token_RawToken* self);
-} python_ispa_std_raw_token_RawToken_vt;
 struct python_ispa_std_raw_token_RawToken {
-	const python_ispa_std_raw_token_RawToken_vt* vt;
 	int64_t _type_id;
 	python_ispa_std_raw_token_RawTokenMeta* _meta;
 };
@@ -293,12 +214,7 @@ struct python_ispa_std_dfa_api_DFADebug {
 	int64_t length;
 	ispa_str ch;
 };
-typedef struct python_ispa_std_dfa_api_DebugIndex_vt {
-	void (*put)(python_ispa_std_dfa_api_DebugIndex* self, int64_t, int64_t, int64_t);
-	int64_t (*find)(python_ispa_std_dfa_api_DebugIndex* self, int64_t, int64_t);
-} python_ispa_std_dfa_api_DebugIndex_vt;
 struct python_ispa_std_dfa_api_DebugIndex {
-	const python_ispa_std_dfa_api_DebugIndex_vt* vt;
 	ispa_vec_int64_t* _keys;
 	ispa_vec_int64_t* _values;
 };
@@ -317,30 +233,10 @@ struct python_ispa_std_dfa_api_CaptureState {
 	int64_t first_line;
 	bool dirty;
 };
-typedef struct python_ispa_std_dfa_api_Captures_vt {
-	int64_t (*begin_off)(python_ispa_std_dfa_api_Captures* self, int64_t);
-	int64_t (*end_off)(python_ispa_std_dfa_api_Captures* self, int64_t);
-	bool (*is_set)(python_ispa_std_dfa_api_Captures* self, int64_t);
-	int64_t (*begin)(python_ispa_std_dfa_api_Captures* self, int64_t);
-	int64_t (*end)(python_ispa_std_dfa_api_Captures* self, int64_t);
-	ispa_str (*text)(python_ispa_std_dfa_api_Captures* self, int64_t);
-	ispa_str (*view)(python_ispa_std_dfa_api_Captures* self, int64_t);
-	ispa_str (*character)(python_ispa_std_dfa_api_Captures* self, int64_t);
-	ispa_vec_int64_t* (*list_positions)(python_ispa_std_dfa_api_Captures* self, int64_t);
-	ispa_vec_ispa_str* (*list_texts)(python_ispa_std_dfa_api_Captures* self, int64_t);
-	ispa_vec_ispa_str* (*list_chars)(python_ispa_std_dfa_api_Captures* self, int64_t);
-	int64_t (*line)(python_ispa_std_dfa_api_Captures* self, int64_t);
-	int64_t (*column)(python_ispa_std_dfa_api_Captures* self, int64_t);
-} python_ispa_std_dfa_api_Captures_vt;
 struct python_ispa_std_dfa_api_Captures {
-	const python_ispa_std_dfa_api_Captures_vt* vt;
 	python_ispa_std_dfa_api_CaptureState* _state;
 };
-typedef struct python_ispa_std_refs_Cursor_vt {
-	python_ispa_std_refs_Cursor* (*copy)(python_ispa_std_refs_Cursor* self);
-} python_ispa_std_refs_Cursor_vt;
 struct python_ispa_std_refs_Cursor {
-	const python_ispa_std_refs_Cursor_vt* vt;
 	int64_t pos;
 	int64_t line;
 };
@@ -357,24 +253,11 @@ struct python_ispa_std_dfa_run_DfaTables {
 	python_ispa_std_dfa_api_CaptureState* state;
 	python_ispa_std_dfa_api_Captures* captures;
 };
-typedef struct python_ispa_std_dfa_run_TraceSink_vt {
-	void (*write)(python_ispa_std_dfa_run_TraceSink* self, ispa_str);
-} python_ispa_std_dfa_run_TraceSink_vt;
 struct python_ispa_std_dfa_run_TraceSink {
-	const python_ispa_std_dfa_run_TraceSink_vt* vt;
 };
 struct python_ispa_std_lexer_LexerDecision {
 };
-typedef struct python_ispa_std_lexer_LexerFailureContext_vt {
-	bool (*at)(python_ispa_std_lexer_LexerFailureContext* self, ispa_str, int64_t);
-	void (*error)(python_ispa_std_lexer_LexerFailureContext* self, ispa_str);
-	void (*erase)(python_ispa_std_lexer_LexerFailureContext* self);
-	void (*skip)(python_ispa_std_lexer_LexerFailureContext* self);
-	void (*insert)(python_ispa_std_lexer_LexerFailureContext* self);
-	void (*abort)(python_ispa_std_lexer_LexerFailureContext* self);
-} python_ispa_std_lexer_LexerFailureContext_vt;
 struct python_ispa_std_lexer_LexerFailureContext {
-	const python_ispa_std_lexer_LexerFailureContext_vt* vt;
 	ispa_str src;
 	int64_t cursor;
 	ispa_vec_ispa_str* diagnostics;
@@ -389,50 +272,7 @@ struct python_ispa_std_lexer__SharedState {
 	bool eof_processed;
 	ispa_vec_python_ispa_std_lexer_CheckpointP* checkpoints;
 };
-typedef struct python_ispa_std_lexer_Lexer_base_vt {
-	python_ispa_std_raw_token_RawToken* (*makeToken)(python_ispa_std_lexer_Lexer_base* self, python_ispa_std_refs_Cursor*);
-	void (*init)(python_ispa_std_lexer_Lexer_base* self);
-	python_ispa_std_raw_token_RawToken* (*empty_token)(python_ispa_std_lexer_Lexer_base* self);
-	python_ispa_std_raw_token_RawToken* (*ambiguous_token)(python_ispa_std_lexer_Lexer_base* self, int64_t, int64_t);
-	python_ispa_std_lexer_Lexer_base* (*clone)(python_ispa_std_lexer_Lexer_base* self);
-	python_ispa_std_lexer_Checkpoint* (*checkpoint)(python_ispa_std_lexer_Lexer_base* self);
-	void (*restoreCheckpoint)(python_ispa_std_lexer_Lexer_base* self, python_ispa_std_lexer_Checkpoint*);
-	void (*externalAdvance)(python_ispa_std_lexer_Lexer_base* self, int64_t, int64_t);
-	bool (*hasExternalRules)(python_ispa_std_lexer_Lexer_base* self);
-	void (*on_token)(python_ispa_std_lexer_Lexer_base* self, python_ispa_std_raw_token_RawToken*);
-	void (*on_eof)(python_ispa_std_lexer_Lexer_base* self);
-	void (*push)(python_ispa_std_lexer_Lexer_base* self, python_ispa_std_raw_token_RawToken*);
-	void (*push_eof)(python_ispa_std_lexer_Lexer_base* self);
-	void (*append_token)(python_ispa_std_lexer_Lexer_base* self, python_ispa_std_raw_token_RawToken*);
-	bool (*has_buffered_tokens)(python_ispa_std_lexer_Lexer_base* self);
-	python_ispa_std_raw_token_RawToken* (*pop_buffered_token)(python_ispa_std_lexer_Lexer_base* self);
-	void (*setExternalBoundary)(python_ispa_std_lexer_Lexer_base* self, bool);
-	void (*set_bound)(python_ispa_std_lexer_Lexer_base* self, int64_t);
-	bool (*hasInput)(python_ispa_std_lexer_Lexer_base* self);
-	bool (*hasTokens)(python_ispa_std_lexer_Lexer_base* self);
-	ispa_str (*source)(python_ispa_std_lexer_Lexer_base* self);
-	python_ispa_std_lexer_Lexer_base* (*setInput)(python_ispa_std_lexer_Lexer_base* self, ispa_str);
-	ispa_vec_python_ispa_std_raw_token_RawTokenP* (*getTokens)(python_ispa_std_lexer_Lexer_base* self);
-	void (*clearTokens)(python_ispa_std_lexer_Lexer_base* self);
-	ispa_vec_ispa_str* (*getErrors)(python_ispa_std_lexer_Lexer_base* self);
-	void (*copy_base_into)(python_ispa_std_lexer_Lexer_base* self, python_ispa_std_lexer_Lexer_base*);
-	void (*assign_from)(python_ispa_std_lexer_Lexer_base* self, python_ispa_std_lexer_Lexer_base*);
-	bool (*equals)(python_ispa_std_lexer_Lexer_base* self, python_ispa_std_lexer_Lexer_base*);
-	int64_t (*getCurrentPos)(python_ispa_std_lexer_Lexer_base* self, int64_t);
-	int64_t (*skip_spaces)(python_ispa_std_lexer_Lexer_base* self, python_ispa_std_refs_Cursor*);
-	int64_t (*line_at)(python_ispa_std_lexer_Lexer_base* self, int64_t);
-	int64_t (*column_at)(python_ispa_std_lexer_Lexer_base* self, int64_t);
-	ispa_str (*line_prefix)(python_ispa_std_lexer_Lexer_base* self, int64_t);
-	ispa_str (*next_char)(python_ispa_std_lexer_Lexer_base* self, int64_t);
-	void (*panic_mode)(python_ispa_std_lexer_Lexer_base* self, python_ispa_std_refs_Cursor*);
-	python_ispa_std_lexer_LexerFailureContext* (*lexer_failure_context)(python_ispa_std_lexer_Lexer_base* self, int64_t, ispa_str, ispa_str);
-	python_ispa_std_utility_Pair__int64_t_python_ispa_std_raw_token_RawTokenP* (*lexer_failure_result)(python_ispa_std_lexer_Lexer_base* self, python_ispa_std_lexer_LexerFailureContext*, python_ispa_std_raw_token_RawToken*);
-	python_ispa_std_raw_token_RawToken* (*lookup)(python_ispa_std_lexer_Lexer_base* self, python_ispa_std_dfa_run_DfaTables*, ispa_fn, python_ispa_std_refs_Cursor*);
-	ispa_vec_python_ispa_std_raw_token_RawTokenP* (*makeTokens)(python_ispa_std_lexer_Lexer_base* self);
-	ispa_vec_python_ispa_std_raw_token_RawTokenP* (*makeTokensFromText)(python_ispa_std_lexer_Lexer_base* self, ispa_str);
-} python_ispa_std_lexer_Lexer_base_vt;
 struct python_ispa_std_lexer_Lexer_base {
-	const python_ispa_std_lexer_Lexer_base_vt* vt;
 	python_ispa_std_dfa_api_SourceText* _src;
 	bool _has_input;
 	ispa_vec_python_ispa_std_raw_token_RawTokenP* tokens;
@@ -443,7 +283,6 @@ struct python_ispa_std_lexer_Lexer_base {
 };
 typedef struct python_ispa_std_lexer_TokenCursor_vt {
 	python_ispa_std_lexer_TokenCursor* (*copy)(python_ispa_std_lexer_TokenCursor* self);
-	void (*assign)(python_ispa_std_lexer_TokenCursor* self, python_ispa_std_lexer_TokenCursor*);
 	bool (*has_source)(python_ispa_std_lexer_TokenCursor* self);
 	ispa_str (*sourceOrigin)(python_ispa_std_lexer_TokenCursor* self);
 	ispa_vec_ispa_str* (*getErrors)(python_ispa_std_lexer_TokenCursor* self);
@@ -453,11 +292,7 @@ typedef struct python_ispa_std_lexer_TokenCursor_vt {
 	python_ispa_std_lexer_TokenCursor* (*next)(python_ispa_std_lexer_TokenCursor* self);
 	python_ispa_std_lexer_TokenCursor* (*prev)(python_ispa_std_lexer_TokenCursor* self);
 	python_ispa_std_lexer_TokenCursor* (*advance_by)(python_ispa_std_lexer_TokenCursor* self, int64_t);
-	python_ispa_std_lexer_TokenCursor* (*plus)(python_ispa_std_lexer_TokenCursor* self, int64_t);
 	python_ispa_std_raw_token_RawToken* (*current)(python_ispa_std_lexer_TokenCursor* self);
-	bool (*kind_is)(python_ispa_std_lexer_TokenCursor* self, int64_t);
-	int64_t (*minus)(python_ispa_std_lexer_TokenCursor* self, python_ispa_std_lexer_TokenCursor*);
-	int64_t (*distance)(python_ispa_std_lexer_TokenCursor* self);
 	int64_t (*resumePosition)(python_ispa_std_lexer_TokenCursor* self);
 	bool (*advanceCharacters)(python_ispa_std_lexer_TokenCursor* self, int64_t);
 } python_ispa_std_lexer_TokenCursor_vt;
@@ -470,25 +305,8 @@ struct python_ispa_std_lexer_TokenCursor {
 	python_ispa_std_lexer_Lexer_base* owned_owner;
 	bool has_owned;
 };
-typedef struct python_ispa_std_lexer_LazyIterator_vt {
-	python_ispa_std_lexer_TokenCursor* (*copy)(python_ispa_std_lexer_LazyIterator* self);
-	bool (*has_source)(python_ispa_std_lexer_LazyIterator* self);
-	void (*ensure_token)(python_ispa_std_lexer_LazyIterator* self);
-	ispa_str (*sourceOrigin)(python_ispa_std_lexer_LazyIterator* self);
-	ispa_vec_ispa_str* (*getErrors)(python_ispa_std_lexer_LazyIterator* self);
-	int64_t (*sourcePosition)(python_ispa_std_lexer_LazyIterator* self);
-	void (*consumeExternal)(python_ispa_std_lexer_LazyIterator* self, int64_t);
-	bool (*isEnd)(python_ispa_std_lexer_LazyIterator* self);
-	python_ispa_std_lexer_TokenCursor* (*next)(python_ispa_std_lexer_LazyIterator* self);
-	python_ispa_std_lexer_TokenCursor* (*prev)(python_ispa_std_lexer_LazyIterator* self);
-	python_ispa_std_lexer_TokenCursor* (*advance_by)(python_ispa_std_lexer_LazyIterator* self, int64_t);
-	python_ispa_std_raw_token_RawToken* (*current)(python_ispa_std_lexer_LazyIterator* self);
-	int64_t (*resumePosition)(python_ispa_std_lexer_LazyIterator* self);
-	bool (*advanceCharacters)(python_ispa_std_lexer_LazyIterator* self, int64_t);
-} python_ispa_std_lexer_LazyIterator_vt;
 struct python_ispa_std_lexer_LazyIterator {
 	python_ispa_std_lexer_TokenCursor base_python_ispa_std_lexer_TokenCursor;
-	const python_ispa_std_lexer_LazyIterator_vt* vt;
 	python_ispa_std_lexer_Lexer_base* owner;
 	python_ispa_std_lexer__SharedState* state;
 	int64_t token_index;
@@ -496,18 +314,8 @@ struct python_ispa_std_lexer_LazyIterator {
 	python_ispa_std_lexer_Lexer_base* owned_owner;
 	bool has_owned;
 };
-typedef struct python_ispa_std_lexer_TokenIterator_vt {
-	python_ispa_std_lexer_TokenCursor* (*copy)(python_ispa_std_lexer_TokenIterator* self);
-	python_ispa_std_lexer_TokenCursor* (*next)(python_ispa_std_lexer_TokenIterator* self);
-	python_ispa_std_lexer_TokenCursor* (*prev)(python_ispa_std_lexer_TokenIterator* self);
-	python_ispa_std_lexer_TokenCursor* (*advance_by)(python_ispa_std_lexer_TokenIterator* self, int64_t);
-	bool (*isEnd)(python_ispa_std_lexer_TokenIterator* self);
-	python_ispa_std_raw_token_RawToken* (*current)(python_ispa_std_lexer_TokenIterator* self);
-	int64_t (*resumePosition)(python_ispa_std_lexer_TokenIterator* self);
-} python_ispa_std_lexer_TokenIterator_vt;
 struct python_ispa_std_lexer_TokenIterator {
 	python_ispa_std_lexer_TokenCursor base_python_ispa_std_lexer_TokenCursor;
-	const python_ispa_std_lexer_TokenIterator_vt* vt;
 	python_ispa_std_lexer_Lexer_base* owner;
 	int64_t token_index;
 	int64_t distance_base;
@@ -516,11 +324,7 @@ struct python_ispa_std_lexer_TokenIterator {
 };
 struct python_ispa_std_recovery_Mode {
 };
-typedef struct python_ispa_std_recovery_Decision_vt {
-	python_ispa_std_recovery_Decision* (*copy)(python_ispa_std_recovery_Decision* self);
-} python_ispa_std_recovery_Decision_vt;
 struct python_ispa_std_recovery_Decision {
-	const python_ispa_std_recovery_Decision_vt* vt;
 	int64_t mode;
 	int64_t synthesized;
 	int64_t unexpected;
@@ -538,11 +342,7 @@ struct python_ispa_std_recovery_Diagnostic {
 	ispa_str code;
 	ispa_vec_ispa_str* notes;
 };
-typedef struct python_ispa_std_recovery_State_vt {
-	bool (*exhausted)(python_ispa_std_recovery_State* self);
-} python_ispa_std_recovery_State_vt;
 struct python_ispa_std_recovery_State {
-	const python_ispa_std_recovery_State_vt* vt;
 	int64_t max_errors;
 	int64_t max_total_skipped;
 	int64_t total_skipped;
@@ -561,12 +361,7 @@ struct python_ispa_std_recovery_Plan {
 	bool allow_replacement;
 	int64_t max_skip;
 };
-typedef struct python_ispa_std_recovery_TokenSet_vt {
-	ispa_vec_int64_t* (*values)(python_ispa_std_recovery_TokenSet* self);
-	bool (*matches)(python_ispa_std_recovery_TokenSet* self, python_ispa_std_raw_token_RawToken*);
-} python_ispa_std_recovery_TokenSet_vt;
 struct python_ispa_std_recovery_TokenSet {
-	const python_ispa_std_recovery_TokenSet_vt* vt;
 	ispa_vec_int64_t* _values;
 };
 struct python_ispa_std_recovery_Policy {
@@ -583,12 +378,8 @@ typedef struct python_ispa_std_recovery_FailHandler_vt {
 struct python_ispa_std_recovery_FailHandler {
 	const python_ispa_std_recovery_FailHandler_vt* vt;
 };
-typedef struct python_ispa_std_recovery_Handler_vt {
-	python_ispa_std_recovery_Decision* (*run)(python_ispa_std_recovery_Handler* self, python_ispa_std_lexer_TokenCursor*, python_ispa_std_recovery_State*);
-} python_ispa_std_recovery_Handler_vt;
 struct python_ispa_std_recovery_Handler {
 	python_ispa_std_recovery_FailHandler base_python_ispa_std_recovery_FailHandler;
-	const python_ispa_std_recovery_Handler_vt* vt;
 	ispa_str rule;
 	ispa_str expected_text;
 	python_ispa_std_recovery_TokenSet* expected;
@@ -597,22 +388,12 @@ struct python_ispa_std_recovery_Handler {
 	python_ispa_std_recovery_TokenSet* synchronization;
 	python_ispa_std_recovery_Policy* policy;
 };
-typedef struct python_ispa_std_recovery_ActionFailure_vt {
-	python_ispa_std_recovery_Decision* (*run)(python_ispa_std_recovery_ActionFailure* self, python_ispa_std_lexer_TokenCursor*, python_ispa_std_recovery_State*);
-	bool (*is_custom)(python_ispa_std_recovery_ActionFailure* self);
-} python_ispa_std_recovery_ActionFailure_vt;
 struct python_ispa_std_recovery_ActionFailure {
 	python_ispa_std_recovery_FailHandler base_python_ispa_std_recovery_FailHandler;
-	const python_ispa_std_recovery_ActionFailure_vt* vt;
 	ispa_fn action;
 };
-typedef struct python_ispa_std_recovery_LegacyFail_vt {
-	python_ispa_std_recovery_Decision* (*run)(python_ispa_std_recovery_LegacyFail* self, python_ispa_std_lexer_TokenCursor*, python_ispa_std_recovery_State*);
-	bool (*is_recovering)(python_ispa_std_recovery_LegacyFail* self);
-} python_ispa_std_recovery_LegacyFail_vt;
 struct python_ispa_std_recovery_LegacyFail {
 	python_ispa_std_recovery_FailHandler base_python_ispa_std_recovery_FailHandler;
-	const python_ispa_std_recovery_LegacyFail_vt* vt;
 	ispa_fn action;
 };
 struct python_ispa_std_recovery_RequiredStatus {
@@ -656,16 +437,8 @@ struct python_ispa_std_match_result_MatchResult {
 	python_ispa_std_lexer_TokenCursor* it;
 };
 typedef struct python_ispa_std_parser_base_Parser_base_vt {
-	ispa_any (*parse_lexer)(python_ispa_std_parser_base_Parser_base* self, python_ispa_std_lexer_Lexer_base*);
-	ispa_any (*parse_text)(python_ispa_std_parser_base_Parser_base* self, ispa_str);
-	void (*set_input_lexer)(python_ispa_std_parser_base_Parser_base* self, python_ispa_std_lexer_Lexer_base*);
-	void (*set_input_text)(python_ispa_std_parser_base_Parser_base* self, ispa_str);
-	void (*clear_input)(python_ispa_std_parser_base_Parser_base* self);
-	ispa_any (*parse_tokens)(python_ispa_std_parser_base_Parser_base* self);
 	void (*before_parse)(python_ispa_std_parser_base_Parser_base* self);
 	ispa_any (*parseLazy)(python_ispa_std_parser_base_Parser_base* self);
-	void (*parseFromTokens)(python_ispa_std_parser_base_Parser_base* self);
-	python_ispa_std_match_result_MatchResult* (*lazyParse)(python_ispa_std_parser_base_Parser_base* self);
 } python_ispa_std_parser_base_Parser_base_vt;
 struct python_ispa_std_parser_base_Parser_base {
 	const python_ispa_std_parser_base_Parser_base_vt* vt;
@@ -679,39 +452,14 @@ struct python_ispa_std_scan_ScanResult {
 	int64_t end;
 	bool exhausted;
 };
-typedef struct python_ispa_std_sortedmap_StrIntMap_vt {
-	int64_t (*find)(python_ispa_std_sortedmap_StrIntMap* self, ispa_str);
-	bool (*contains)(python_ispa_std_sortedmap_StrIntMap* self, ispa_str);
-	int64_t (*get)(python_ispa_std_sortedmap_StrIntMap* self, ispa_str);
-	void (*set)(python_ispa_std_sortedmap_StrIntMap* self, ispa_str, int64_t);
-	bool (*try_emplace)(python_ispa_std_sortedmap_StrIntMap* self, ispa_str, int64_t);
-	void (*clear)(python_ispa_std_sortedmap_StrIntMap* self);
-	python_ispa_std_sortedmap_StrIntMap* (*copy)(python_ispa_std_sortedmap_StrIntMap* self);
-	void (*assign)(python_ispa_std_sortedmap_StrIntMap* self, python_ispa_std_sortedmap_StrIntMap*);
-} python_ispa_std_sortedmap_StrIntMap_vt;
 struct python_ispa_std_sortedmap_StrIntMap {
-	const python_ispa_std_sortedmap_StrIntMap_vt* vt;
 	ispa_vec_ispa_str* keys;
 	ispa_vec_int64_t* values;
 };
-typedef struct python_ispa_std_sortedmap_IntSet_vt {
-	bool (*add)(python_ispa_std_sortedmap_IntSet* self, int64_t);
-	bool (*contains)(python_ispa_std_sortedmap_IntSet* self, int64_t);
-	int64_t (*size)(python_ispa_std_sortedmap_IntSet* self);
-	bool (*empty)(python_ispa_std_sortedmap_IntSet* self);
-	int64_t (*smallest)(python_ispa_std_sortedmap_IntSet* self);
-	python_ispa_std_sortedmap_IntSet* (*copy)(python_ispa_std_sortedmap_IntSet* self);
-} python_ispa_std_sortedmap_IntSet_vt;
 struct python_ispa_std_sortedmap_IntSet {
-	const python_ispa_std_sortedmap_IntSet_vt* vt;
 	ispa_vec_int64_t* items;
 };
-typedef struct python_ispa_std_parser_ll_ActionToken_vt {
-	bool (*empty)(python_ispa_std_parser_ll_ActionToken* self);
-	bool (*matches_name)(python_ispa_std_parser_ll_ActionToken* self, ispa_str);
-} python_ispa_std_parser_ll_ActionToken_vt;
 struct python_ispa_std_parser_ll_ActionToken {
-	const python_ispa_std_parser_ll_ActionToken_vt* vt;
 	python_ispa_std_raw_token_RawToken* raw;
 	ispa_str text;
 	ispa_str name;
@@ -726,35 +474,16 @@ struct python_ispa_std_parser_ll_TokenBoundary {
 	ispa_str value;
 	bool token_name;
 };
-typedef struct python_ispa_std_parser_ll_TokenNames_vt {
-	ispa_str (*lookup)(python_ispa_std_parser_ll_TokenNames* self, int64_t);
-} python_ispa_std_parser_ll_TokenNames_vt;
 struct python_ispa_std_parser_ll_TokenNames {
-	const python_ispa_std_parser_ll_TokenNames_vt* vt;
 	ispa_vec_ispa_str* names;
 };
-typedef struct python_ispa_std_parser_ll_ActionCheckpoint_vt {
-	void (*mark)(python_ispa_std_parser_ll_ActionCheckpoint* self, ispa_str);
-	int64_t (*_find_last)(python_ispa_std_parser_ll_ActionCheckpoint* self, ispa_str);
-	void (*restore)(python_ispa_std_parser_ll_ActionCheckpoint* self, ispa_str);
-	void (*commit)(python_ispa_std_parser_ll_ActionCheckpoint* self, ispa_str);
-} python_ispa_std_parser_ll_ActionCheckpoint_vt;
 struct python_ispa_std_parser_ll_ActionCheckpoint {
-	const python_ispa_std_parser_ll_ActionCheckpoint_vt* vt;
 	python_ispa_std_lexer_TokenCursor* pos;
 	ispa_vec_ispa_str* names;
 	ispa_vec_python_ispa_std_lexer_TokenCursorP* saved;
 };
-typedef struct python_ispa_std_parser_ll_Ctx_vt {
-	bool (*at)(python_ispa_std_parser_ll_Ctx* self, ispa_str, int64_t);
-	bool (*at_token)(python_ispa_std_parser_ll_Ctx* self, ispa_str, int64_t);
-	python_ispa_std_parser_ll_ActionToken* (*peek)(python_ispa_std_parser_ll_Ctx* self, int64_t);
-	python_ispa_std_parser_ll_ActionToken* (*take)(python_ispa_std_parser_ll_Ctx* self);
-	python_ispa_std_parser_ll_ActionToken* (*prev)(python_ispa_std_parser_ll_Ctx* self);
-} python_ispa_std_parser_ll_Ctx_vt;
 struct python_ispa_std_parser_ll_Ctx {
 	python_ispa_std_parser_ll_ActionCheckpoint base_python_ispa_std_parser_ll_ActionCheckpoint;
-	const python_ispa_std_parser_ll_Ctx_vt* vt;
 	python_ispa_std_lexer_TokenCursor* start_pos;
 	ispa_str rule;
 	python_ispa_std_parser_ll_TokenNames* token_names;
@@ -765,28 +494,16 @@ struct python_ispa_std_parser_ll_Frame {
 	ispa_str expecting;
 	python_ispa_std_recovery_ClaimSet* claim_set;
 };
-typedef struct python_ispa_std_parser_ll_FrameGuard_vt {
-	void (*close)(python_ispa_std_parser_ll_FrameGuard* self);
-} python_ispa_std_parser_ll_FrameGuard_vt;
 struct python_ispa_std_parser_ll_FrameGuard {
-	const python_ispa_std_parser_ll_FrameGuard_vt* vt;
 	python_ispa_std_parser_ll_LLParser* parser;
 	bool open;
 };
-typedef struct python_ispa_std_parser_ll_CounterScope_vt {
-	void (*restore)(python_ispa_std_parser_ll_CounterScope* self);
-} python_ispa_std_parser_ll_CounterScope_vt;
 struct python_ispa_std_parser_ll_CounterScope {
-	const python_ispa_std_parser_ll_CounterScope_vt* vt;
 	python_ispa_std_parser_ll_LLParser* parser;
 	python_ispa_std_sortedmap_StrIntMap* saved;
 	bool open;
 };
-typedef struct python_ispa_std_parser_ll_RuleProbe_vt {
-	void (*close)(python_ispa_std_parser_ll_RuleProbe* self);
-} python_ispa_std_parser_ll_RuleProbe_vt;
 struct python_ispa_std_parser_ll_RuleProbe {
-	const python_ispa_std_parser_ll_RuleProbe_vt* vt;
 	python_ispa_std_parser_ll_LLParser* parser;
 	int64_t start;
 	bool committed;
@@ -799,74 +516,8 @@ struct python_ispa_std_parser_ll_Resume {
 	python_ispa_std_recovery_ContextClaim* claim;
 	bool has_claim;
 };
-typedef struct python_ispa_std_parser_ll_LLParser_vt {
-	void (*set_token_names)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_parser_ll_TokenNames*, int64_t);
-	void (*set_space_token)(python_ispa_std_parser_ll_LLParser* self, int64_t);
-	ispa_vec_python_ispa_std_recovery_DiagnosticP* (*getErrors)(python_ispa_std_parser_ll_LLParser* self);
-	ispa_vec_python_ispa_std_recovery_ContextDiagnosticP* (*getContextErrors)(python_ispa_std_parser_ll_LLParser* self);
-	void (*reset_probes)(python_ispa_std_parser_ll_LLParser* self);
-	void (*reset_recovery)(python_ispa_std_parser_ll_LLParser* self);
-	void (*before_parse)(python_ispa_std_parser_ll_LLParser* self);
-	ispa_any (*parseLazy)(python_ispa_std_parser_ll_LLParser* self);
-	python_ispa_std_parser_ll_CounterScope* (*counter_scope)(python_ispa_std_parser_ll_LLParser* self);
-	void (*bind_counter_count)(python_ispa_std_parser_ll_LLParser* self, ispa_str, int64_t);
-	void (*bind_counter_list)(python_ispa_std_parser_ll_LLParser* self, ispa_str, ispa_vec_python_ispa_std_node_NodeP*);
-	void (*bind_counter_node)(python_ispa_std_parser_ll_LLParser* self, ispa_str, python_ispa_std_node_Node*);
-	python_ispa_std_parser_ll_RuleProbe* (*begin_probe)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*);
-	bool (*reject_absent_rule)(python_ispa_std_parser_ll_LLParser* self);
-	bool (*absent_pending)(python_ispa_std_parser_ll_LLParser* self);
-	bool (*take_absent)(python_ispa_std_parser_ll_LLParser* self);
-	void (*commit_rule)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*);
-	bool (*fast_path_ok)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_recovery_FailHandler*, bool);
-	void (*accept_at)(python_ispa_std_parser_ll_LLParser* self, int64_t);
-	void (*commit_at)(python_ispa_std_parser_ll_LLParser* self, int64_t);
-	void (*note_match)(python_ispa_std_parser_ll_LLParser* self);
-	ispa_str (*debug_actual)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*);
-	ispa_str (*debug_recovery_mode)(python_ispa_std_parser_ll_LLParser* self, int64_t);
-	python_ispa_std_parser_ll_FrameGuard* (*recovery_frame)(python_ispa_std_parser_ll_LLParser* self, ispa_str);
-	void (*enter_frame)(python_ispa_std_parser_ll_LLParser* self, ispa_str);
-	void (*leave_frame)(python_ispa_std_parser_ll_LLParser* self);
-	void (*recovery_at)(python_ispa_std_parser_ll_LLParser* self, ispa_str, ispa_vec_python_ispa_std_recovery_ContextClaimP*);
-	void (*recovery_at_set)(python_ispa_std_parser_ll_LLParser* self, ispa_str, python_ispa_std_recovery_ClaimSet*);
-	bool (*unwinding)(python_ispa_std_parser_ll_LLParser* self);
-	ispa_str (*describe_token)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*);
-	ispa_str (*breadcrumb)(python_ispa_std_parser_ll_LLParser* self);
-	python_ispa_std_parser_ll_Resume* (*resolve_context)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*, int64_t);
-	void (*report_context)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*, int64_t, python_ispa_std_parser_ll_Resume*);
-	bool (*recover_at_context)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*, int64_t);
-	void (*sync_loop)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*);
-	int64_t (*recover_choice)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*, ispa_str, ispa_str, ispa_vec_python_ispa_std_recovery_TokenSetP*, ispa_vec_python_ispa_std_recovery_TokenSetP*);
-	void (*raise_error)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_raw_token_RawToken*, ispa_str);
-	python_ispa_std_recovery_RequiredResult* (*required_recovering)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*, int64_t, python_ispa_std_recovery_FailHandler*);
-	python_ispa_std_match_result_MatchResult* (*_attempt_rule)(python_ispa_std_parser_ll_LLParser* self, ispa_fn, python_ispa_std_lexer_TokenCursor*);
-	python_ispa_std_recovery_RequiredResult* (*required_rule_recovering)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*, ispa_fn, python_ispa_std_recovery_FailHandler*);
-	python_ispa_std_recovery_RequiredResult* (*_rule_recovery)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*, ispa_fn, python_ispa_std_recovery_FailHandler*, python_ispa_std_match_result_MatchResult*, bool);
-	python_ispa_std_node_Node* (*required_rule_resume)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*, ispa_fn, python_ispa_std_recovery_FailHandler*, python_ispa_std_match_result_MatchResult*);
-	python_ispa_std_node_Node* (*_required_outcome)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_recovery_RequiredResult*, python_ispa_std_lexer_TokenCursor*, python_ispa_std_debug_MatchScope*, ispa_str);
-	python_ispa_std_node_Node* (*required_token)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*, int64_t, python_ispa_std_recovery_FailHandler*);
-	python_ispa_std_node_Node* (*required_rule)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*, ispa_str, ispa_fn, python_ispa_std_recovery_FailHandler*);
-	python_ispa_std_node_Node* (*optional_token)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*, int64_t);
-	python_ispa_std_node_Node* (*optional_rule)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*, ispa_fn);
-	void (*skip_spaces)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*);
-	void (*skip_external_spaces)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*);
-	ispa_vec_python_ispa_std_node_NodeP* (*counted_impl)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*, python_ispa_std_counter_CountSpec*, ispa_fn);
-	ispa_vec_python_ispa_std_node_NodeP* (*counted_token)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*, int64_t, python_ispa_std_counter_CountSpec*);
-	ispa_vec_python_ispa_std_node_NodeP* (*counted_rule)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*, ispa_fn, python_ispa_std_counter_CountSpec*);
-	python_ispa_std_node_Node* (*repeat_optional)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*, ispa_fn, bool);
-	ispa_vec_python_ispa_std_node_NodeP* (*range_token)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*, int64_t, python_ispa_std_recovery_FailHandler*);
-	ispa_vec_python_ispa_std_node_NodeP* (*range_rule)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*, ispa_str, ispa_fn, python_ispa_std_recovery_FailHandler*);
-	ispa_vec_python_ispa_std_node_NodeP* (*range_optional_token)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*, int64_t);
-	ispa_vec_python_ispa_std_node_NodeP* (*range_optional_rule)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*, ispa_fn);
-	python_ispa_std_parser_ll_RuleContext__voidP* (*rule_context)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*, void*, python_ispa_std_lexer_TokenCursor*, ispa_str);
-	python_ispa_std_parser_ll_FailContext__voidP* (*fail_context)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*, void*, python_ispa_std_lexer_TokenCursor*, ispa_str, ispa_str);
-	python_ispa_std_recovery_Decision* (*custom_failure_decision)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*, python_ispa_std_lexer_TokenCursor*);
-	python_ispa_std_recovery_Decision* (*custom_failure_decision_ctx)(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor*, python_ispa_std_parser_ll_FailContext__voidP*);
-	python_ispa_std_recovery_ActionFailure* (*custom_failure)(python_ispa_std_parser_ll_LLParser* self, ispa_fn);
-	python_ispa_std_match_result_MatchResult* (*action_result)(python_ispa_std_parser_ll_LLParser* self, ispa_any, python_ispa_std_lexer_TokenCursor*);
-} python_ispa_std_parser_ll_LLParser_vt;
 struct python_ispa_std_parser_ll_LLParser {
 	python_ispa_std_parser_base_Parser_base base_python_ispa_std_parser_base_Parser_base;
-	const python_ispa_std_parser_ll_LLParser_vt* vt;
 	python_ispa_std_recovery_State* recovery_state_;
 	python_ispa_std_sortedmap_StrIntMap* counters_;
 	ispa_vec_python_ispa_std_parser_ll_FrameP* frames_;
@@ -889,11 +540,7 @@ struct python_ispa_std_lr_LRControlState {
 	int64_t continuation;
 	int64_t production;
 };
-typedef struct python_ispa_std_lr_LRRuleSpan_vt {
-	python_ispa_std_lr_LRRuleSpan* (*copy)(python_ispa_std_lr_LRRuleSpan* self);
-} python_ispa_std_lr_LRRuleSpan_vt;
 struct python_ispa_std_lr_LRRuleSpan {
-	const python_ispa_std_lr_LRRuleSpan_vt* vt;
 	int64_t begin;
 	int64_t end;
 	bool leading;
@@ -904,20 +551,7 @@ struct python_ispa_std_lr_LRTokenValue {
 	python_ispa_std_node_Node* node;
 	ispa_str text;
 };
-typedef struct python_ispa_std_lr_LRParser_vt {
-	ispa_vec_python_ispa_std_recovery_DiagnosticP* (*getErrors)(python_ispa_std_lr_LRParser* self);
-	void (*_skip)(python_ispa_std_lr_LRParser* self, python_ispa_std_lr_LRGrammar__voidP*, python_ispa_std_lexer_TokenCursor*, ispa_vec_int64_t*);
-	bool (*_gap)(python_ispa_std_lr_LRParser* self, python_ispa_std_lr_LRGrammar__voidP*, int64_t, int64_t);
-	void (*_window_into)(python_ispa_std_lr_LRParser* self, python_ispa_std_lr_LRGrammar__voidP*, python_ispa_std_lexer_TokenCursor*, ispa_vec_int64_t*);
-	ispa_vec_int64_t* (*_window)(python_ispa_std_lr_LRParser* self, python_ispa_std_lr_LRGrammar__voidP*, python_ispa_std_lexer_TokenCursor*);
-	python_ispa_std_recovery_Diagnostic* (*_unexpected)(python_ispa_std_lr_LRParser* self, python_ispa_std_lr_LRGrammar__voidP*, ispa_vec_int64_t*, ispa_vec_int64_t*, python_ispa_std_lexer_TokenCursor*);
-	void (*_push_span)(python_ispa_std_lr_LRParser* self, python_ispa_std_lr_LRRegionFrame__voidP*, int64_t, int64_t, bool, bool, bool);
-	void (*_pop_spans)(python_ispa_std_lr_LRParser* self, python_ispa_std_lr_LRRegionFrame__voidP*, int64_t);
-	void (*_reduce_span)(python_ispa_std_lr_LRParser* self, python_ispa_std_lr_LRGrammar__voidP*, int64_t, int64_t, int64_t, python_ispa_std_lr_LRRegionFrame__voidP*);
-	python_ispa_std_match_result_MatchResult* (*lr_parse)(python_ispa_std_lr_LRParser* self, python_ispa_std_lr_LRGrammar__voidP*, python_ispa_std_lexer_TokenCursor*);
-} python_ispa_std_lr_LRParser_vt;
 struct python_ispa_std_lr_LRParser {
-	const python_ispa_std_lr_LRParser_vt* vt;
 	ispa_vec_python_ispa_std_recovery_DiagnosticP* errors_;
 };
 struct python_ispa_std_lr_conflicts__Span {
@@ -927,11 +561,7 @@ struct python_ispa_std_lr_conflicts__Span {
 	bool trailing;
 	bool empty;
 };
-typedef struct python_ispa_std_lr_conflicts__Alternative_vt {
-	bool (*equals)(python_ispa_std_lr_conflicts__Alternative* self, python_ispa_std_lr_conflicts__Alternative*);
-} python_ispa_std_lr_conflicts__Alternative_vt;
 struct python_ispa_std_lr_conflicts__Alternative {
-	const python_ispa_std_lr_conflicts__Alternative_vt* vt;
 	int64_t rule;
 	ispa_vec_int64_t* children;
 };
@@ -951,16 +581,8 @@ struct python_ispa_std_lr_conflicts__Stack {
 	int64_t state;
 	int64_t forest;
 };
-typedef struct python_ispa_std_lr_conflicts_LRGeneralizedParser_vt {
-	void (*_tick)(python_ispa_std_lr_conflicts_LRGeneralizedParser* self, ispa_vec_python_ispa_std_lr_conflicts__ForestP*, ispa_vec_python_ispa_std_lr_conflicts__StackP*);
-	python_ispa_std_match_result_MatchResult* (*lr_parse_generalized)(python_ispa_std_lr_conflicts_LRGeneralizedParser* self, python_ispa_std_lr_LRGrammar__voidP*, python_ispa_std_lexer_TokenCursor*);
-	ispa_str (*_key)(python_ispa_std_lr_conflicts_LRGeneralizedParser* self, ispa_vec_ispa_str*);
-	int64_t (*_intern)(python_ispa_std_lr_conflicts_LRGeneralizedParser* self, ispa_vec_python_ispa_std_lr_conflicts__ForestP*, python_ispa_std_sortedmap_StrIntMap*, bool, int64_t, python_ispa_std_lr_conflicts__Span*, bool, python_ispa_std_lexer_TokenCursor*);
-	int64_t (*_push)(python_ispa_std_lr_conflicts_LRGeneralizedParser* self, ispa_vec_python_ispa_std_lr_conflicts__StackP*, python_ispa_std_sortedmap_StrIntMap*, int64_t, int64_t, int64_t);
-} python_ispa_std_lr_conflicts_LRGeneralizedParser_vt;
 struct python_ispa_std_lr_conflicts_LRGeneralizedParser {
 	python_ispa_std_lr_LRParser base_python_ispa_std_lr_LRParser;
-	const python_ispa_std_lr_conflicts_LRGeneralizedParser_vt* vt;
 	int64_t work;
 };
 struct python_ispa_std_external_ExternalResult {
@@ -968,113 +590,13 @@ struct python_ispa_std_external_ExternalResult {
 	python_ispa_std_node_Node* node;
 	int64_t end;
 };
-typedef struct python_ispa_std_external_ExternalBinding_vt {
-	bool (*starts)(python_ispa_std_external_ExternalBinding* self, ispa_str, int64_t);
-	python_ispa_std_external_ExternalResult* (*parse)(python_ispa_std_external_ExternalBinding* self, ispa_str, int64_t);
-} python_ispa_std_external_ExternalBinding_vt;
 struct python_ispa_std_external_ExternalBinding {
-	const python_ispa_std_external_ExternalBinding_vt* vt;
 };
-typedef struct python_ispa_std_ast_printer_ASTPrinter_vt {
-	ispa_str (*text)(python_ispa_std_ast_printer_ASTPrinter* self);
-	void (*up)(python_ispa_std_ast_printer_ASTPrinter* self, bool);
-	void (*down)(python_ispa_std_ast_printer_ASTPrinter* self);
-	void (*_prefix)(python_ispa_std_ast_printer_ASTPrinter* self, bool);
-	void (*node)(python_ispa_std_ast_printer_ASTPrinter* self, ispa_str, bool);
-	void (*scalar)(python_ispa_std_ast_printer_ASTPrinter* self, ispa_str, ispa_str, bool);
-} python_ispa_std_ast_printer_ASTPrinter_vt;
 struct python_ispa_std_ast_printer_ASTPrinter {
-	const python_ispa_std_ast_printer_ASTPrinter_vt* vt;
 	ispa_vec_ispa_str* _out;
 	ispa_vec_bool* _branches;
 };
-struct python_ispa_std_lr_LRRegionFrame__voidP {
-	python_ispa_std_lexer_TokenCursor* pos;
-	ispa_vec_int64_t* states;
-	ispa_vec_voidP* values;
-	ispa_vec_int64_t* span_begin;
-	ispa_vec_int64_t* span_end;
-	ispa_vec_bool* span_leading;
-	ispa_vec_bool* span_trailing;
-	ispa_vec_bool* span_empty;
-	int64_t rb;
-	int64_t re;
-	bool rl;
-	bool rt;
-	bool rx;
-	ispa_vec_int64_t* capture_destinations;
-	int64_t cursor;
-	bool recovered_prefix;
-	python_ispa_std_lr_LRControlState* control;
-};
-typedef struct python_ispa_std_lr_LRGrammar__voidP_vt {
-	int64_t (*lr_k)(python_ispa_std_lr_LRGrammar__voidP* self);
-	int64_t (*lr_action)(python_ispa_std_lr_LRGrammar__voidP* self, int64_t, ispa_vec_int64_t*);
-	ispa_vec_int64_t* (*lr_conflict)(python_ispa_std_lr_LRGrammar__voidP* self, int64_t, ispa_vec_int64_t*);
-	void* (*lr_shift)(python_ispa_std_lr_LRGrammar__voidP* self, python_ispa_std_raw_token_RawToken*);
-	int64_t (*lr_length)(python_ispa_std_lr_LRGrammar__voidP* self, int64_t);
-	void* (*lr_reduce)(python_ispa_std_lr_LRGrammar__voidP* self, int64_t, ispa_vec_voidP*);
-	int64_t (*lr_lhs)(python_ispa_std_lr_LRGrammar__voidP* self, int64_t);
-	int64_t (*lr_goto)(python_ispa_std_lr_LRGrammar__voidP* self, int64_t, int64_t);
-	bool (*has_is_space)(python_ispa_std_lr_LRGrammar__voidP* self);
-	bool (*lr_is_space)(python_ispa_std_lr_LRGrammar__voidP* self, python_ispa_std_raw_token_RawToken*);
-	bool (*has_space)(python_ispa_std_lr_LRGrammar__voidP* self);
-	bool (*lr_space)(python_ispa_std_lr_LRGrammar__voidP* self, int64_t, int64_t);
-	bool (*has_expected)(python_ispa_std_lr_LRGrammar__voidP* self);
-	ispa_vec_int64_t* (*lr_expected)(python_ispa_std_lr_LRGrammar__voidP* self, int64_t);
-	bool (*has_context)(python_ispa_std_lr_LRGrammar__voidP* self);
-	ispa_str (*lr_context)(python_ispa_std_lr_LRGrammar__voidP* self, int64_t);
-	bool (*has_token_name)(python_ispa_std_lr_LRGrammar__voidP* self);
-	ispa_str (*lr_token_name)(python_ispa_std_lr_LRGrammar__voidP* self, int64_t);
-	bool (*has_rule_label)(python_ispa_std_lr_LRGrammar__voidP* self);
-	ispa_str (*lr_rule_label)(python_ispa_std_lr_LRGrammar__voidP* self, int64_t);
-	bool (*has_recover)(python_ispa_std_lr_LRGrammar__voidP* self);
-	bool (*lr_recover)(python_ispa_std_lr_LRGrammar__voidP* self, python_ispa_std_lr_LRRegionFrame__voidP*, python_ispa_std_recovery_Diagnostic*);
-	bool (*has_semantic_reduce)(python_ispa_std_lr_LRGrammar__voidP* self);
-	void* (*lr_semantic_reduce)(python_ispa_std_lr_LRGrammar__voidP* self, int64_t, python_ispa_std_lr_LRRegionFrame__voidP*, python_ispa_std_lr_LRRuleSpan*, ispa_vec_voidP*);
-} python_ispa_std_lr_LRGrammar__voidP_vt;
-struct python_ispa_std_lr_LRGrammar__voidP {
-	const python_ispa_std_lr_LRGrammar__voidP_vt* vt;
-};
-typedef struct python_ispa_std_parser_ll_FailContext__voidP_vt {
-	void (*error)(python_ispa_std_parser_ll_FailContext__voidP* self, ispa_str, ispa_str, int64_t, int64_t);
-	void (*note)(python_ispa_std_parser_ll_FailContext__voidP* self, ispa_str);
-	void (*sync)(python_ispa_std_parser_ll_FailContext__voidP* self, ispa_vec_ispa_str*);
-	void (*sync_tokens)(python_ispa_std_parser_ll_FailContext__voidP* self, ispa_vec_python_ispa_std_parser_ll_TokenBoundaryP*);
-	void (*skip)(python_ispa_std_parser_ll_FailContext__voidP* self);
-	void (*insert)(python_ispa_std_parser_ll_FailContext__voidP* self);
-	void (*replace)(python_ispa_std_parser_ll_FailContext__voidP* self);
-	void (*retry)(python_ispa_std_parser_ll_FailContext__voidP* self);
-	void (*abort)(python_ispa_std_parser_ll_FailContext__voidP* self);
-	python_ispa_std_recovery_Decision* (*finish)(python_ispa_std_parser_ll_FailContext__voidP* self, python_ispa_std_lexer_TokenCursor*);
-} python_ispa_std_parser_ll_FailContext__voidP_vt;
-struct python_ispa_std_parser_ll_FailContext__voidP {
-	python_ispa_std_parser_ll_Ctx base_python_ispa_std_parser_ll_Ctx;
-	const python_ispa_std_parser_ll_FailContext__voidP_vt* vt;
-	void* ast;
-	ispa_str failed_rule;
-	python_ispa_std_recovery_State* recovery_state;
-	ispa_str source;
-	bool has_source_text;
-	int64_t diagnostic_begin;
-	int64_t requested;
-	bool has_request;
-	int64_t skipped;
-};
-typedef struct python_ispa_std_parser_ll_RuleContext__voidP_vt {
-	ispa_vec_python_ispa_std_raw_token_RawTokenP* (*collect_braced)(python_ispa_std_parser_ll_RuleContext__voidP* self);
-} python_ispa_std_parser_ll_RuleContext__voidP_vt;
-struct python_ispa_std_parser_ll_RuleContext__voidP {
-	python_ispa_std_parser_ll_Ctx base_python_ispa_std_parser_ll_Ctx;
-	const python_ispa_std_parser_ll_RuleContext__voidP_vt* vt;
-	void* ast;
-};
-typedef struct python_ispa_std_utility_Pair__int64_t_python_ispa_std_raw_token_RawTokenP_vt {
-	bool (*__eq__)(python_ispa_std_utility_Pair__int64_t_python_ispa_std_raw_token_RawTokenP* self, python_ispa_std_utility_Pair__int64_t_python_ispa_std_raw_token_RawTokenP*);
-	bool (*__lt__)(python_ispa_std_utility_Pair__int64_t_python_ispa_std_raw_token_RawTokenP* self, python_ispa_std_utility_Pair__int64_t_python_ispa_std_raw_token_RawTokenP*);
-} python_ispa_std_utility_Pair__int64_t_python_ispa_std_raw_token_RawTokenP_vt;
 struct python_ispa_std_utility_Pair__int64_t_python_ispa_std_raw_token_RawTokenP {
-	const python_ispa_std_utility_Pair__int64_t_python_ispa_std_raw_token_RawTokenP_vt* vt;
 	int64_t first;
 	python_ispa_std_raw_token_RawToken* second;
 };
@@ -1147,6 +669,7 @@ python_ispa_std_debug_DebugControl* python_ispa_std_debug_get_DebugControl_handl
 void python_ispa_std_debug_free_DebugControl_handler(python_ispa_std_debug_DebugControl* handler);
 python_ispa_std_debug_DebugControl* python_ispa_std_debug_DebugControl_new(void);
 int64_t python_ispa_std_debug_DebugControl_read_byte(python_ispa_std_debug_DebugControl* self);
+static inline void python_ispa_std_debug_ScopeBase_close_v(python_ispa_std_debug_ScopeBase* self) {  self->vt->close(self); }
 python_ispa_std_debug_ScopeBase* python_ispa_std_debug_get_ScopeBase_handler(ispa_arena* arena);
 void python_ispa_std_debug_free_ScopeBase_handler(python_ispa_std_debug_ScopeBase* handler);
 python_ispa_std_debug_ScopeBase* python_ispa_std_debug_ScopeBase_new(void);
@@ -1439,6 +962,19 @@ python_ispa_std_raw_token_RawToken* python_ispa_std_lexer_Lexer_base_lookup(pyth
 ispa_vec_python_ispa_std_raw_token_RawTokenP* python_ispa_std_lexer_Lexer_base_makeTokens(python_ispa_std_lexer_Lexer_base* self);
 ispa_vec_python_ispa_std_raw_token_RawTokenP* python_ispa_std_lexer_Lexer_base_makeTokensFromText(python_ispa_std_lexer_Lexer_base* self, ispa_str text);
 bool python_ispa_std_lexer__token_equal(python_ispa_std_raw_token_RawToken* a, python_ispa_std_raw_token_RawToken* b);
+static inline python_ispa_std_lexer_TokenCursor* python_ispa_std_lexer_TokenCursor_copy_v(python_ispa_std_lexer_TokenCursor* self) { return self->vt->copy(self); }
+static inline bool python_ispa_std_lexer_TokenCursor_has_source_v(python_ispa_std_lexer_TokenCursor* self) { return self->vt->has_source(self); }
+static inline ispa_str python_ispa_std_lexer_TokenCursor_sourceOrigin_v(python_ispa_std_lexer_TokenCursor* self) { return self->vt->sourceOrigin(self); }
+static inline ispa_vec_ispa_str* python_ispa_std_lexer_TokenCursor_getErrors_v(python_ispa_std_lexer_TokenCursor* self) { return self->vt->getErrors(self); }
+static inline int64_t python_ispa_std_lexer_TokenCursor_sourcePosition_v(python_ispa_std_lexer_TokenCursor* self) { return self->vt->sourcePosition(self); }
+static inline void python_ispa_std_lexer_TokenCursor_consumeExternal_v(python_ispa_std_lexer_TokenCursor* self, int64_t end) {  self->vt->consumeExternal(self, end); }
+static inline bool python_ispa_std_lexer_TokenCursor_isEnd_v(python_ispa_std_lexer_TokenCursor* self) { return self->vt->isEnd(self); }
+static inline python_ispa_std_lexer_TokenCursor* python_ispa_std_lexer_TokenCursor_next_v(python_ispa_std_lexer_TokenCursor* self) { return self->vt->next(self); }
+static inline python_ispa_std_lexer_TokenCursor* python_ispa_std_lexer_TokenCursor_prev_v(python_ispa_std_lexer_TokenCursor* self) { return self->vt->prev(self); }
+static inline python_ispa_std_lexer_TokenCursor* python_ispa_std_lexer_TokenCursor_advance_by_v(python_ispa_std_lexer_TokenCursor* self, int64_t count) { return self->vt->advance_by(self, count); }
+static inline python_ispa_std_raw_token_RawToken* python_ispa_std_lexer_TokenCursor_current_v(python_ispa_std_lexer_TokenCursor* self) { return self->vt->current(self); }
+static inline int64_t python_ispa_std_lexer_TokenCursor_resumePosition_v(python_ispa_std_lexer_TokenCursor* self) { return self->vt->resumePosition(self); }
+static inline bool python_ispa_std_lexer_TokenCursor_advanceCharacters_v(python_ispa_std_lexer_TokenCursor* self, int64_t count) { return self->vt->advanceCharacters(self, count); }
 python_ispa_std_lexer_TokenCursor* python_ispa_std_lexer_get_TokenCursor_handler(ispa_arena* arena);
 void python_ispa_std_lexer_free_TokenCursor_handler(python_ispa_std_lexer_TokenCursor* handler);
 python_ispa_std_lexer_TokenCursor* python_ispa_std_lexer_TokenCursor_new(void);
@@ -1547,6 +1083,9 @@ void python_ispa_std_recovery_free_Policy_handler(python_ispa_std_recovery_Polic
 python_ispa_std_recovery_Policy* python_ispa_std_recovery_Policy_new(bool allow_insertion, bool allow_deletion, bool allow_replacement, int64_t max_skip);
 void python_ispa_std_recovery_Policy___init__(python_ispa_std_recovery_Policy* self, bool allow_insertion, bool allow_deletion, bool allow_replacement, int64_t max_skip);
 python_ispa_std_recovery_Policy* python_ispa_std_recovery_Policy_initial(void);
+static inline python_ispa_std_recovery_Decision* python_ispa_std_recovery_FailHandler_run_v(python_ispa_std_recovery_FailHandler* self, python_ispa_std_lexer_TokenCursor* pos, python_ispa_std_recovery_State* state) { return self->vt->run(self, pos, state); }
+static inline bool python_ispa_std_recovery_FailHandler_is_custom_v(python_ispa_std_recovery_FailHandler* self) { return self->vt->is_custom(self); }
+static inline bool python_ispa_std_recovery_FailHandler_is_recovering_v(python_ispa_std_recovery_FailHandler* self) { return self->vt->is_recovering(self); }
 python_ispa_std_recovery_FailHandler* python_ispa_std_recovery_get_FailHandler_handler(ispa_arena* arena);
 void python_ispa_std_recovery_free_FailHandler_handler(python_ispa_std_recovery_FailHandler* handler);
 python_ispa_std_recovery_FailHandler* python_ispa_std_recovery_FailHandler_new(void);
@@ -1614,6 +1153,8 @@ void python_ispa_std_match_result_free_MatchResult_handler(python_ispa_std_match
 python_ispa_std_match_result_MatchResult* python_ispa_std_match_result_MatchResult_new(bool status, python_ispa_std_node_Node* node, python_ispa_std_lexer_TokenCursor* it);
 void python_ispa_std_match_result_MatchResult___init__(python_ispa_std_match_result_MatchResult* self, bool status, python_ispa_std_node_Node* node, python_ispa_std_lexer_TokenCursor* it);
 python_ispa_std_match_result_MatchResult* python_ispa_std_match_result_MatchResult_failed(python_ispa_std_lexer_TokenCursor* it);
+static inline void python_ispa_std_parser_base_Parser_base_before_parse_v(python_ispa_std_parser_base_Parser_base* self) {  self->vt->before_parse(self); }
+static inline ispa_any python_ispa_std_parser_base_Parser_base_parseLazy_v(python_ispa_std_parser_base_Parser_base* self) { return self->vt->parseLazy(self); }
 python_ispa_std_parser_base_Parser_base* python_ispa_std_parser_base_get_Parser_base_handler(ispa_arena* arena);
 void python_ispa_std_parser_base_free_Parser_base_handler(python_ispa_std_parser_base_Parser_base* handler);
 python_ispa_std_parser_base_Parser_base* python_ispa_std_parser_base_Parser_base_new(void);
@@ -1883,58 +1424,8 @@ void python_ispa_std_ast_printer_ASTPrinter_scalar(python_ispa_std_ast_printer_A
 ispa_str python_ispa_std_to_string_str_to_string(ispa_str value);
 ispa_str python_ispa_std_to_string_bool_value_to_string(bool value);
 ispa_str python_ispa_std_to_string_int_value_to_string(int64_t value);
-python_ispa_std_lr_LRRegionFrame__voidP* python_ispa_std_lr_get_LRRegionFrame__voidP_handler(ispa_arena* arena);
-void python_ispa_std_lr_free_LRRegionFrame__voidP_handler(python_ispa_std_lr_LRRegionFrame__voidP* handler);
-python_ispa_std_lr_LRRegionFrame__voidP* python_ispa_std_lr_LRRegionFrame__voidP_new(python_ispa_std_lexer_TokenCursor* start, int64_t continuation);
-void python_ispa_std_lr_LRRegionFrame__voidP___init__(python_ispa_std_lr_LRRegionFrame__voidP* self, python_ispa_std_lexer_TokenCursor* start, int64_t continuation);
-python_ispa_std_lr_LRGrammar__voidP* python_ispa_std_lr_get_LRGrammar__voidP_handler(ispa_arena* arena);
-void python_ispa_std_lr_free_LRGrammar__voidP_handler(python_ispa_std_lr_LRGrammar__voidP* handler);
-python_ispa_std_lr_LRGrammar__voidP* python_ispa_std_lr_LRGrammar__voidP_new(void);
-int64_t python_ispa_std_lr_LRGrammar__voidP_lr_k(python_ispa_std_lr_LRGrammar__voidP* self);
-int64_t python_ispa_std_lr_LRGrammar__voidP_lr_action(python_ispa_std_lr_LRGrammar__voidP* self, int64_t state, ispa_vec_int64_t* window);
-ispa_vec_int64_t* python_ispa_std_lr_LRGrammar__voidP_lr_conflict(python_ispa_std_lr_LRGrammar__voidP* self, int64_t state, ispa_vec_int64_t* window);
-void* python_ispa_std_lr_LRGrammar__voidP_lr_shift(python_ispa_std_lr_LRGrammar__voidP* self, python_ispa_std_raw_token_RawToken* token);
-int64_t python_ispa_std_lr_LRGrammar__voidP_lr_length(python_ispa_std_lr_LRGrammar__voidP* self, int64_t rule);
-void* python_ispa_std_lr_LRGrammar__voidP_lr_reduce(python_ispa_std_lr_LRGrammar__voidP* self, int64_t rule, ispa_vec_voidP* rhs);
-int64_t python_ispa_std_lr_LRGrammar__voidP_lr_lhs(python_ispa_std_lr_LRGrammar__voidP* self, int64_t rule);
-int64_t python_ispa_std_lr_LRGrammar__voidP_lr_goto(python_ispa_std_lr_LRGrammar__voidP* self, int64_t state, int64_t lhs);
-bool python_ispa_std_lr_LRGrammar__voidP_has_is_space(python_ispa_std_lr_LRGrammar__voidP* self);
-bool python_ispa_std_lr_LRGrammar__voidP_lr_is_space(python_ispa_std_lr_LRGrammar__voidP* self, python_ispa_std_raw_token_RawToken* token);
-bool python_ispa_std_lr_LRGrammar__voidP_has_space(python_ispa_std_lr_LRGrammar__voidP* self);
-bool python_ispa_std_lr_LRGrammar__voidP_lr_space(python_ispa_std_lr_LRGrammar__voidP* self, int64_t rule, int64_t index);
-bool python_ispa_std_lr_LRGrammar__voidP_has_expected(python_ispa_std_lr_LRGrammar__voidP* self);
-ispa_vec_int64_t* python_ispa_std_lr_LRGrammar__voidP_lr_expected(python_ispa_std_lr_LRGrammar__voidP* self, int64_t state);
-bool python_ispa_std_lr_LRGrammar__voidP_has_context(python_ispa_std_lr_LRGrammar__voidP* self);
-ispa_str python_ispa_std_lr_LRGrammar__voidP_lr_context(python_ispa_std_lr_LRGrammar__voidP* self, int64_t state);
-bool python_ispa_std_lr_LRGrammar__voidP_has_token_name(python_ispa_std_lr_LRGrammar__voidP* self);
-ispa_str python_ispa_std_lr_LRGrammar__voidP_lr_token_name(python_ispa_std_lr_LRGrammar__voidP* self, int64_t id);
-bool python_ispa_std_lr_LRGrammar__voidP_has_rule_label(python_ispa_std_lr_LRGrammar__voidP* self);
-ispa_str python_ispa_std_lr_LRGrammar__voidP_lr_rule_label(python_ispa_std_lr_LRGrammar__voidP* self, int64_t rule);
-bool python_ispa_std_lr_LRGrammar__voidP_has_recover(python_ispa_std_lr_LRGrammar__voidP* self);
-bool python_ispa_std_lr_LRGrammar__voidP_lr_recover(python_ispa_std_lr_LRGrammar__voidP* self, python_ispa_std_lr_LRRegionFrame__voidP* region, python_ispa_std_recovery_Diagnostic* diagnostic);
-bool python_ispa_std_lr_LRGrammar__voidP_has_semantic_reduce(python_ispa_std_lr_LRGrammar__voidP* self);
-void* python_ispa_std_lr_LRGrammar__voidP_lr_semantic_reduce(python_ispa_std_lr_LRGrammar__voidP* self, int64_t rule, python_ispa_std_lr_LRRegionFrame__voidP* region, python_ispa_std_lr_LRRuleSpan* span, ispa_vec_voidP* rhs);
 int64_t python_ispa_std_utility_maximum__int64_t(int64_t a, int64_t b);
 int64_t python_ispa_std_utility_minimum__int64_t(int64_t a, int64_t b);
-python_ispa_std_parser_ll_FailContext__voidP* python_ispa_std_parser_ll_get_FailContext__voidP_handler(ispa_arena* arena);
-void python_ispa_std_parser_ll_free_FailContext__voidP_handler(python_ispa_std_parser_ll_FailContext__voidP* handler);
-python_ispa_std_parser_ll_FailContext__voidP* python_ispa_std_parser_ll_FailContext__voidP_new(python_ispa_std_lexer_TokenCursor* pos, void* ast, python_ispa_std_lexer_TokenCursor* start_pos, ispa_str rule, ispa_str failed_rule, python_ispa_std_recovery_State* state, ispa_str source, bool has_source_text, int64_t diagnostic_begin, python_ispa_std_parser_ll_TokenNames* token_names, int64_t ambiguous_id);
-void python_ispa_std_parser_ll_FailContext__voidP___init__(python_ispa_std_parser_ll_FailContext__voidP* self, python_ispa_std_lexer_TokenCursor* pos, void* ast, python_ispa_std_lexer_TokenCursor* start_pos, ispa_str rule, ispa_str failed_rule, python_ispa_std_recovery_State* state, ispa_str source, bool has_source_text, int64_t diagnostic_begin, python_ispa_std_parser_ll_TokenNames* token_names, int64_t ambiguous_id);
-void python_ispa_std_parser_ll_FailContext__voidP_error(python_ispa_std_parser_ll_FailContext__voidP* self, ispa_str message, ispa_str code, int64_t source_offset, int64_t source_length);
-void python_ispa_std_parser_ll_FailContext__voidP_note(python_ispa_std_parser_ll_FailContext__voidP* self, ispa_str message);
-void python_ispa_std_parser_ll_FailContext__voidP_sync(python_ispa_std_parser_ll_FailContext__voidP* self, ispa_vec_ispa_str* boundaries);
-void python_ispa_std_parser_ll_FailContext__voidP_sync_tokens(python_ispa_std_parser_ll_FailContext__voidP* self, ispa_vec_python_ispa_std_parser_ll_TokenBoundaryP* boundaries);
-void python_ispa_std_parser_ll_FailContext__voidP_skip(python_ispa_std_parser_ll_FailContext__voidP* self);
-void python_ispa_std_parser_ll_FailContext__voidP_insert(python_ispa_std_parser_ll_FailContext__voidP* self);
-void python_ispa_std_parser_ll_FailContext__voidP_replace(python_ispa_std_parser_ll_FailContext__voidP* self);
-void python_ispa_std_parser_ll_FailContext__voidP_retry(python_ispa_std_parser_ll_FailContext__voidP* self);
-void python_ispa_std_parser_ll_FailContext__voidP_abort(python_ispa_std_parser_ll_FailContext__voidP* self);
-python_ispa_std_recovery_Decision* python_ispa_std_parser_ll_FailContext__voidP_finish(python_ispa_std_parser_ll_FailContext__voidP* self, python_ispa_std_lexer_TokenCursor* before);
-python_ispa_std_parser_ll_RuleContext__voidP* python_ispa_std_parser_ll_get_RuleContext__voidP_handler(ispa_arena* arena);
-void python_ispa_std_parser_ll_free_RuleContext__voidP_handler(python_ispa_std_parser_ll_RuleContext__voidP* handler);
-python_ispa_std_parser_ll_RuleContext__voidP* python_ispa_std_parser_ll_RuleContext__voidP_new(python_ispa_std_lexer_TokenCursor* pos, void* ast, python_ispa_std_lexer_TokenCursor* start_pos, ispa_str rule, python_ispa_std_parser_ll_TokenNames* token_names, int64_t ambiguous_id);
-void python_ispa_std_parser_ll_RuleContext__voidP___init__(python_ispa_std_parser_ll_RuleContext__voidP* self, python_ispa_std_lexer_TokenCursor* pos, void* ast, python_ispa_std_lexer_TokenCursor* start_pos, ispa_str rule, python_ispa_std_parser_ll_TokenNames* token_names, int64_t ambiguous_id);
-ispa_vec_python_ispa_std_raw_token_RawTokenP* python_ispa_std_parser_ll_RuleContext__voidP_collect_braced(python_ispa_std_parser_ll_RuleContext__voidP* self);
 int64_t python_ispa_std_algorithm_lower_bound__int64_t(ispa_vec_int64_t* arr, int64_t first, int64_t last, int64_t value);
 void python_ispa_std_algorithm__check__int64_t(ispa_vec_int64_t* arr, int64_t first, int64_t last);
 int64_t python_ispa_std_algorithm_lower_bound__ispa_str(ispa_vec_ispa_str* arr, int64_t first, int64_t last, ispa_str value);

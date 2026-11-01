@@ -39,6 +39,11 @@ namespace C {
         auto instantiateClass(const LangAPI::Class &g, const std::vector<LangAPI::Type> &args) -> const LangAPI::Class *;
         auto instantiateFunction(const LangAPI::Function &g, const std::vector<LangAPI::Type> &args) -> const LangAPI::Function *;
         auto registerClass(const LangAPI::Class &c) -> void;
+        // dispatch: a method is virtual only if a subclass redefines it (see parser/stdlibs/target/c/README.md, "Dispatch")
+        std::map<std::pair<const LangAPI::Class *, std::string>, const LangAPI::Class *> slot_root;   // (definer, method) -> class owning the vtable slot
+        std::map<const LangAPI::Class *, std::vector<std::string>> root_slots;                        // root -> its slot names in declaration order
+        auto analyzeVirtuals() -> void;
+        auto pathToBase(const LangAPI::Class &from, const LangAPI::Class *target) const -> std::optional<std::vector<std::string>>;
         std::unordered_set<std::string> thunks_done;
         auto functionValue(const LangAPI::Symbol &sy, const LangAPI::Function &fn) -> std::string;
         LangAPI::Typing::MaybeType array_hint;                   // expected type of the sole operand being converted

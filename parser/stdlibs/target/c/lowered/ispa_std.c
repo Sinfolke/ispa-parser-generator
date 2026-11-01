@@ -34,8 +34,6 @@
 /* ISPA-C-WARNING: python_ispa_std_parser_ll.rule_context: generic function not instantiated yet */
 /* ISPA-C-WARNING: python_ispa_std_parser_ll.fail_context: generic function not instantiated yet */
 /* ISPA-C-WARNING: python_ispa_std_parser_ll.custom_failure_decision_ctx: generic function not instantiated yet */
-/* ISPA-C-WARNING: python_ispa_std_parser_ll_LLParser: unresolved symbol AST */
-/* ISPA-C-WARNING: python_ispa_std_parser_ll_LLParser: unresolved symbol AST */
 /* ISPA-C-WARNING: python_ispa_std_lr_LRRegionFrame: generic class (1 parameters) not instantiated yet */
 /* ISPA-C-WARNING: python_ispa_std_lr_LRGrammar: generic class (1 parameters) not instantiated yet */
 /* ISPA-C-WARNING: python_ispa_std_lr_LRCaptures: generic class (1 parameters) not instantiated yet */
@@ -74,23 +72,6 @@
 /* ISPA-C-WARNING: python_ispa_std_vector.swap: generic function not instantiated yet */
 /* ISPA-C-WARNING: python_ispa_std_vector.lexicographical_less: generic function not instantiated yet */
 /* ISPA-C-WARNING: python_ispa_std_to_string.list_to_string: generic function not instantiated yet */
-/* ISPA-C-WARNING: python_ispa_std_lr_LRRegionFrame__voidP: unresolved symbol V */
-/* ISPA-C-WARNING: python_ispa_std_lr.lr_shift: unresolved symbol V */
-/* ISPA-C-WARNING: python_ispa_std_lr.lr_reduce: unresolved symbol V */
-/* ISPA-C-WARNING: python_ispa_std_lr.lr_reduce: unresolved symbol V */
-/* ISPA-C-WARNING: python_ispa_std_lr.lr_semantic_reduce: unresolved symbol V */
-/* ISPA-C-WARNING: python_ispa_std_lr.lr_semantic_reduce: unresolved symbol V */
-/* ISPA-C-WARNING: python_ispa_std_lr_LRGrammar__voidP: unresolved symbol V */
-/* ISPA-C-WARNING: python_ispa_std_lr_LRGrammar__voidP: unresolved symbol V */
-/* ISPA-C-WARNING: python_ispa_std_lr_LRGrammar__voidP: unresolved symbol V */
-/* ISPA-C-WARNING: python_ispa_std_lr_LRGrammar__voidP: unresolved symbol V */
-/* ISPA-C-WARNING: python_ispa_std_lr_LRGrammar__voidP: unresolved symbol V */
-/* ISPA-C-WARNING: python_ispa_std_parser_ll.__init__: unresolved symbol AST */
-/* ISPA-C-WARNING: python_ispa_std_parser_ll_FailContext__voidP: unresolved symbol AST */
-/* ISPA-C-WARNING: python_ispa_std_parser_ll_FailContext__voidP: unresolved symbol AST */
-/* ISPA-C-WARNING: python_ispa_std_parser_ll.__init__: unresolved symbol AST */
-/* ISPA-C-WARNING: python_ispa_std_parser_ll_RuleContext__voidP: unresolved symbol AST */
-/* ISPA-C-WARNING: python_ispa_std_parser_ll_RuleContext__voidP: unresolved symbol AST */
 
 int64_t python_ispa_std_chars_code_of(ispa_str ch) {
 	/* ISPA-C-TODO: local without a declared type */
@@ -376,8 +357,11 @@ python_ispa_std_debug_DebugControl* python_ispa_std_debug_DebugControl_new(void)
 int64_t python_ispa_std_debug_DebugControl_read_byte(python_ispa_std_debug_DebugControl* self) {
 	return (-(INT64_C(1)));
 }
+static void python_ispa_std_debug_ScopeBase_close_as_python_ispa_std_debug_ScopeBase(python_ispa_std_debug_ScopeBase* self) {  python_ispa_std_debug_ScopeBase_close((python_ispa_std_debug_ScopeBase*)self); }
+static const python_ispa_std_debug_ScopeBase_vt python_ispa_std_debug_ScopeBase_as_python_ispa_std_debug_ScopeBase_vtable = { .close = python_ispa_std_debug_ScopeBase_close_as_python_ispa_std_debug_ScopeBase };
 python_ispa_std_debug_ScopeBase* python_ispa_std_debug_get_ScopeBase_handler(ispa_arena* arena) {
 	python_ispa_std_debug_ScopeBase* h = (python_ispa_std_debug_ScopeBase*)ispa_arena_calloc(arena, sizeof(python_ispa_std_debug_ScopeBase));
+	h->vt = &python_ispa_std_debug_ScopeBase_as_python_ispa_std_debug_ScopeBase_vtable;
 	return h;
 }
 void python_ispa_std_debug_free_ScopeBase_handler(python_ispa_std_debug_ScopeBase* handler) { (void)handler; }
@@ -692,7 +676,7 @@ int64_t python_ispa_std_debug_scope_depth(void) {
 void python_ispa_std_debug_unwind_to(int64_t depth) {
 	ISPA_STR("Close scopes opened after `depth`, innermost first (what C++ destructors\n    do while an exception propagates).");
 	while (((((int64_t)((python_ispa_std_debug__S)->scopes)->len) > (depth)))) {
-		python_ispa_std_debug_ScopeBase_close((ispa_vec_python_ispa_std_debug_ScopeBaseP_get(((python_ispa_std_debug__S)->scopes), (((int64_t)((python_ispa_std_debug__S)->scopes)->len) - (INT64_C(1))))));
+		python_ispa_std_debug_ScopeBase_close_v((ispa_vec_python_ispa_std_debug_ScopeBaseP_get(((python_ispa_std_debug__S)->scopes), (((int64_t)((python_ispa_std_debug__S)->scopes)->len) - (INT64_C(1))))));
 	}
 }
 int64_t python_ispa_std_debug__next_serial(void) {
@@ -703,8 +687,11 @@ void python_ispa_std_debug__forget(python_ispa_std_debug_ScopeBase* scope) {
 	/* ISPA-C-TODO: pop(index) */
 	ISPA_UNIMPLEMENTED("python_ispa_std_debug._forget");
 }
+static void python_ispa_std_debug_RuleScope_close_as_python_ispa_std_debug_ScopeBase(python_ispa_std_debug_ScopeBase* self) {  python_ispa_std_debug_RuleScope_close((python_ispa_std_debug_RuleScope*)self); }
+static const python_ispa_std_debug_ScopeBase_vt python_ispa_std_debug_RuleScope_as_python_ispa_std_debug_ScopeBase_vtable = { .close = python_ispa_std_debug_RuleScope_close_as_python_ispa_std_debug_ScopeBase };
 python_ispa_std_debug_RuleScope* python_ispa_std_debug_get_RuleScope_handler(ispa_arena* arena) {
 	python_ispa_std_debug_RuleScope* h = (python_ispa_std_debug_RuleScope*)ispa_arena_calloc(arena, sizeof(python_ispa_std_debug_RuleScope));
+	h->base_python_ispa_std_debug_ScopeBase.vt = &python_ispa_std_debug_RuleScope_as_python_ispa_std_debug_ScopeBase_vtable;
 	return h;
 }
 void python_ispa_std_debug_free_RuleScope_handler(python_ispa_std_debug_RuleScope* handler) { (void)handler; }
@@ -734,8 +721,11 @@ void python_ispa_std_debug_RuleScope_close(python_ispa_std_debug_RuleScope* self
 	python_ispa_std_debug_exit_rule((self)->name, (self)->loc);
 	(python_ispa_std_debug__S)->location = (self)->previous;
 }
+static void python_ispa_std_debug_ProductionScope_close_as_python_ispa_std_debug_ScopeBase(python_ispa_std_debug_ScopeBase* self) {  python_ispa_std_debug_ProductionScope_close((python_ispa_std_debug_ProductionScope*)self); }
+static const python_ispa_std_debug_ScopeBase_vt python_ispa_std_debug_ProductionScope_as_python_ispa_std_debug_ScopeBase_vtable = { .close = python_ispa_std_debug_ProductionScope_close_as_python_ispa_std_debug_ScopeBase };
 python_ispa_std_debug_ProductionScope* python_ispa_std_debug_get_ProductionScope_handler(ispa_arena* arena) {
 	python_ispa_std_debug_ProductionScope* h = (python_ispa_std_debug_ProductionScope*)ispa_arena_calloc(arena, sizeof(python_ispa_std_debug_ProductionScope));
+	h->base_python_ispa_std_debug_ScopeBase.vt = &python_ispa_std_debug_ProductionScope_as_python_ispa_std_debug_ScopeBase_vtable;
 	return h;
 }
 void python_ispa_std_debug_free_ProductionScope_handler(python_ispa_std_debug_ProductionScope* handler) { (void)handler; }
@@ -765,8 +755,11 @@ void python_ispa_std_debug_ProductionScope_close(python_ispa_std_debug_Productio
 	python_ispa_std_debug_leave_production((self)->name, (self)->loc);
 	(python_ispa_std_debug__S)->location = (self)->previous;
 }
+static void python_ispa_std_debug_MatchScope_close_as_python_ispa_std_debug_ScopeBase(python_ispa_std_debug_ScopeBase* self) {  python_ispa_std_debug_MatchScope_close((python_ispa_std_debug_MatchScope*)self); }
+static const python_ispa_std_debug_ScopeBase_vt python_ispa_std_debug_MatchScope_as_python_ispa_std_debug_ScopeBase_vtable = { .close = python_ispa_std_debug_MatchScope_close_as_python_ispa_std_debug_ScopeBase };
 python_ispa_std_debug_MatchScope* python_ispa_std_debug_get_MatchScope_handler(ispa_arena* arena) {
 	python_ispa_std_debug_MatchScope* h = (python_ispa_std_debug_MatchScope*)ispa_arena_calloc(arena, sizeof(python_ispa_std_debug_MatchScope));
+	h->base_python_ispa_std_debug_ScopeBase.vt = &python_ispa_std_debug_MatchScope_as_python_ispa_std_debug_ScopeBase_vtable;
 	return h;
 }
 void python_ispa_std_debug_free_MatchScope_handler(python_ispa_std_debug_MatchScope* handler) { (void)handler; }
@@ -1594,7 +1587,7 @@ python_ispa_std_raw_token_RawToken* python_ispa_std_dfa_run_run(python_ispa_std_
 				ispa_vec_int64_t* row = ispa_vec_ispa_vec_int64_tP_get((action_table), ((state) - (nstates)));
 				int64_t here = (((cur)->pos) - (start));
 				if (((((((ispa_vec_int64_t_get((row), INT64_C(1))) >= (registers)))) || (((((((ispa_vec_int64_t_get((row), INT64_C(2))) != (python_ispa_std_dfa_api_NULL_STATE)))) && ((((ispa_vec_int64_t_get((row), INT64_C(2))) >= (registers)))))))))) {
-					python_ispa_std_debug_MatchScope_close((scope));
+					python_ispa_std_debug_ScopeBase_close_v((python_ispa_std_debug_ScopeBase*)(scope));
 					python_ispa_std_failures_runtime_error(ISPA_STR("DFA: register out of range"));
 				}
 				int64_t op = ispa_vec_int64_t_get((row), INT64_C(0));
@@ -1621,7 +1614,7 @@ python_ispa_std_raw_token_RawToken* python_ispa_std_dfa_run_run(python_ispa_std_
 							ispa_vec_python_ispa_std_dfa_api_HistoryNodeP_push((history), python_ispa_std_dfa_api_HistoryNode_new(mark, prev));
 							ispa_vec_int64_t_set((regs), ispa_vec_int64_t_get((row), INT64_C(1)), (((int64_t)(history)->len) - (INT64_C(1))));
 						} else {
-							python_ispa_std_debug_MatchScope_close((scope));
+							python_ispa_std_debug_ScopeBase_close_v((python_ispa_std_debug_ScopeBase*)(scope));
 							python_ispa_std_failures_runtime_error(ISPA_STR("DFA: unknown action; Report this error to github"));
 						}
 					}
@@ -1633,7 +1626,7 @@ python_ispa_std_raw_token_RawToken* python_ispa_std_dfa_run_run(python_ispa_std_
 				python_ispa_std_utility_Pair__int64_t_python_ispa_std_raw_token_RawTokenP* result = ((python_ispa_std_utility_Pair__int64_t_python_ispa_std_raw_token_RawTokenP* (*)(void*, int64_t, python_ispa_std_dfa_api_Captures*, int64_t, int64_t, int64_t, python_ispa_std_refs_Cursor*))(semantic).fn)((semantic).env, ((((state) - (nstates))) - (nactions)), captures, start_pos, (((cur)->pos) - (start)), start_line, cur);
 				if (((((cur)->pos) != (semantic_pos)))) {
 					if (((((cur)->pos) < (semantic_pos)))) {
-						python_ispa_std_debug_MatchScope_close((scope));
+						python_ispa_std_debug_ScopeBase_close_v((python_ispa_std_debug_ScopeBase*)(scope));
 						python_ispa_std_failures_runtime_error(ISPA_STR("DFA: semantic matcher moved the cursor backwards"));
 					}
 					int64_t k = semantic_pos;
@@ -1648,7 +1641,7 @@ python_ispa_std_raw_token_RawToken* python_ispa_std_dfa_run_run(python_ispa_std_
 				state = (result)->first;
 				if ((((state) == (python_ispa_std_dfa_api_DYNAMIC_FAIL_STATE)))) {
 					python_ispa_std_debug_MatchScope_outcome((scope), ISPA_STR("dynamic matcher failed"));
-					python_ispa_std_debug_MatchScope_close((scope));
+					python_ispa_std_debug_ScopeBase_close_v((python_ispa_std_debug_ScopeBase*)(scope));
 					return empty_token;
 				}
 				if ((((state) == (python_ispa_std_dfa_api_LEXER_DELETE_STATE)))) {
@@ -1656,18 +1649,18 @@ python_ispa_std_raw_token_RawToken* python_ispa_std_dfa_run_run(python_ispa_std_
 						(cur)->pos = (((cur)->pos) + (INT64_C(1)));
 					}
 					python_ispa_std_debug_MatchScope_success((scope));
-					python_ispa_std_debug_MatchScope_close((scope));
+					python_ispa_std_debug_ScopeBase_close_v((python_ispa_std_debug_ScopeBase*)(scope));
 					return empty_token;
 				}
 				if ((((state) == (python_ispa_std_dfa_api_NULL_STATE)))) {
 					python_ispa_std_debug_MatchScope_success((scope));
-					python_ispa_std_debug_MatchScope_close((scope));
+					python_ispa_std_debug_ScopeBase_close_v((python_ispa_std_debug_ScopeBase*)(scope));
 					return (result)->second;
 				}
 				if (((((cur)->pos) == (last_pos)))) {
 					steps_without_progress = ((steps_without_progress) + (INT64_C(1)));
 					if ((((steps_without_progress) > (INT64_C(100))))) {
-						python_ispa_std_debug_MatchScope_close((scope));
+						python_ispa_std_debug_ScopeBase_close_v((python_ispa_std_debug_ScopeBase*)(scope));
 						python_ispa_std_failures_internal_error(ISPA_STR("DFA: possible zero-width transition cycle at state {}, offset {}"), ISPA_STR("Lexer TDFA generation"), true, ispa_vec_ispa_str_from((ispa_str[]){python_ispa_std_format_int_to_string(state), python_ispa_std_format_int_to_string((((cur)->pos) - (start)))}, 2));
 					}
 				} else {
@@ -1678,7 +1671,7 @@ python_ispa_std_raw_token_RawToken* python_ispa_std_dfa_run_run(python_ispa_std_
 		}
 	}
 	python_ispa_std_debug_MatchScope_outcome((scope), ISPA_STR("DFA found no accepting token"));
-	python_ispa_std_debug_MatchScope_close((scope));
+	python_ispa_std_debug_ScopeBase_close_v((python_ispa_std_debug_ScopeBase*)(scope));
 	return empty_token;
 }
 python_ispa_std_lexer_LexerDecision* python_ispa_std_lexer_get_LexerDecision_handler(ispa_arena* arena) {
@@ -2022,8 +2015,23 @@ bool python_ispa_std_lexer__token_equal(python_ispa_std_raw_token_RawToken* a, p
 	}
 	return ((((((((((((python_ispa_std_raw_token_RawToken_kind((a))) == (python_ispa_std_raw_token_RawToken_kind((b)))))) && ((((python_ispa_std_raw_token_RawToken_index((a))) == (python_ispa_std_raw_token_RawToken_index((b))))))))) && ((((python_ispa_std_raw_token_RawTokenMeta_startpos((python_ispa_std_raw_token_RawToken_meta((a))))) == (python_ispa_std_raw_token_RawTokenMeta_startpos((python_ispa_std_raw_token_RawToken_meta((b))))))))))) && ((((python_ispa_std_raw_token_RawTokenMeta_length((python_ispa_std_raw_token_RawToken_meta((a))))) == (python_ispa_std_raw_token_RawTokenMeta_length((python_ispa_std_raw_token_RawToken_meta((b))))))))));
 }
+static python_ispa_std_lexer_TokenCursor* python_ispa_std_lexer_TokenCursor_copy_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_TokenCursor_copy((python_ispa_std_lexer_TokenCursor*)self); }
+static bool python_ispa_std_lexer_TokenCursor_has_source_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_TokenCursor_has_source((python_ispa_std_lexer_TokenCursor*)self); }
+static ispa_str python_ispa_std_lexer_TokenCursor_sourceOrigin_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_TokenCursor_sourceOrigin((python_ispa_std_lexer_TokenCursor*)self); }
+static ispa_vec_ispa_str* python_ispa_std_lexer_TokenCursor_getErrors_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_TokenCursor_getErrors((python_ispa_std_lexer_TokenCursor*)self); }
+static int64_t python_ispa_std_lexer_TokenCursor_sourcePosition_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_TokenCursor_sourcePosition((python_ispa_std_lexer_TokenCursor*)self); }
+static void python_ispa_std_lexer_TokenCursor_consumeExternal_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self, int64_t end) {  python_ispa_std_lexer_TokenCursor_consumeExternal((python_ispa_std_lexer_TokenCursor*)self, end); }
+static bool python_ispa_std_lexer_TokenCursor_isEnd_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_TokenCursor_isEnd((python_ispa_std_lexer_TokenCursor*)self); }
+static python_ispa_std_lexer_TokenCursor* python_ispa_std_lexer_TokenCursor_next_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_TokenCursor_next((python_ispa_std_lexer_TokenCursor*)self); }
+static python_ispa_std_lexer_TokenCursor* python_ispa_std_lexer_TokenCursor_prev_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_TokenCursor_prev((python_ispa_std_lexer_TokenCursor*)self); }
+static python_ispa_std_lexer_TokenCursor* python_ispa_std_lexer_TokenCursor_advance_by_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self, int64_t count) { return python_ispa_std_lexer_TokenCursor_advance_by((python_ispa_std_lexer_TokenCursor*)self, count); }
+static python_ispa_std_raw_token_RawToken* python_ispa_std_lexer_TokenCursor_current_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_TokenCursor_current((python_ispa_std_lexer_TokenCursor*)self); }
+static int64_t python_ispa_std_lexer_TokenCursor_resumePosition_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_TokenCursor_resumePosition((python_ispa_std_lexer_TokenCursor*)self); }
+static bool python_ispa_std_lexer_TokenCursor_advanceCharacters_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self, int64_t count) { return python_ispa_std_lexer_TokenCursor_advanceCharacters((python_ispa_std_lexer_TokenCursor*)self, count); }
+static const python_ispa_std_lexer_TokenCursor_vt python_ispa_std_lexer_TokenCursor_as_python_ispa_std_lexer_TokenCursor_vtable = { .copy = python_ispa_std_lexer_TokenCursor_copy_as_python_ispa_std_lexer_TokenCursor, .has_source = python_ispa_std_lexer_TokenCursor_has_source_as_python_ispa_std_lexer_TokenCursor, .sourceOrigin = python_ispa_std_lexer_TokenCursor_sourceOrigin_as_python_ispa_std_lexer_TokenCursor, .getErrors = python_ispa_std_lexer_TokenCursor_getErrors_as_python_ispa_std_lexer_TokenCursor, .sourcePosition = python_ispa_std_lexer_TokenCursor_sourcePosition_as_python_ispa_std_lexer_TokenCursor, .consumeExternal = python_ispa_std_lexer_TokenCursor_consumeExternal_as_python_ispa_std_lexer_TokenCursor, .isEnd = python_ispa_std_lexer_TokenCursor_isEnd_as_python_ispa_std_lexer_TokenCursor, .next = python_ispa_std_lexer_TokenCursor_next_as_python_ispa_std_lexer_TokenCursor, .prev = python_ispa_std_lexer_TokenCursor_prev_as_python_ispa_std_lexer_TokenCursor, .advance_by = python_ispa_std_lexer_TokenCursor_advance_by_as_python_ispa_std_lexer_TokenCursor, .current = python_ispa_std_lexer_TokenCursor_current_as_python_ispa_std_lexer_TokenCursor, .resumePosition = python_ispa_std_lexer_TokenCursor_resumePosition_as_python_ispa_std_lexer_TokenCursor, .advanceCharacters = python_ispa_std_lexer_TokenCursor_advanceCharacters_as_python_ispa_std_lexer_TokenCursor };
 python_ispa_std_lexer_TokenCursor* python_ispa_std_lexer_get_TokenCursor_handler(ispa_arena* arena) {
 	python_ispa_std_lexer_TokenCursor* h = (python_ispa_std_lexer_TokenCursor*)ispa_arena_calloc(arena, sizeof(python_ispa_std_lexer_TokenCursor));
+	h->vt = &python_ispa_std_lexer_TokenCursor_as_python_ispa_std_lexer_TokenCursor_vtable;
 	return h;
 }
 void python_ispa_std_lexer_free_TokenCursor_handler(python_ispa_std_lexer_TokenCursor* handler) { (void)handler; }
@@ -2084,8 +2092,8 @@ python_ispa_std_lexer_TokenCursor* python_ispa_std_lexer_TokenCursor_advance_by(
 	return self;
 }
 python_ispa_std_lexer_TokenCursor* python_ispa_std_lexer_TokenCursor_plus(python_ispa_std_lexer_TokenCursor* self, int64_t count) {
-	python_ispa_std_lexer_TokenCursor* out = python_ispa_std_lexer_TokenCursor_copy((self));
-	python_ispa_std_lexer_TokenCursor_advance_by((out), count);
+	python_ispa_std_lexer_TokenCursor* out = python_ispa_std_lexer_TokenCursor_copy_v((self));
+	python_ispa_std_lexer_TokenCursor_advance_by_v((out), count);
 	return out;
 }
 python_ispa_std_raw_token_RawToken* python_ispa_std_lexer_TokenCursor_current(python_ispa_std_lexer_TokenCursor* self) {
@@ -2094,7 +2102,7 @@ python_ispa_std_raw_token_RawToken* python_ispa_std_lexer_TokenCursor_current(py
 }
 bool python_ispa_std_lexer_TokenCursor_kind_is(python_ispa_std_lexer_TokenCursor* self, int64_t type_id) {
 	ISPA_STR("Whether the token here holds `type_id`; cursors that can answer without materialising a RawToken override it.");
-	return python_ispa_std_raw_token_RawToken_holds((python_ispa_std_lexer_TokenCursor_current((self))), type_id);
+	return python_ispa_std_raw_token_RawToken_holds((python_ispa_std_lexer_TokenCursor_current_v((self))), type_id);
 }
 int64_t python_ispa_std_lexer_TokenCursor_minus(python_ispa_std_lexer_TokenCursor* self, python_ispa_std_lexer_TokenCursor* other) {
 	return ((python_ispa_std_lexer_TokenCursor_distance((self))) - (python_ispa_std_lexer_TokenCursor_distance((other))));
@@ -2109,8 +2117,23 @@ bool python_ispa_std_lexer_TokenCursor_advanceCharacters(python_ispa_std_lexer_T
 	python_ispa_std_failures_runtime_error(ISPA_STR("advanceCharacters needs a lazy cursor (external parser integration)"));
 	return false;
 }
+static python_ispa_std_lexer_TokenCursor* python_ispa_std_lexer_LazyIterator_copy_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_LazyIterator_copy((python_ispa_std_lexer_LazyIterator*)self); }
+static bool python_ispa_std_lexer_LazyIterator_has_source_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_LazyIterator_has_source((python_ispa_std_lexer_LazyIterator*)self); }
+static ispa_str python_ispa_std_lexer_LazyIterator_sourceOrigin_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_LazyIterator_sourceOrigin((python_ispa_std_lexer_LazyIterator*)self); }
+static ispa_vec_ispa_str* python_ispa_std_lexer_LazyIterator_getErrors_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_LazyIterator_getErrors((python_ispa_std_lexer_LazyIterator*)self); }
+static int64_t python_ispa_std_lexer_LazyIterator_sourcePosition_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_LazyIterator_sourcePosition((python_ispa_std_lexer_LazyIterator*)self); }
+static void python_ispa_std_lexer_LazyIterator_consumeExternal_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self, int64_t end) {  python_ispa_std_lexer_LazyIterator_consumeExternal((python_ispa_std_lexer_LazyIterator*)self, end); }
+static bool python_ispa_std_lexer_LazyIterator_isEnd_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_LazyIterator_isEnd((python_ispa_std_lexer_LazyIterator*)self); }
+static python_ispa_std_lexer_TokenCursor* python_ispa_std_lexer_LazyIterator_next_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_LazyIterator_next((python_ispa_std_lexer_LazyIterator*)self); }
+static python_ispa_std_lexer_TokenCursor* python_ispa_std_lexer_LazyIterator_prev_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_LazyIterator_prev((python_ispa_std_lexer_LazyIterator*)self); }
+static python_ispa_std_lexer_TokenCursor* python_ispa_std_lexer_LazyIterator_advance_by_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self, int64_t count) { return python_ispa_std_lexer_LazyIterator_advance_by((python_ispa_std_lexer_LazyIterator*)self, count); }
+static python_ispa_std_raw_token_RawToken* python_ispa_std_lexer_LazyIterator_current_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_LazyIterator_current((python_ispa_std_lexer_LazyIterator*)self); }
+static int64_t python_ispa_std_lexer_LazyIterator_resumePosition_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_LazyIterator_resumePosition((python_ispa_std_lexer_LazyIterator*)self); }
+static bool python_ispa_std_lexer_LazyIterator_advanceCharacters_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self, int64_t count) { return python_ispa_std_lexer_LazyIterator_advanceCharacters((python_ispa_std_lexer_LazyIterator*)self, count); }
+static const python_ispa_std_lexer_TokenCursor_vt python_ispa_std_lexer_LazyIterator_as_python_ispa_std_lexer_TokenCursor_vtable = { .copy = python_ispa_std_lexer_LazyIterator_copy_as_python_ispa_std_lexer_TokenCursor, .has_source = python_ispa_std_lexer_LazyIterator_has_source_as_python_ispa_std_lexer_TokenCursor, .sourceOrigin = python_ispa_std_lexer_LazyIterator_sourceOrigin_as_python_ispa_std_lexer_TokenCursor, .getErrors = python_ispa_std_lexer_LazyIterator_getErrors_as_python_ispa_std_lexer_TokenCursor, .sourcePosition = python_ispa_std_lexer_LazyIterator_sourcePosition_as_python_ispa_std_lexer_TokenCursor, .consumeExternal = python_ispa_std_lexer_LazyIterator_consumeExternal_as_python_ispa_std_lexer_TokenCursor, .isEnd = python_ispa_std_lexer_LazyIterator_isEnd_as_python_ispa_std_lexer_TokenCursor, .next = python_ispa_std_lexer_LazyIterator_next_as_python_ispa_std_lexer_TokenCursor, .prev = python_ispa_std_lexer_LazyIterator_prev_as_python_ispa_std_lexer_TokenCursor, .advance_by = python_ispa_std_lexer_LazyIterator_advance_by_as_python_ispa_std_lexer_TokenCursor, .current = python_ispa_std_lexer_LazyIterator_current_as_python_ispa_std_lexer_TokenCursor, .resumePosition = python_ispa_std_lexer_LazyIterator_resumePosition_as_python_ispa_std_lexer_TokenCursor, .advanceCharacters = python_ispa_std_lexer_LazyIterator_advanceCharacters_as_python_ispa_std_lexer_TokenCursor };
 python_ispa_std_lexer_LazyIterator* python_ispa_std_lexer_get_LazyIterator_handler(ispa_arena* arena) {
 	python_ispa_std_lexer_LazyIterator* h = (python_ispa_std_lexer_LazyIterator*)ispa_arena_calloc(arena, sizeof(python_ispa_std_lexer_LazyIterator));
+	h->base_python_ispa_std_lexer_TokenCursor.vt = &python_ispa_std_lexer_LazyIterator_as_python_ispa_std_lexer_TokenCursor_vtable;
 	return h;
 }
 void python_ispa_std_lexer_free_LazyIterator_handler(python_ispa_std_lexer_LazyIterator* handler) { (void)handler; }
@@ -2168,7 +2191,7 @@ int64_t python_ispa_std_lexer_LazyIterator_sourcePosition(python_ispa_std_lexer_
 	return ((self)->state)->pos;
 }
 void python_ispa_std_lexer_LazyIterator_consumeExternal(python_ispa_std_lexer_LazyIterator* self, int64_t end) {
-	int64_t begin = python_ispa_std_lexer_LazyIterator_sourcePosition((self));
+	int64_t begin = python_ispa_std_lexer_TokenCursor_sourcePosition_v((python_ispa_std_lexer_TokenCursor*)(self));
 	ispa_str origin = python_ispa_std_lexer_Lexer_base_source(((self)->owner));
 	if (((((((end) < (begin)))) || ((((end) > ((int64_t)(origin).len))))))) {
 		python_ispa_std_failures_logic_error(ISPA_STR("External parser returned an invalid source cursor"));
@@ -2202,7 +2225,7 @@ bool python_ispa_std_lexer_LazyIterator_isEnd(python_ispa_std_lexer_LazyIterator
 }
 python_ispa_std_lexer_TokenCursor* python_ispa_std_lexer_LazyIterator_next(python_ispa_std_lexer_LazyIterator* self) {
 	ISPA_STR("operator++");
-	if ((!(python_ispa_std_lexer_LazyIterator_isEnd((self))))) {
+	if ((!(python_ispa_std_lexer_TokenCursor_isEnd_v((python_ispa_std_lexer_TokenCursor*)(self))))) {
 		(self)->token_index = (((self)->token_index) + (INT64_C(1)));
 	}
 	return (python_ispa_std_lexer_TokenCursor*)self;
@@ -2217,8 +2240,8 @@ python_ispa_std_lexer_TokenCursor* python_ispa_std_lexer_LazyIterator_prev(pytho
 python_ispa_std_lexer_TokenCursor* python_ispa_std_lexer_LazyIterator_advance_by(python_ispa_std_lexer_LazyIterator* self, int64_t count) {
 	ISPA_STR("operator+=");
 	int64_t left = count;
-	while (((((((left) > (INT64_C(0))))) && ((!(python_ispa_std_lexer_LazyIterator_isEnd((self)))))))) {
-		python_ispa_std_lexer_LazyIterator_next((self));
+	while (((((((left) > (INT64_C(0))))) && ((!(python_ispa_std_lexer_TokenCursor_isEnd_v((python_ispa_std_lexer_TokenCursor*)(self)))))))) {
+		python_ispa_std_lexer_TokenCursor_next_v((python_ispa_std_lexer_TokenCursor*)(self));
 		left = ((left) - (INT64_C(1)));
 	}
 	return (python_ispa_std_lexer_TokenCursor*)self;
@@ -2271,8 +2294,23 @@ bool python_ispa_std_lexer_LazyIterator_advanceCharacters(python_ispa_std_lexer_
 	python_ispa_std_lexer_LazyIterator_ensure_token((self));
 	return true;
 }
+static python_ispa_std_lexer_TokenCursor* python_ispa_std_lexer_TokenIterator_copy_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_TokenIterator_copy((python_ispa_std_lexer_TokenIterator*)self); }
+static bool python_ispa_std_lexer_TokenIterator_has_source_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_TokenCursor_has_source((python_ispa_std_lexer_TokenCursor*)self); }
+static ispa_str python_ispa_std_lexer_TokenIterator_sourceOrigin_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_TokenCursor_sourceOrigin((python_ispa_std_lexer_TokenCursor*)self); }
+static ispa_vec_ispa_str* python_ispa_std_lexer_TokenIterator_getErrors_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_TokenCursor_getErrors((python_ispa_std_lexer_TokenCursor*)self); }
+static int64_t python_ispa_std_lexer_TokenIterator_sourcePosition_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_TokenCursor_sourcePosition((python_ispa_std_lexer_TokenCursor*)self); }
+static void python_ispa_std_lexer_TokenIterator_consumeExternal_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self, int64_t end) {  python_ispa_std_lexer_TokenCursor_consumeExternal((python_ispa_std_lexer_TokenCursor*)self, end); }
+static bool python_ispa_std_lexer_TokenIterator_isEnd_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_TokenIterator_isEnd((python_ispa_std_lexer_TokenIterator*)self); }
+static python_ispa_std_lexer_TokenCursor* python_ispa_std_lexer_TokenIterator_next_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_TokenIterator_next((python_ispa_std_lexer_TokenIterator*)self); }
+static python_ispa_std_lexer_TokenCursor* python_ispa_std_lexer_TokenIterator_prev_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_TokenIterator_prev((python_ispa_std_lexer_TokenIterator*)self); }
+static python_ispa_std_lexer_TokenCursor* python_ispa_std_lexer_TokenIterator_advance_by_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self, int64_t count) { return python_ispa_std_lexer_TokenIterator_advance_by((python_ispa_std_lexer_TokenIterator*)self, count); }
+static python_ispa_std_raw_token_RawToken* python_ispa_std_lexer_TokenIterator_current_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_TokenIterator_current((python_ispa_std_lexer_TokenIterator*)self); }
+static int64_t python_ispa_std_lexer_TokenIterator_resumePosition_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self) { return python_ispa_std_lexer_TokenIterator_resumePosition((python_ispa_std_lexer_TokenIterator*)self); }
+static bool python_ispa_std_lexer_TokenIterator_advanceCharacters_as_python_ispa_std_lexer_TokenCursor(python_ispa_std_lexer_TokenCursor* self, int64_t count) { return python_ispa_std_lexer_TokenCursor_advanceCharacters((python_ispa_std_lexer_TokenCursor*)self, count); }
+static const python_ispa_std_lexer_TokenCursor_vt python_ispa_std_lexer_TokenIterator_as_python_ispa_std_lexer_TokenCursor_vtable = { .copy = python_ispa_std_lexer_TokenIterator_copy_as_python_ispa_std_lexer_TokenCursor, .has_source = python_ispa_std_lexer_TokenIterator_has_source_as_python_ispa_std_lexer_TokenCursor, .sourceOrigin = python_ispa_std_lexer_TokenIterator_sourceOrigin_as_python_ispa_std_lexer_TokenCursor, .getErrors = python_ispa_std_lexer_TokenIterator_getErrors_as_python_ispa_std_lexer_TokenCursor, .sourcePosition = python_ispa_std_lexer_TokenIterator_sourcePosition_as_python_ispa_std_lexer_TokenCursor, .consumeExternal = python_ispa_std_lexer_TokenIterator_consumeExternal_as_python_ispa_std_lexer_TokenCursor, .isEnd = python_ispa_std_lexer_TokenIterator_isEnd_as_python_ispa_std_lexer_TokenCursor, .next = python_ispa_std_lexer_TokenIterator_next_as_python_ispa_std_lexer_TokenCursor, .prev = python_ispa_std_lexer_TokenIterator_prev_as_python_ispa_std_lexer_TokenCursor, .advance_by = python_ispa_std_lexer_TokenIterator_advance_by_as_python_ispa_std_lexer_TokenCursor, .current = python_ispa_std_lexer_TokenIterator_current_as_python_ispa_std_lexer_TokenCursor, .resumePosition = python_ispa_std_lexer_TokenIterator_resumePosition_as_python_ispa_std_lexer_TokenCursor, .advanceCharacters = python_ispa_std_lexer_TokenIterator_advanceCharacters_as_python_ispa_std_lexer_TokenCursor };
 python_ispa_std_lexer_TokenIterator* python_ispa_std_lexer_get_TokenIterator_handler(ispa_arena* arena) {
 	python_ispa_std_lexer_TokenIterator* h = (python_ispa_std_lexer_TokenIterator*)ispa_arena_calloc(arena, sizeof(python_ispa_std_lexer_TokenIterator));
+	h->base_python_ispa_std_lexer_TokenCursor.vt = &python_ispa_std_lexer_TokenIterator_as_python_ispa_std_lexer_TokenCursor_vtable;
 	return h;
 }
 void python_ispa_std_lexer_free_TokenIterator_handler(python_ispa_std_lexer_TokenIterator* handler) { (void)handler; }
@@ -2485,22 +2523,22 @@ int64_t python_ispa_std_recovery_token_id(python_ispa_std_raw_token_RawToken* to
 	return python_ispa_std_raw_token_RawToken_kind((token));
 }
 int64_t python_ispa_std_recovery__kind(python_ispa_std_lexer_TokenCursor* pos) {
-	if (python_ispa_std_lexer_TokenCursor_isEnd((pos))) {
+	if (python_ispa_std_lexer_TokenCursor_isEnd_v((pos))) {
 		return python_ispa_std_recovery_EOF_TOKEN;
 	}
-	return python_ispa_std_recovery_token_id(python_ispa_std_lexer_TokenCursor_current((pos)));
+	return python_ispa_std_recovery_token_id(python_ispa_std_lexer_TokenCursor_current_v((pos)));
 }
 python_ispa_std_recovery_Decision* python_ispa_std_recovery_recover(python_ispa_std_lexer_TokenCursor* pos, python_ispa_std_recovery_State* state, python_ispa_std_recovery_Plan* plan, ispa_fn token_kind) {
 	ISPA_STR("Pick and perform a repair at `pos`. `token_kind(token) -> id`; pos is\n    advanced in place when tokens are skipped.");
 	int64_t at = python_ispa_std_recovery_EOF_TOKEN;
-	if ((!(python_ispa_std_lexer_TokenCursor_isEnd((pos))))) {
-		at = ((int64_t (*)(void*, python_ispa_std_raw_token_RawToken*))(token_kind).fn)((token_kind).env, python_ispa_std_lexer_TokenCursor_current((pos)));
+	if ((!(python_ispa_std_lexer_TokenCursor_isEnd_v((pos))))) {
+		at = ((int64_t (*)(void*, python_ispa_std_raw_token_RawToken*))(token_kind).fn)((token_kind).env, python_ispa_std_lexer_TokenCursor_current_v((pos)));
 	}
 	int64_t offset = python_ispa_std_recovery_NO_OFFSET;
 	int64_t length = INT64_C(0);
 	ispa_str actual = ISPA_STR("end of input");
 	if ((((at) != (python_ispa_std_recovery_EOF_TOKEN)))) {
-		python_ispa_std_raw_token_RawTokenMeta* meta = python_ispa_std_raw_token_RawToken_meta((python_ispa_std_lexer_TokenCursor_current((pos))));
+		python_ispa_std_raw_token_RawTokenMeta* meta = python_ispa_std_raw_token_RawToken_meta((python_ispa_std_lexer_TokenCursor_current_v((pos))));
 		offset = python_ispa_std_raw_token_RawTokenMeta_startpos((meta));
 		length = python_ispa_std_raw_token_RawTokenMeta_length((meta));
 		if (python_ispa_std_raw_token_RawTokenMeta_has_source((meta))) {
@@ -2518,16 +2556,16 @@ python_ispa_std_recovery_Decision* python_ispa_std_recovery_recover(python_ispa_
 		} else {
 			int64_t nxt = python_ispa_std_recovery_EOF_TOKEN;
 			if ((((at) != (python_ispa_std_recovery_EOF_TOKEN)))) {
-				python_ispa_std_lexer_TokenCursor* lookahead = python_ispa_std_lexer_TokenCursor_copy((pos));
-				python_ispa_std_lexer_TokenCursor_next((lookahead));
-				if ((!(python_ispa_std_lexer_TokenCursor_isEnd((lookahead))))) {
-					nxt = ((int64_t (*)(void*, python_ispa_std_raw_token_RawToken*))(token_kind).fn)((token_kind).env, python_ispa_std_lexer_TokenCursor_current((lookahead)));
+				python_ispa_std_lexer_TokenCursor* lookahead = python_ispa_std_lexer_TokenCursor_copy_v((pos));
+				python_ispa_std_lexer_TokenCursor_next_v((lookahead));
+				if ((!(python_ispa_std_lexer_TokenCursor_isEnd_v((lookahead))))) {
+					nxt = ((int64_t (*)(void*, python_ispa_std_raw_token_RawToken*))(token_kind).fn)((token_kind).env, python_ispa_std_lexer_TokenCursor_current_v((lookahead)));
 				}
 			}
 			bool expected_one = ((((int64_t)((plan)->expected)->len) == (INT64_C(1))));
 			bool protected_token = (((python_ispa_std_recovery_contains((plan)->follow, at)) || (python_ispa_std_recovery__anchor(plan, state, at))));
 			if (((((((((((plan)->allow_deletion) && ((!(protected_token)))))) && ((((at) != (python_ispa_std_recovery_EOF_TOKEN))))))) && (python_ispa_std_recovery_contains((plan)->expected, nxt))))) {
-				python_ispa_std_lexer_TokenCursor_next((pos));
+				python_ispa_std_lexer_TokenCursor_next_v((pos));
 				(decision)->mode = python_ispa_std_recovery_Mode_Delete;
 				(decision)->skipped = INT64_C(1);
 			} else {
@@ -2536,7 +2574,7 @@ python_ispa_std_recovery_Decision* python_ispa_std_recovery_recover(python_ispa_
 					(decision)->synthesized = ispa_vec_int64_t_get(((plan)->expected), INT64_C(0));
 				} else {
 					if ((((((((((((((plan)->allow_replacement) && (expected_one)))) && ((!(protected_token)))))) && ((((at) != (python_ispa_std_recovery_EOF_TOKEN))))))) && (python_ispa_std_recovery_contains((plan)->continuation, nxt))))) {
-						python_ispa_std_lexer_TokenCursor_next((pos));
+						python_ispa_std_lexer_TokenCursor_next_v((pos));
 						(decision)->mode = python_ispa_std_recovery_Mode_Replace;
 						(decision)->synthesized = ispa_vec_int64_t_get(((plan)->expected), INT64_C(0));
 						(decision)->skipped = INT64_C(1);
@@ -2548,18 +2586,18 @@ python_ispa_std_recovery_Decision* python_ispa_std_recovery_recover(python_ispa_
 								(decision)->mode = python_ispa_std_recovery_Mode_Synchronize;
 							} else {
 								bool scanning = true;
-								while ((((((((((scanning) && ((!(python_ispa_std_lexer_TokenCursor_isEnd((pos)))))))) && (((((decision)->skipped) < ((plan)->max_skip))))))) && (((((((state)->total_skipped) + ((decision)->skipped))) < ((state)->max_total_skipped))))))) {
-									int64_t ident = ((int64_t (*)(void*, python_ispa_std_raw_token_RawToken*))(token_kind).fn)((token_kind).env, python_ispa_std_lexer_TokenCursor_current((pos)));
+								while ((((((((((scanning) && ((!(python_ispa_std_lexer_TokenCursor_isEnd_v((pos)))))))) && (((((decision)->skipped) < ((plan)->max_skip))))))) && (((((((state)->total_skipped) + ((decision)->skipped))) < ((state)->max_total_skipped))))))) {
+									int64_t ident = ((int64_t (*)(void*, python_ispa_std_raw_token_RawToken*))(token_kind).fn)((token_kind).env, python_ispa_std_lexer_TokenCursor_current_v((pos)));
 									if ((((((((((python_ispa_std_recovery_contains((plan)->expected, ident)) || (python_ispa_std_recovery_contains((plan)->continuation, ident))))) || (python_ispa_std_recovery_contains((plan)->follow, ident))))) || (python_ispa_std_recovery__anchor(plan, state, ident))))) {
 										scanning = false;
 									} else {
-										python_ispa_std_lexer_TokenCursor_next((pos));
+										python_ispa_std_lexer_TokenCursor_next_v((pos));
 										(decision)->skipped = (((decision)->skipped) + (INT64_C(1)));
 									}
 								}
 								int64_t here = python_ispa_std_recovery_EOF_TOKEN;
-								if ((!(python_ispa_std_lexer_TokenCursor_isEnd((pos))))) {
-									here = ((int64_t (*)(void*, python_ispa_std_raw_token_RawToken*))(token_kind).fn)((token_kind).env, python_ispa_std_lexer_TokenCursor_current((pos)));
+								if ((!(python_ispa_std_lexer_TokenCursor_isEnd_v((pos))))) {
+									here = ((int64_t (*)(void*, python_ispa_std_raw_token_RawToken*))(token_kind).fn)((token_kind).env, python_ispa_std_lexer_TokenCursor_current_v((pos)));
 								}
 								if (python_ispa_std_recovery_contains((plan)->expected, here)) {
 									(decision)->mode = python_ispa_std_recovery_Mode_Retry;
@@ -2663,8 +2701,13 @@ void python_ispa_std_recovery_Policy___init__(python_ispa_std_recovery_Policy* s
 python_ispa_std_recovery_Policy* python_ispa_std_recovery_Policy_initial(void) {
 	return python_ispa_std_recovery_Policy_new(true, true, true, INT64_C(64));
 }
+static python_ispa_std_recovery_Decision* python_ispa_std_recovery_FailHandler_run_as_python_ispa_std_recovery_FailHandler(python_ispa_std_recovery_FailHandler* self, python_ispa_std_lexer_TokenCursor* pos, python_ispa_std_recovery_State* state) { return python_ispa_std_recovery_FailHandler_run((python_ispa_std_recovery_FailHandler*)self, pos, state); }
+static bool python_ispa_std_recovery_FailHandler_is_custom_as_python_ispa_std_recovery_FailHandler(python_ispa_std_recovery_FailHandler* self) { return python_ispa_std_recovery_FailHandler_is_custom((python_ispa_std_recovery_FailHandler*)self); }
+static bool python_ispa_std_recovery_FailHandler_is_recovering_as_python_ispa_std_recovery_FailHandler(python_ispa_std_recovery_FailHandler* self) { return python_ispa_std_recovery_FailHandler_is_recovering((python_ispa_std_recovery_FailHandler*)self); }
+static const python_ispa_std_recovery_FailHandler_vt python_ispa_std_recovery_FailHandler_as_python_ispa_std_recovery_FailHandler_vtable = { .run = python_ispa_std_recovery_FailHandler_run_as_python_ispa_std_recovery_FailHandler, .is_custom = python_ispa_std_recovery_FailHandler_is_custom_as_python_ispa_std_recovery_FailHandler, .is_recovering = python_ispa_std_recovery_FailHandler_is_recovering_as_python_ispa_std_recovery_FailHandler };
 python_ispa_std_recovery_FailHandler* python_ispa_std_recovery_get_FailHandler_handler(ispa_arena* arena) {
 	python_ispa_std_recovery_FailHandler* h = (python_ispa_std_recovery_FailHandler*)ispa_arena_calloc(arena, sizeof(python_ispa_std_recovery_FailHandler));
+	h->vt = &python_ispa_std_recovery_FailHandler_as_python_ispa_std_recovery_FailHandler_vtable;
 	return h;
 }
 void python_ispa_std_recovery_free_FailHandler_handler(python_ispa_std_recovery_FailHandler* handler) { (void)handler; }
@@ -2682,8 +2725,13 @@ bool python_ispa_std_recovery_FailHandler_is_custom(python_ispa_std_recovery_Fai
 bool python_ispa_std_recovery_FailHandler_is_recovering(python_ispa_std_recovery_FailHandler* self) {
 	return true;
 }
+static python_ispa_std_recovery_Decision* python_ispa_std_recovery_Handler_run_as_python_ispa_std_recovery_FailHandler(python_ispa_std_recovery_FailHandler* self, python_ispa_std_lexer_TokenCursor* pos, python_ispa_std_recovery_State* state) { return python_ispa_std_recovery_Handler_run((python_ispa_std_recovery_Handler*)self, pos, state); }
+static bool python_ispa_std_recovery_Handler_is_custom_as_python_ispa_std_recovery_FailHandler(python_ispa_std_recovery_FailHandler* self) { return python_ispa_std_recovery_FailHandler_is_custom((python_ispa_std_recovery_FailHandler*)self); }
+static bool python_ispa_std_recovery_Handler_is_recovering_as_python_ispa_std_recovery_FailHandler(python_ispa_std_recovery_FailHandler* self) { return python_ispa_std_recovery_FailHandler_is_recovering((python_ispa_std_recovery_FailHandler*)self); }
+static const python_ispa_std_recovery_FailHandler_vt python_ispa_std_recovery_Handler_as_python_ispa_std_recovery_FailHandler_vtable = { .run = python_ispa_std_recovery_Handler_run_as_python_ispa_std_recovery_FailHandler, .is_custom = python_ispa_std_recovery_Handler_is_custom_as_python_ispa_std_recovery_FailHandler, .is_recovering = python_ispa_std_recovery_Handler_is_recovering_as_python_ispa_std_recovery_FailHandler };
 python_ispa_std_recovery_Handler* python_ispa_std_recovery_get_Handler_handler(ispa_arena* arena) {
 	python_ispa_std_recovery_Handler* h = (python_ispa_std_recovery_Handler*)ispa_arena_calloc(arena, sizeof(python_ispa_std_recovery_Handler));
+	h->base_python_ispa_std_recovery_FailHandler.vt = &python_ispa_std_recovery_Handler_as_python_ispa_std_recovery_FailHandler_vtable;
 	return h;
 }
 void python_ispa_std_recovery_free_Handler_handler(python_ispa_std_recovery_Handler* handler) { (void)handler; }
@@ -2705,8 +2753,13 @@ python_ispa_std_recovery_Decision* python_ispa_std_recovery_Handler_run(python_i
 	/* ISPA-C-TODO: unresolved name ISPA_STD::borrow */
 	ISPA_UNIMPLEMENTED("python_ispa_std_recovery.run");
 }
+static python_ispa_std_recovery_Decision* python_ispa_std_recovery_ActionFailure_run_as_python_ispa_std_recovery_FailHandler(python_ispa_std_recovery_FailHandler* self, python_ispa_std_lexer_TokenCursor* pos, python_ispa_std_recovery_State* state) { return python_ispa_std_recovery_ActionFailure_run((python_ispa_std_recovery_ActionFailure*)self, pos, state); }
+static bool python_ispa_std_recovery_ActionFailure_is_custom_as_python_ispa_std_recovery_FailHandler(python_ispa_std_recovery_FailHandler* self) { return python_ispa_std_recovery_ActionFailure_is_custom((python_ispa_std_recovery_ActionFailure*)self); }
+static bool python_ispa_std_recovery_ActionFailure_is_recovering_as_python_ispa_std_recovery_FailHandler(python_ispa_std_recovery_FailHandler* self) { return python_ispa_std_recovery_FailHandler_is_recovering((python_ispa_std_recovery_FailHandler*)self); }
+static const python_ispa_std_recovery_FailHandler_vt python_ispa_std_recovery_ActionFailure_as_python_ispa_std_recovery_FailHandler_vtable = { .run = python_ispa_std_recovery_ActionFailure_run_as_python_ispa_std_recovery_FailHandler, .is_custom = python_ispa_std_recovery_ActionFailure_is_custom_as_python_ispa_std_recovery_FailHandler, .is_recovering = python_ispa_std_recovery_ActionFailure_is_recovering_as_python_ispa_std_recovery_FailHandler };
 python_ispa_std_recovery_ActionFailure* python_ispa_std_recovery_get_ActionFailure_handler(ispa_arena* arena) {
 	python_ispa_std_recovery_ActionFailure* h = (python_ispa_std_recovery_ActionFailure*)ispa_arena_calloc(arena, sizeof(python_ispa_std_recovery_ActionFailure));
+	h->base_python_ispa_std_recovery_FailHandler.vt = &python_ispa_std_recovery_ActionFailure_as_python_ispa_std_recovery_FailHandler_vtable;
 	return h;
 }
 void python_ispa_std_recovery_free_ActionFailure_handler(python_ispa_std_recovery_ActionFailure* handler) { (void)handler; }
@@ -2724,8 +2777,13 @@ python_ispa_std_recovery_Decision* python_ispa_std_recovery_ActionFailure_run(py
 bool python_ispa_std_recovery_ActionFailure_is_custom(python_ispa_std_recovery_ActionFailure* self) {
 	return true;
 }
+static python_ispa_std_recovery_Decision* python_ispa_std_recovery_LegacyFail_run_as_python_ispa_std_recovery_FailHandler(python_ispa_std_recovery_FailHandler* self, python_ispa_std_lexer_TokenCursor* pos, python_ispa_std_recovery_State* state) { return python_ispa_std_recovery_LegacyFail_run((python_ispa_std_recovery_LegacyFail*)self, pos, state); }
+static bool python_ispa_std_recovery_LegacyFail_is_custom_as_python_ispa_std_recovery_FailHandler(python_ispa_std_recovery_FailHandler* self) { return python_ispa_std_recovery_FailHandler_is_custom((python_ispa_std_recovery_FailHandler*)self); }
+static bool python_ispa_std_recovery_LegacyFail_is_recovering_as_python_ispa_std_recovery_FailHandler(python_ispa_std_recovery_FailHandler* self) { return python_ispa_std_recovery_LegacyFail_is_recovering((python_ispa_std_recovery_LegacyFail*)self); }
+static const python_ispa_std_recovery_FailHandler_vt python_ispa_std_recovery_LegacyFail_as_python_ispa_std_recovery_FailHandler_vtable = { .run = python_ispa_std_recovery_LegacyFail_run_as_python_ispa_std_recovery_FailHandler, .is_custom = python_ispa_std_recovery_LegacyFail_is_custom_as_python_ispa_std_recovery_FailHandler, .is_recovering = python_ispa_std_recovery_LegacyFail_is_recovering_as_python_ispa_std_recovery_FailHandler };
 python_ispa_std_recovery_LegacyFail* python_ispa_std_recovery_get_LegacyFail_handler(ispa_arena* arena) {
 	python_ispa_std_recovery_LegacyFail* h = (python_ispa_std_recovery_LegacyFail*)ispa_arena_calloc(arena, sizeof(python_ispa_std_recovery_LegacyFail));
+	h->base_python_ispa_std_recovery_FailHandler.vt = &python_ispa_std_recovery_LegacyFail_as_python_ispa_std_recovery_FailHandler_vtable;
 	return h;
 }
 void python_ispa_std_recovery_free_LegacyFail_handler(python_ispa_std_recovery_LegacyFail* handler) { (void)handler; }
@@ -2907,8 +2965,12 @@ void python_ispa_std_match_result_MatchResult___init__(python_ispa_std_match_res
 python_ispa_std_match_result_MatchResult* python_ispa_std_match_result_MatchResult_failed(python_ispa_std_lexer_TokenCursor* it) {
 	return python_ispa_std_match_result_MatchResult_new(false, python_ispa_std_node_Node_blank(), it);
 }
+static void python_ispa_std_parser_base_Parser_base_before_parse_as_python_ispa_std_parser_base_Parser_base(python_ispa_std_parser_base_Parser_base* self) {  python_ispa_std_parser_base_Parser_base_before_parse((python_ispa_std_parser_base_Parser_base*)self); }
+static ispa_any python_ispa_std_parser_base_Parser_base_parseLazy_as_python_ispa_std_parser_base_Parser_base(python_ispa_std_parser_base_Parser_base* self) { return python_ispa_std_parser_base_Parser_base_parseLazy((python_ispa_std_parser_base_Parser_base*)self); }
+static const python_ispa_std_parser_base_Parser_base_vt python_ispa_std_parser_base_Parser_base_as_python_ispa_std_parser_base_Parser_base_vtable = { .before_parse = python_ispa_std_parser_base_Parser_base_before_parse_as_python_ispa_std_parser_base_Parser_base, .parseLazy = python_ispa_std_parser_base_Parser_base_parseLazy_as_python_ispa_std_parser_base_Parser_base };
 python_ispa_std_parser_base_Parser_base* python_ispa_std_parser_base_get_Parser_base_handler(ispa_arena* arena) {
 	python_ispa_std_parser_base_Parser_base* h = (python_ispa_std_parser_base_Parser_base*)ispa_arena_calloc(arena, sizeof(python_ispa_std_parser_base_Parser_base));
+	h->vt = &python_ispa_std_parser_base_Parser_base_as_python_ispa_std_parser_base_Parser_base_vtable;
 	return h;
 }
 void python_ispa_std_parser_base_free_Parser_base_handler(python_ispa_std_parser_base_Parser_base* handler) { (void)handler; }
@@ -2937,7 +2999,7 @@ ispa_any python_ispa_std_parser_base_Parser_base_parse_lexer(python_ispa_std_par
 ispa_any python_ispa_std_parser_base_Parser_base_parse_text(python_ispa_std_parser_base_Parser_base* self, ispa_str text) {
 	(self)->text = text;
 	(self)->has_text = true;
-	return python_ispa_std_parser_base_Parser_base_parseLazy((self));
+	return python_ispa_std_parser_base_Parser_base_parseLazy_v((self));
 }
 void python_ispa_std_parser_base_Parser_base_set_input_lexer(python_ispa_std_parser_base_Parser_base* self, python_ispa_std_lexer_Lexer_base* lex) {
 	if ((!(python_ispa_std_lexer_Lexer_base_hasTokens((lex))))) {
@@ -2955,7 +3017,7 @@ void python_ispa_std_parser_base_Parser_base_clear_input(python_ispa_std_parser_
 	(self)->text = ISPA_STR("");
 }
 ispa_any python_ispa_std_parser_base_Parser_base_parse_tokens(python_ispa_std_parser_base_Parser_base* self) {
-	python_ispa_std_parser_base_Parser_base_before_parse((self));
+	python_ispa_std_parser_base_Parser_base_before_parse_v((self));
 	if ((!((self)->has_lexer))) {
 		python_ispa_std_failures_api_error(ISPA_STR("Can't parse because no input lexer is provided"), ispa_vec_ispa_str_new());
 	}
@@ -3218,10 +3280,10 @@ int64_t python_ispa_std_parser_ll_MAX_ACTION_CHECKPOINTS = INT64_C(32);
 int64_t python_ispa_std_parser_ll_NPOS;
 int64_t python_ispa_std_parser_ll_lookahead_kind(python_ispa_std_lexer_TokenCursor* pos) {
 	ISPA_STR("Recovery::TokenId of the token at pos (EOF_TOKEN at end of input).");
-	if (python_ispa_std_lexer_TokenCursor_isEnd((pos))) {
+	if (python_ispa_std_lexer_TokenCursor_isEnd_v((pos))) {
 		return python_ispa_std_recovery_END_OF_INPUT;
 	}
-	return python_ispa_std_raw_token_RawToken_kind((python_ispa_std_lexer_TokenCursor_current((pos))));
+	return python_ispa_std_raw_token_RawToken_kind((python_ispa_std_lexer_TokenCursor_current_v((pos))));
 }
 int64_t python_ispa_std_parser_ll_cursor_position(python_ispa_std_lexer_TokenCursor* pos) {
 	return python_ispa_std_lexer_TokenCursor_distance((pos));
@@ -3236,7 +3298,7 @@ python_ispa_std_node_Node* python_ispa_std_parser_ll_parse_token_stream(python_i
 	python_ispa_std_lexer_Lexer_base_push_eof((lexer));
 	python_ispa_std_lexer_TokenCursor* begin = python_ispa_std_lexer_TokenIterator_begin(lexer);
 	python_ispa_std_match_result_MatchResult* result = ((python_ispa_std_match_result_MatchResult* (*)(void*, python_ispa_std_lexer_TokenCursor*))(rule).fn)((rule).env, begin);
-	if (((((!((result)->status))) || ((!(python_ispa_std_lexer_TokenCursor_isEnd(((result)->it)))))))) {
+	if (((((!((result)->status))) || ((!(python_ispa_std_lexer_TokenCursor_isEnd_v(((result)->it)))))))) {
 		return python_ispa_std_node_Node_blank();
 	}
 	return (result)->node;
@@ -3255,7 +3317,7 @@ python_ispa_std_node_Node* python_ispa_std_parser_ll_parse_source_span(python_is
 	python_ispa_std_lexer_Lexer_base_set_bound((lexer), python_ispa_std_raw_token_RawTokenMeta_end_pos((last)));
 	python_ispa_std_lexer_LazyIterator* begin = python_ispa_std_lexer_LazyIterator_at_position(lexer, python_ispa_std_raw_token_RawTokenMeta_startpos((first)));
 	python_ispa_std_match_result_MatchResult* result = ((python_ispa_std_match_result_MatchResult* (*)(void*, python_ispa_std_lexer_TokenCursor*))(rule).fn)((rule).env, (python_ispa_std_lexer_TokenCursor*)begin);
-	if ((((((((!((result)->status))) || ((!(python_ispa_std_lexer_TokenCursor_isEnd(((result)->it)))))))) || ((((python_ispa_std_lexer_TokenCursor_sourcePosition(((result)->it))) > (python_ispa_std_raw_token_RawTokenMeta_end_pos((last))))))))) {
+	if ((((((((!((result)->status))) || ((!(python_ispa_std_lexer_TokenCursor_isEnd_v(((result)->it)))))))) || ((((python_ispa_std_lexer_TokenCursor_sourcePosition_v(((result)->it))) > (python_ispa_std_raw_token_RawTokenMeta_end_pos((last))))))))) {
 		return python_ispa_std_node_Node_blank();
 	}
 	return (result)->node;
@@ -3339,19 +3401,19 @@ python_ispa_std_parser_ll_ActionToken* python_ispa_std_parser_ll_context_peek(py
 	if ((((lookahead) > (python_ispa_std_parser_ll_MAX_ACTION_LOOKAHEAD)))) {
 		python_ispa_std_failures_out_of_range(ISPA_STR("ctx.peek lookahead exceeds 64 tokens"));
 	}
-	python_ispa_std_lexer_TokenCursor* candidate = python_ispa_std_lexer_TokenCursor_copy((pos));
+	python_ispa_std_lexer_TokenCursor* candidate = python_ispa_std_lexer_TokenCursor_copy_v((pos));
 	int64_t i = INT64_C(0);
 	while ((((i) < (lookahead)))) {
-		if (python_ispa_std_lexer_TokenCursor_isEnd((candidate))) {
+		if (python_ispa_std_lexer_TokenCursor_isEnd_v((candidate))) {
 			return python_ispa_std_parser_ll_ActionToken_new();
 		}
-		python_ispa_std_lexer_TokenCursor_next((candidate));
+		python_ispa_std_lexer_TokenCursor_next_v((candidate));
 		i = ((i) + (INT64_C(1)));
 	}
-	if (python_ispa_std_lexer_TokenCursor_isEnd((candidate))) {
+	if (python_ispa_std_lexer_TokenCursor_isEnd_v((candidate))) {
 		return python_ispa_std_parser_ll_ActionToken_new();
 	}
-	python_ispa_std_raw_token_RawToken* token = python_ispa_std_lexer_TokenCursor_current((candidate));
+	python_ispa_std_raw_token_RawToken* token = python_ispa_std_lexer_TokenCursor_current_v((candidate));
 	python_ispa_std_raw_token_RawTokenMeta* meta = python_ispa_std_raw_token_RawToken_meta((token));
 	python_ispa_std_parser_ll_ActionToken* result = python_ispa_std_parser_ll_ActionToken_new();
 	(result)->raw = token;
@@ -3374,8 +3436,8 @@ python_ispa_std_parser_ll_ActionToken* python_ispa_std_parser_ll_context_prev(py
 	if ((((python_ispa_std_parser_ll_cursor_position(pos)) <= (python_ispa_std_parser_ll_cursor_position(start_pos))))) {
 		return python_ispa_std_parser_ll_ActionToken_new();
 	}
-	python_ispa_std_lexer_TokenCursor* previous = python_ispa_std_lexer_TokenCursor_copy((pos));
-	python_ispa_std_lexer_TokenCursor_prev((previous));
+	python_ispa_std_lexer_TokenCursor* previous = python_ispa_std_lexer_TokenCursor_copy_v((pos));
+	python_ispa_std_lexer_TokenCursor_prev_v((previous));
 	if (((((((python_ispa_std_parser_ll_cursor_position(previous)) >= (python_ispa_std_parser_ll_cursor_position(pos))))) || ((((python_ispa_std_parser_ll_cursor_position(previous)) < (python_ispa_std_parser_ll_cursor_position(start_pos)))))))) {
 		return python_ispa_std_parser_ll_ActionToken_new();
 	}
@@ -3386,27 +3448,27 @@ bool python_ispa_std_parser_ll_context_at(python_ispa_std_lexer_TokenCursor* pos
 	if ((((lookahead) > (python_ispa_std_parser_ll_MAX_ACTION_LOOKAHEAD)))) {
 		python_ispa_std_failures_out_of_range(ISPA_STR("ctx.at lookahead exceeds 64 tokens"));
 	}
-	python_ispa_std_lexer_TokenCursor* candidate = python_ispa_std_lexer_TokenCursor_copy((pos));
+	python_ispa_std_lexer_TokenCursor* candidate = python_ispa_std_lexer_TokenCursor_copy_v((pos));
 	int64_t i = INT64_C(0);
 	while ((((i) < (lookahead)))) {
-		if (python_ispa_std_lexer_TokenCursor_isEnd((candidate))) {
+		if (python_ispa_std_lexer_TokenCursor_isEnd_v((candidate))) {
 			return false;
 		}
-		python_ispa_std_lexer_TokenCursor_next((candidate));
+		python_ispa_std_lexer_TokenCursor_next_v((candidate));
 		i = ((i) + (INT64_C(1)));
 	}
-	if (python_ispa_std_lexer_TokenCursor_isEnd((candidate))) {
+	if (python_ispa_std_lexer_TokenCursor_isEnd_v((candidate))) {
 		return false;
 	}
-	python_ispa_std_raw_token_RawTokenMeta* meta = python_ispa_std_raw_token_RawToken_meta((python_ispa_std_lexer_TokenCursor_current((candidate))));
+	python_ispa_std_raw_token_RawTokenMeta* meta = python_ispa_std_raw_token_RawToken_meta((python_ispa_std_lexer_TokenCursor_current_v((candidate))));
 	if ((!(match_name))) {
 		return (((python_ispa_std_raw_token_RawTokenMeta_has_source((meta))) && ((ispa_str_eq((python_ispa_std_raw_token_RawTokenMeta_text((meta))), (text))))));
 	}
-	if ((((python_ispa_std_recovery_token_id(python_ispa_std_lexer_TokenCursor_current((candidate)))) == (ambiguous_id)))) {
+	if ((((python_ispa_std_recovery_token_id(python_ispa_std_lexer_TokenCursor_current_v((candidate)))) == (ambiguous_id)))) {
 		return false;
 	}
 	ispa_str name = python_ispa_std_format_replace_all(text, ISPA_STR("::"), ISPA_STR("."));
-	ispa_str actual = python_ispa_std_parser_ll_TokenNames_lookup((token_names), python_ispa_std_recovery_token_id(python_ispa_std_lexer_TokenCursor_current((candidate))));
+	ispa_str actual = python_ispa_std_parser_ll_TokenNames_lookup((token_names), python_ispa_std_recovery_token_id(python_ispa_std_lexer_TokenCursor_current_v((candidate))));
 	if ((ispa_str_eq((actual), (name)))) {
 		return true;
 	}
@@ -3435,7 +3497,7 @@ void python_ispa_std_parser_ll_ActionCheckpoint_mark(python_ispa_std_parser_ll_A
 		python_ispa_std_failures_length_error(ISPA_STR("action checkpoint limit (32) exceeded"));
 	}
 	ispa_vec_ispa_str_push(((self)->names), name);
-	ispa_vec_python_ispa_std_lexer_TokenCursorP_push(((self)->saved), python_ispa_std_lexer_TokenCursor_copy(((self)->pos)));
+	ispa_vec_python_ispa_std_lexer_TokenCursorP_push(((self)->saved), python_ispa_std_lexer_TokenCursor_copy_v(((self)->pos)));
 }
 int64_t python_ispa_std_parser_ll_ActionCheckpoint__find_last(python_ispa_std_parser_ll_ActionCheckpoint* self, ispa_str name) {
 	int64_t i = (((int64_t)((self)->names)->len) - (INT64_C(1)));
@@ -3497,7 +3559,7 @@ python_ispa_std_parser_ll_ActionToken* python_ispa_std_parser_ll_Ctx_peek(python
 python_ispa_std_parser_ll_ActionToken* python_ispa_std_parser_ll_Ctx_take(python_ispa_std_parser_ll_Ctx* self) {
 	python_ispa_std_parser_ll_ActionToken* token = python_ispa_std_parser_ll_Ctx_peek((self), INT64_C(0));
 	if ((!(python_ispa_std_parser_ll_ActionToken_empty((token))))) {
-		python_ispa_std_lexer_TokenCursor_next(((self)->base_python_ispa_std_parser_ll_ActionCheckpoint.pos));
+		python_ispa_std_lexer_TokenCursor_next_v(((self)->base_python_ispa_std_parser_ll_ActionCheckpoint.pos));
 	}
 	return token;
 }
@@ -3606,8 +3668,12 @@ void python_ispa_std_parser_ll_Resume___init__(python_ispa_std_parser_ll_Resume*
 	(self)->claim = claim;
 	(self)->has_claim = has_claim;
 }
+static void python_ispa_std_parser_ll_LLParser_before_parse_as_python_ispa_std_parser_base_Parser_base(python_ispa_std_parser_base_Parser_base* self) {  python_ispa_std_parser_ll_LLParser_before_parse((python_ispa_std_parser_ll_LLParser*)self); }
+static ispa_any python_ispa_std_parser_ll_LLParser_parseLazy_as_python_ispa_std_parser_base_Parser_base(python_ispa_std_parser_base_Parser_base* self) { return python_ispa_std_parser_ll_LLParser_parseLazy((python_ispa_std_parser_ll_LLParser*)self); }
+static const python_ispa_std_parser_base_Parser_base_vt python_ispa_std_parser_ll_LLParser_as_python_ispa_std_parser_base_Parser_base_vtable = { .before_parse = python_ispa_std_parser_ll_LLParser_before_parse_as_python_ispa_std_parser_base_Parser_base, .parseLazy = python_ispa_std_parser_ll_LLParser_parseLazy_as_python_ispa_std_parser_base_Parser_base };
 python_ispa_std_parser_ll_LLParser* python_ispa_std_parser_ll_get_LLParser_handler(ispa_arena* arena) {
 	python_ispa_std_parser_ll_LLParser* h = (python_ispa_std_parser_ll_LLParser*)ispa_arena_calloc(arena, sizeof(python_ispa_std_parser_ll_LLParser));
+	h->base_python_ispa_std_parser_base_Parser_base.vt = &python_ispa_std_parser_ll_LLParser_as_python_ispa_std_parser_base_Parser_base_vtable;
 	return h;
 }
 void python_ispa_std_parser_ll_free_LLParser_handler(python_ispa_std_parser_ll_LLParser* handler) { (void)handler; }
@@ -3671,8 +3737,8 @@ ispa_any python_ispa_std_parser_ll_LLParser_parseLazy(python_ispa_std_parser_ll_
 		python_ispa_std_failures_api_error(ISPA_STR("Can't parse because no input text is provided"), ispa_vec_ispa_str_new());
 	}
 	python_ispa_std_match_result_MatchResult* result = python_ispa_std_parser_base_Parser_base_lazyParse((python_ispa_std_parser_base_Parser_base*)(self));
-	bool at_end = python_ispa_std_lexer_TokenCursor_isEnd(((result)->it));
-	ispa_vec_ispa_str* messages = python_ispa_std_lexer_TokenCursor_getErrors(((result)->it));
+	bool at_end = python_ispa_std_lexer_TokenCursor_isEnd_v(((result)->it));
+	ispa_vec_ispa_str* messages = python_ispa_std_lexer_TokenCursor_getErrors_v(((result)->it));
 	int64_t i = INT64_C(0);
 	while ((((i) < ((int64_t)(messages)->len)))) {
 		python_ispa_std_recovery_Diagnostic* diagnostic = python_ispa_std_recovery_Diagnostic_new();
@@ -3690,7 +3756,7 @@ ispa_any python_ispa_std_parser_ll_LLParser_parseLazy(python_ispa_std_parser_ll_
 			(diagnostic)->message = ISPA_STR("could not match main rule");
 		}
 		if ((!(at_end))) {
-			python_ispa_std_raw_token_RawToken* token = python_ispa_std_lexer_TokenCursor_current(((result)->it));
+			python_ispa_std_raw_token_RawToken* token = python_ispa_std_lexer_TokenCursor_current_v(((result)->it));
 			(diagnostic)->offset = python_ispa_std_raw_token_RawTokenMeta_startpos((python_ispa_std_raw_token_RawToken_meta((token))));
 			(diagnostic)->length = python_ispa_std_raw_token_RawTokenMeta_length((python_ispa_std_raw_token_RawToken_meta((token))));
 		} else {
@@ -3754,7 +3820,7 @@ void python_ispa_std_parser_ll_LLParser_commit_rule(python_ispa_std_parser_ll_LL
 }
 bool python_ispa_std_parser_ll_LLParser_fast_path_ok(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_recovery_FailHandler* fail, bool allow_custom) {
 	ISPA_STR("Whether a native caller may take a matched terminal/rule without the debug scope, RequiredResult and\n        recovery objects (then it reports the match with accept_at). The one place that decides; native fast paths\n        must not re-derive these conditions.");
-	return ((((((((((!(python_ispa_std_parser_ll_LLParser_unwinding((self))))) && ((!(python_ispa_std_debug_enabled())))))) && (python_ispa_std_recovery_FailHandler_is_recovering((fail)))))) && ((((allow_custom) || ((!(python_ispa_std_recovery_FailHandler_is_custom((fail))))))))));
+	return ((((((((((!(python_ispa_std_parser_ll_LLParser_unwinding((self))))) && ((!(python_ispa_std_debug_enabled())))))) && (python_ispa_std_recovery_FailHandler_is_recovering_v((fail)))))) && ((((allow_custom) || ((!(python_ispa_std_recovery_FailHandler_is_custom_v((fail))))))))));
 }
 void python_ispa_std_parser_ll_LLParser_accept_at(python_ispa_std_parser_ll_LLParser* self, int64_t here) {
 	ISPA_STR("A required terminal was consumed by a native fast path (cursor now at `here`).");
@@ -3777,11 +3843,11 @@ ispa_str python_ispa_std_parser_ll_LLParser_debug_actual(python_ispa_std_parser_
 	if ((!(python_ispa_std_debug_enabled()))) {
 		return ISPA_STR("");
 	}
-	if (python_ispa_std_lexer_TokenCursor_isEnd((pos))) {
+	if (python_ispa_std_lexer_TokenCursor_isEnd_v((pos))) {
 		return ISPA_STR("<end of input>");
 	}
-	ispa_str actual = (ISPA_CONCAT((ISPA_STR("token #")), (python_ispa_std_format_int_to_string(python_ispa_std_recovery_token_id(python_ispa_std_lexer_TokenCursor_current((pos)))))));
-	python_ispa_std_raw_token_RawTokenMeta* meta = python_ispa_std_raw_token_RawToken_meta((python_ispa_std_lexer_TokenCursor_current((pos))));
+	ispa_str actual = (ISPA_CONCAT((ISPA_STR("token #")), (python_ispa_std_format_int_to_string(python_ispa_std_recovery_token_id(python_ispa_std_lexer_TokenCursor_current_v((pos)))))));
+	python_ispa_std_raw_token_RawTokenMeta* meta = python_ispa_std_raw_token_RawToken_meta((python_ispa_std_lexer_TokenCursor_current_v((pos))));
 	int64_t shown = INT64_C(80);
 	if ((((python_ispa_std_raw_token_RawTokenMeta_has_source((meta))) && ((((python_ispa_std_raw_token_RawTokenMeta_length((meta))) > (INT64_C(0)))))))) {
 		actual = (ISPA_CONCAT(((ISPA_CONCAT(((ISPA_CONCAT((actual), (ISPA_STR(" '"))))), (python_ispa_std_string_substr(python_ispa_std_raw_token_RawTokenMeta_source((meta)), python_ispa_std_raw_token_RawTokenMeta_startpos((meta)), python_ispa_std_utility_minimum__int64_t(python_ispa_std_raw_token_RawTokenMeta_length((meta)), shown)))))), (ISPA_STR("'"))));
@@ -3862,12 +3928,12 @@ bool python_ispa_std_parser_ll_LLParser_unwinding(python_ispa_std_parser_ll_LLPa
 	return ((((self)->unwind_) != (INT64_C(0))));
 }
 ispa_str python_ispa_std_parser_ll_LLParser_describe_token(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor* pos) {
-	if (python_ispa_std_lexer_TokenCursor_isEnd((pos))) {
+	if (python_ispa_std_lexer_TokenCursor_isEnd_v((pos))) {
 		return ISPA_STR("end of input");
 	}
-	python_ispa_std_raw_token_RawTokenMeta* meta = python_ispa_std_raw_token_RawToken_meta((python_ispa_std_lexer_TokenCursor_current((pos))));
-	if ((((python_ispa_std_lexer_TokenCursor_has_source((pos))) && ((((python_ispa_std_raw_token_RawTokenMeta_startpos((meta))) != (python_ispa_std_parser_ll_NPOS))))))) {
-		ispa_str origin = python_ispa_std_lexer_TokenCursor_sourceOrigin((pos));
+	python_ispa_std_raw_token_RawTokenMeta* meta = python_ispa_std_raw_token_RawToken_meta((python_ispa_std_lexer_TokenCursor_current_v((pos))));
+	if ((((python_ispa_std_lexer_TokenCursor_has_source_v((pos))) && ((((python_ispa_std_raw_token_RawTokenMeta_startpos((meta))) != (python_ispa_std_parser_ll_NPOS))))))) {
+		ispa_str origin = python_ispa_std_lexer_TokenCursor_sourceOrigin_v((pos));
 		if (((((((python_ispa_std_raw_token_RawTokenMeta_startpos((meta))) <= ((int64_t)(origin).len)))) && ((((python_ispa_std_raw_token_RawTokenMeta_length((meta))) <= ((((int64_t)(origin).len) - (python_ispa_std_raw_token_RawTokenMeta_startpos((meta))))))))))) {
 			return (ISPA_CONCAT(((ISPA_CONCAT((ISPA_STR("'")), (python_ispa_std_string_substr(origin, python_ispa_std_raw_token_RawTokenMeta_startpos((meta)), python_ispa_std_raw_token_RawTokenMeta_length((meta))))))), (ISPA_STR("'"))));
 		}
@@ -3889,10 +3955,10 @@ ispa_str python_ispa_std_parser_ll_LLParser_breadcrumb(python_ispa_std_parser_ll
 python_ispa_std_parser_ll_Resume* python_ispa_std_parser_ll_LLParser_resolve_context(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor* pos, int64_t max_skip) {
 	ISPA_STR("Earliest token (within max_skip) claimed by any frame; ties go to the\n        innermost frame. If an identical spot already failed, the innermost\n        frame may not claim the current token again (guarantees progress).\n        Returns a Resume with frame == -1 when there is none.");
 	bool repeat_spot = (((python_ispa_std_parser_ll_cursor_position(pos)) == ((self)->last_resume_pos_)));
-	python_ispa_std_lexer_TokenCursor* candidate = python_ispa_std_lexer_TokenCursor_copy((pos));
+	python_ispa_std_lexer_TokenCursor* candidate = python_ispa_std_lexer_TokenCursor_copy_v((pos));
 	int64_t k = INT64_C(0);
-	while (((((((k) <= (max_skip)))) && ((!(python_ispa_std_lexer_TokenCursor_isEnd((candidate)))))))) {
-		python_ispa_std_raw_token_RawToken* token = python_ispa_std_lexer_TokenCursor_current((candidate));
+	while (((((((k) <= (max_skip)))) && ((!(python_ispa_std_lexer_TokenCursor_isEnd_v((candidate)))))))) {
+		python_ispa_std_raw_token_RawToken* token = python_ispa_std_lexer_TokenCursor_current_v((candidate));
 		int64_t f = (self)->frame_count;
 		while ((((f) > (INT64_C(0))))) {
 			f = ((f) - (INT64_C(1)));
@@ -3908,9 +3974,9 @@ python_ispa_std_parser_ll_Resume* python_ispa_std_parser_ll_LLParser_resolve_con
 			}
 		}
 		k = ((k) + (INT64_C(1)));
-		python_ispa_std_lexer_TokenCursor_next((candidate));
+		python_ispa_std_lexer_TokenCursor_next_v((candidate));
 	}
-	if ((((python_ispa_std_lexer_TokenCursor_isEnd((candidate))) && (((((self)->frame_count) > (INT64_C(0)))))))) {
+	if ((((python_ispa_std_lexer_TokenCursor_isEnd_v((candidate))) && (((((self)->frame_count) > (INT64_C(0)))))))) {
 		return python_ispa_std_parser_ll_Resume_new(k, INT64_C(0), python_ispa_std_recovery_ContextClaim_new(ISPA_STR(""), python_ispa_std_recovery_empty_token_set()), false);
 	}
 	return python_ispa_std_parser_ll_Resume_new(INT64_C(0), (-(INT64_C(1))), python_ispa_std_recovery_ContextClaim_new(ISPA_STR(""), python_ispa_std_recovery_empty_token_set()), false);
@@ -3921,22 +3987,22 @@ void python_ispa_std_parser_ll_LLParser_report_context(python_ispa_std_parser_ll
 	python_ispa_std_recovery_ContextDiagnostic* d = python_ispa_std_recovery_ContextDiagnostic_new();
 	(d)->kind = kind;
 	(d)->position = python_ispa_std_parser_ll_cursor_position(pos);
-	if (python_ispa_std_lexer_TokenCursor_has_source((pos))) {
-		int64_t at = python_ispa_std_lexer_TokenCursor_sourcePosition((pos));
+	if (python_ispa_std_lexer_TokenCursor_has_source_v((pos))) {
+		int64_t at = python_ispa_std_lexer_TokenCursor_sourcePosition_v((pos));
 		if ((((at) >= (INT64_C(0))))) {
 			(d)->offset = at;
 			(d)->length = INT64_C(0);
-			if ((((at) < ((int64_t)(python_ispa_std_lexer_TokenCursor_sourceOrigin((pos))).len)))) {
+			if ((((at) < ((int64_t)(python_ispa_std_lexer_TokenCursor_sourceOrigin_v((pos))).len)))) {
 				(d)->length = INT64_C(1);
 			}
 		}
 	} else {
-		if ((!(python_ispa_std_lexer_TokenCursor_isEnd((pos))))) {
-			(d)->offset = python_ispa_std_raw_token_RawTokenMeta_startpos((python_ispa_std_raw_token_RawToken_meta((python_ispa_std_lexer_TokenCursor_current((pos))))));
-			(d)->length = python_ispa_std_raw_token_RawTokenMeta_length((python_ispa_std_raw_token_RawToken_meta((python_ispa_std_lexer_TokenCursor_current((pos))))));
+		if ((!(python_ispa_std_lexer_TokenCursor_isEnd_v((pos))))) {
+			(d)->offset = python_ispa_std_raw_token_RawTokenMeta_startpos((python_ispa_std_raw_token_RawToken_meta((python_ispa_std_lexer_TokenCursor_current_v((pos))))));
+			(d)->length = python_ispa_std_raw_token_RawTokenMeta_length((python_ispa_std_raw_token_RawToken_meta((python_ispa_std_lexer_TokenCursor_current_v((pos))))));
 		}
 	}
-	if (((((((((((d)->offset) == (python_ispa_std_recovery_NO_OFFSET)))) && (python_ispa_std_lexer_TokenCursor_isEnd((pos)))))) && ((self)->base_python_ispa_std_parser_base_Parser_base.has_text)))) {
+	if (((((((((((d)->offset) == (python_ispa_std_recovery_NO_OFFSET)))) && (python_ispa_std_lexer_TokenCursor_isEnd_v((pos)))))) && ((self)->base_python_ispa_std_parser_base_Parser_base.has_text)))) {
 		(d)->offset = (int64_t)((self)->base_python_ispa_std_parser_base_Parser_base.text).len;
 	}
 	(d)->skipped = (r)->skip;
@@ -3993,8 +4059,8 @@ bool python_ispa_std_parser_ll_LLParser_recover_at_context(python_ispa_std_parse
 		python_ispa_std_parser_ll_LLParser_report_context((self), pos, effective, r);
 	}
 	int64_t i = INT64_C(0);
-	while (((((((i) < ((r)->skip)))) && ((!(python_ispa_std_lexer_TokenCursor_isEnd((pos)))))))) {
-		python_ispa_std_lexer_TokenCursor_next((pos));
+	while (((((((i) < ((r)->skip)))) && ((!(python_ispa_std_lexer_TokenCursor_isEnd_v((pos)))))))) {
+		python_ispa_std_lexer_TokenCursor_next_v((pos));
 		i = ((i) + (INT64_C(1)));
 	}
 	((self)->recovery_state_)->total_skipped = ((((self)->recovery_state_)->total_skipped) + ((r)->skip));
@@ -4005,20 +4071,20 @@ bool python_ispa_std_parser_ll_LLParser_recover_at_context(python_ispa_std_parse
 }
 void python_ispa_std_parser_ll_LLParser_sync_loop(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor* pos) {
 	ISPA_STR("A loop ended on a token that no active frame can accept: report it\n        here, where the mistake is, rather than at the next required member.");
-	if (((((((python_ispa_std_lexer_TokenCursor_isEnd((pos))) || (((((self)->frame_count) == (INT64_C(0)))))))) || (python_ispa_std_parser_ll_LLParser_unwinding((self)))))) {
+	if (((((((python_ispa_std_lexer_TokenCursor_isEnd_v((pos))) || (((((self)->frame_count) == (INT64_C(0)))))))) || (python_ispa_std_parser_ll_LLParser_unwinding((self)))))) {
 		return;
 	}
-	python_ispa_std_lexer_TokenCursor* candidate = python_ispa_std_lexer_TokenCursor_copy((pos));
+	python_ispa_std_lexer_TokenCursor* candidate = python_ispa_std_lexer_TokenCursor_copy_v((pos));
 	if ((self)->has_space_token_) {
 		python_ispa_std_parser_ll_LLParser_skip_spaces((self), candidate);
 	}
-	if (python_ispa_std_lexer_TokenCursor_isEnd((candidate))) {
+	if (python_ispa_std_lexer_TokenCursor_isEnd_v((candidate))) {
 		return;
 	}
-	if (python_ispa_std_raw_token_RawToken_isAmbiguous((python_ispa_std_lexer_TokenCursor_current((candidate))))) {
+	if (python_ispa_std_raw_token_RawToken_isAmbiguous((python_ispa_std_lexer_TokenCursor_current_v((candidate))))) {
 		return;
 	}
-	python_ispa_std_raw_token_RawToken* token = python_ispa_std_lexer_TokenCursor_current((candidate));
+	python_ispa_std_raw_token_RawToken* token = python_ispa_std_lexer_TokenCursor_current_v((candidate));
 	bool any_claims = false;
 	int64_t i = INT64_C(0);
 	while ((((i) < ((self)->frame_count)))) {
@@ -4051,10 +4117,10 @@ int64_t python_ispa_std_parser_ll_LLParser_recover_choice(python_ispa_std_parser
 	(diagnostic)->rule = rule;
 	(diagnostic)->expected_text = expected;
 	(diagnostic)->message = (ISPA_CONCAT(((ISPA_CONCAT(((ISPA_CONCAT(((ISPA_CONCAT(((ISPA_CONCAT((ISPA_STR("unexpected ")), (python_ispa_std_parser_ll_LLParser_describe_token((self), pos))))), (ISPA_STR(" in "))))), (rule)))), (ISPA_STR("; expected one of: "))))), (expected)));
-	if ((!(python_ispa_std_lexer_TokenCursor_isEnd((pos))))) {
-		(diagnostic)->unexpected = python_ispa_std_recovery_token_id(python_ispa_std_lexer_TokenCursor_current((pos)));
-		(diagnostic)->offset = python_ispa_std_raw_token_RawTokenMeta_startpos((python_ispa_std_raw_token_RawToken_meta((python_ispa_std_lexer_TokenCursor_current((pos))))));
-		(diagnostic)->length = python_ispa_std_raw_token_RawTokenMeta_length((python_ispa_std_raw_token_RawToken_meta((python_ispa_std_lexer_TokenCursor_current((pos))))));
+	if ((!(python_ispa_std_lexer_TokenCursor_isEnd_v((pos))))) {
+		(diagnostic)->unexpected = python_ispa_std_recovery_token_id(python_ispa_std_lexer_TokenCursor_current_v((pos)));
+		(diagnostic)->offset = python_ispa_std_raw_token_RawTokenMeta_startpos((python_ispa_std_raw_token_RawToken_meta((python_ispa_std_lexer_TokenCursor_current_v((pos))))));
+		(diagnostic)->length = python_ispa_std_raw_token_RawTokenMeta_length((python_ispa_std_raw_token_RawToken_meta((python_ispa_std_lexer_TokenCursor_current_v((pos))))));
 	}
 	int64_t i = INT64_C(0);
 	while ((((i) < ((int64_t)(first_sets)->len)))) {
@@ -4065,8 +4131,8 @@ int64_t python_ispa_std_parser_ll_LLParser_recover_choice(python_ispa_std_parser
 	int64_t skipped = INT64_C(0);
 	if ((!(python_ispa_std_recovery_State_exhausted(((self)->recovery_state_))))) {
 		bool scanning = true;
-		while ((((scanning) && ((!(python_ispa_std_lexer_TokenCursor_isEnd((pos)))))))) {
-			int64_t ident = python_ispa_std_recovery_token_id(python_ispa_std_lexer_TokenCursor_current((pos)));
+		while ((((scanning) && ((!(python_ispa_std_lexer_TokenCursor_isEnd_v((pos)))))))) {
+			int64_t ident = python_ispa_std_recovery_token_id(python_ispa_std_lexer_TokenCursor_current_v((pos)));
 			int64_t phase = INT64_C(0);
 			while (((((((phase) < (INT64_C(2))))) && ((((selected) == ((-(INT64_C(1)))))))))) {
 				ispa_vec_python_ispa_std_recovery_TokenSetP* sets = first_sets;
@@ -4106,7 +4172,7 @@ int64_t python_ispa_std_parser_ll_LLParser_recover_choice(python_ispa_std_parser
 				if (((((((boundary) || ((((skipped) >= ((self)->context_max_skip_))))))) || ((((((((self)->recovery_state_)->total_skipped) + (skipped))) >= (((self)->recovery_state_)->max_total_skipped))))))) {
 					scanning = false;
 				} else {
-					python_ispa_std_lexer_TokenCursor_next((pos));
+					python_ispa_std_lexer_TokenCursor_next_v((pos));
 					skipped = ((skipped) + (INT64_C(1)));
 				}
 			}
@@ -4155,8 +4221,8 @@ python_ispa_std_recovery_RequiredResult* python_ispa_std_parser_ll_LLParser_requ
 	int64_t retries = INT64_C(0);
 	while (true) {
 		if (python_ispa_std_lexer_TokenCursor_kind_is((pos), type_id)) {
-			python_ispa_std_node_Node* node = python_ispa_std_raw_token_RawToken_to_node((python_ispa_std_lexer_TokenCursor_current((pos))), type_id);
-			python_ispa_std_lexer_TokenCursor_next((pos));
+			python_ispa_std_node_Node* node = python_ispa_std_raw_token_RawToken_to_node((python_ispa_std_lexer_TokenCursor_current_v((pos))), type_id);
+			python_ispa_std_lexer_TokenCursor_next_v((pos));
 			python_ispa_std_parser_ll_LLParser_commit_rule((self), pos);
 			python_ispa_std_parser_ll_LLParser_note_match((self));
 			return python_ispa_std_recovery_RequiredResult_new(python_ispa_std_recovery_RequiredStatus_Matched, true, node, python_ispa_std_recovery_Decision_initial());
@@ -4164,7 +4230,7 @@ python_ispa_std_recovery_RequiredResult* python_ispa_std_parser_ll_LLParser_requ
 		if (python_ispa_std_parser_ll_LLParser_reject_absent_rule((self))) {
 			return python_ispa_std_recovery_RequiredResult_boundary_only();
 		}
-		python_ispa_std_recovery_Decision* decision = python_ispa_std_recovery_FailHandler_run((fail), pos, (self)->recovery_state_);
+		python_ispa_std_recovery_Decision* decision = python_ispa_std_recovery_FailHandler_run_v((fail), pos, (self)->recovery_state_);
 		bool retry = false;
 		if (((((decision)->mode) == (python_ispa_std_recovery_Mode_Delete)))) {
 			retries = ((retries) + (INT64_C(1)));
@@ -4208,8 +4274,8 @@ python_ispa_std_recovery_RequiredResult* python_ispa_std_parser_ll_LLParser__rul
 		if (have_first) {
 			have_first = false;
 		} else {
-			python_ispa_std_lexer_TokenCursor* attempt = python_ispa_std_lexer_TokenCursor_copy((pos));
-			if (python_ispa_std_recovery_FailHandler_is_custom((fail))) {
+			python_ispa_std_lexer_TokenCursor* attempt = python_ispa_std_lexer_TokenCursor_copy_v((pos));
+			if (python_ispa_std_recovery_FailHandler_is_custom_v((fail))) {
 				match = python_ispa_std_parser_ll_LLParser__attempt_rule((self), rec, attempt);
 			} else {
 				match = ((python_ispa_std_match_result_MatchResult* (*)(void*, python_ispa_std_lexer_TokenCursor*))(rec).fn)((rec).env, attempt);
@@ -4228,7 +4294,7 @@ python_ispa_std_recovery_RequiredResult* python_ispa_std_parser_ll_LLParser__rul
 		if (python_ispa_std_parser_ll_LLParser_reject_absent_rule((self))) {
 			return python_ispa_std_recovery_RequiredResult_boundary_only();
 		}
-		python_ispa_std_recovery_Decision* decision = python_ispa_std_recovery_FailHandler_run((fail), pos, (self)->recovery_state_);
+		python_ispa_std_recovery_Decision* decision = python_ispa_std_recovery_FailHandler_run_v((fail), pos, (self)->recovery_state_);
 		bool again = false;
 		if ((((((((decision)->mode) == (python_ispa_std_recovery_Mode_Retry)))) || (((((decision)->mode) == (python_ispa_std_recovery_Mode_Delete))))))) {
 			retries = ((retries) + (INT64_C(1)));
@@ -4259,15 +4325,15 @@ python_ispa_std_node_Node* python_ispa_std_parser_ll_LLParser__required_outcome(
 	ISPA_STR("Shared tail of required_token / required_rule: a repaired or unwound\n        match yields an empty Node; anything else is unrecoverable.");
 	if ((result)->has_node) {
 		python_ispa_std_debug_MatchScope_success((scope));
-		python_ispa_std_debug_MatchScope_close((scope));
+		python_ispa_std_debug_ScopeBase_close_v((python_ispa_std_debug_ScopeBase*)(scope));
 		return (result)->node;
 	}
 	if (((((result)->status) != (python_ispa_std_recovery_RequiredStatus_Matched)))) {
 		python_ispa_std_debug_MatchScope_outcome((scope), (ISPA_CONCAT(((ISPA_CONCAT(((ISPA_CONCAT((ISPA_STR("recovery: ")), (python_ispa_std_parser_ll_LLParser_debug_recovery_mode((self), ((result)->recovery)->mode))))), (ISPA_STR(", skipped "))))), (python_ispa_std_format_int_to_string(((result)->recovery)->skipped)))));
 	}
-	python_ispa_std_debug_MatchScope_close((scope));
+	python_ispa_std_debug_ScopeBase_close_v((python_ispa_std_debug_ScopeBase*)(scope));
 	if (((((result)->status) != (python_ispa_std_recovery_RequiredStatus_Aborted)))) {
-		if (((((((((((result)->status) == (python_ispa_std_recovery_RequiredStatus_Missing)))) || (python_ispa_std_parser_ll_LLParser_unwinding((self)))))) || (((((!(python_ispa_std_lexer_TokenCursor_isEnd((pos))))) && ((((((result)->recovery)->mode) != (python_ispa_std_recovery_Mode_Propagate)))))))))) {
+		if (((((((((((result)->status) == (python_ispa_std_recovery_RequiredStatus_Missing)))) || (python_ispa_std_parser_ll_LLParser_unwinding((self)))))) || (((((!(python_ispa_std_lexer_TokenCursor_isEnd_v((pos))))) && ((((((result)->recovery)->mode) != (python_ispa_std_recovery_Mode_Propagate)))))))))) {
 			return python_ispa_std_node_Node_blank();
 		}
 	}
@@ -4284,33 +4350,33 @@ python_ispa_std_node_Node* python_ispa_std_parser_ll_LLParser_required_token(pyt
 	if (python_ispa_std_debug_enabled()) {
 		scope = python_ispa_std_debug_MatchScope_new(python_ispa_std_parser_ll_TokenNames_lookup(((self)->token_names_), type_id), python_ispa_std_parser_ll_LLParser_debug_actual((self), pos));
 	}
-	if (python_ispa_std_recovery_FailHandler_is_recovering((fail))) {
+	if (python_ispa_std_recovery_FailHandler_is_recovering_v((fail))) {
 		if (((((!(python_ispa_std_parser_ll_LLParser_unwinding((self))))) && (python_ispa_std_lexer_TokenCursor_kind_is((pos), type_id))))) {
-			python_ispa_std_node_Node* node = python_ispa_std_raw_token_RawToken_to_node((python_ispa_std_lexer_TokenCursor_current((pos))), type_id);
-			python_ispa_std_lexer_TokenCursor_next((pos));
+			python_ispa_std_node_Node* node = python_ispa_std_raw_token_RawToken_to_node((python_ispa_std_lexer_TokenCursor_current_v((pos))), type_id);
+			python_ispa_std_lexer_TokenCursor_next_v((pos));
 			python_ispa_std_parser_ll_LLParser_commit_rule((self), pos);
 			python_ispa_std_parser_ll_LLParser_note_match((self));
 			python_ispa_std_debug_MatchScope_success((scope));
-			python_ispa_std_debug_MatchScope_close((scope));
+			python_ispa_std_debug_ScopeBase_close_v((python_ispa_std_debug_ScopeBase*)(scope));
 			return node;
 		}
 		python_ispa_std_recovery_RequiredResult* result = python_ispa_std_parser_ll_LLParser_required_recovering((self), pos, type_id, fail);
 		return python_ispa_std_parser_ll_LLParser__required_outcome((self), result, pos, scope, ISPA_STR("required token"));
 	}
 	if (python_ispa_std_lexer_TokenCursor_kind_is((pos), type_id)) {
-		python_ispa_std_node_Node* node = python_ispa_std_raw_token_RawToken_to_node((python_ispa_std_lexer_TokenCursor_current((pos))), type_id);
-		python_ispa_std_lexer_TokenCursor_next((pos));
+		python_ispa_std_node_Node* node = python_ispa_std_raw_token_RawToken_to_node((python_ispa_std_lexer_TokenCursor_current_v((pos))), type_id);
+		python_ispa_std_lexer_TokenCursor_next_v((pos));
 		python_ispa_std_parser_ll_LLParser_commit_rule((self), pos);
 		python_ispa_std_debug_MatchScope_success((scope));
-		python_ispa_std_debug_MatchScope_close((scope));
+		python_ispa_std_debug_ScopeBase_close_v((python_ispa_std_debug_ScopeBase*)(scope));
 		return node;
 	}
 	if (python_ispa_std_parser_ll_LLParser_reject_absent_rule((self))) {
-		python_ispa_std_debug_MatchScope_close((scope));
+		python_ispa_std_debug_ScopeBase_close_v((python_ispa_std_debug_ScopeBase*)(scope));
 		return python_ispa_std_node_Node_blank();
 	}
-	python_ispa_std_recovery_FailHandler_run((fail), pos, (self)->recovery_state_);
-	python_ispa_std_debug_MatchScope_close((scope));
+	python_ispa_std_recovery_FailHandler_run_v((fail), pos, (self)->recovery_state_);
+	python_ispa_std_debug_ScopeBase_close_v((python_ispa_std_debug_ScopeBase*)(scope));
 	python_ispa_std_debug_breakpoint(ISPA_STR("required token failed"));
 	if (((((int64_t)(((self)->recovery_state_)->diagnostics)->len) == (INT64_C(0))))) {
 		python_ispa_std_failures_logic_error(ISPA_STR("ISPA required(): required token could not be recovered"));
@@ -4325,15 +4391,15 @@ python_ispa_std_node_Node* python_ispa_std_parser_ll_LLParser_required_rule(pyth
 	if (python_ispa_std_debug_enabled()) {
 		scope = python_ispa_std_debug_MatchScope_new(rule_name, python_ispa_std_parser_ll_LLParser_debug_actual((self), pos));
 	}
-	if (python_ispa_std_recovery_FailHandler_is_recovering((fail))) {
-		if (((((!(python_ispa_std_parser_ll_LLParser_unwinding((self))))) && ((!(python_ispa_std_recovery_FailHandler_is_custom((fail)))))))) {
-			python_ispa_std_match_result_MatchResult* first = ((python_ispa_std_match_result_MatchResult* (*)(void*, python_ispa_std_lexer_TokenCursor*))(rec).fn)((rec).env, python_ispa_std_lexer_TokenCursor_copy((pos)));
+	if (python_ispa_std_recovery_FailHandler_is_recovering_v((fail))) {
+		if (((((!(python_ispa_std_parser_ll_LLParser_unwinding((self))))) && ((!(python_ispa_std_recovery_FailHandler_is_custom_v((fail)))))))) {
+			python_ispa_std_match_result_MatchResult* first = ((python_ispa_std_match_result_MatchResult* (*)(void*, python_ispa_std_lexer_TokenCursor*))(rec).fn)((rec).env, python_ispa_std_lexer_TokenCursor_copy_v((pos)));
 			if ((first)->status) {
 				python_ispa_std_lexer_TokenCursor_assign((pos), (first)->it);
 				python_ispa_std_parser_ll_LLParser_commit_rule((self), pos);
 				python_ispa_std_parser_ll_LLParser_note_match((self));
 				python_ispa_std_debug_MatchScope_success((scope));
-				python_ispa_std_debug_MatchScope_close((scope));
+				python_ispa_std_debug_ScopeBase_close_v((python_ispa_std_debug_ScopeBase*)(scope));
 				return (first)->node;
 			}
 			result = python_ispa_std_parser_ll_LLParser__rule_recovery((self), pos, rec, fail, first, true);
@@ -4347,15 +4413,15 @@ python_ispa_std_node_Node* python_ispa_std_parser_ll_LLParser_required_rule(pyth
 		python_ispa_std_lexer_TokenCursor_assign((pos), (match)->it);
 		python_ispa_std_parser_ll_LLParser_commit_rule((self), pos);
 		python_ispa_std_debug_MatchScope_success((scope));
-		python_ispa_std_debug_MatchScope_close((scope));
+		python_ispa_std_debug_ScopeBase_close_v((python_ispa_std_debug_ScopeBase*)(scope));
 		return (match)->node;
 	}
 	if (python_ispa_std_parser_ll_LLParser_reject_absent_rule((self))) {
-		python_ispa_std_debug_MatchScope_close((scope));
+		python_ispa_std_debug_ScopeBase_close_v((python_ispa_std_debug_ScopeBase*)(scope));
 		return python_ispa_std_node_Node_blank();
 	}
-	python_ispa_std_recovery_FailHandler_run((fail), pos, (self)->recovery_state_);
-	python_ispa_std_debug_MatchScope_close((scope));
+	python_ispa_std_recovery_FailHandler_run_v((fail), pos, (self)->recovery_state_);
+	python_ispa_std_debug_ScopeBase_close_v((python_ispa_std_debug_ScopeBase*)(scope));
 	python_ispa_std_debug_breakpoint(ISPA_STR("required rule failed"));
 	if (((((int64_t)(((self)->recovery_state_)->diagnostics)->len) == (INT64_C(0))))) {
 		python_ispa_std_failures_logic_error(ISPA_STR("ISPA required(): required rule could not be recovered"));
@@ -4370,14 +4436,14 @@ python_ispa_std_node_Node* python_ispa_std_parser_ll_LLParser_optional_token(pyt
 		scope = python_ispa_std_debug_MatchScope_new(python_ispa_std_parser_ll_TokenNames_lookup(((self)->token_names_), type_id), python_ispa_std_parser_ll_LLParser_debug_actual((self), pos));
 	}
 	if (python_ispa_std_lexer_TokenCursor_kind_is((pos), type_id)) {
-		python_ispa_std_node_Node* node = python_ispa_std_raw_token_RawToken_to_node((python_ispa_std_lexer_TokenCursor_current((pos))), type_id);
-		python_ispa_std_lexer_TokenCursor_next((pos));
+		python_ispa_std_node_Node* node = python_ispa_std_raw_token_RawToken_to_node((python_ispa_std_lexer_TokenCursor_current_v((pos))), type_id);
+		python_ispa_std_lexer_TokenCursor_next_v((pos));
 		python_ispa_std_parser_ll_LLParser_commit_rule((self), pos);
 		python_ispa_std_debug_MatchScope_success((scope));
-		python_ispa_std_debug_MatchScope_close((scope));
+		python_ispa_std_debug_ScopeBase_close_v((python_ispa_std_debug_ScopeBase*)(scope));
 		return node;
 	}
-	python_ispa_std_debug_MatchScope_close((scope));
+	python_ispa_std_debug_ScopeBase_close_v((python_ispa_std_debug_ScopeBase*)(scope));
 	return python_ispa_std_node_Node_blank();
 }
 python_ispa_std_node_Node* python_ispa_std_parser_ll_LLParser_optional_rule(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor* pos, ispa_fn rec) {
@@ -4385,7 +4451,7 @@ python_ispa_std_node_Node* python_ispa_std_parser_ll_LLParser_optional_rule(pyth
 	if (((((self)->unwind_) < (INT64_C(0))))) {
 		return python_ispa_std_node_Node_blank();
 	}
-	python_ispa_std_lexer_TokenCursor* attempt = python_ispa_std_lexer_TokenCursor_copy((pos));
+	python_ispa_std_lexer_TokenCursor* attempt = python_ispa_std_lexer_TokenCursor_copy_v((pos));
 	python_ispa_std_parser_ll_RuleProbe* probe = python_ispa_std_parser_ll_LLParser_begin_probe((self), pos);
 	python_ispa_std_match_result_MatchResult* match = ((python_ispa_std_match_result_MatchResult* (*)(void*, python_ispa_std_lexer_TokenCursor*))(rec).fn)((rec).env, attempt);
 	if (python_ispa_std_parser_ll_LLParser_take_absent((self))) {
@@ -4413,19 +4479,19 @@ void python_ispa_std_parser_ll_LLParser_skip_spaces(python_ispa_std_parser_ll_LL
 		return;
 	}
 	if (python_ispa_std_lexer_TokenCursor_kind_is((pos), (self)->space_token_)) {
-		python_ispa_std_lexer_TokenCursor_next((pos));
+		python_ispa_std_lexer_TokenCursor_next_v((pos));
 	}
 }
 void python_ispa_std_parser_ll_LLParser_skip_external_spaces(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor* pos) {
-	if (python_ispa_std_lexer_TokenCursor_has_source((pos))) {
-		ispa_str origin = python_ispa_std_lexer_TokenCursor_sourceOrigin((pos));
-		int64_t begin = python_ispa_std_lexer_TokenCursor_sourcePosition((pos));
+	if (python_ispa_std_lexer_TokenCursor_has_source_v((pos))) {
+		ispa_str origin = python_ispa_std_lexer_TokenCursor_sourceOrigin_v((pos));
+		int64_t begin = python_ispa_std_lexer_TokenCursor_sourcePosition_v((pos));
 		int64_t end = begin;
 		while (python_ispa_std_chars_is_space(python_ispa_std_chars_at(origin, end))) {
 			end = ((end) + (INT64_C(1)));
 		}
 		if ((((end) != (begin)))) {
-			python_ispa_std_lexer_TokenCursor_consumeExternal((pos), end);
+			python_ispa_std_lexer_TokenCursor_consumeExternal_v((pos), end);
 		}
 	} else {
 		python_ispa_std_parser_ll_LLParser_skip_spaces((self), pos);
@@ -4441,10 +4507,10 @@ ispa_vec_python_ispa_std_node_NodeP* python_ispa_std_parser_ll_LLParser_counted_
 		}
 	}
 	ispa_vec_python_ispa_std_node_NodeP* nodes = ispa_vec_python_ispa_std_node_NodeP_new();
-	python_ispa_std_lexer_TokenCursor* cursor = python_ispa_std_lexer_TokenCursor_copy((pos));
+	python_ispa_std_lexer_TokenCursor* cursor = python_ispa_std_lexer_TokenCursor_copy_v((pos));
 	bool matching = true;
 	while ((((matching) && (((((!(has_limit))) || (((((int64_t)(nodes)->len) < (limit)))))))))) {
-		python_ispa_std_lexer_TokenCursor* attempt = python_ispa_std_lexer_TokenCursor_copy((cursor));
+		python_ispa_std_lexer_TokenCursor* attempt = python_ispa_std_lexer_TokenCursor_copy_v((cursor));
 		if (((((self)->has_space_token_) && (((((int64_t)(nodes)->len) > (INT64_C(0)))))))) {
 			python_ispa_std_parser_ll_LLParser_skip_spaces((self), attempt);
 		}
@@ -4480,9 +4546,9 @@ ispa_vec_python_ispa_std_node_NodeP* python_ispa_std_parser_ll_LLParser_counted_
 			label = (ISPA_CONCAT(((ISPA_CONCAT((ISPA_STR(" '")), ((spec)->name)))), (ISPA_STR("'"))));
 		}
 		(diagnostic)->message = (ISPA_CONCAT(((ISPA_CONCAT(((ISPA_CONCAT(((ISPA_CONCAT(((ISPA_CONCAT((ISPA_STR("Counted repetition")), (label)))), (ISPA_STR(" expected "))))), (python_ispa_std_format_int_to_string(wanted))))), (ISPA_STR(" matches, got "))))), (python_ispa_std_format_int_to_string((int64_t)(nodes)->len))));
-		if ((!(python_ispa_std_lexer_TokenCursor_isEnd((cursor))))) {
-			(diagnostic)->unexpected = python_ispa_std_recovery_token_id(python_ispa_std_lexer_TokenCursor_current((cursor)));
-			(diagnostic)->offset = python_ispa_std_raw_token_RawTokenMeta_startpos((python_ispa_std_raw_token_RawToken_meta((python_ispa_std_lexer_TokenCursor_current((cursor))))));
+		if ((!(python_ispa_std_lexer_TokenCursor_isEnd_v((cursor))))) {
+			(diagnostic)->unexpected = python_ispa_std_recovery_token_id(python_ispa_std_lexer_TokenCursor_current_v((cursor)));
+			(diagnostic)->offset = python_ispa_std_raw_token_RawTokenMeta_startpos((python_ispa_std_raw_token_RawToken_meta((python_ispa_std_lexer_TokenCursor_current_v((cursor))))));
 		}
 		ispa_str message = (diagnostic)->message;
 		ispa_vec_python_ispa_std_recovery_DiagnosticP_push((((self)->recovery_state_)->diagnostics), diagnostic);
@@ -4537,7 +4603,7 @@ ispa_vec_python_ispa_std_node_NodeP* python_ispa_std_parser_ll_LLParser_counted_
 }
 python_ispa_std_node_Node* python_ispa_std_parser_ll_LLParser_repeat_optional(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor* pos, ispa_fn match, bool separated) {
 	ISPA_STR("Separators belong to a successful next iteration, not to the end of\n        the list: leave pos (including whitespace) intact on absence.");
-	python_ispa_std_lexer_TokenCursor* attempt = python_ispa_std_lexer_TokenCursor_copy((pos));
+	python_ispa_std_lexer_TokenCursor* attempt = python_ispa_std_lexer_TokenCursor_copy_v((pos));
 	if (((((self)->has_space_token_) && (separated)))) {
 		python_ispa_std_parser_ll_LLParser_skip_spaces((self), attempt);
 	}
@@ -4568,7 +4634,7 @@ static ispa_fn python_ispa_std_parser_ll_lam2_make(int64_t type_id, python_ispa_
 
 ispa_vec_python_ispa_std_node_NodeP* python_ispa_std_parser_ll_LLParser_range_token(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor* pos, int64_t type_id, python_ispa_std_recovery_FailHandler* fail) {
 	ispa_vec_python_ispa_std_node_NodeP* result = ispa_vec_python_ispa_std_node_NodeP_new();
-	if (python_ispa_std_recovery_FailHandler_is_recovering((fail))) {
+	if (python_ispa_std_recovery_FailHandler_is_recovering_v((fail))) {
 		python_ispa_std_recovery_RequiredResult* first = python_ispa_std_parser_ll_LLParser_required_recovering((self), pos, type_id, fail);
 		if ((!((first)->has_node))) {
 			return result;
@@ -4581,7 +4647,7 @@ ispa_vec_python_ispa_std_node_NodeP* python_ispa_std_parser_ll_LLParser_range_to
 		return result;
 	}
 	bool repeating = true;
-	while (((((((repeating) && ((!(python_ispa_std_lexer_TokenCursor_isEnd((pos)))))))) && ((!(python_ispa_std_parser_ll_LLParser_unwinding((self)))))))) {
+	while (((((((repeating) && ((!(python_ispa_std_lexer_TokenCursor_isEnd_v((pos)))))))) && ((!(python_ispa_std_parser_ll_LLParser_unwinding((self)))))))) {
 		python_ispa_std_node_Node* node = python_ispa_std_parser_ll_LLParser_repeat_optional((self), pos, python_ispa_std_parser_ll_lam2_make(type_id, self), true);
 		if (python_ispa_std_node_Node_empty((node))) {
 			repeating = false;
@@ -4612,7 +4678,7 @@ static ispa_fn python_ispa_std_parser_ll_lam3_make(ispa_fn rec, python_ispa_std_
 ispa_vec_python_ispa_std_node_NodeP* python_ispa_std_parser_ll_LLParser_range_rule(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor* pos, ispa_str rule_name, ispa_fn rec, python_ispa_std_recovery_FailHandler* fail) {
 	int64_t start = python_ispa_std_parser_ll_cursor_position(pos);
 	ispa_vec_python_ispa_std_node_NodeP* result = ispa_vec_python_ispa_std_node_NodeP_new();
-	if (python_ispa_std_recovery_FailHandler_is_recovering((fail))) {
+	if (python_ispa_std_recovery_FailHandler_is_recovering_v((fail))) {
 		python_ispa_std_recovery_RequiredResult* first = python_ispa_std_parser_ll_LLParser_required_rule_recovering((self), pos, rec, fail);
 		if ((!((first)->has_node))) {
 			return result;
@@ -4625,7 +4691,7 @@ ispa_vec_python_ispa_std_node_NodeP* python_ispa_std_parser_ll_LLParser_range_ru
 		return result;
 	}
 	bool repeating = true;
-	while (((((((repeating) && ((!(python_ispa_std_lexer_TokenCursor_isEnd((pos)))))))) && ((!(python_ispa_std_parser_ll_LLParser_unwinding((self)))))))) {
+	while (((((((repeating) && ((!(python_ispa_std_lexer_TokenCursor_isEnd_v((pos)))))))) && ((!(python_ispa_std_parser_ll_LLParser_unwinding((self)))))))) {
 		python_ispa_std_node_Node* node = python_ispa_std_parser_ll_LLParser_repeat_optional((self), pos, python_ispa_std_parser_ll_lam3_make(rec, self), true);
 		if (python_ispa_std_node_Node_empty((node))) {
 			repeating = false;
@@ -4656,7 +4722,7 @@ static ispa_fn python_ispa_std_parser_ll_lam4_make(int64_t type_id, python_ispa_
 ispa_vec_python_ispa_std_node_NodeP* python_ispa_std_parser_ll_LLParser_range_optional_token(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor* pos, int64_t type_id) {
 	ispa_vec_python_ispa_std_node_NodeP* result = ispa_vec_python_ispa_std_node_NodeP_new();
 	bool repeating = true;
-	while (((((((repeating) && ((!(python_ispa_std_lexer_TokenCursor_isEnd((pos)))))))) && ((!(python_ispa_std_parser_ll_LLParser_unwinding((self)))))))) {
+	while (((((((repeating) && ((!(python_ispa_std_lexer_TokenCursor_isEnd_v((pos)))))))) && ((!(python_ispa_std_parser_ll_LLParser_unwinding((self)))))))) {
 		python_ispa_std_node_Node* node = python_ispa_std_parser_ll_LLParser_repeat_optional((self), pos, python_ispa_std_parser_ll_lam4_make(type_id, self), ((((int64_t)(result)->len) > (INT64_C(0)))));
 		if (python_ispa_std_node_Node_empty((node))) {
 			repeating = false;
@@ -4687,7 +4753,7 @@ static ispa_fn python_ispa_std_parser_ll_lam5_make(ispa_fn rec, python_ispa_std_
 ispa_vec_python_ispa_std_node_NodeP* python_ispa_std_parser_ll_LLParser_range_optional_rule(python_ispa_std_parser_ll_LLParser* self, python_ispa_std_lexer_TokenCursor* pos, ispa_fn rec) {
 	ispa_vec_python_ispa_std_node_NodeP* result = ispa_vec_python_ispa_std_node_NodeP_new();
 	bool repeating = true;
-	while (((((((repeating) && ((!(python_ispa_std_lexer_TokenCursor_isEnd((pos)))))))) && ((!(python_ispa_std_parser_ll_LLParser_unwinding((self)))))))) {
+	while (((((((repeating) && ((!(python_ispa_std_lexer_TokenCursor_isEnd_v((pos)))))))) && ((!(python_ispa_std_parser_ll_LLParser_unwinding((self)))))))) {
 		python_ispa_std_node_Node* node = python_ispa_std_parser_ll_LLParser_repeat_optional((self), pos, python_ispa_std_parser_ll_lam5_make(rec, self), ((((int64_t)(result)->len) > (INT64_C(0)))));
 		if (python_ispa_std_node_Node_empty((node))) {
 			repeating = false;
@@ -4716,7 +4782,7 @@ python_ispa_std_match_result_MatchResult* python_ispa_std_parser_ll_LLParser_act
 	}
 	python_ispa_std_node_Node* node = python_ispa_std_node_Node_blank();
 	python_ispa_std_node_Node_set_data((node), ast);
-	return python_ispa_std_match_result_MatchResult_new(true, node, python_ispa_std_lexer_TokenCursor_copy((pos)));
+	return python_ispa_std_match_result_MatchResult_new(true, node, python_ispa_std_lexer_TokenCursor_copy_v((pos)));
 }
 int64_t python_ispa_std_lr_LR_INVALID;
 int64_t python_ispa_std_lr_LR_CONFLICT = INT64_C(9223372036854775807);
@@ -5015,13 +5081,13 @@ python_ispa_std_node_Node* python_ispa_std_external_external_node(ispa_str origi
 	return python_ispa_std_node_Node_with_data(start, origin, true, ((end) - (start)), line, ((((start) - (line_start))) + (INT64_C(1))), python_ispa_std_node_Node_name((node)), python_ispa_std_node_Node_data((node)));
 }
 void python_ispa_std_external__require_lazy(python_ispa_std_lexer_TokenCursor* pos) {
-	if ((!(python_ispa_std_lexer_TokenCursor_has_source((pos))))) {
+	if ((!(python_ispa_std_lexer_TokenCursor_has_source_v((pos))))) {
 		python_ispa_std_failures_logic_error(ISPA_STR("AMBIGUOUS eager token stream: external parsers require lazy tokenization"));
 	}
 }
 bool python_ispa_std_external_external_starts(python_ispa_std_external_ExternalBinding* binding, python_ispa_std_lexer_TokenCursor* pos) {
 	python_ispa_std_external__require_lazy(pos);
-	return python_ispa_std_external_ExternalBinding_starts((binding), python_ispa_std_lexer_TokenCursor_sourceOrigin((pos)), python_ispa_std_lexer_TokenCursor_sourcePosition((pos)));
+	return python_ispa_std_external_ExternalBinding_starts((binding), python_ispa_std_lexer_TokenCursor_sourceOrigin_v((pos)), python_ispa_std_lexer_TokenCursor_sourcePosition_v((pos)));
 }
 python_ispa_std_match_result_MatchResult* python_ispa_std_external_external_match(python_ispa_std_external_ExternalBinding* binding, python_ispa_std_lexer_TokenCursor* pos) {
 	/* ISPA-C-TODO: local without a declared type */
@@ -5090,119 +5156,6 @@ ispa_str python_ispa_std_to_string_bool_value_to_string(bool value) {
 ispa_str python_ispa_std_to_string_int_value_to_string(int64_t value) {
 	return python_ispa_std_format_int_to_string(value);
 }
-python_ispa_std_lr_LRRegionFrame__voidP* python_ispa_std_lr_get_LRRegionFrame__voidP_handler(ispa_arena* arena) {
-	python_ispa_std_lr_LRRegionFrame__voidP* h = (python_ispa_std_lr_LRRegionFrame__voidP*)ispa_arena_calloc(arena, sizeof(python_ispa_std_lr_LRRegionFrame__voidP));
-	return h;
-}
-void python_ispa_std_lr_free_LRRegionFrame__voidP_handler(python_ispa_std_lr_LRRegionFrame__voidP* handler) { (void)handler; }
-python_ispa_std_lr_LRRegionFrame__voidP* python_ispa_std_lr_LRRegionFrame__voidP_new(python_ispa_std_lexer_TokenCursor* start, int64_t continuation) {
-	python_ispa_std_lr_LRRegionFrame__voidP* o = python_ispa_std_lr_get_LRRegionFrame__voidP_handler(ispa_cur);
-	python_ispa_std_lr_LRRegionFrame__voidP___init__(o, start, continuation);
-	return o;
-}
-void python_ispa_std_lr_LRRegionFrame__voidP___init__(python_ispa_std_lr_LRRegionFrame__voidP* self, python_ispa_std_lexer_TokenCursor* start, int64_t continuation) {
-	(self)->pos = start;
-	(self)->states = ispa_vec_int64_t_from((int64_t[]){INT64_C(0)}, 1);
-	(self)->values = ispa_vec_voidP_new();
-	(self)->span_begin = ispa_vec_int64_t_new();
-	(self)->span_end = ispa_vec_int64_t_new();
-	(self)->span_leading = ispa_vec_bool_new();
-	(self)->span_trailing = ispa_vec_bool_new();
-	(self)->span_empty = ispa_vec_bool_new();
-	(self)->rb = INT64_C(0);
-	(self)->re = INT64_C(0);
-	(self)->rl = false;
-	(self)->rt = false;
-	(self)->rx = true;
-	(self)->capture_destinations = ispa_vec_int64_t_new();
-	(self)->cursor = INT64_C(0);
-	(self)->recovered_prefix = false;
-	(self)->control = python_ispa_std_lr_LRControlState_new();
-	((self)->control)->continuation = continuation;
-}
-python_ispa_std_lr_LRGrammar__voidP* python_ispa_std_lr_get_LRGrammar__voidP_handler(ispa_arena* arena) {
-	python_ispa_std_lr_LRGrammar__voidP* h = (python_ispa_std_lr_LRGrammar__voidP*)ispa_arena_calloc(arena, sizeof(python_ispa_std_lr_LRGrammar__voidP));
-	return h;
-}
-void python_ispa_std_lr_free_LRGrammar__voidP_handler(python_ispa_std_lr_LRGrammar__voidP* handler) { (void)handler; }
-python_ispa_std_lr_LRGrammar__voidP* python_ispa_std_lr_LRGrammar__voidP_new(void) {
-	python_ispa_std_lr_LRGrammar__voidP* o = python_ispa_std_lr_get_LRGrammar__voidP_handler(ispa_cur);
-	return o;
-}
-int64_t python_ispa_std_lr_LRGrammar__voidP_lr_k(python_ispa_std_lr_LRGrammar__voidP* self) {
-	return INT64_C(1);
-}
-int64_t python_ispa_std_lr_LRGrammar__voidP_lr_action(python_ispa_std_lr_LRGrammar__voidP* self, int64_t state, ispa_vec_int64_t* window) {
-	return python_ispa_std_lr_LR_INVALID;
-}
-ispa_vec_int64_t* python_ispa_std_lr_LRGrammar__voidP_lr_conflict(python_ispa_std_lr_LRGrammar__voidP* self, int64_t state, ispa_vec_int64_t* window) {
-	return ispa_vec_int64_t_new();
-}
-void* python_ispa_std_lr_LRGrammar__voidP_lr_shift(python_ispa_std_lr_LRGrammar__voidP* self, python_ispa_std_raw_token_RawToken* token) {
-	python_ispa_std_failures_logic_error(ISPA_STR("LRGrammar.lr_shift is abstract"));
-	return python_ispa_std_lr_LRGrammar__voidP_lr_reduce((self), INT64_C(0), ispa_vec_voidP_new());
-}
-int64_t python_ispa_std_lr_LRGrammar__voidP_lr_length(python_ispa_std_lr_LRGrammar__voidP* self, int64_t rule) {
-	return INT64_C(0);
-}
-void* python_ispa_std_lr_LRGrammar__voidP_lr_reduce(python_ispa_std_lr_LRGrammar__voidP* self, int64_t rule, ispa_vec_voidP* rhs) {
-	python_ispa_std_failures_logic_error(ISPA_STR("LRGrammar.lr_reduce is abstract"));
-	return ispa_vec_voidP_get((rhs), INT64_C(0));
-}
-int64_t python_ispa_std_lr_LRGrammar__voidP_lr_lhs(python_ispa_std_lr_LRGrammar__voidP* self, int64_t rule) {
-	return INT64_C(0);
-}
-int64_t python_ispa_std_lr_LRGrammar__voidP_lr_goto(python_ispa_std_lr_LRGrammar__voidP* self, int64_t state, int64_t lhs) {
-	return INT64_C(0);
-}
-bool python_ispa_std_lr_LRGrammar__voidP_has_is_space(python_ispa_std_lr_LRGrammar__voidP* self) {
-	return false;
-}
-bool python_ispa_std_lr_LRGrammar__voidP_lr_is_space(python_ispa_std_lr_LRGrammar__voidP* self, python_ispa_std_raw_token_RawToken* token) {
-	return false;
-}
-bool python_ispa_std_lr_LRGrammar__voidP_has_space(python_ispa_std_lr_LRGrammar__voidP* self) {
-	return false;
-}
-bool python_ispa_std_lr_LRGrammar__voidP_lr_space(python_ispa_std_lr_LRGrammar__voidP* self, int64_t rule, int64_t index) {
-	return false;
-}
-bool python_ispa_std_lr_LRGrammar__voidP_has_expected(python_ispa_std_lr_LRGrammar__voidP* self) {
-	return false;
-}
-ispa_vec_int64_t* python_ispa_std_lr_LRGrammar__voidP_lr_expected(python_ispa_std_lr_LRGrammar__voidP* self, int64_t state) {
-	return ispa_vec_int64_t_new();
-}
-bool python_ispa_std_lr_LRGrammar__voidP_has_context(python_ispa_std_lr_LRGrammar__voidP* self) {
-	return false;
-}
-ispa_str python_ispa_std_lr_LRGrammar__voidP_lr_context(python_ispa_std_lr_LRGrammar__voidP* self, int64_t state) {
-	return ISPA_STR("");
-}
-bool python_ispa_std_lr_LRGrammar__voidP_has_token_name(python_ispa_std_lr_LRGrammar__voidP* self) {
-	return false;
-}
-ispa_str python_ispa_std_lr_LRGrammar__voidP_lr_token_name(python_ispa_std_lr_LRGrammar__voidP* self, int64_t id) {
-	return ISPA_STR("");
-}
-bool python_ispa_std_lr_LRGrammar__voidP_has_rule_label(python_ispa_std_lr_LRGrammar__voidP* self) {
-	return false;
-}
-ispa_str python_ispa_std_lr_LRGrammar__voidP_lr_rule_label(python_ispa_std_lr_LRGrammar__voidP* self, int64_t rule) {
-	return ISPA_STR("");
-}
-bool python_ispa_std_lr_LRGrammar__voidP_has_recover(python_ispa_std_lr_LRGrammar__voidP* self) {
-	return false;
-}
-bool python_ispa_std_lr_LRGrammar__voidP_lr_recover(python_ispa_std_lr_LRGrammar__voidP* self, python_ispa_std_lr_LRRegionFrame__voidP* region, python_ispa_std_recovery_Diagnostic* diagnostic) {
-	return false;
-}
-bool python_ispa_std_lr_LRGrammar__voidP_has_semantic_reduce(python_ispa_std_lr_LRGrammar__voidP* self) {
-	return false;
-}
-void* python_ispa_std_lr_LRGrammar__voidP_lr_semantic_reduce(python_ispa_std_lr_LRGrammar__voidP* self, int64_t rule, python_ispa_std_lr_LRRegionFrame__voidP* region, python_ispa_std_lr_LRRuleSpan* span, ispa_vec_voidP* rhs) {
-	return python_ispa_std_lr_LRGrammar__voidP_lr_reduce((self), rule, rhs);
-}
 int64_t python_ispa_std_utility_maximum__int64_t(int64_t a, int64_t b) {
 	if ((((a) < (b)))) {
 		return b;
@@ -5214,273 +5167,6 @@ int64_t python_ispa_std_utility_minimum__int64_t(int64_t a, int64_t b) {
 		return b;
 	}
 	return a;
-}
-python_ispa_std_parser_ll_FailContext__voidP* python_ispa_std_parser_ll_get_FailContext__voidP_handler(ispa_arena* arena) {
-	python_ispa_std_parser_ll_FailContext__voidP* h = (python_ispa_std_parser_ll_FailContext__voidP*)ispa_arena_calloc(arena, sizeof(python_ispa_std_parser_ll_FailContext__voidP));
-	return h;
-}
-void python_ispa_std_parser_ll_free_FailContext__voidP_handler(python_ispa_std_parser_ll_FailContext__voidP* handler) { (void)handler; }
-python_ispa_std_parser_ll_FailContext__voidP* python_ispa_std_parser_ll_FailContext__voidP_new(python_ispa_std_lexer_TokenCursor* pos, void* ast, python_ispa_std_lexer_TokenCursor* start_pos, ispa_str rule, ispa_str failed_rule, python_ispa_std_recovery_State* state, ispa_str source, bool has_source_text, int64_t diagnostic_begin, python_ispa_std_parser_ll_TokenNames* token_names, int64_t ambiguous_id) {
-	python_ispa_std_parser_ll_FailContext__voidP* o = python_ispa_std_parser_ll_get_FailContext__voidP_handler(ispa_cur);
-	python_ispa_std_parser_ll_FailContext__voidP___init__(o, pos, ast, start_pos, rule, failed_rule, state, source, has_source_text, diagnostic_begin, token_names, ambiguous_id);
-	return o;
-}
-void python_ispa_std_parser_ll_FailContext__voidP___init__(python_ispa_std_parser_ll_FailContext__voidP* self, python_ispa_std_lexer_TokenCursor* pos, void* ast, python_ispa_std_lexer_TokenCursor* start_pos, ispa_str rule, ispa_str failed_rule, python_ispa_std_recovery_State* state, ispa_str source, bool has_source_text, int64_t diagnostic_begin, python_ispa_std_parser_ll_TokenNames* token_names, int64_t ambiguous_id) {
-	python_ispa_std_parser_ll_Ctx___init__((python_ispa_std_parser_ll_Ctx*)self, pos, start_pos, rule, token_names, ambiguous_id);
-	(self)->ast = ast;
-	(self)->failed_rule = failed_rule;
-	(self)->recovery_state = state;
-	(self)->source = source;
-	(self)->has_source_text = has_source_text;
-	(self)->diagnostic_begin = diagnostic_begin;
-	(self)->requested = python_ispa_std_recovery_Mode_Propagate;
-	(self)->has_request = false;
-	(self)->skipped = INT64_C(0);
-}
-void python_ispa_std_parser_ll_FailContext__voidP_error(python_ispa_std_parser_ll_FailContext__voidP* self, ispa_str message, ispa_str code, int64_t source_offset, int64_t source_length) {
-	ISPA_STR("Custom diagnostics share the collection with automatic repairs.\n        Pass source_offset = -1 to take the span from the current token.");
-	if (((((((source_offset) < (INT64_C(0))))) != ((((source_length) < (INT64_C(0)))))))) {
-		python_ispa_std_failures_invalid_argument(ISPA_STR("ctx.error source span requires both offset and length"));
-	}
-	if (python_ispa_std_recovery_State_exhausted(((self)->recovery_state))) {
-		python_ispa_std_parser_ll_FailContext__voidP_abort((self));
-		return;
-	}
-	python_ispa_std_recovery_Diagnostic* diagnostic = python_ispa_std_recovery_Diagnostic_new();
-	(diagnostic)->rule = (self)->base_python_ispa_std_parser_ll_Ctx.rule;
-	(diagnostic)->expected_text = (self)->failed_rule;
-	(diagnostic)->message = message;
-	(diagnostic)->code = code;
-	if (python_ispa_std_lexer_TokenCursor_has_source(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos))) {
-		int64_t p = python_ispa_std_lexer_TokenCursor_sourcePosition(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos));
-		if ((((p) >= (INT64_C(0))))) {
-			(diagnostic)->offset = p;
-			(diagnostic)->length = INT64_C(0);
-			if ((((p) < ((int64_t)(python_ispa_std_lexer_TokenCursor_sourceOrigin(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos))).len)))) {
-				(diagnostic)->length = INT64_C(1);
-			}
-		}
-	} else {
-		if ((!(python_ispa_std_lexer_TokenCursor_isEnd(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos))))) {
-			(diagnostic)->unexpected = python_ispa_std_recovery_token_id(python_ispa_std_lexer_TokenCursor_current(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos)));
-			(diagnostic)->offset = python_ispa_std_raw_token_RawTokenMeta_startpos((python_ispa_std_raw_token_RawToken_meta((python_ispa_std_lexer_TokenCursor_current(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos))))));
-			(diagnostic)->length = python_ispa_std_raw_token_RawTokenMeta_length((python_ispa_std_raw_token_RawToken_meta((python_ispa_std_lexer_TokenCursor_current(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos))))));
-		} else {
-			if ((self)->has_source_text) {
-				(diagnostic)->offset = (int64_t)((self)->source).len;
-			}
-		}
-	}
-	if ((((source_offset) >= (INT64_C(0))))) {
-		int64_t input_length = INT64_C(0);
-		if ((self)->has_source_text) {
-			input_length = (int64_t)((self)->source).len;
-		}
-		if (((((((source_offset) > (input_length)))) || ((((source_length) > (((input_length) - (source_offset))))))))) {
-			python_ispa_std_failures_out_of_range(ISPA_STR("ctx.error source span is outside parser input"));
-		}
-		(diagnostic)->offset = source_offset;
-		(diagnostic)->length = source_length;
-	}
-	ispa_vec_python_ispa_std_recovery_DiagnosticP_push((((self)->recovery_state)->diagnostics), diagnostic);
-}
-void python_ispa_std_parser_ll_FailContext__voidP_note(python_ispa_std_parser_ll_FailContext__voidP* self, ispa_str message) {
-	if (((((int64_t)(((self)->recovery_state)->diagnostics)->len) <= ((self)->diagnostic_begin)))) {
-		python_ispa_std_failures_logic_error(ISPA_STR("ctx.note requires a preceding ctx.error in this fail block"));
-	}
-	ispa_vec_ispa_str_push(((ispa_vec_python_ispa_std_recovery_DiagnosticP_get((((self)->recovery_state)->diagnostics), (((int64_t)(((self)->recovery_state)->diagnostics)->len) - (INT64_C(1)))))->notes), message);
-}
-void python_ispa_std_parser_ll_FailContext__voidP_sync(python_ispa_std_parser_ll_FailContext__voidP* self, ispa_vec_ispa_str* boundaries) {
-	ISPA_STR("Skip source text to one of `boundaries` (Strings). Lazy cursors only.");
-	if (((((int64_t)(boundaries)->len) == (INT64_C(0))))) {
-		python_ispa_std_failures_logic_error(ISPA_STR("ctx.sync requires at least one boundary"));
-	}
-	if ((((python_ispa_std_recovery_State_exhausted(((self)->recovery_state))) || (((((self)->has_request) && (((((self)->requested) == (python_ispa_std_recovery_Mode_Abort)))))))))) {
-		python_ispa_std_parser_ll_FailContext__voidP_abort((self));
-		return;
-	}
-	int64_t i = INT64_C(0);
-	while ((((i) < ((int64_t)(boundaries)->len)))) {
-		if (((((int64_t)(ispa_vec_ispa_str_get((boundaries), i)).len) == (INT64_C(0))))) {
-			python_ispa_std_failures_invalid_argument(ISPA_STR("ctx.sync requires nonempty boundaries"));
-		}
-		i = ((i) + (INT64_C(1)));
-	}
-	if ((!(python_ispa_std_lexer_TokenCursor_has_source(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos))))) {
-		python_ispa_std_failures_logic_error(ISPA_STR("ctx.sync requires a lazy source cursor"));
-		return;
-	}
-	int64_t begin = python_ispa_std_lexer_TokenCursor_sourcePosition(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos));
-	int64_t cap = INT64_C(4096);
-	int64_t budget = python_ispa_std_utility_minimum__int64_t(cap, ((((self)->recovery_state)->max_total_skipped) - (((self)->recovery_state)->total_skipped)));
-	python_ispa_std_scan_ScanResult* scanned = python_ispa_std_scan_scan_balanced(python_ispa_std_lexer_TokenCursor_sourceOrigin(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos)), begin, boundaries, budget);
-	int64_t count = (((scanned)->end) - (begin));
-	if ((((count) > (INT64_C(0))))) {
-		python_ispa_std_lexer_TokenCursor_consumeExternal(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos), (scanned)->end);
-	}
-	(self)->skipped = (((self)->skipped) + (count));
-	((self)->recovery_state)->total_skipped = ((((self)->recovery_state)->total_skipped) + (count));
-	if (((((scanned)->exhausted) || (python_ispa_std_recovery_State_exhausted(((self)->recovery_state)))))) {
-		python_ispa_std_parser_ll_FailContext__voidP_abort((self));
-	}
-}
-void python_ispa_std_parser_ll_FailContext__voidP_sync_tokens(python_ispa_std_parser_ll_FailContext__voidP* self, ispa_vec_python_ispa_std_parser_ll_TokenBoundaryP* boundaries) {
-	ISPA_STR("Skip whole tokens to one of `boundaries` (TokenBoundary), preserving\n        token-stream structure (including synthetic indentation).");
-	if (((((int64_t)(boundaries)->len) == (INT64_C(0))))) {
-		python_ispa_std_failures_logic_error(ISPA_STR("ctx.sync_tokens requires at least one boundary"));
-	}
-	int64_t i = INT64_C(0);
-	while ((((i) < ((int64_t)(boundaries)->len)))) {
-		if (((((int64_t)((ispa_vec_python_ispa_std_parser_ll_TokenBoundaryP_get((boundaries), i))->value).len) == (INT64_C(0))))) {
-			python_ispa_std_failures_invalid_argument(ISPA_STR("ctx.sync_tokens requires nonempty boundaries"));
-		}
-		i = ((i) + (INT64_C(1)));
-	}
-	while (true) {
-		if ((((python_ispa_std_recovery_State_exhausted(((self)->recovery_state))) || (((((self)->has_request) && (((((self)->requested) == (python_ispa_std_recovery_Mode_Abort)))))))))) {
-			python_ispa_std_parser_ll_FailContext__voidP_abort((self));
-			return;
-		}
-		if (python_ispa_std_lexer_TokenCursor_isEnd(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos))) {
-			return;
-		}
-		int64_t j = INT64_C(0);
-		while ((((j) < ((int64_t)(boundaries)->len)))) {
-			python_ispa_std_parser_ll_TokenBoundary* stop = ispa_vec_python_ispa_std_parser_ll_TokenBoundaryP_get((boundaries), j);
-			if ((stop)->token_name) {
-				if (python_ispa_std_parser_ll_Ctx_at_token((python_ispa_std_parser_ll_Ctx*)(self), (stop)->value, INT64_C(0))) {
-					return;
-				}
-			} else {
-				if (python_ispa_std_parser_ll_Ctx_at((python_ispa_std_parser_ll_Ctx*)(self), (stop)->value, INT64_C(0))) {
-					return;
-				}
-			}
-			j = ((j) + (INT64_C(1)));
-		}
-		python_ispa_std_parser_ll_FailContext__voidP_skip((self));
-	}
-}
-void python_ispa_std_parser_ll_FailContext__voidP_skip(python_ispa_std_parser_ll_FailContext__voidP* self) {
-	if (python_ispa_std_recovery_State_exhausted(((self)->recovery_state))) {
-		python_ispa_std_parser_ll_FailContext__voidP_abort((self));
-		return;
-	}
-	if ((!(python_ispa_std_lexer_TokenCursor_isEnd(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos))))) {
-		python_ispa_std_lexer_TokenCursor_next(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos));
-		(self)->skipped = (((self)->skipped) + (INT64_C(1)));
-		((self)->recovery_state)->total_skipped = ((((self)->recovery_state)->total_skipped) + (INT64_C(1)));
-	}
-}
-void python_ispa_std_parser_ll_FailContext__voidP_insert(python_ispa_std_parser_ll_FailContext__voidP* self) {
-	if ((!(((((self)->has_request) && (((((self)->requested) == (python_ispa_std_recovery_Mode_Abort))))))))) {
-		(self)->requested = python_ispa_std_recovery_Mode_Insert;
-		(self)->has_request = true;
-	}
-}
-void python_ispa_std_parser_ll_FailContext__voidP_replace(python_ispa_std_parser_ll_FailContext__voidP* self) {
-	python_ispa_std_parser_ll_FailContext__voidP_skip((self));
-	python_ispa_std_parser_ll_FailContext__voidP_insert((self));
-}
-void python_ispa_std_parser_ll_FailContext__voidP_retry(python_ispa_std_parser_ll_FailContext__voidP* self) {
-	if ((!(((((self)->has_request) && (((((self)->requested) == (python_ispa_std_recovery_Mode_Abort))))))))) {
-		(self)->requested = python_ispa_std_recovery_Mode_Retry;
-		(self)->has_request = true;
-	}
-}
-void python_ispa_std_parser_ll_FailContext__voidP_abort(python_ispa_std_parser_ll_FailContext__voidP* self) {
-	(self)->requested = python_ispa_std_recovery_Mode_Abort;
-	(self)->has_request = true;
-}
-python_ispa_std_recovery_Decision* python_ispa_std_parser_ll_FailContext__voidP_finish(python_ispa_std_parser_ll_FailContext__voidP* self, python_ispa_std_lexer_TokenCursor* before) {
-	int64_t begin = python_ispa_std_parser_ll_cursor_position(before);
-	int64_t end = python_ispa_std_parser_ll_cursor_position((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos);
-	int64_t moved = INT64_C(0);
-	if ((((end) > (begin)))) {
-		moved = ((end) - (begin));
-	}
-	if ((((moved) > ((self)->skipped)))) {
-		((self)->recovery_state)->total_skipped = ((((self)->recovery_state)->total_skipped) + (((moved) - ((self)->skipped))));
-	}
-	python_ispa_std_recovery_Decision* decision = python_ispa_std_recovery_Decision_initial();
-	if (python_ispa_std_recovery_State_exhausted(((self)->recovery_state))) {
-		(decision)->mode = python_ispa_std_recovery_Mode_Abort;
-	} else {
-		if ((self)->has_request) {
-			(decision)->mode = (self)->requested;
-		} else {
-			if ((((begin) == (end)))) {
-				(decision)->mode = python_ispa_std_recovery_Mode_Insert;
-			} else {
-				(decision)->mode = python_ispa_std_recovery_Mode_Retry;
-			}
-		}
-	}
-	if ((((((((decision)->mode) == (python_ispa_std_recovery_Mode_Insert)))) && ((((moved) > (INT64_C(0)))))))) {
-		(decision)->mode = python_ispa_std_recovery_Mode_Replace;
-	}
-	(decision)->skipped = python_ispa_std_utility_maximum__int64_t(moved, (self)->skipped);
-	int64_t i = (self)->diagnostic_begin;
-	while ((((i) < ((int64_t)(((self)->recovery_state)->diagnostics)->len)))) {
-		python_ispa_std_recovery_Diagnostic* diagnostic = ispa_vec_python_ispa_std_recovery_DiagnosticP_get((((self)->recovery_state)->diagnostics), i);
-		(diagnostic)->decision = python_ispa_std_recovery_Decision_copy((decision));
-		((diagnostic)->decision)->unexpected = (diagnostic)->unexpected;
-		i = ((i) + (INT64_C(1)));
-	}
-	return decision;
-}
-python_ispa_std_parser_ll_RuleContext__voidP* python_ispa_std_parser_ll_get_RuleContext__voidP_handler(ispa_arena* arena) {
-	python_ispa_std_parser_ll_RuleContext__voidP* h = (python_ispa_std_parser_ll_RuleContext__voidP*)ispa_arena_calloc(arena, sizeof(python_ispa_std_parser_ll_RuleContext__voidP));
-	return h;
-}
-void python_ispa_std_parser_ll_free_RuleContext__voidP_handler(python_ispa_std_parser_ll_RuleContext__voidP* handler) { (void)handler; }
-python_ispa_std_parser_ll_RuleContext__voidP* python_ispa_std_parser_ll_RuleContext__voidP_new(python_ispa_std_lexer_TokenCursor* pos, void* ast, python_ispa_std_lexer_TokenCursor* start_pos, ispa_str rule, python_ispa_std_parser_ll_TokenNames* token_names, int64_t ambiguous_id) {
-	python_ispa_std_parser_ll_RuleContext__voidP* o = python_ispa_std_parser_ll_get_RuleContext__voidP_handler(ispa_cur);
-	python_ispa_std_parser_ll_RuleContext__voidP___init__(o, pos, ast, start_pos, rule, token_names, ambiguous_id);
-	return o;
-}
-void python_ispa_std_parser_ll_RuleContext__voidP___init__(python_ispa_std_parser_ll_RuleContext__voidP* self, python_ispa_std_lexer_TokenCursor* pos, void* ast, python_ispa_std_lexer_TokenCursor* start_pos, ispa_str rule, python_ispa_std_parser_ll_TokenNames* token_names, int64_t ambiguous_id) {
-	python_ispa_std_parser_ll_Ctx___init__((python_ispa_std_parser_ll_Ctx*)self, pos, start_pos, rule, token_names, ambiguous_id);
-	(self)->ast = ast;
-}
-ispa_vec_python_ispa_std_raw_token_RawTokenP* python_ispa_std_parser_ll_RuleContext__voidP_collect_braced(python_ispa_std_parser_ll_RuleContext__voidP* self) {
-	ISPA_STR("Collect a braced region's contents after its opening token has been\n        consumed. The closing token is consumed but not included; nested braces\n        are preserved.");
-	ispa_vec_python_ispa_std_raw_token_RawTokenP* collected = ispa_vec_python_ispa_std_raw_token_RawTokenP_new();
-	if (python_ispa_std_lexer_TokenCursor_has_source(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos))) {
-		int64_t begin = python_ispa_std_lexer_TokenCursor_sourcePosition(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos));
-		ispa_str origin = python_ispa_std_lexer_TokenCursor_sourceOrigin(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos));
-		python_ispa_std_scan_ScanResult* scanned = python_ispa_std_scan_scan_balanced(origin, begin, ispa_vec_ispa_str_from((ispa_str[]){ISPA_STR("}")}, 1), (((int64_t)(origin).len) - (begin)));
-		if ((((((((scanned)->exhausted) || (((((scanned)->end) >= ((int64_t)(origin).len))))))) || ((!ispa_str_eq((ispa_str_from_char(ispa_str_at((origin), (scanned)->end))), (ISPA_STR("}")))))))) {
-			python_ispa_std_failures_runtime_error(ISPA_STR("unterminated braced region in parser action"));
-		}
-		while (((((!(python_ispa_std_lexer_TokenCursor_isEnd(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos))))) && ((((python_ispa_std_lexer_TokenCursor_sourcePosition(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos))) < ((scanned)->end))))))) {
-			ispa_vec_python_ispa_std_raw_token_RawTokenP_push((collected), python_ispa_std_lexer_TokenCursor_current(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos)));
-			python_ispa_std_lexer_TokenCursor_next(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos));
-		}
-		if (((((((python_ispa_std_lexer_TokenCursor_isEnd(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos))) || ((((python_ispa_std_lexer_TokenCursor_sourcePosition(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos))) != ((scanned)->end))))))) || ((!(python_ispa_std_parser_ll_Ctx_at((python_ispa_std_parser_ll_Ctx*)(self), ISPA_STR("}"), INT64_C(0)))))))) {
-			python_ispa_std_failures_runtime_error(ISPA_STR("braced region boundary is not a token"));
-		}
-		python_ispa_std_lexer_TokenCursor_next(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos));
-		return collected;
-	}
-	int64_t depth = INT64_C(1);
-	while ((!(python_ispa_std_lexer_TokenCursor_isEnd(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos))))) {
-		if (python_ispa_std_parser_ll_Ctx_at((python_ispa_std_parser_ll_Ctx*)(self), ISPA_STR("{"), INT64_C(0))) {
-			depth = ((depth) + (INT64_C(1)));
-		} else {
-			if (python_ispa_std_parser_ll_Ctx_at((python_ispa_std_parser_ll_Ctx*)(self), ISPA_STR("}"), INT64_C(0))) {
-				depth = ((depth) - (INT64_C(1)));
-				if ((((depth) == (INT64_C(0))))) {
-					python_ispa_std_lexer_TokenCursor_next(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos));
-					return collected;
-				}
-			}
-		}
-		ispa_vec_python_ispa_std_raw_token_RawTokenP_push((collected), python_ispa_std_lexer_TokenCursor_current(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos)));
-		python_ispa_std_lexer_TokenCursor_next(((self)->base_python_ispa_std_parser_ll_Ctx.base_python_ispa_std_parser_ll_ActionCheckpoint.pos));
-	}
-	python_ispa_std_failures_runtime_error(ISPA_STR("unterminated braced region in parser action"));
-	return collected;
 }
 int64_t python_ispa_std_algorithm_lower_bound__int64_t(ispa_vec_int64_t* arr, int64_t first, int64_t last, int64_t value) {
 	python_ispa_std_algorithm__check__int64_t(arr, first, last);

@@ -40,6 +40,56 @@ namespace C {
         return joined(parts, "_");
     }
 
+    namespace {
+        auto definesMethod(const LangAPI::Class &c, const std::string &m) -> const LangAPI::Function * {
+            for (const auto &[decl, vis] : c.data)
+                if (decl->isFunction() && decl->getFunction().name == m) return &decl->getFunction();
+            return nullptr;
+        }
+    }
+
+    // A method is virtual iff a class redefines a method that an ancestor defines. Slots live in the topmost definer.
+    auto Construct::analyzeVirtuals() -> void {
+        slot_root.clear(); root_slots.clear();
+        const auto parentWith = [&](auto &&self, const LangAPI::Class &c, const std::string &m) -> const LangAPI::Class * {
+            for (const auto &[vis, base] : c.inherit_members)
+                if (const auto *bs = std::get_if<LangAPI::Symbol>(&base))
+                    if (const auto *b = typer->findClass(*bs); b && b != &c) {
+                        if (definesMethod(*b, m)) return b;
+                        if (const auto *r = self(self, *b, m)) return r;
+                    }
+            return nullptr;
+        };
+        for (const auto &[cls, cname] : class_cname) {
+            if (!cls->template_parameters.empty()) continue;
+            for (const auto &[decl, vis] : cls->data) {
+                if (!decl->isFunction() || decl->getFunction().is_static || decl->getFunction().name == "__init__") continue;
+                const auto &m = decl->getFunction().name;
+                std::vector<const LangAPI::Class *> chain = {cls};
+                while (const auto *up = parentWith(parentWith, *chain.back(), m)) chain.push_back(up);
+                if (chain.size() < 2) continue;
+                for (const auto *k : chain) slot_root[{k, m}] = chain.back();
+            }
+        }
+        for (const auto &[key, root] : slot_root)
+            if (key.first == root) root_slots[root].push_back(key.second);
+        for (auto &[root, names] : root_slots) {       // declaration order
+            std::vector<std::string> ordered;
+            for (const auto &[decl, vis] : root->data)
+                if (decl->isFunction() && std::ranges::find(names, decl->getFunction().name) != names.end()) ordered.push_back(decl->getFunction().name);
+            names = std::move(ordered);
+        }
+    }
+
+    auto Construct::pathToBase(const LangAPI::Class &from, const LangAPI::Class *target) const -> std::optional<std::vector<std::string>> {
+        if (&from == target) return std::vector<std::string>{};
+        for (const auto &[vis, base] : from.inherit_members)
+            if (const auto *bs = std::get_if<LangAPI::Symbol>(&base))
+                if (const auto *b = typer->findClass(*bs); b && b != &from)
+                    if (auto r = pathToBase(*b, target)) { r->insert(r->begin(), "base_" + symbolName(*bs)); return r; }
+        return std::nullopt;
+    }
+
     auto Construct::registerClass(const LangAPI::Class &c) -> void {
         const auto n = prefix() + "_" + symbolName(c.name);
         class_cname[&c] = n;
@@ -391,16 +441,9 @@ namespace C {
         }
         const auto &path = (*sym)->path;
         if (path.size() == 1 && std::holds_alternative<std::string>(path[0]) && !cur_class.empty()) {
-            // implicit-self method call
+            // implicit-self method call (own or inherited)
             const auto &m = std::get<std::string>(path[0]);
-            for (auto cls = cur_class; ;) {
-                const auto it = classes.find(cls);
-                if (it == classes.end() || !it->second.methods.contains(m)) break;
-                std::string recv = "self";
-                if (cls != cur_class) throw Unsupported{"call of inherited method " + m};
-                args.insert(args.begin(), recv);
-                return cls + "_" + cIdent(m) + "(" + joined(args, ", ") + ")";
-            }
+            if (cur_class_decl && typer->findMethod(*cur_class_decl, m)) return methodCall(*cur_class_decl, m, "self", args);
         }
         const auto fn = convertSymbolValue(**sym);
         return fn + "(" + joined(args, ", ") + ")";
@@ -515,9 +558,15 @@ namespace C {
         if (!owner) throw Unsupported{"method " + name + " not found"};
         const auto it = class_cname.find(owner);
         if (it == class_cname.end()) throw Unsupported{"class of method " + name + " unknown"};
-        // TODO(vtable): Python methods are virtual; dispatch through the vtable once registration exists
-        const auto cast = owner == &recv_cls ? recv : "(" + it->second + "*)" + recv;
-        args.insert(args.begin(), cast);
+        const auto *fn = typer->findMethod(recv_cls, name);
+        if (fn && fn->is_static) return it->second + "_" + cIdent(name) + "(" + joined(args, ", ") + ")";
+        if (const auto v = slot_root.find({owner, name}); v != slot_root.end()) {   // overridden somewhere: dispatch through the vtable
+            const auto *root = v->second;
+            const auto rc = class_cname.at(root);
+            args.insert(args.begin(), root == &recv_cls ? recv : "(" + rc + "*)" + recv);
+            return rc + "_" + cIdent(name) + "_v(" + joined(args, ", ") + ")";
+        }
+        args.insert(args.begin(), owner == &recv_cls ? recv : "(" + it->second + "*)" + recv);
         return it->second + "_" + cIdent(name) + "(" + joined(args, ", ") + ")";
     }
 
@@ -1007,17 +1056,21 @@ namespace C {
         const auto *saved_decl = cur_class_decl;
         cur_class_decl = &cls;
         struct Restore { const LangAPI::Class *&r; const LangAPI::Class *v; ~Restore() { r = v; } } restore{cur_class_decl, saved_decl};
-        std::vector<const LangAPI::Function *> virtuals;
-        for (const auto &[decl, vis] : cls.data)
-            if (decl->isFunction() && decl->getFunction().is_virtual) virtuals.push_back(&decl->getFunction());
-
-        if (!virtuals.empty()) {
+        const auto slots_it = root_slots.find(&cls);
+        const bool is_root = slots_it != root_slots.end();
+        const auto sigOf = [&](const LangAPI::Function &f, const std::string &self_t) {
+            std::vector<std::string> ps = {self_t + "* self"};
+            for (const auto &[t, n] : f.parameters) ps.push_back(typeName(t, diag) + " " + cIdent(n));
+            return ps;
+        };
+        if (is_root) {
             types.writeln("typedef struct {}_vt {", c_name);
             types.increaseIndentation();
-            for (const auto *f : virtuals) {
+            for (const auto &m : slots_it->second) {
+                const auto *f = definesMethod(cls, m);
                 std::vector<std::string> ps = {c_name + "* self"};
                 for (const auto &[t, n] : f->parameters) ps.push_back(typeName(t, diag));
-                types.writeln("{} (*{})({});", typeName(f->type, diag), cIdent(f->name), joined(ps, ", "));
+                types.writeln("{} (*{})({});", typeName(f->type, diag), cIdent(m), joined(ps, ", "));
             }
             types.decreaseIndentation();
             types.writeln("} {}_vt;", c_name);
@@ -1027,17 +1080,58 @@ namespace C {
         for (const auto &[vis, base] : cls.inherit_members)
             if (const auto *s = std::get_if<LangAPI::Symbol>(&base)) types.writeln("{} base_{};", resolve(*s, diag), symbolName(*s));
             else diagnostics.push_back(c_name + ": library base class not mapped");
-        if (!virtuals.empty()) types.writeln("const {}_vt* vt;", c_name);
+        if (is_root) types.writeln("const {}_vt* vt;", c_name);
         for (const auto &[decl, vis] : cls.data)
             if (decl->isVariable() && !decl->getVariable().is_static) types.writeln("{} {};", typeName(decl->getVariable().type, diag), cIdent(decl->getVariable().name));
         types.decreaseIndentation();
         types.writeln("};");
 
+        if (is_root)
+            for (const auto &m : slots_it->second) {      // dispatcher: the one call form used for virtual methods
+                const auto *f = definesMethod(cls, m);
+                std::vector<std::string> ps = sigOf(*f, c_name), as = {"self"};
+                for (const auto &[t, n] : f->parameters) as.push_back(cIdent(n));
+                protos.writeln("static inline {} {}_{}_v({}) { {} self->vt->{}({}); }", typeName(f->type, diag), c_name, cIdent(m), joined(ps, ", "),
+                               typeName(f->type, diag) == "void" ? "" : "return", cIdent(m), joined(as, ", "));
+            }
+        // vtable instances: one per vtable root this class takes part in
+        std::vector<std::pair<const LangAPI::Class *, std::string>> installs;   // (root, member path to its vt)
+        {
+            std::set<const LangAPI::Class *> roots;
+            for (const auto &[decl, vis] : cls.data)
+                if (decl->isFunction())
+                    if (const auto v = slot_root.find({&cls, decl->getFunction().name}); v != slot_root.end()) roots.insert(v->second);
+            for (const auto *root : roots) {
+                const auto rc = class_cname.at(root);
+                auto path = pathToBase(cls, root);
+                if (!path) { diagnostics.push_back(c_name + ": cannot reach vtable root " + rc); continue; }
+                const auto vt = c_name + "_as_" + rc + "_vtable";
+                std::vector<std::string> entries;
+                for (const auto &m : root_slots.at(root)) {
+                    const auto *owner = typer->methodOwner(cls, m);
+                    const auto *f = typer->findMethod(cls, m);
+                    const auto oc = class_cname.at(owner);
+                    const auto thunk = c_name + "_" + cIdent(m) + "_as_" + rc;
+                    std::vector<std::string> ps = sigOf(*f, rc), as = {"(" + oc + "*)self"};
+                    for (const auto &[t, n] : f->parameters) as.push_back(cIdent(n));
+                    impls.writeln("static {} {}({}) { {} {}_{}({}); }", typeName(f->type, diag), thunk, joined(ps, ", "),
+                                  typeName(f->type, diag) == "void" ? "" : "return", oc, cIdent(m), joined(as, ", "));
+                    entries.push_back("." + cIdent(m) + " = " + thunk);
+                }
+                impls.writeln("static const {}_vt {} = { {} };", rc, vt, joined(entries, ", "));
+                path->push_back("vt");
+                installs.emplace_back(root, vt + "\x01" + joined(*path, "."));
+            }
+        }
         protos.writeln("{}* {}_get_{}_handler(ispa_arena* arena);", c_name, pfx, name);
         protos.writeln("void {}_free_{}_handler({}* handler);", pfx, name, c_name);
         impls.writeln("{}* {}_get_{}_handler(ispa_arena* arena) {", c_name, pfx, name);
         impls.increaseIndentation();
         impls.writeln("{}* h = ({}*)ispa_arena_calloc(arena, sizeof({}));", c_name, c_name, c_name);
+        for (const auto &[root, spec] : installs) {
+            const auto cut = spec.find('\x01');
+            impls.writeln("h->{} = &{};", spec.substr(cut + 1), spec.substr(0, cut));
+        }
         impls.writeln("return h;");
         impls.decreaseIndentation();
         impls.writeln("}");
@@ -1113,6 +1207,7 @@ namespace C {
         class_clones.clear(); fn_clones.clear(); class_insts.clear(); fn_insts.clear(); pending.clear();
         generic_decl.clear(); generic_scope.clear(); generic_fn_scope.clear();
         collect(*source);
+        analyzeVirtuals();
         emitted_functions = skipped_functions = 0;
         Converter::Writer types, protos, impls;
         emitDeclarations(*source, types, protos, impls);
