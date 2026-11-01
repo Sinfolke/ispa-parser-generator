@@ -1,12 +1,12 @@
 module grammar -> grammar;
-import {name, rule_params} from common;
+import {name, rule_params, type_annotation} from common;
 import rule.regular;
 import rule.advanced;
 
 grammar:
-    @ modifier* @ name<rule_params> @ rule.regular | rule.advanced
+    @ modifier* @ name<rule_params> @ rule_type? @ rule.regular | rule.advanced
 
-    @{mod, name, entry}
+    @{mod, name, type, entry}
 
 
 ;
@@ -19,4 +19,9 @@ modifier:
         @ 'inline' | 'noinline' | 'skip' | 'extern' | 'global'
         {@}
     ;
+;
+// `name | PythonClass:` declares a typed rule: its value is built by calling the imported Python class.
+rule_type:
+    '|' @ type_annotation
+    {@}
 ;

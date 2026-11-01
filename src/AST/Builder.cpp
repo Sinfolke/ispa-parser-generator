@@ -551,10 +551,128 @@ AST::DataBlock AST::Builder::convertData(
     return result;
 }
 
+
+namespace {
+    // Gives every `@` capture a variable name (an existing `&name` is reused) and turns it into a plain
+    // variable capture, so a constructor call can refer to it. Mirrors the capture order of capturedTypes().
+    template<class Members>
+    void nameCaptures(Members& members, std::vector<std::string>& names, std::size_t& index) {
+        for (auto& member : members) {
+            if (!member->prefix.empty()) {
+                const AST::VariableCapture* existing = nullptr;
+                for (const auto& feature : member->features)
+                    if (const auto* variable = std::get_if<AST::VariableCapture>(&feature)) existing = variable;
+                if (index >= names.size()) names.resize(index + 1);
+                if (existing) names[index] = existing->name;
+                else if (names[index].empty()) names[index] = "__ispa_capture_" + std::to_string(index);
+                if (!existing) member->features.push_back(AST::VariableCapture{names[index], member->position});
+                member->prefix.clear();
+                ++index;
+            } else if (member->isGroup()) {
+                nameCaptures(member->getGroup().values, names, index);
+            } else if (member->isOp()) {
+                const auto first = index;
+                std::size_t last = first;
+                for (auto& option : member->getOp().options) {
+                    index = first;
+                    std::vector<std::shared_ptr<AST::RuleMember>> one{option};
+                    nameCaptures(one, names, index);
+                    last = index;
+                }
+                index = last;
+            }
+        }
+    }
+}
+
+// A typed rule `name | Class:` builds its value with `Class(...)`. The data block supplies the arguments:
+//   @{a, b}        keyword arguments a=<1st @ capture>, b=<2nd @ capture>
+//   {@}            the single @ capture, as the one positional argument
+//   {expression}   the expression, as the one positional argument
+//   &={k: expr}    keyword arguments k=expr
+// Keywords are matched to the parameters of Class.__init__ and passed positionally.
+void AST::Builder::convertTypedData(const UAST::Node<UAST::rule_ast>& data, Members& members, const TypedRule& typed) {
+    const auto fail = [&](const std::string& message) {
+        throw std::runtime_error(typed.position.file + ":" + std::to_string(typed.position.line) + ": typed rule '" +
+                                 fullname.back() + " | " + typed.type + "': " + message);
+    };
+    if (!currentPythonImports) fail("Python imports are not available");
+    const auto constructor = currentPythonImports->constructor(typed.type, typed.position.file);
+    if (!constructor) fail("'" + typed.type + "' is not a Python class imported with 'import py'");
+    const auto parameters = &constructor->parameters;
+    if (data.empty()) fail("a data block is required: @{field, ...}, {@}, {expression} or &={field: expression}");
+
+    std::vector<UAST::py::ExprPtr> arguments(parameters->size());
+    const auto slot = [&](const std::string& name) -> UAST::py::ExprPtr& {
+        const auto found = std::ranges::find(*parameters, name);
+        if (found == parameters->end()) fail("'" + name + "' is not a parameter of " + typed.type + ".__init__");
+        auto& argument = arguments[static_cast<std::size_t>(found - parameters->begin())];
+        if (argument) fail("parameter '" + name + "' is given more than once");
+        return argument;
+    };
+    const auto variable = [&](const std::string& name) {
+        return std::make_shared<UAST::py::Expr>(UAST::py::Expr{typed.at, UAST::py::Name{name}});
+    };
+    std::vector<std::string> names;
+    std::size_t captures = 0;
+    std::visit([&](const auto& item) {
+        using T = std::decay_t<decltype(item)>;
+        if constexpr (std::is_same_v<T, UAST::Node<UAST::rule_ast_abbr>>) {
+            std::vector<std::string> fields{id(payload(item).f)};
+            for (const auto& name : payload(item).seq) fields.push_back(id(name));
+            nameCaptures(members, names, captures);
+            if (captures != fields.size())
+                fail("@{...} names " + std::to_string(fields.size()) + " fields but the rule has " +
+                     std::to_string(captures) + " '@' captures");
+            for (std::size_t i = 0; i < fields.size(); ++i) slot(fields[i]) = variable(names[i]);
+        } else if constexpr (std::is_same_v<T, UAST::Node<UAST::rule_ast_single_value>>) {
+            std::visit([&](const auto& value) {
+                using Value = std::decay_t<decltype(value)>;
+                if constexpr (std::is_same_v<Value, UAST::Node<UAST::expr>>) {
+                    auto inner = action(value);
+                    const auto* expression = std::get_if<UAST::py::Expr>(&inner.code);
+                    if (!expression) fail("expected a Python expression");
+                    if (parameters->size() != 1) fail("a single value needs a class with exactly one __init__ parameter");
+                    arguments[0] = std::make_shared<UAST::py::Expr>(*expression);
+                } else if constexpr (std::is_same_v<Value, UAST::Node<UAST::COMMERCIAL_AT>> || std::is_same_v<Value, char>) {
+                    nameCaptures(members, names, captures);
+                    if (captures != 1) fail("{@} needs exactly one '@' capture, found " + std::to_string(captures));
+                    if (parameters->size() != 1) fail("{@} needs a class with exactly one __init__ parameter");
+                    arguments[0] = variable(names[0]);
+                } else fail("absent data block value");
+            }, payload(item).value);
+        } else if constexpr (std::is_same_v<T, UAST::Node<UAST::rule_ast_full>>) {
+            for (const auto& part : payload(item).value) {
+                auto inner = action(payload(part).e, part);
+                const auto* expression = std::get_if<UAST::py::Expr>(&inner.code);
+                if (!expression) fail("expected a Python expression");
+                slot(id(payload(part).key)) = std::make_shared<UAST::py::Expr>(*expression);
+            }
+        } else fail("a data block is required");
+    }, payload(data).value);
+
+    for (std::size_t i = 0; i < arguments.size(); ++i)
+        if (!arguments[i]) fail("parameter '" + (*parameters)[i] + "' of " + typed.type + ".__init__ is not given");
+
+    UAST::py::Expr function{typed.at, UAST::py::Name{constructor->qualified}};
+    UAST::py::Call call;
+    call.func = std::make_shared<UAST::py::Expr>(std::move(function));
+    call.args = std::move(arguments);
+    AST::PythonAction result;
+    result.position = typed.position;
+    result.target = "value";
+    result.code = UAST::py::Expr{typed.at, std::move(call)};
+    result.python = lower_python(std::get<UAST::py::Expr>(result.code), typed.at);
+    rule_features.push_back(std::move(result));
+}
+
 void AST::Builder::convertRule(const Rule& rule) {
     AST::Rule output;
     output.rule_members = convertValues(rule.v, [this](const Value& v) { return convertValue(v); });
-    output.data_block = convertData(rule.ast_pointer);
+    // The type belongs to this declaration only, not to the rules nested inside it.
+    const auto typed = std::exchange(typed_rule, std::nullopt);
+    if (typed) convertTypedData(rule.ast_pointer, output.rule_members, *typed);
+    else output.data_block = convertData(rule.ast_pointer);
     output.features = std::move(rule_features);
     rule_features.clear();
     if (!rule.fail_pointer.empty()) {
@@ -598,8 +716,20 @@ void AST::Builder::convertGrammar(const Grammar& grammar) {
         rule_features.push_back(std::move(declaration));
     using OrdinaryNode = UAST::Node<std::shared_ptr<Rule>>;
     if (const auto* ordinary = std::get_if<OrdinaryNode>(&grammar.entry)) {
+        if (!grammar.type.empty()) {
+            const auto& annotation = payload(payload(grammar.type).value);
+            TypedRule typed;
+            typed.type = id(annotation.base);
+            for (const auto& part : annotation.nested) typed.type += "." + id(part);
+            typed.at = where(grammar.type);
+            typed.position = position(grammar.type);
+            typed_rule = std::move(typed);
+        }
         convertRule(payload(*ordinary));
     } else {
+        if (!grammar.type.empty())
+            throw std::runtime_error("ISPA: only regular rules can have a Python class type; '" +
+                                     fullname.back() + "' is an advanced rule");
         AST::Rule out;
         out.features = std::move(rule_features);
         rule_features.clear();

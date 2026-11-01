@@ -66,7 +66,7 @@ declaration:
     @ modifier* @ form
     @{modifiers, value}
     #form:
-        @ name<rule_params> @ body
+        @ name<rule_params> ('|' ID ('.' ID)*)? @ body
         @{name, body}
     ;
 ;
@@ -95,5 +95,5 @@ braces: '{' balanced_item* '}';
 balanced_item: parentheses | braces | atom | ';' | '#';
 atom:
     ID | NUMBER | STRING | CGROUP | COMMENT | OTHER |
-    '->' | ',' | '.' | '<' | '>' | ':' | '*'
+    '->' | ',' | '.' | '<' | '>' | ':' | '*' | '|'
 ;

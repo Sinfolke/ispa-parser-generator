@@ -102,5 +102,9 @@ export namespace ParserIR {
     auto dataBlock(const AST::DataBlock& block) -> DataBlock;
     // The rule's data block extended with the AST fields its actions and fail handlers declare (ctx.ast.x).
     auto withActionFields(AST::Tree& tree, const stdu::vector<std::string>& name, const AST::Rule& rule, DataBlock block) -> DataBlock;
+    // A typed rule `r | Class` calls the imported class; `Node` in the class's `__init__` parameters (and the fields they fill)
+    // stands for the captured value, so it is replaced by the type of each capture (`types`: `&name` binding -> type).
+    void specializeTypedClass(LangAPI::Declarations& python, const AST::PythonAction& action,
+                              const std::map<std::string, LangAPI::Type>& types, const std::string& rule);
     using DataBlockList = tsl::ordered_map<stdu::vector<std::string>, DataBlock, uhash>;
 }

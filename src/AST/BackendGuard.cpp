@@ -102,7 +102,8 @@ void AST::requireCppSupport(const Tree& tree, bool ll_actions) {
             // already an LR production after normalization.  Statements and
             // stream matches still need semantic callbacks and stay rejected.
             if (!actions && !token && std::holds_alternative<AST::AdvancedRule>(feature)) continue;
-            if (const auto* statement = std::get_if<AST::PythonAction>(&feature); statement && !actions && !token && statement->target.empty()) continue;
+            if (const auto* statement = std::get_if<AST::PythonAction>(&feature); statement && !actions && !token &&
+            (statement->target.empty() || statement->target == "value")) continue;   // `value`: a typed rule's constructor call
             if (actions && (std::holds_alternative<AST::AdvancedRule>(feature) ||
                 std::holds_alternative<AST::PythonAction>(feature) ||
                 std::holds_alternative<AST::DeclarationSyntax>(feature))) continue;

@@ -38,6 +38,14 @@ class Builder {
     AST::DataBlock convertData(const UAST::Node<UAST::rule_ast>& data);
     void convertGrammar(const Grammar& grammar);
     void convertRule(const Rule& rule);
+    // `name | PythonClass:` rules: the rule's value is built by calling the imported class.
+    struct TypedRule {
+        std::string type;
+        UAST::SourcePosition at;
+        AST::SourcePosition position;
+    };
+    std::optional<TypedRule> typed_rule;
+    void convertTypedData(const UAST::Node<UAST::rule_ast>& data, Members& members, const TypedRule& typed);
     void convertMain(const UAST::main& main);
 
 public:

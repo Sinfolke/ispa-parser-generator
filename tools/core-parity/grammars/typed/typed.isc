@@ -1,0 +1,14 @@
+module typed -> pair;
+import py {a_ast, pair_ast} from shapes;
+
+ID: @ [a-z]+ {@};
+NUM: @ [0-9]+ {@};
+
+a | a_ast:
+    @ NUM '>>' @ ID
+    @{type, value}
+;
+pair | pair_ast:
+    @ a ',' @ a
+    @{first, second}
+;

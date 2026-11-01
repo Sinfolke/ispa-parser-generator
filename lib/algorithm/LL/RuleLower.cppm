@@ -30,6 +30,7 @@ export struct FunctionCtx {
     utype::unordered_map<std::vector<std::string>, std::size_t> variables_lowered;
     std::set<std::string> action_locals;
     std::set<std::string> action_objects;
+    std::map<std::string, LangAPI::Type> action_types;   // `&name` binding -> type of the captured value
 
     auto uid() -> std::size_t { return next_id++; }
 };

@@ -433,6 +433,8 @@ std::string Imports::module(const Modules::Path& source_path, const std::string&
             }
             std::string symbol;
             std::optional<std::size_t> arity;
+            std::vector<std::string> constructor;
+            bool is_class = false;
             if (auto f = statement->get<py::FunctionDef>()) {
                 symbol = f->name;
                 arity = f->params.size();
@@ -441,10 +443,13 @@ std::string Imports::module(const Modules::Path& source_path, const std::string&
             } else if (auto c = statement->get<py::ClassDef>()) {
                 symbol = c->name;
                 arity = 0;
+                constructor.clear();
+                is_class = true;
                 for (const auto& member : c->body) if (auto f = member->get<py::FunctionDef>()) {
                     if (f->name == "__init__") {
                         if (f->params.empty()) fail(member->pos, "__init__ requires self");
                         arity = f->params.size() - 1;
+                        for (std::size_t i = 1; i < f->params.size(); ++i) constructor.push_back(f->params[i].name);
                     }
                     const bool is_static = f->decorators.size() == 1 && f->decorators[0]->get<py::Name>() &&
                         f->decorators[0]->get<py::Name>()->id == "staticmethod";
@@ -464,7 +469,7 @@ std::string Imports::module(const Modules::Path& source_path, const std::string&
                 if (auto c = e->value->get<py::Constant>(); c && c->kind == py::ConstantKind::Str) continue;
             }
             if (symbol.empty()) fail(statement->pos, "expected a function, class or initialized module variable");
-            if (!symbols.emplace(symbol, Export{"python." + name + "." + symbol, arity}).second)
+            if (!symbols.emplace(symbol, Export{"python." + name + "." + symbol, arity, std::move(constructor), is_class}).second)
                 fail(statement->pos, "duplicate declaration " + symbol);
         }
         std::set<std::string> classes = imported_classes;
@@ -689,6 +694,20 @@ void Imports::bind(py::Expr& expression, const std::string& file) const {
         Bind bind{found->second, {}, true};
         walk(expression, bind);
     }
+}
+auto Imports::constructor(const std::string& name, const std::string& file) const -> std::optional<Constructor> {
+    const auto found = files.find(file);
+    if (found == files.end()) return std::nullopt;
+    // `import py m;` binds `m.Class`; `import py {Class} from m;` leaves the bare name to be resolved later.
+    const Export* match = nullptr;
+    if (const auto exact = found->second.find(name); exact != found->second.end()) match = &exact->second;
+    else for (const auto& [key, item] : found->second) {
+        if (key.size() <= name.size() || !key.ends_with(name) || key[key.size() - name.size() - 1] != '.') continue;
+        if (match && match->qualified != item.qualified) return std::nullopt;   // ambiguous
+        match = &item;
+    }
+    if (!match || !match->is_class) return std::nullopt;
+    return Constructor{match->qualified, match->constructor};
 }
 void Imports::bind(py::Module& module, const std::string& file) const {
     if (auto found = files.find(file); found != files.end()) {

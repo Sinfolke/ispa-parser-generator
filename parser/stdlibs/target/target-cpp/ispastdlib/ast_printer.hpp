@@ -3,7 +3,10 @@
  * Part of the split ISPA std lib; include <ispastdlib.hpp> for everything.
  */
 #pragma once
+#include <string>
 #include <tuple>
+#include <type_traits>
+#include <utility>
 #include <ispastdlib/traits.hpp>
 
 namespace ISPA_STD {
@@ -60,6 +63,14 @@ namespace ISPA_STD {
         }
 
     private:
+        // Lowered Python classes (typed rule values) expose their fields through members()/members_str().
+        template<typename T, typename = void>
+        struct is_object : std::false_type {};
+        template<typename T>
+        struct is_object<T, std::void_t<decltype(std::declval<const T&>().members()), decltype(T::members_str())>> : std::true_type {};
+        template<typename T>
+        static constexpr bool is_object_v = is_object<T>::value;
+
         template<typename T>
         void print_named_value(
             const char* name,
@@ -81,7 +92,8 @@ namespace ISPA_STD {
                 is_variant<Type>::value ||
                 is_tuple_like_v<Type> ||
                 has_write_to_output<Type, ASTPrinter<OS>>::value ||
-                has_ast_print<Type, ASTPrinter<OS>>::value
+                has_ast_print<Type, ASTPrinter<OS>>::value ||
+                is_object_v<Type>
             ) {
                 subtree(name, value, last);
 
@@ -145,6 +157,13 @@ namespace ISPA_STD {
                 has_ast_print<Type, ASTPrinter<OS>>::value
             ) {
                 value.print(*this);
+
+            } else if constexpr (is_object_v<Type>) {
+                const auto names = Type::members_str();
+                std::size_t index = 0;
+                std::apply([&](const auto&... fields) {
+                    (node_with_value(std::string(names[index]).c_str(), fields, ++index == sizeof...(fields)), ...);
+                }, value.members());
 
             } else {
                 node_with_value("value", value, true);

@@ -197,7 +197,7 @@ namespace Rust {
                     const auto equal = local.find('=');
                     const auto label = equal == std::string::npos ? local : local.substr(0, equal);
                     const auto symbol = equal == std::string::npos ? local : local.substr(equal + 1);
-                    snapshot += ".add(\"" + label + "\", &" + symbol + ")";
+                    snapshot += ".add(\"" + label + "\", &" + (symbol.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_") == std::string::npos ? RustCore::ident(symbol) : symbol) + ")";
                 }
             }
             emitLine(o, "if ::ispa_std::debug::enabled() { ::ispa_std::debug::line(::ispa_std::debug::Loc::new(" + quoted(file) + ", " +
@@ -846,6 +846,22 @@ namespace Rust {
                             "fn print_subtree(&self, printer: &mut ::ispa_std::ASTPrinter) { self.write_to_output(printer) } }");
             if (cls.to_str_fun)
                 emitLine(w, "impl ::ispa_std::ToText for " + name + " { fn to_text(&self) -> String { self.to_string() } }");
+            // An imported Python class held by a typed rule prints its fields (C++: ASTPrinter's object branch).
+            if (cls.shared_object && !fields.empty()) {
+                const auto plain = [](std::string field) { return field.starts_with("r#") ? field.substr(2) : field; };
+                std::string body, text = "let mut out = String::from(\"{\"); ";
+                for (std::size_t i = 0; i < fields.size(); ++i) {
+                    body += "printer.node_with_value(String::from(\"" + plain(fields[i].name) + "\"), &self." + fields[i].name + ", " +
+                            (i + 1 == fields.size() ? "true" : "false") + "); ";
+                    text += std::string(i ? "out.push_str(\", \"); " : "") + "out.push_str(\"" + plain(fields[i].name) +
+                            " = \"); out.push_str(&::ispa_std::ToText::to_text(&self." + fields[i].name + ")); ";
+                }
+                if (!prints)
+                    emitLine(w, "impl ::ispa_std::PrintValue for " + name + " { fn structured(&self) -> bool { true } "
+                                "fn print_subtree(&self, printer: &mut ::ispa_std::ASTPrinter) { " + body + "} }");
+                if (!cls.to_str_fun)
+                    emitLine(w, "impl ::ispa_std::ToText for " + name + " { fn to_text(&self) -> String { " + text + "out.push('}'); out } }");
+            }
         }
         if (debug_instrumentation_ && !templated) {
             const auto in_types = std::find(context.module_path.begin(), context.module_path.end(), "Types") != context.module_path.end() ||

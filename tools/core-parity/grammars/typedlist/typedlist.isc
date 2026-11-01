@@ -1,0 +1,10 @@
+module typedlist -> nums;
+import py {nums_ast} from shapes;
+
+ID: @ [a-z]+ {@};
+NUM: @ [0-9]+ {@};
+
+nums | nums_ast:
+    @ NUM+ ';' @ ID
+    @{items, tail}
+;

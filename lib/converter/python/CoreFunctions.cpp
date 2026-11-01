@@ -460,6 +460,16 @@ std::string Core::call(const LangAPI::FunctionCall& c) {
         [this](const std::shared_ptr<LangAPI::Symbol>& name) { return symbol(*name); },
         [this](const std::shared_ptr<LangAPI::IspaLibSymbol>& name) { return lib(*name); }
     }, c.name);
+    // A call of a Python builtin (`int(x)`) must not get the reserved-name suffix meant for user variables.
+    if (const auto* callee = std::get_if<std::shared_ptr<LangAPI::Symbol>>(&c.name); callee && *callee &&
+        (*callee)->path.size() == 1) {
+        if (const auto* bare = std::get_if<std::string>(&(*callee)->path.front())) {
+            static const std::unordered_set<std::string> builtins {"int", "str", "float", "bool", "len", "list", "dict", "tuple"};
+            if (builtins.contains(*bare) && fn == *bare + "_" &&
+                !std::ranges::any_of(scopes_, [&](const auto& scope) { return scope.contains(fn); }))
+                fn = *bare;
+        }
+    }
     if (fn.starts_with("ISPA_STD.CountSpec.")) fn.replace(0, 8, "ispa_std");
     if (c.args.size() == 1 && (fn == "ISPA_STD.python_char_code" || fn == "ISPA_STD.python_char_from_code")) {
         const auto value = expression(c.args.front());
