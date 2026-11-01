@@ -74,16 +74,28 @@
 /* ISPA-C-WARNING: python_ispa_std_to_string.list_to_string: generic function not instantiated yet */
 
 int64_t python_ispa_std_chars_code_of(ispa_str ch) {
-	/* ISPA-C-TODO: local without a declared type */
-	ISPA_UNIMPLEMENTED("python_ispa_std_chars.code_of");
+	int64_t code = ispa_str_code(ch);
+	if ((((code) > (INT64_C(255))))) {
+		return INT64_C(255);
+	}
+	return code;
 }
 ispa_str python_ispa_std_chars_char_of(int64_t code) {
-	/* ISPA-C-TODO: unresolved name ISPA_STD::python_char_from_code */
-	ISPA_UNIMPLEMENTED("python_ispa_std_chars.char_of");
+	if (((((((code) < (INT64_C(0))))) || ((((code) > (INT64_C(255)))))))) {
+		return ISPA_STR("");
+	}
+	return ispa_char_from_code(code);
 }
 int64_t python_ispa_std_chars_code_at(ispa_str s, int64_t index) {
-	/* ISPA-C-TODO: local without a declared type */
-	ISPA_UNIMPLEMENTED("python_ispa_std_chars.code_at");
+	ISPA_STR("code_of(at(s, index)) without building the one-character string.");
+	if (((((((index) < (INT64_C(0))))) || ((((index) >= ((int64_t)(s).len))))))) {
+		return INT64_C(0);
+	}
+	int64_t code = ispa_str_code(ispa_str_from_char(ispa_str_at((s), index)));
+	if ((((code) > (INT64_C(255))))) {
+		return INT64_C(255);
+	}
+	return code;
 }
 ispa_str python_ispa_std_chars_at(ispa_str s, int64_t index) {
 	ISPA_STR("s[index], or \"\" outside the string (the C++ NUL terminator).");
@@ -684,8 +696,14 @@ int64_t python_ispa_std_debug__next_serial(void) {
 	return (python_ispa_std_debug__S)->serial;
 }
 void python_ispa_std_debug__forget(python_ispa_std_debug_ScopeBase* scope) {
-	/* ISPA-C-TODO: pop(index) */
-	ISPA_UNIMPLEMENTED("python_ispa_std_debug._forget");
+	int64_t i = (((int64_t)((python_ispa_std_debug__S)->scopes)->len) - (INT64_C(1)));
+	while ((((i) >= (INT64_C(0))))) {
+		if (((((ispa_vec_python_ispa_std_debug_ScopeBaseP_get(((python_ispa_std_debug__S)->scopes), i))->serial) == ((scope)->serial)))) {
+			ispa_vec_python_ispa_std_debug_ScopeBaseP_pop_at(((python_ispa_std_debug__S)->scopes), i);
+			return;
+		}
+		i = ((i) - (INT64_C(1)));
+	}
 }
 static void python_ispa_std_debug_RuleScope_close_as_python_ispa_std_debug_ScopeBase(python_ispa_std_debug_ScopeBase* self) {  python_ispa_std_debug_RuleScope_close((python_ispa_std_debug_RuleScope*)self); }
 static const python_ispa_std_debug_ScopeBase_vt python_ispa_std_debug_RuleScope_as_python_ispa_std_debug_ScopeBase_vtable = { .close = python_ispa_std_debug_RuleScope_close_as_python_ispa_std_debug_ScopeBase };
@@ -1317,8 +1335,14 @@ ispa_str python_ispa_std_dfa_api_Captures_character(python_ispa_std_dfa_api_Capt
 	return python_ispa_std_chars_at((((self)->_state)->src)->text, python_ispa_std_dfa_api_Captures_begin((self), k));
 }
 ispa_vec_int64_t* python_ispa_std_dfa_api_Captures_list_positions(python_ispa_std_dfa_api_Captures* self, int64_t k) {
-	/* ISPA-C-TODO: array method 14 */
-	ISPA_UNIMPLEMENTED("python_ispa_std_dfa_api.list_positions");
+	ispa_vec_int64_t* positions = ispa_vec_int64_t_new();
+	int64_t h = python_ispa_std_dfa_api_Captures_begin_off((self), k);
+	while ((((h) != (python_ispa_std_dfa_api_UNSET)))) {
+		ispa_vec_int64_t_push((positions), (ispa_vec_python_ispa_std_dfa_api_HistoryNodeP_get((((self)->_state)->history), h))->pos);
+		h = (ispa_vec_python_ispa_std_dfa_api_HistoryNodeP_get((((self)->_state)->history), h))->prev;
+	}
+	ispa_vec_int64_t_reverse((positions));
+	return positions;
 }
 ispa_vec_ispa_str* python_ispa_std_dfa_api_Captures_list_texts(python_ispa_std_dfa_api_Captures* self, int64_t k) {
 	ISPA_STR("One entry per iteration of a list capture, in input order.");
@@ -1832,8 +1856,7 @@ bool python_ispa_std_lexer_Lexer_base_has_buffered_tokens(python_ispa_std_lexer_
 	return ((((int64_t)((self)->tokens)->len) > (INT64_C(0))));
 }
 python_ispa_std_raw_token_RawToken* python_ispa_std_lexer_Lexer_base_pop_buffered_token(python_ispa_std_lexer_Lexer_base* self) {
-	/* ISPA-C-TODO: pop(index) */
-	ISPA_UNIMPLEMENTED("python_ispa_std_lexer.pop_buffered_token");
+	return ispa_vec_python_ispa_std_raw_token_RawTokenP_pop_at(((self)->tokens), INT64_C(0));
 }
 void python_ispa_std_lexer_Lexer_base_setExternalBoundary(python_ispa_std_lexer_Lexer_base* self, bool enabled) {
 	(self)->external_boundary = enabled;
@@ -1999,8 +2022,26 @@ python_ispa_std_raw_token_RawToken* python_ispa_std_lexer_Lexer_base_lookup(pyth
 	return token;
 }
 ispa_vec_python_ispa_std_raw_token_RawTokenP* python_ispa_std_lexer_Lexer_base_makeTokens(python_ispa_std_lexer_Lexer_base* self) {
-	/* ISPA-C-TODO: unresolved name ISPA_STD::borrow */
-	ISPA_UNIMPLEMENTED("python_ispa_std_lexer.makeTokens");
+	if (python_ispa_std_lexer_Lexer_base_hasExternalRules((self))) {
+		python_ispa_std_failures_logic_error(ISPA_STR("AMBIGUOUS eager token stream: use lazy tokenization with external parsers"));
+	}
+	if ((!((self)->_has_input))) {
+		python_ispa_std_failures_api_error(ISPA_STR("can't lex because no input provided. "), ispa_vec_ispa_str_new());
+	}
+	python_ispa_std_refs_Cursor* cur = python_ispa_std_refs_Cursor_new(INT64_C(0), (self)->line);
+	int64_t n = (int64_t)(((self)->_src)->text).len;
+	while (((((cur)->pos) < (n)))) {
+		int64_t before = (cur)->pos;
+		python_ispa_std_raw_token_RawToken* token = python_ispa_std_lexer_Lexer_base_makeToken((self), cur);
+		if (((((cur)->pos) == (before)))) {
+			python_ispa_std_failures_internal_error(ISPA_STR("no matches at position {}, on character {}, and no exception can handle it"), ISPA_STR("Lexer TDFA generation"), true, ispa_vec_ispa_str_from((ispa_str[]){python_ispa_std_format_int_to_string((cur)->pos), python_ispa_std_chars_at(((self)->_src)->text, (cur)->pos)}, 2));
+		}
+		if ((!(python_ispa_std_lexer_is_token_end(token)))) {
+			python_ispa_std_lexer_Lexer_base_push((self), token);
+		}
+	}
+	python_ispa_std_lexer_Lexer_base_push_eof((self));
+	return (self)->tokens;
 }
 ispa_vec_python_ispa_std_raw_token_RawTokenP* python_ispa_std_lexer_Lexer_base_makeTokensFromText(python_ispa_std_lexer_Lexer_base* self, ispa_str text) {
 	python_ispa_std_lexer_Lexer_base_setInput((self), text);
@@ -2172,8 +2213,52 @@ bool python_ispa_std_lexer_LazyIterator_has_source(python_ispa_std_lexer_LazyIte
 	return true;
 }
 void python_ispa_std_lexer_LazyIterator_ensure_token(python_ispa_std_lexer_LazyIterator* self) {
-	/* ISPA-C-TODO: unresolved name ISPA_STD::borrow */
-	ISPA_UNIMPLEMENTED("python_ispa_std_lexer.ensure_token");
+	python_ispa_std_lexer_Lexer_base* owner = (self)->owner;
+	python_ispa_std_lexer__SharedState* state = (self)->state;
+	bool running = true;
+	while ((((running) && (((((int64_t)((owner)->tokens)->len) <= ((self)->token_index))))))) {
+		if ((state)->eof_processed) {
+			running = false;
+		} else {
+			if ((!(python_ispa_std_lexer_Lexer_base_hasInput((owner))))) {
+				python_ispa_std_failures_logic_error(ISPA_STR("Lazy lexer has no source input"));
+			}
+			if (((((state)->pos) >= ((int64_t)(python_ispa_std_lexer_Lexer_base_source((owner))).len)))) {
+				(state)->eof_processed = true;
+				python_ispa_std_lexer_Lexer_base_push_eof((owner));
+				running = false;
+			} else {
+				int64_t before = (state)->pos;
+				python_ispa_std_lexer_Checkpoint* checkpoint = python_ispa_std_lexer_Lexer_base_checkpoint((owner));
+				python_ispa_std_refs_Cursor* cur = python_ispa_std_refs_Cursor_new((state)->pos, (owner)->line);
+				python_ispa_std_raw_token_RawToken* raw = python_ispa_std_lexer_Lexer_base_empty_token((owner));
+				if ((((((((owner)->bound) < (INT64_C(0))))) || (((((state)->pos) < ((owner)->bound))))))) {
+					raw = python_ispa_std_lexer_Lexer_base_makeToken((owner), cur);
+				}
+				(state)->pos = (cur)->pos;
+				if ((((python_ispa_std_raw_token_RawToken_empty((raw))) && ((owner)->external_boundary)))) {
+					(state)->pos = before;
+					(state)->eof_processed = true;
+					python_ispa_std_lexer_Lexer_base_push_eof((owner));
+					running = false;
+				} else {
+					if (((((((python_ispa_std_raw_token_RawToken_empty((raw))) && ((!(python_ispa_std_raw_token_RawToken_isAmbiguous((raw)))))))) && (python_ispa_std_lexer_Lexer_base_hasExternalRules((owner)))))) {
+						(state)->pos = ((before) + (INT64_C(1)));
+						raw = python_ispa_std_lexer_Lexer_base_ambiguous_token((owner), before, (state)->pos);
+					}
+					if (((((state)->pos) == (before)))) {
+						python_ispa_std_failures_runtime_error(ISPA_STR("Lazy lexer did not advance source position"));
+					}
+					if ((!(python_ispa_std_lexer_is_token_end(raw)))) {
+						python_ispa_std_lexer_Lexer_base_push((owner), raw);
+					}
+					while (((((int64_t)((state)->checkpoints)->len) < ((int64_t)((owner)->tokens)->len)))) {
+						ispa_vec_python_ispa_std_lexer_CheckpointP_push(((state)->checkpoints), checkpoint);
+					}
+				}
+			}
+		}
+	}
 }
 ispa_str python_ispa_std_lexer_LazyIterator_sourceOrigin(python_ispa_std_lexer_LazyIterator* self) {
 	return python_ispa_std_lexer_Lexer_base_source(((self)->owner));
@@ -2750,8 +2835,32 @@ void python_ispa_std_recovery_Handler___init__(python_ispa_std_recovery_Handler*
 	(self)->policy = policy;
 }
 python_ispa_std_recovery_Decision* python_ispa_std_recovery_Handler_run(python_ispa_std_recovery_Handler* self, python_ispa_std_lexer_TokenCursor* pos, python_ispa_std_recovery_State* state) {
-	/* ISPA-C-TODO: unresolved name ISPA_STD::borrow */
-	ISPA_UNIMPLEMENTED("python_ispa_std_recovery.run");
+	python_ispa_std_recovery_Plan* plan = python_ispa_std_recovery_Plan_new((self)->rule, python_ispa_std_recovery_TokenSet_values(((self)->expected)), python_ispa_std_recovery_TokenSet_values(((self)->continuation)), python_ispa_std_recovery_TokenSet_values(((self)->follow)), python_ispa_std_recovery_TokenSet_values(((self)->synchronization)), ((self)->policy)->allow_insertion, ((self)->policy)->allow_deletion, ((self)->policy)->allow_replacement, ((self)->policy)->max_skip);
+	python_ispa_std_recovery_Decision* decision = python_ispa_std_recovery_recover_default(pos, state, plan);
+	if (((((int64_t)((state)->diagnostics)->len) > (INT64_C(0))))) {
+		python_ispa_std_recovery_Diagnostic* diagnostic = ispa_vec_python_ispa_std_recovery_DiagnosticP_get(((state)->diagnostics), (((int64_t)((state)->diagnostics)->len) - (INT64_C(1))));
+		(diagnostic)->expected_text = (self)->expected_text;
+		(diagnostic)->message = (ISPA_CONCAT(((ISPA_CONCAT(((diagnostic)->message), (ISPA_STR("; expected "))))), ((self)->expected_text)));
+		if (((((decision)->mode) == (python_ispa_std_recovery_Mode_Insert)))) {
+			(diagnostic)->message = (ISPA_CONCAT(((diagnostic)->message), (ISPA_STR("; inserted missing token"))));
+		} else {
+			if (((((decision)->mode) == (python_ispa_std_recovery_Mode_Replace)))) {
+				(diagnostic)->message = (ISPA_CONCAT(((diagnostic)->message), (ISPA_STR("; replaced unexpected token"))));
+			} else {
+				if (((((decision)->mode) == (python_ispa_std_recovery_Mode_Delete)))) {
+					(diagnostic)->message = (ISPA_CONCAT(((diagnostic)->message), (ISPA_STR("; deleted unexpected token"))));
+				} else {
+					if (((((decision)->mode) == (python_ispa_std_recovery_Mode_Abort)))) {
+						(diagnostic)->message = (ISPA_CONCAT(((diagnostic)->message), (ISPA_STR("; recovery limit reached"))));
+					}
+				}
+			}
+		}
+		if (((((decision)->skipped) > (INT64_C(1))))) {
+			(diagnostic)->message = (ISPA_CONCAT(((ISPA_CONCAT(((ISPA_CONCAT(((diagnostic)->message), (ISPA_STR("; skipped "))))), (python_ispa_std_format_int_to_string((decision)->skipped))))), (ISPA_STR(" tokens"))));
+		}
+	}
+	return decision;
 }
 static python_ispa_std_recovery_Decision* python_ispa_std_recovery_ActionFailure_run_as_python_ispa_std_recovery_FailHandler(python_ispa_std_recovery_FailHandler* self, python_ispa_std_lexer_TokenCursor* pos, python_ispa_std_recovery_State* state) { return python_ispa_std_recovery_ActionFailure_run((python_ispa_std_recovery_ActionFailure*)self, pos, state); }
 static bool python_ispa_std_recovery_ActionFailure_is_custom_as_python_ispa_std_recovery_FailHandler(python_ispa_std_recovery_FailHandler* self) { return python_ispa_std_recovery_ActionFailure_is_custom((python_ispa_std_recovery_ActionFailure*)self); }
@@ -5233,7 +5342,7 @@ bool python_ispa_std_utility_Pair__int64_t_python_ispa_std_raw_token_RawTokenP__
 	return ((((self)->second) < ((other)->second)));
 }
 
-void o_init_globals(void) {
+void ispa_std_init_globals(void) {
     python_ispa_std_string_NPOS = (-(INT64_C(1)));
     python_ispa_std_debug__S = python_ispa_std_debug_DebugState_new();
     python_ispa_std_debug__IDLE_MATCH_SCOPE = python_ispa_std_debug_MatchScope_new(ISPA_STR(""), ISPA_STR(""));

@@ -397,6 +397,19 @@ namespace C {
             for (const auto &x : gs) parts.push_back(cIdent(x));
             return joined(parts, "_") + "_" + cIdent(inst->name) + "(" + joined(cargs, ", ") + ")";
         }
+        const auto *isym = std::get_if<std::shared_ptr<LangAPI::Symbol>>(&call.name);
+        if (isym && *isym && (*isym)->path.size() == 2 && std::holds_alternative<std::string>((*isym)->path[0]) && std::get<std::string>((*isym)->path[0]) == "ISPA_STD" &&
+            std::holds_alternative<std::string>((*isym)->path[1])) {
+            const auto &f = std::get<std::string>((*isym)->path[1]);
+            if (call.args.size() == 1) {
+                const auto a0 = convertExpr(call.args[0]);
+                const auto t0 = typer->typeOf(call.args[0]);
+                if (f == "borrow") return a0;     // a handle already is a reference
+                if (f == "python_char_code")
+                    return t0 && LangAPI::Typing::Typer::isValue(*t0, LangAPI::ValueType::Char) ? "ispa_char_code(" + a0 + ")" : "ispa_str_code(" + a0 + ")";
+                if (f == "python_char_from_code") return "ispa_char_from_code(" + a0 + ")";
+            }
+        }
         if (!call.template_parameters.empty()) {
             std::string nm = "?";
             if (const auto *sy = std::get_if<std::shared_ptr<LangAPI::Symbol>>(&call.name); sy && *sy) nm = symbolName(**sy);
@@ -646,8 +659,8 @@ namespace C {
                         out = vn + "_push(" + out + ", " + a[0] + ")"; cur = LangAPI::Type(LangAPI::ValueType::Void); break;
                     case AM::Pop: case AM::SequencePopBack: out = vn + "_pop(" + out + ")"; cur = elemT; break;
                     case AM::PythonPop:
-                        if (!a.empty()) throw Unsupported{"pop(index)"};
-                        out = vn + "_pop(" + out + ")"; cur = elemT; break;
+                        out = a.empty() ? vn + "_pop(" + out + ")" : vn + "_pop_at(" + out + ", " + a[0] + ")"; cur = elemT; break;
+                    case AM::PythonReverse: out = vn + "_reverse(" + out + ")"; cur = LangAPI::Type(LangAPI::ValueType::Void); break;
                     case AM::PythonInsert:
                         if (a.size() != 2) throw Unsupported{"insert arity"};
                         out = vn + "_insert(" + out + ", " + a[0] + ", " + a[1] + ")"; cur = LangAPI::Type(LangAPI::ValueType::Void); break;
@@ -861,7 +874,6 @@ namespace C {
                 out = "(" + parseBinary(e, i, 1) + ")";
                 if (i >= e.size() || !e[i].isExpressionElement() || e[i].getExpressionElement() != EE::GroupClose) throw Unsupported{"unbalanced group"};
                 ++i;
-                last_type = last_type;  // group keeps the type of its content
             } else if (el == EE::Not) { ++i; out = "!" + parsePrimary(e, i); last_type = LangAPI::Type(LangAPI::ValueType::Bool); return out; }
             else if (el == EE::Minus) { ++i; out = "-" + parsePrimary(e, i); return out; }
             else if (el == EE::PlusPlus || el == EE::MinusMinus) { ++i; out = std::string(el == EE::PlusPlus ? "++" : "--") + parsePrimary(e, i); return out; }

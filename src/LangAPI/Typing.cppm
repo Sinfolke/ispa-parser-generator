@@ -255,6 +255,11 @@ export namespace LangAPI::Typing {
             if (parts.size() == 2 && parts[0] == "ISPA_STD" && (parts[1] == "construct" || parts[1] == "make_value") &&
                 c.template_parameters.size() == 1)
                 if (const auto *t = std::get_if<std::shared_ptr<Type>>(&c.template_parameters[0]); t && *t) return **t;
+            if (parts.size() == 2 && parts[0] == "ISPA_STD" && c.args.size() == 1) {
+                if (parts[1] == "borrow") return typeOf(c.args[0]);
+                if (parts[1] == "python_char_code") return Type(ValueType::Int);
+                if (parts[1] == "python_char_from_code") return Type(ValueType::String);
+            }
             if (parts.size() == 1) {   // call of a Callable local / field
                 MaybeType v = lookupLocal(parts[0]) ? MaybeType(*lookupLocal(parts[0])) : (cur_class ? fieldType(*cur_class, parts[0]) : std::nullopt);
                 if (v) if (const auto sig = callableSignature(*v)) return sig->second;

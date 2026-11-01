@@ -90,6 +90,9 @@ static inline int ispa_str_cmp(ispa_str a, ispa_str b) {
     return c ? c : (a.len > b.len) - (a.len < b.len);
 }
 static inline ispa_str ispa_str_from_char(char c) { char *p = (char *)ispa_arena_alloc(ispa_cur, 2); p[0] = c; p[1] = 0; return (ispa_str){ p, 1 }; }
+static inline int64_t ispa_char_code(char c) { return (unsigned char)c; }
+static inline int64_t ispa_str_code(ispa_str s) { return s.len ? (unsigned char)s.data[0] : 0; }
+static inline ispa_str ispa_char_from_code(int64_t n) { return (n < 0 || n > 255) ? (ispa_str){ "", 0 } : ispa_str_from_char((char)n); }
 static inline char ispa_str_at(ispa_str s, int64_t i) { return s.data[ispa_idx(i, s.len)]; }
 
 /* ---- typed vector (Python list: reference semantics, so always handled through NAME*) ----
@@ -114,6 +117,13 @@ static inline char ispa_str_at(ispa_str s, int64_t i) { return s.data[ispa_idx(i
         if (i < 0) { i += (int64_t)v->len; } if (i < 0) { i = 0; } if ((size_t)i > v->len) { i = (int64_t)v->len; }\
         NAME##_reserve(v, v->len + 1);                                                                         \
         memmove(v->data + i + 1, v->data + i, (v->len - (size_t)i) * sizeof(T)); v->data[i] = x; v->len++;     \
+    }                                                                                                          \
+    static inline T NAME##_pop_at(NAME *v, int64_t i) {                                                        \
+        i = ispa_idx(i, v->len); T x = v->data[i];                                                             \
+        memmove(v->data + i, v->data + i + 1, (v->len - (size_t)i - 1) * sizeof(T)); v->len--; return x;     \
+    }                                                                                                          \
+    static inline void NAME##_reverse(NAME *v) {                                                               \
+        for (size_t a = 0, b = v->len; a + 1 < b; ++a, --b) { T t = v->data[a]; v->data[a] = v->data[b - 1]; v->data[b - 1] = t; } \
     }                                                                                                          \
     static inline void NAME##_clear(NAME *v) { v->len = 0; }
 
