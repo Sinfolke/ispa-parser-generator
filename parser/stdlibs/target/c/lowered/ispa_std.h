@@ -413,6 +413,7 @@ struct python_ispa_std_recovery_ContextClaim {
 struct python_ispa_std_recovery_ClaimSet {
 	ispa_vec_python_ispa_std_recovery_ContextClaimP* claims;
 	ispa_vec_int64_t* tokens;
+	ispa_str expecting;
 };
 struct python_ispa_std_recovery_ContextDiagnostic {
 	int64_t kind;
@@ -491,7 +492,6 @@ struct python_ispa_std_parser_ll_Ctx {
 };
 struct python_ispa_std_parser_ll_Frame {
 	ispa_str rule;
-	ispa_str expecting;
 	python_ispa_std_recovery_ClaimSet* claim_set;
 };
 struct python_ispa_std_parser_ll_FrameGuard {

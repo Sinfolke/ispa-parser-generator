@@ -802,10 +802,14 @@ void python_ispa_std_debug_MatchScope___init__(python_ispa_std_debug_MatchScope*
 }
 void python_ispa_std_debug_MatchScope_success(python_ispa_std_debug_MatchScope* self) {
 	(self)->matched = true;
-	(self)->reason = ISPA_STR("matched");
+	if ((self)->active) {
+		(self)->reason = ISPA_STR("matched");
+	}
 }
 void python_ispa_std_debug_MatchScope_outcome(python_ispa_std_debug_MatchScope* self, ispa_str why) {
-	(self)->reason = why;
+	if ((self)->active) {
+		(self)->reason = why;
+	}
 }
 void python_ispa_std_debug_MatchScope_close(python_ispa_std_debug_MatchScope* self) {
 	if ((!((self)->open))) {
@@ -2982,6 +2986,7 @@ python_ispa_std_recovery_ClaimSet* python_ispa_std_recovery_ClaimSet_new(ispa_ve
 }
 void python_ispa_std_recovery_ClaimSet___init__(python_ispa_std_recovery_ClaimSet* self, ispa_vec_python_ispa_std_recovery_ContextClaimP* claims) {
 	(self)->claims = claims;
+	(self)->expecting = ISPA_STR("");
 	(self)->tokens = ispa_vec_int64_t_new();
 	int64_t i = INT64_C(0);
 	while ((((i) < ((int64_t)(claims)->len)))) {
@@ -3687,7 +3692,6 @@ python_ispa_std_parser_ll_Frame* python_ispa_std_parser_ll_Frame_new(ispa_str ru
 }
 void python_ispa_std_parser_ll_Frame___init__(python_ispa_std_parser_ll_Frame* self, ispa_str rule) {
 	(self)->rule = rule;
-	(self)->expecting = ISPA_STR("");
 	(self)->claim_set = python_ispa_std_recovery_empty_claim_set();
 }
 python_ispa_std_parser_ll_FrameGuard* python_ispa_std_parser_ll_get_FrameGuard_handler(ispa_arena* arena) {
@@ -3998,7 +4002,6 @@ void python_ispa_std_parser_ll_LLParser_enter_frame(python_ispa_std_parser_ll_LL
 	if (((((self)->frame_count) < ((int64_t)((self)->frames_)->len)))) {
 		python_ispa_std_parser_ll_Frame* frame = ispa_vec_python_ispa_std_parser_ll_FrameP_get(((self)->frames_), (self)->frame_count);
 		(frame)->rule = rule;
-		(frame)->expecting = ISPA_STR("");
 		(frame)->claim_set = python_ispa_std_recovery_empty_claim_set();
 	} else {
 		ispa_vec_python_ispa_std_parser_ll_FrameP_push(((self)->frames_), python_ispa_std_parser_ll_Frame_new(rule));
@@ -4029,7 +4032,9 @@ void python_ispa_std_parser_ll_LLParser_recovery_at_set(python_ispa_std_parser_l
 		return;
 	}
 	python_ispa_std_parser_ll_Frame* frame = ispa_vec_python_ispa_std_parser_ll_FrameP_get(((self)->frames_), (((self)->frame_count) - (INT64_C(1))));
-	(frame)->expecting = expecting;
+	if ((!ispa_str_eq(((claims)->expecting), (expecting)))) {
+		(claims)->expecting = expecting;
+	}
 	(frame)->claim_set = claims;
 	ispa_vec_python_ispa_std_recovery_ClaimSetP_set((((self)->recovery_state_)->anchors), ((((self)->recovery_state_)->anchor_count) - (INT64_C(1))), claims);
 }
@@ -4123,8 +4128,8 @@ void python_ispa_std_parser_ll_LLParser_report_context(python_ispa_std_parser_ll
 	ispa_str tok = python_ispa_std_parser_ll_LLParser_describe_token((self), pos);
 	ispa_str where = python_ispa_std_parser_ll_LLParser_breadcrumb((self));
 	ispa_str expected = ISPA_STR("");
-	if (((((int64_t)((inner)->expecting).len) > (INT64_C(0))))) {
-		expected = (ISPA_CONCAT((ISPA_STR("; expected ")), ((inner)->expecting)));
+	if (((((int64_t)(((inner)->claim_set)->expecting).len) > (INT64_C(0))))) {
+		expected = (ISPA_CONCAT((ISPA_STR("; expected ")), (((inner)->claim_set)->expecting)));
 	}
 	if ((((kind) == (python_ispa_std_recovery_ContextKind_Misplaced)))) {
 		(d)->message = (ISPA_CONCAT(((ISPA_CONCAT(((ISPA_CONCAT(((ISPA_CONCAT(((ISPA_CONCAT(((ISPA_CONCAT(((ISPA_CONCAT(((ISPA_CONCAT(((ISPA_CONCAT(((ISPA_CONCAT((ISPA_STR("unexpected ")), (tok)))), (ISPA_STR(" while parsing '"))))), ((d)->rule)))), (ISPA_STR("'"))))), (expected)))), (ISPA_STR("; continuing at '"))))), ((d)->claim)))), (ISPA_STR("' in enclosing rule '"))))), ((d)->resume_rule)))), (ISPA_STR("'"))));
