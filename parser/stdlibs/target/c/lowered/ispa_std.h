@@ -193,7 +193,11 @@ struct python_ispa_std_raw_token_RawTokenMeta {
 	bool _has_source;
 	int64_t _name;
 };
+typedef struct python_ispa_std_raw_token_RawToken_vt {
+	python_ispa_std_node_Node* (*to_node)(python_ispa_std_raw_token_RawToken* self, int64_t);
+} python_ispa_std_raw_token_RawToken_vt;
 struct python_ispa_std_raw_token_RawToken {
+	const python_ispa_std_raw_token_RawToken_vt* vt;
 	int64_t _type_id;
 	python_ispa_std_raw_token_RawTokenMeta* _meta;
 };
@@ -798,6 +802,7 @@ ispa_str python_ispa_std_raw_token_RawTokenMeta_source(python_ispa_std_raw_token
 bool python_ispa_std_raw_token_RawTokenMeta_has_source(python_ispa_std_raw_token_RawTokenMeta* self);
 int64_t python_ispa_std_raw_token_RawTokenMeta_end_pos(python_ispa_std_raw_token_RawTokenMeta* self);
 ispa_str python_ispa_std_raw_token_RawTokenMeta_text(python_ispa_std_raw_token_RawTokenMeta* self);
+static inline python_ispa_std_node_Node* python_ispa_std_raw_token_RawToken_to_node_v(python_ispa_std_raw_token_RawToken* self, int64_t type_id) { return self->vt->to_node(self, type_id); }
 python_ispa_std_raw_token_RawToken* python_ispa_std_raw_token_get_RawToken_handler(ispa_arena* arena);
 void python_ispa_std_raw_token_free_RawToken_handler(python_ispa_std_raw_token_RawToken* handler);
 python_ispa_std_raw_token_RawToken* python_ispa_std_raw_token_RawToken_new(python_ispa_std_raw_token_RawTokenMeta* meta, int64_t type_id);

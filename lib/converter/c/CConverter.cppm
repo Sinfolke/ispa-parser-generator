@@ -48,6 +48,7 @@ namespace C {
         LangAPI::Declarations owned_tree;                        // working copy of the source with library symbols mapped
         auto mapLibrary() -> void;
         std::unordered_map<const LangAPI::Class *, std::string> handler_names;
+        auto defaultObject(const LangAPI::Class &cls) -> std::string;
         auto handlerName(const LangAPI::Class &cls) const -> std::string;
         std::vector<std::string> counters{"pos"};          // position-counter stack of the rule being emitted
         auto cursorCall(const std::string &method, const std::string &recv, std::vector<std::string> args) -> std::string;
@@ -64,6 +65,7 @@ namespace C {
         std::set<std::string> token_classes;                      // names of synthesized token classes (see mapLibrary)
         auto emitTokenClass(const LangAPI::Class &cls, ::Converter::Writer &protos, ::Converter::Writer &impls) -> void;
         int switch_counter = 0;
+        bool dry_pass = false;
         bool app_mode = false;                                   // the tree holds an application next to the library
         std::unordered_set<std::string> thunks_done;
         auto functionValue(const LangAPI::Symbol &sy, const LangAPI::Function &fn) -> std::string;

@@ -209,6 +209,7 @@ export namespace LangAPI::Typing {
                         case StdlibExports::ParserRange: case StdlibExports::ParserRangeOptional: case StdlibExports::ParserCounted:
                             t = Type(ValueType::Array, Type(Symbol(std::vector<std::string>{"python", "ispa_std", "node", "Node"}))); break;
                         case StdlibExports::AssignCompatible: if (!v.getIspaLibFunctionCall().args.empty()) t = typeOf(v.getIspaLibFunctionCall().args[0]); break;
+                        case StdlibExports::CloneSelfBox: if (cur_class) t = classType(*cur_class); break;
                         case StdlibExports::Fail: t = Type(ValueType::Void); break;
                         case StdlibExports::LookaheadKind: t = Type(ValueType::Int); break;
                         case StdlibExports::TokenCursor: case StdlibExports::LazyTokenCursor:

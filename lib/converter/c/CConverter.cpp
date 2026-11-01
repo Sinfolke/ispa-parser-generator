@@ -105,6 +105,14 @@ namespace C {
         return std::nullopt;
     }
 
+    // `T x;` / `T{}` for a class type: Node and MatchResult are blank, everything else is a zeroed object
+    auto Construct::defaultObject(const LangAPI::Class &cls) -> std::string {
+        const auto cn = class_cname.at(&cls);
+        if (cn == "python_ispa_std_node_Node") return "python_ispa_std_node_Node_blank()";
+        if (cn == "python_ispa_std_match_result_MatchResult") return "python_ispa_std_match_result_MatchResult_new(false, python_ispa_std_node_Node_blank(), NULL)";
+        return handlerName(cls) + "(ispa_cur)";
+    }
+
     // <ns>_get_<Class>_handler for a class (its C name is <ns>_<Class>, the handler name follows emitClass)
     auto Construct::handlerName(const LangAPI::Class &cls) const -> std::string {
         const auto it = handler_names.find(&cls);
@@ -116,6 +124,7 @@ namespace C {
         const auto n = prefix() + "_" + symbolName(c.name);
         class_cname[&c] = n;
         handler_names[&c] = prefix() + "_get_" + symbolName(c.name) + "_handler";
+        if (token_classes.contains(symbolName(c.name)) && !n.starts_with("python_ispa_std_")) token_cname = n;
         defined.insert(n);
         if (!c.template_parameters.empty()) { generic_classes.insert(n); generic_decl[n] = &c; generic_scope[n] = scope; }
         ClassInfo info; info.c_name = n;
@@ -249,7 +258,8 @@ namespace C {
         const auto *cf = typer->classOf(*from), *ct = typer->classOf(to);
         if (!cf || !ct || cf == ct) return code;
         const auto it = class_cname.find(ct);
-        return it == class_cname.end() ? code : "(" + it->second + "*)" + code;
+        if (it == class_cname.end() || (!token_cname.empty() && it->second == token_cname)) return code;     // the app token travels as RawToken*
+        return "(" + it->second + "*)" + code;
     }
 
     auto Construct::vecName(const std::string &elem) const -> std::string {
@@ -302,6 +312,7 @@ namespace C {
                 if (targs.size() != g->template_parameters.size()) { diag.push_back("generic class " + n + " used without its type arguments"); return "void*"; }
                 return class_cname.at(instantiateClass(*g, targs)) + "*";
             }
+            if (app_mode && !token_cname.empty() && n == token_cname) return "python_ispa_std_raw_token_RawToken*";   // layout-compatible with its base
             return n + "*";
         }
         diag.push_back("library type has no C spelling yet");
@@ -379,7 +390,13 @@ namespace C {
                 case S::LRValue: return LangAPI::Type(LangAPI::ValueType::Any);
                 default: break;
             }
-            if (const auto p = libPath(s.exports)) return LangAPI::Type(LangAPI::Symbol(*p));
+            if (const auto p = libPath(s.exports)) {
+                LangAPI::Type out{LangAPI::Symbol(*p)};
+                if (s.exports == S::TdfaLayout)       // TdfaLayout<Registers, Outputs>: the sizes are needed to construct one
+                    for (const auto &tp : s.template_parameters)
+                        if (const auto *rv = std::get_if<std::shared_ptr<LangAPI::RValue>>(&tp); rv && *rv) out.template_parameters.push_back(**rv);
+                return out;
+            }
             return std::nullopt;
         }
     }
@@ -477,8 +494,8 @@ namespace C {
         const auto ns = cn.substr(0, at), suffix = cn.substr(at + std::string("_FlatTypes_").size());
         RuleOrToken out;
         const auto tok = ns + "_Tokens_" + suffix + "_id";
-        if (functions.contains(tok)) { out.token = true; out.id = "(int64_t)" + tok; }
-        else out.name = ns + "_RulesStr_" + suffix + "_id";
+        if (functions.contains(tok)) out.id = "(int64_t)" + tok;
+        out.name = ns + "_RulesStr_" + suffix + "_id";
         return out;
     }
 
@@ -507,8 +524,12 @@ namespace C {
                 return constant ? siteStatic("python_ispa_std_recovery_Handler*", init) : init;
             }
             case S::ParserRequired: case S::ParserRange: case S::ParserOptional: case S::ParserRangeOptional: case S::ParserCounted: {
-                const auto rt = ruleOrToken(typeArg(0));
+                auto rt = ruleOrToken(typeArg(0));
                 const bool has_fail = lib.exports == S::ParserRequired || lib.exports == S::ParserRange;
+                // rules also own a Tokens id (their marker), so the form is told by its arguments: a rule match carries the callback
+                const std::size_t rule_args = lib.exports == S::ParserCounted ? 3 : has_fail ? 3 : 2;
+                rt.token = call.args.size() < rule_args;
+                if (rt.token && rt.id.empty()) throw Unsupported{"token combinator over a type without a token id"};
                 const char *base = lib.exports == S::ParserRequired ? "required" : lib.exports == S::ParserRange ? "range" :
                                    lib.exports == S::ParserOptional ? "optional" : lib.exports == S::ParserRangeOptional ? "range_optional" : "counted";
                 const std::string method = std::string(base) + (rt.token ? "_token" : "_rule");
@@ -522,11 +543,11 @@ namespace C {
                     else a.insert(a.end(), {cb(2, 1), spec});
                 } else if (rt.token) {
                     a.push_back(rt.id);
-                    if (has_fail) a.push_back(arg(1));
+                    if (has_fail) a.push_back("(python_ispa_std_recovery_FailHandler*)" + arg(1));
                 } else {
                     if (has_fail) a.push_back(rt.name);       // rule name
                     a.push_back(cb(1, has_fail ? 2 : 1));
-                    if (has_fail) a.push_back(arg(2));
+                    if (has_fail) a.push_back("(python_ispa_std_recovery_FailHandler*)" + arg(2));
                 }
                 return methodCall(*cur_class_decl, method, "self", a);
             }
@@ -574,6 +595,12 @@ namespace C {
 
     auto Construct::convertCall(const LangAPI::FunctionCall &call) -> std::string {
         if (const auto *lib = std::get_if<std::shared_ptr<LangAPI::IspaLibSymbol>>(&call.name); lib && *lib) return convertLibCall(call, **lib);
+        if (const auto *ls = std::get_if<std::shared_ptr<LangAPI::Symbol>>(&call.name); ls && *ls && (*ls)->path.size() == 1 &&
+            std::holds_alternative<std::string>((*ls)->path[0]) && std::get<std::string>((*ls)->path[0]) == "lookup" && call.args.size() == 6 && cur_class_decl) {
+            // generated lexers hand their DFA tables over in 6 arguments; the lowered scanner takes a DfaTables object
+            const auto tn = [&](std::size_t i) { return convertExpr(call.args[i]); };
+            return "ispa_lexer_lookup((python_ispa_std_lexer_Lexer_base*)self, " + tn(0) + ", " + tn(1) + ", " + tn(2) + ", " + tn(3) + ", " + tn(4) + ", " + tn(5) + ")";
+        }
         if (const auto *rs = std::get_if<std::shared_ptr<LangAPI::Symbol>>(&call.name); rs && *rs && (*rs)->path.size() == 1 &&
             std::holds_alternative<std::string>((*rs)->path[0]) && !call.template_parameters.empty() &&
             (std::get<std::string>((*rs)->path[0]) == "recovery_at" || std::get<std::string>((*rs)->path[0]) == "recover_choice"))
@@ -1089,7 +1116,7 @@ namespace C {
                         case LangAPI::StdlibExports::RawTokenNodeConstruct: case LangAPI::StdlibExports::ParserNodeConstructor: {
                             if (token_cname.empty() || a.size() != 6) throw Unsupported{"token construction needs the application token class and 6 arguments"};
                             const auto vt = typer->typeOf(c.args[5]);
-                            out += token_cname + "_create(" + a[0] + ", " + a[1] + ", " + a[2] + ", " + a[3] + ", " + a[4] + ", " +
+                            out += "(python_ispa_std_raw_token_RawToken*)" + token_cname + "_create(" + a[0] + ", " + a[1] + ", " + a[2] + ", " + a[3] + ", " + a[4] + ", " +
                                    coerce(a[5], vt, LangAPI::Type(LangAPI::ValueType::Any)) + ")";
                             break;
                         }
@@ -1170,7 +1197,7 @@ namespace C {
                     std::vector<std::string> d;
                     const auto st = LangAPI::Typing::Typer::strip(*expected);
                     if (const auto *cls = typer->classOf(st)) {
-                        out += handlerName(*cls) + "(ispa_cur)";
+                        out += defaultObject(*cls);
                     } else if (LangAPI::Typing::Typer::isValue(st, LangAPI::ValueType::Array)) out += vecName(typeName(*LangAPI::Typing::Typer::elementType(st), d)) + "_new()";
                     else if (LangAPI::Typing::Typer::isValue(st, LangAPI::ValueType::String)) out += "ISPA_STR(\"\")";
                     else if (LangAPI::Typing::Typer::isValue(st, LangAPI::ValueType::Any)) out += "ISPA_ANY_NONE";
@@ -1425,7 +1452,11 @@ namespace C {
             const auto t = typeName(declared, d);
             if (!d.empty()) throw Unsupported{"local type: " + d.front()};
             locals.back().insert(v.name);
-            if (v.value.empty()) o.writeln("{} {} = {0};", t, cIdent(v.name));
+            if (v.value.empty()) {
+                const auto *dcls = declared.isSymbol() ? typer->classOf(declared) : nullptr;
+                if (dcls && (token_cname.empty() || class_cname.at(dcls) != token_cname)) o.writeln("{} {} = {};", t, cIdent(v.name), defaultObject(*dcls));
+                else o.writeln("{} {} = {0};", t, cIdent(v.name));
+            }
             else o.writeln("{} {} = {};", t, cIdent(v.name), coerce(convertExprAs(v.value, declared), typer->typeOf(v.value), declared));
         } else if (st.isIf()) {
             const auto &i = st.getIf();
@@ -1658,13 +1689,16 @@ namespace C {
                 std::vector<std::string> entries;
                 for (const auto &m : root_slots.at(root)) {
                     const auto *owner = typer->methodOwner(cls, m);
-                    const auto *f = typer->findMethod(cls, m);
+                    const auto *f = typer->findMethod(cls, m);            // the implementation's signature
+                    const auto *rf = definesMethod(*root, m);              // the slot's signature (what callers see)
                     const auto oc = class_cname.at(owner);
                     const auto thunk = c_name + "_" + cIdent(m) + "_as_" + rc;
-                    std::vector<std::string> ps = sigOf(*f, rc), as = {"(" + oc + "*)self"};
-                    for (const auto &[t, n] : f->parameters) as.push_back(cIdent(n));
-                    impls.writeln("static {} {}({}) { {} {}_{}({}); }", typeName(f->type, diag), thunk, joined(ps, ", "),
-                                  typeName(f->type, diag) == "void" ? "" : "return", oc, cIdent(m), joined(as, ", "));
+                    const auto rret = typeName(rf->type, diag);
+                    std::vector<std::string> ps = sigOf(*rf, rc), as = {"(" + oc + "*)self"};
+                    for (std::size_t k = 0; k < f->parameters.size(); ++k)
+                        as.push_back("(" + typeName(f->parameters[k].first, diag) + ")" + cIdent(rf->parameters[k].second));
+                    impls.writeln("static {} {}({}) { {} {}_{}({}); }", rret, thunk, joined(ps, ", "),
+                                  rret == "void" ? "" : "return (" + rret + ")", oc, cIdent(m), joined(as, ", "));
                     entries.push_back("." + cIdent(m) + " = " + thunk);
                 }
                 impls.writeln("static const {}_vt {} = { {} };", rc, vt, joined(entries, ", "));
@@ -1677,6 +1711,19 @@ namespace C {
         impls.writeln("{}* {}_get_{}_handler(ispa_arena* arena) {", c_name, pfx, name);
         impls.increaseIndentation();
         impls.writeln("{}* h = ({}*)ispa_arena_calloc(arena, sizeof({}));", c_name, c_name, c_name);
+        for (const auto &[decl, vis] : cls.data)      // TdfaLayout<R, O> fields are born with their sizes
+            if (decl->isVariable() && !decl->getVariable().is_static && decl->getVariable().type.isSymbol() && decl->getVariable().value.empty()) {
+                const auto &ft = decl->getVariable().type;
+                const auto &sp = ft.getSymbol().path;
+                if (sp.size() == 4 && std::holds_alternative<std::string>(sp[3]) && std::get<std::string>(sp[3]) == "TdfaLayout" && ft.template_parameters.size() == 2) {
+                    std::vector<std::string> sz;
+                    for (const auto &tp : ft.template_parameters) {
+                        const auto *rv = std::get_if<LangAPI::RValue>(&tp);
+                        sz.push_back(rv && rv->isInt() ? "INT64_C(" + std::to_string(rv->getInt().value) + ")" : "INT64_C(0)");
+                    }
+                    impls.writeln("h->{} = python_ispa_std_dfa_api_TdfaLayout_new({}, {});", cIdent(decl->getVariable().name), sz[0], sz[1]);
+                }
+            }
         if (!c_name.starts_with("python_ispa_std_"))      // application classes: list fields start as fresh empty lists (Python `= []`)
             for (const auto &[decl, vis] : cls.data)
                 if (decl->isVariable() && !decl->getVariable().is_static && LangAPI::Typing::Typer::isValue(decl->getVariable().type, LangAPI::ValueType::Array)) {
@@ -1719,7 +1766,7 @@ namespace C {
         for (const auto &[decl, vis] : cls.data)
             if (decl->isFunction()) emitFunction(decl->getFunction(), name, protos, impls);
         if (cls.constructor) emitFunction(*cls.constructor, name, protos, impls);
-        if (token_classes.contains(name) && !c_name.starts_with("python_ispa_std_")) { token_cname = c_name; emitTokenClass(cls, protos, impls); }
+        if (token_classes.contains(name) && !c_name.starts_with("python_ispa_std_")) emitTokenClass(cls, protos, impls);
         for (auto &d : diag) diagnostics.push_back(c_name + ": " + d);
     }
 
@@ -1732,6 +1779,7 @@ namespace C {
                 fwd_w.writeln("typedef struct {} {};", n, n);
             }
         for (const auto &d : decls) {
+            if (dry_pass && scope.empty() && !(d.isNamespace() && d.getNamespace().name == "python")) continue;
             if (d.isNamespace()) {
                 // application build: the lowered library is compiled separately (lowered/ispa_std.c); it stays indexed only
                 const bool library = scope.empty() && d.getNamespace().name == "python";
@@ -1910,6 +1958,22 @@ namespace C {
             }
         emitted_functions = skipped_functions = 0;
         Converter::Writer types, protos, impls;
+        if (app_mode) {
+            // The library is compiled separately; emit it once into scratch buffers to learn which vector types and generic
+            // instances its header already defines, then start the application's output from scratch.
+            Converter::Writer t2, p2, i2;
+            dry_pass = true; app_mode = false;
+            emitDeclarations(owned_tree, t2, p2, i2);
+            while (!pending.empty()) {
+                const auto q = pending.back(); pending.pop_back();
+                scope = q.scope;
+                if (q.cls) emitClass(*q.cls, t2, p2, i2); else emitFunction(*q.fn, "", p2, i2);
+            }
+            scope.clear();
+            dry_pass = false; app_mode = true;
+            vec_defs.clear(); fwd_w = {}; diagnostics.clear(); lambda_defs.clear(); init_globals.clear(); thunks_done.clear();
+            emitted_functions = skipped_functions = 0; reasons.clear();
+        }
         emitDeclarations(owned_tree, types, protos, impls);
         while (!pending.empty()) {       // monomorphized instances discovered while emitting
             const auto p = pending.back();
@@ -1921,7 +1985,7 @@ namespace C {
 
         const auto stem = std::string(namespace_name);
         std::string header = "/* @generated by the ISPA C backend. Needs ispa_c.h (parser/stdlibs/target/c). */\n"
-                             "#pragma once\n#include \"ispa_c.h\"\n\n";
+                             "#pragma once\n#include \"" + std::string(app_mode ? "ispa_std.h\"\n#include \"ispa_lexer.h" : "ispa_c.h") + "\"\n\n";
         std::string vecs;
         for (const auto &[n, e] : vec_defs) vecs += "ISPA_DEFINE_VEC(" + n + ", " + e + ")\n";
         header += std::string(fwd_w.get()) + "\n" + vecs + "\n" + std::string(types.get()) + "\n" + std::string(protos.get());

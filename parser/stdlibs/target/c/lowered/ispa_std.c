@@ -1021,8 +1021,11 @@ ispa_str python_ispa_std_raw_token_RawTokenMeta_text(python_ispa_std_raw_token_R
 	}
 	return python_ispa_std_string_substr((self)->_source, (self)->_startpos, (self)->_length);
 }
+static python_ispa_std_node_Node* python_ispa_std_raw_token_RawToken_to_node_as_python_ispa_std_raw_token_RawToken(python_ispa_std_raw_token_RawToken* self, int64_t type_id) { return python_ispa_std_raw_token_RawToken_to_node((python_ispa_std_raw_token_RawToken*)self, type_id); }
+static const python_ispa_std_raw_token_RawToken_vt python_ispa_std_raw_token_RawToken_as_python_ispa_std_raw_token_RawToken_vtable = { .to_node = python_ispa_std_raw_token_RawToken_to_node_as_python_ispa_std_raw_token_RawToken };
 python_ispa_std_raw_token_RawToken* python_ispa_std_raw_token_get_RawToken_handler(ispa_arena* arena) {
 	python_ispa_std_raw_token_RawToken* h = (python_ispa_std_raw_token_RawToken*)ispa_arena_calloc(arena, sizeof(python_ispa_std_raw_token_RawToken));
+	h->vt = &python_ispa_std_raw_token_RawToken_as_python_ispa_std_raw_token_RawToken_vtable;
 	return h;
 }
 void python_ispa_std_raw_token_free_RawToken_handler(python_ispa_std_raw_token_RawToken* handler) { (void)handler; }
@@ -4346,7 +4349,7 @@ python_ispa_std_recovery_RequiredResult* python_ispa_std_parser_ll_LLParser_requ
 	int64_t retries = INT64_C(0);
 	while (true) {
 		if (python_ispa_std_lexer_TokenCursor_kind_is((pos), type_id)) {
-			python_ispa_std_node_Node* node = python_ispa_std_raw_token_RawToken_to_node((python_ispa_std_lexer_TokenCursor_current_v((pos))), type_id);
+			python_ispa_std_node_Node* node = python_ispa_std_raw_token_RawToken_to_node_v((python_ispa_std_lexer_TokenCursor_current_v((pos))), type_id);
 			python_ispa_std_lexer_TokenCursor_next_v((pos));
 			python_ispa_std_parser_ll_LLParser_commit_rule((self), pos);
 			python_ispa_std_parser_ll_LLParser_note_match((self));
@@ -4542,7 +4545,7 @@ python_ispa_std_node_Node* python_ispa_std_parser_ll_LLParser_required_token(pyt
 	}
 	if (python_ispa_std_recovery_FailHandler_is_recovering_v((fail))) {
 		if (((((!(python_ispa_std_parser_ll_LLParser_unwinding((self))))) && (python_ispa_std_lexer_TokenCursor_kind_is((pos), type_id))))) {
-			python_ispa_std_node_Node* node = python_ispa_std_raw_token_RawToken_to_node((python_ispa_std_lexer_TokenCursor_current_v((pos))), type_id);
+			python_ispa_std_node_Node* node = python_ispa_std_raw_token_RawToken_to_node_v((python_ispa_std_lexer_TokenCursor_current_v((pos))), type_id);
 			python_ispa_std_lexer_TokenCursor_next_v((pos));
 			python_ispa_std_parser_ll_LLParser_commit_rule((self), pos);
 			python_ispa_std_parser_ll_LLParser_note_match((self));
@@ -4554,7 +4557,7 @@ python_ispa_std_node_Node* python_ispa_std_parser_ll_LLParser_required_token(pyt
 		return python_ispa_std_parser_ll_LLParser__required_outcome((self), result, pos, scope, ISPA_STR("required token"));
 	}
 	if (python_ispa_std_lexer_TokenCursor_kind_is((pos), type_id)) {
-		python_ispa_std_node_Node* node = python_ispa_std_raw_token_RawToken_to_node((python_ispa_std_lexer_TokenCursor_current_v((pos))), type_id);
+		python_ispa_std_node_Node* node = python_ispa_std_raw_token_RawToken_to_node_v((python_ispa_std_lexer_TokenCursor_current_v((pos))), type_id);
 		python_ispa_std_lexer_TokenCursor_next_v((pos));
 		python_ispa_std_parser_ll_LLParser_commit_rule((self), pos);
 		python_ispa_std_debug_MatchScope_success((scope));
@@ -4626,7 +4629,7 @@ python_ispa_std_node_Node* python_ispa_std_parser_ll_LLParser_optional_token(pyt
 		scope = python_ispa_std_debug_MatchScope_new(python_ispa_std_parser_ll_TokenNames_lookup(((self)->token_names_), type_id), python_ispa_std_parser_ll_LLParser_debug_actual((self), pos));
 	}
 	if (python_ispa_std_lexer_TokenCursor_kind_is((pos), type_id)) {
-		python_ispa_std_node_Node* node = python_ispa_std_raw_token_RawToken_to_node((python_ispa_std_lexer_TokenCursor_current_v((pos))), type_id);
+		python_ispa_std_node_Node* node = python_ispa_std_raw_token_RawToken_to_node_v((python_ispa_std_lexer_TokenCursor_current_v((pos))), type_id);
 		python_ispa_std_lexer_TokenCursor_next_v((pos));
 		python_ispa_std_parser_ll_LLParser_commit_rule((self), pos);
 		python_ispa_std_debug_MatchScope_success((scope));
