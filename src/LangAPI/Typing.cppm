@@ -95,7 +95,7 @@ export namespace LangAPI::Typing {
         }
         auto addClass(const Class &c, std::vector<std::string> ns) -> void {
             auto parts = std::move(ns);
-            for (const auto &p : c.name.path) if (const auto *s = std::get_if<std::string>(&p)) parts.push_back(*s);
+            for (const auto &p : c.name.path) if (const auto *s = std::get_if<std::string>(&p)) for (auto &piece : split(*s)) parts.push_back(std::move(piece));
             classes_by_bare[parts.back()].push_back({join(parts), &c});
         }
         auto addFunction(const Function &f, std::vector<std::string> ns) -> void {
@@ -133,14 +133,26 @@ export namespace LangAPI::Typing {
         auto findClass(const Symbol &sym) const -> const Class * {
             const auto parts = literalParts(sym);
             if (parts.empty()) return nullptr;
-            const auto it = classes_by_bare.find(parts.back());
-            if (it == classes_by_bare.end()) return nullptr;
-            const Class *best = nullptr;
-            for (const auto &e : it->second) {
-                if (suffixMatches(e.full, parts)) { if (!best || e.full.size() < best_len(best)) best = e.cls; }
+            if (const auto it = classes_by_bare.find(parts.back()); it != classes_by_bare.end()) {
+                const Class *best = nullptr;
+                for (const auto &e : it->second)
+                    if (suffixMatches(e.full, parts)) { if (!best || e.full.size() < best_len(best)) best = e.cls; }
+                if (!best && !it->second.empty() && parts.size() == 1) best = it->second.front().cls;
+                if (best) return best;
             }
-            if (!best && !it->second.empty() && parts.size() == 1) best = it->second.front().cls;
-            return best;
+            // a class may be declared under one part `a_b_C` while referenced as the path `a::b::C`
+            for (std::size_t k = 2; k <= parts.size(); ++k) {
+                std::string bare;
+                for (std::size_t i = parts.size() - k; i < parts.size(); ++i) { if (!bare.empty()) bare += "_"; bare += parts[i]; }
+                const auto it = classes_by_bare.find(bare);
+                if (it == classes_by_bare.end()) continue;
+                const std::vector<std::string> prefix(parts.begin(), parts.end() - static_cast<std::ptrdiff_t>(k));
+                for (const auto &e : it->second) {
+                    auto f = split(e.full); f.pop_back();
+                    if (prefix.size() <= f.size() && std::equal(prefix.rbegin(), prefix.rend(), f.rbegin())) return e.cls;
+                }
+            }
+            return nullptr;
         }
         // method `name` of the class or of one of its bases
         auto findMethod(const Class &cls, const std::string &name) const -> const Function * {
@@ -171,6 +183,7 @@ export namespace LangAPI::Typing {
                         if (const auto t = fieldType(*b, name)) return t;
             return std::nullopt;
         }
+        auto debugClasses(const std::string &bare) const -> std::vector<std::string> { std::vector<std::string> v; for (auto &[k, es] : classes_by_bare) if (k.find(bare) != std::string::npos) for (auto &e : es) v.push_back(k + "=>" + e.full); return v; }
         auto classType(const Class &cls) const -> Type { return Type(cls.name); }
 
         auto typeOf(const Expression &e) const -> MaybeType {
@@ -331,7 +344,7 @@ export namespace LangAPI::Typing {
                 const auto *str = std::get_if<std::string>(&p);
                 if (!str) return {};
                 if (parts.empty() && (*str == "_" || str->empty()) && s.path.size() > 1) continue;   // `_::a::b`: rooted path
-                parts.push_back(*str);
+                for (auto &piece : split(*str)) parts.push_back(std::move(piece));                    // a part may itself be `a::b`
             }
             return parts;
         }
@@ -359,7 +372,7 @@ export namespace LangAPI::Typing {
                     index(d.getNamespace().declarations, std::move(inner));
                 } else if (d.isClass()) {
                     auto parts = ns;
-                    for (const auto &p : d.getClass().name.path) if (const auto *s = std::get_if<std::string>(&p)) parts.push_back(*s);
+                    for (const auto &p : d.getClass().name.path) if (const auto *s = std::get_if<std::string>(&p)) for (auto &piece : split(*s)) parts.push_back(std::move(piece));
                     classes_by_bare[parts.back()].push_back({join(parts), &d.getClass()});
                 } else if (d.isFunction()) {
                     auto parts = ns; parts.push_back(d.getFunction().name);

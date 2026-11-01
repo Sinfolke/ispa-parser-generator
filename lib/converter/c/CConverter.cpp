@@ -557,6 +557,20 @@ namespace C {
         return "((ispa_fn){ (void *)" + thunk + ", NULL })";
     }
 
+    // `self.method` used as a value: a thunk that receives self through the callable's env
+    auto Construct::boundMethodValue(const std::string &name, const LangAPI::Function &fn) -> std::string {
+        const auto cn = class_cname.at(cur_class_decl);
+        const auto thunk = cn + "_" + cIdent(name) + "__bound";
+        if (thunks_done.insert(thunk).second) {
+            std::vector<std::string> d, ps = {"void *env_"}, as;
+            for (const auto &[t, n] : fn.parameters) { ps.push_back(typeName(t, d) + " " + cIdent(n)); as.push_back(cIdent(n)); }
+            const auto ret = typeName(fn.type, d);
+            const auto call = methodCall(*cur_class_decl, name, "(" + cn + "*)env_", as);
+            lambda_defs += "static " + ret + " " + thunk + "(" + joined(ps, ", ") + ") { " + (ret == "void" ? "" : "return ") + call + "; }\n\n";
+        }
+        return "((ispa_fn){ (void *)" + thunk + ", self })";
+    }
+
     auto Construct::invokeCallable(const std::string &code, const LangAPI::Type &callable, const std::vector<std::string> &args) -> std::string {
         const auto sig = LangAPI::Typing::Typer::callableSignature(callable);
         if (!sig) throw Unsupported{"call of a non-callable"};
@@ -796,6 +810,10 @@ namespace C {
                                       (isLocal(std::get<std::string>(sy.path[0])) || std::get<std::string>(sy.path[0]) == "self" ||
                                        (!cur_class.empty() && memberPath(cur_class, std::get<std::string>(sy.path[0]))) ||
                                        (cur_class_decl && typer->findMethod(*cur_class_decl, std::get<std::string>(sy.path[0]))));
+            if (sy.path.size() == 1 && std::holds_alternative<std::string>(sy.path[0]) && cur_class_decl && !isLocal(std::get<std::string>(sy.path[0])) &&
+                !memberPath(cur_class, std::get<std::string>(sy.path[0])))
+                if (const auto *m = typer->findMethod(*cur_class_decl, std::get<std::string>(sy.path[0])); m && !m->is_static)
+                    return boundMethodValue(std::get<std::string>(sy.path[0]), *m);
             if (!single_local)
                 if (const auto *fn = typer->resolveFunctionSymbol(sy); fn && fn->template_parameters.empty() && !typer->qualifiedMethodClass(sy))
                     return functionValue(sy, *fn);
@@ -860,7 +878,7 @@ namespace C {
             }
             if (!base) {
                 std::string what = "variant " + std::to_string(in.name.index());
-                if (const auto *sy = std::get_if<LangAPI::Symbol>(&in.name)) what += " symbol " + symbolName(*sy);
+                if (const auto *sy = std::get_if<LangAPI::Symbol>(&in.name)) { what += " symbol"; for (const auto &pp : sy->path) what += std::holds_alternative<std::string>(pp) ? " [" + std::get<std::string>(pp) + "]" : " <call>"; for (const auto &f : typer->debugClasses("NUMBER")) what += " cand:" + f; }
                 else if (const auto *il = std::get_if<LangAPI::IspaLibSymbol>(&in.name)) what += " ispalib " + std::to_string(static_cast<int>(il->exports));
                 else if (const auto *ty = std::get_if<std::shared_ptr<LangAPI::Type>>(&in.name); ty && *ty) what += (*ty)->isValueType() ? " valuetype " + std::to_string(static_cast<int>((*ty)->getValueType())) : std::string(" type");
                 throw Unsupported{"base class of an inheritance call is unknown: " + what};

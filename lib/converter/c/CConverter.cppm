@@ -51,6 +51,7 @@ namespace C {
         auto handlerName(const LangAPI::Class &cls) const -> std::string;
         std::vector<std::string> counters{"pos"};          // position-counter stack of the rule being emitted
         auto cursorCall(const std::string &method, const std::string &recv, std::vector<std::string> args) -> std::string;
+        auto boundMethodValue(const std::string &name, const LangAPI::Function &fn) -> std::string;
         std::string token_cname;
         std::set<std::string> token_classes;                      // names of synthesized token classes (see mapLibrary)
         auto emitTokenClass(const LangAPI::Class &cls, ::Converter::Writer &protos, ::Converter::Writer &impls) -> void;
