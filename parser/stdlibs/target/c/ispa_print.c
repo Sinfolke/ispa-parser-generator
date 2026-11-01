@@ -1,7 +1,7 @@
 #include "ispa_print.h"
 
 ispa_str ispa_text_int(int64_t v) { return python_ispa_std_format_int_to_string(v); }
-ispa_str ispa_text_bool(bool v) { return ISPA_STR(v ? "1" : "0"); }
+ispa_str ispa_text_bool(bool v) { return v ? ISPA_STR("1") : ISPA_STR("0"); }
 ispa_str ispa_text_char(char v) { return ispa_str_from_char(v); }
 ispa_str ispa_text_float(double v) { char b[64]; int n = snprintf(b, sizeof b, "%g", v); return ispa_str_from(ispa_cur, b, (size_t)n); }
 
