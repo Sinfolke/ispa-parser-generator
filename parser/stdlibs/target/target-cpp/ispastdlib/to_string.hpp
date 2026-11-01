@@ -3,7 +3,10 @@
  * Part of the split ISPA std lib; include <ispastdlib.hpp> for everything.
  */
 #pragma once
+#include <memory>
 #include <tuple>
+#include <type_traits>
+#include <utility>
 #include <ispastdlib/node.hpp>
 #include <ispastdlib/raw_token.hpp>
 namespace ISPA_STD {
@@ -36,6 +39,11 @@ namespace ISPA_STD {
     std::string to_string_helper(
         const std::vector<T, Allocator>& values
     );
+    // Lowered Python objects (typed rule values) and the shared pointers that hold them.
+    template<typename T>
+    std::string to_string_helper(const std::shared_ptr<T>& value);
+    template<typename T, typename = std::void_t<decltype(std::declval<const T&>().members()), decltype(T::members_str())>>
+    std::string to_string_helper(const T& value);
     inline std::string to_string_helper(const std::string& val) {
         return val;
     }
@@ -141,6 +149,20 @@ namespace ISPA_STD {
         }
 
         return result;
+    }
+    template<typename T>
+    std::string to_string_helper(const std::shared_ptr<T>& value) {
+        return value ? to_string_helper(*value) : std::string("nullptr");
+    }
+    template<typename T, typename>
+    std::string to_string_helper(const T& value) {
+        const auto names = T::members_str();
+        std::size_t index = 0;
+        std::string result = "{";
+        std::apply([&](const auto&... fields) {
+            ((result += (index ? ", " : "") + std::string(names[index]) + " = " + to_string_helper(fields), ++index), ...);
+        }, value.members());
+        return result + "}";
     }
     template<class A, class B>
     std::string to_string_helper(const std::pair<A, B>& value) {

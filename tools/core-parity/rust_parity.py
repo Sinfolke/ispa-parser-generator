@@ -48,8 +48,14 @@ GRAMMARS = {
 }
 
 
+# typed rule `a | a_ast`: the rule value is an instance of an imported Python class (docs/typed-rules.md)
+GRAMMARS['typed'] = (HERE / 'grammars' / 'typed', 'typed.isc',
+                     ['7>>abc,8>>d', '12>>x, 3>>yy', '7>>a', '7>>a,', ',8>>b', '7>>,8>>b', '7>>a,8>>', '', 'abc', '7', '7>>a,8>>b,9>>c'], ['7', '12', '>>', ',', 'a', 'xy', ' '])
+# a typed rule capturing a repetition (a list of nodes)
+GRAMMARS['typedlist'] = (HERE / 'grammars' / 'typedlist', 'typedlist.isc',
+                         ['1 2 3;abc', '7;x', '1 2;', ';a', '', '1 2 3', 'a', '1;a;b'], ['1', '22', ';', 'a', 'bc', ' '])
 # LR grammars: the same corpora, parsed by an LR algorithm instead of LL
-LR_ALGORITHMS = {'lrautoinline': ('autoinline', 'LALR'), 'lrjson': ('json', 'LALR'), 'lr0json': ('json', 'LR'), 'lrambig': ('ambig', 'LALR'), 'lrsql': ('sql', 'LALR'), 'lrpyexpr': ('pyexpr', 'LALR'), 'lrdyn': ('dyn', 'LALR'), 'lract': ('lraction', 'LALR'), 'lrfail': ('failblock', 'LALR')}
+LR_ALGORITHMS = {'lrautoinline': ('autoinline', 'LALR'), 'lrjson': ('json', 'LALR'), 'lr0json': ('json', 'LR'), 'lrambig': ('ambig', 'LALR'), 'lrsql': ('sql', 'LALR'), 'lrpyexpr': ('pyexpr', 'LALR'), 'lrdyn': ('dyn', 'LALR'), 'lract': ('lraction', 'LALR'), 'lrfail': ('failblock', 'LALR'), 'lrtyped': ('typed', 'LALR'), 'lrtypedlist': ('typedlist', 'LALR')}
 # Python statements and bindings in an advanced rule (LL and LR run them alike)
 GRAMMARS['lraction'] = (HERE / 'grammars' / 'lraction', 'lraction.isc',
                         ['1+2;', '1+2;3+4;', '1+2;3+4;5+6;', '1+2', '1+;', '', '1', '+', ';'], ['1', '2', '+', ';', ' ', '12'])

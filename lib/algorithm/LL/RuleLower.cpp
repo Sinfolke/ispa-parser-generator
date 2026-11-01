@@ -2,8 +2,34 @@ module RuleLower;
 
 import MemLower;
 import LangAPI.Context;
+import UAST.PyAST;
+import ParserIR.API;
+import logging;
 import corelib;
 import std;
+
+namespace {
+    // Qualified names of the imported Python classes: calls to them construct objects.
+    std::set<std::string> pythonClasses(const LangAPI::Declarations& declarations, const std::string& prefix = "") {
+        std::set<std::string> names;
+        for (const auto& declaration : declarations) {
+            if (declaration.isNamespace()) {
+                const auto& ns = declaration.getNamespace();
+                const auto nested = pythonClasses(ns.declarations, prefix + ns.name + ".");
+                names.insert(nested.begin(), nested.end());
+            } else if (declaration.isClass()) {
+                const auto& cls = declaration.getClass();
+                std::string name = prefix;
+                for (const auto& part : cls.name.path) if (const auto* value = std::get_if<std::string>(&part)) {
+                    if (name.size() > prefix.size()) name += ".";
+                    name += *value;
+                }
+                names.insert(name);
+            }
+        }
+        return names;
+    }
+}
 
 auto RuleLower::register_function(const LangAPI::Function &fun) -> void {
     decls.push_back(fun);
@@ -89,7 +115,9 @@ void RuleLower::build(const std::vector<std::string> name, const AST::Rule &rule
     fun_ctx.statements = &fun.statements;
     for (const auto& feature : rule.features) if (const auto* action = std::get_if<AST::PythonAction>(&feature);
         action && !action->target.empty()) {
-        auto statements = convertPythonAction(*action, fun_ctx.action_locals, false, {}, &fun_ctx.action_objects);
+        ParserIR::specializeTypedClass(tree->getPythonDeclarations(), *action, fun_ctx.action_types, fun.name);
+        auto statements = convertPythonAction(*action, fun_ctx.action_locals, false,
+            pythonClasses(tree->getPythonDeclarations()), &fun_ctx.action_objects);
         fun.statements.insert(fun.statements.end(), statements.begin(), statements.end());
     }
 

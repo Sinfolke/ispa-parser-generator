@@ -363,6 +363,60 @@ auto ConstructParser::constructLRParser(LangAPI::Class &parser) -> void {
             auto assignments = assignCaptures(production, first_member, production.source.rule_members.size(), "values",
                 [&](std::size_t m) { return integer(m); });
             reduce.insert(reduce.end(), std::make_move_iterator(assignments.begin()), std::make_move_iterator(assignments.end()));
+            // A typed rule (`r | Class`) builds its value in one statement from its `&name` captures: bind each of them
+            // to its stack entry, then run the statement (the same code LL runs after the members).
+            const AST::PythonAction* value_action = nullptr;
+            for (const auto& feature : production.source.features)
+                if (const auto* action = std::get_if<AST::PythonAction>(&feature); action && action->target == "value") value_action = action;
+            if (value_action) {
+                std::set<std::string> locals, objects;
+                std::map<std::string, Type> bound;
+                for (std::size_t m = 0; m < production.source.rule_members.size(); ++m)
+                    for (const auto& feature : production.source.rule_members[m]->features)
+                        if (const auto* capture = std::get_if<AST::VariableCapture>(&feature)) {
+                            if (!locals.insert(capture->name).second)
+                                throw std::invalid_argument("Duplicate action binding " + capture->name);
+                            const auto binding = "ispa_action_" + capture->name;
+                            if (helperSource(production.rhs[m])) {
+                                // A group, optional or repetition: its value is the packed column, typed like the same capture in LL.
+                                const auto type = Parser::ParserBase::dataType(AST::captureType(*helperSource(production.rhs[m])));
+                                // Inside the parser the generated types live under `Types::`.
+                                const std::function<Type(Type)> inParser = [&](Type value) {
+                                    if (value.isSymbol()) {
+                                        auto& parts = value.getSymbol().path;
+                                        if (!parts.empty() && std::holds_alternative<std::string>(parts.front()) &&
+                                            std::get<std::string>(parts.front()) == "modules")
+                                            parts.insert(parts.begin(), Symbol::PathPart{std::string{"Types"}});
+                                    }
+                                    for (auto& parameter : value.template_parameters)
+                                        if (auto* inner = std::get_if<Type>(&parameter)) *inner = inParser(*inner);
+                                    return value;
+                                };
+                                reduce.push_back(Variable{.name = binding, .type = inParser(type)});
+                                reduce.push_back(IspaLibFunctionCall::createStatement(IspaLibFunctionCall{
+                                    .symbol = IspaLibSymbol{.exports = StdlibExports::LRCaptureAssign},
+                                    .args = {symbol(binding), symbol("values"), integer(m),
+                                        Cast::createExpression(Cast{.type = std::make_shared<Type>(size), .what = integer(-1)})}}));
+                                bound.emplace(capture->name, type);
+                                continue;
+                            }
+                            IspaLibSymbol node{.exports = StdlibExports::Node};
+                            node.template_parameters.push_back(std::make_shared<Type>(Symbol{"Types", production.rhs[m]}));
+                            reduce.push_back(Variable{.name = binding, .type = Type{node},
+                                .value = IspaLibFunctionCall::createExpression(IspaLibFunctionCall{
+                                    .symbol = IspaLibSymbol{.exports = StdlibExports::LRGet}, .args = {symbol("values"), integer(m)},
+                                    .template_parameters = {std::make_shared<Type>(Symbol{"Types", production.rhs[m]})}})});
+                            Symbol path;
+                            for (const auto& part : production.rhs[m]) path.path.emplace_back(part);
+                            const bool token = AST::RuleMemberName{.name = production.rhs[m]}.isTerminal();
+                            bound.emplace(capture->name, Type{token ? ValueType::Token : ValueType::Rule, Type{std::move(path)}});
+                        }
+                ParserIR::specializeTypedClass(tree.getPythonDeclarations(), *value_action, bound,
+                                               corelib::text::join(production.lhs, "::"));
+                const auto classes = pythonClassNames(tree.getPythonDeclarations());
+                for (auto& statement : Parser::ParserBase::convertPythonAction(*value_action, locals, false, classes, &objects))
+                    reduce.push_back(finalizeTypes(statement));
+            }
             reduce.push_back(returned(IspaLibFunctionCall::createExpression(IspaLibFunctionCall{
                 .symbol = IspaLibSymbol{.exports = StdlibExports::LRNode},
                 .args = {symbol("result")}, .template_parameters = {std::make_shared<Type>(result_type)}})));

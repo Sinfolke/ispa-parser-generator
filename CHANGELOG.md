@@ -6,6 +6,9 @@
 
 - **Auto-inline of pass-through rules** — A rule of the form `name: @ other {@}` is removed and parsed as `other`; `Types::name` becomes an alias of `Types::other`, so there is no wrapper node and no extra call per use. Opt out per rule with the new `#[noinline]` modifier. Recovery messages and debug scopes name `other`. See `docs/auto-inline.md`. Regenerate the bootstrapped parser (`parser/ispa/bootstrapped`) after pulling: `noinline` is a new token.
 
+- **Typed rules** — `name | Class: ... @{a, b};` makes the rule's value an instance of a class imported with `import py`; the data block supplies the `__init__` arguments. A `Node` annotation in the class stands for the type of the capture it receives. On the C++, Rust and Python targets, with LL and LR parsers. See `docs/typed-rules.md`. Regenerate the bootstrapped parser (`parser/ispa/bootstrapped`) after pulling.
+- **Fixed** — a call of a Python builtin such as `int(x)` inside an imported class was emitted as `int_(x)` by the Python target.
+
 ### Native bindings
 
 - **Native declarations in plain Python** — In a Python file brought in with `import py`, a function or method whose whole body is `raise NotImplementedError` (after an optional docstring) is a declaration only. The C++ target emits a prototype and expects you to define it; the Python target emits a stub that raises until the host assigns an implementation; the Rust target rejects it. See `docs/native-bindings.md`.

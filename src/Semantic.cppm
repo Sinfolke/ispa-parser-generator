@@ -475,6 +475,9 @@ namespace {
                     if (v.ctx != py::ExprContext::Load) return type(TK::Unknown);
                     if (auto* sym = look(s, v.id)) { sym->used = true; return sym->ty; }
                     if (v.id == "__ispa_internal__") return type(TK::Unknown); // compiler-intrinsic declaration marker
+                    // Qualified imported names (python.<module>.<symbol>) are produced by the import binder
+                    // only for symbols it resolved, e.g. the class of a typed rule.
+                    if (v.id.starts_with("python.")) return type(TK::Unknown);
                     report(options_.strictPythonNames ? diag::Severity::Error : diag::Severity::Warning,
                         "PY001", "unresolved Python name '" + v.id + "'", p,
                         "Declare it in the action, a capture, or an imported Python sidecar module.");
@@ -914,6 +917,11 @@ struct AST::Semantic::Impl {
                 Symbol s; s.ty = ofCapture(captureType(n)); s.declaration = at(n.position);
                 s.isCapture = true;
                 symbols.insert_or_assign(n.prefix.name,std::move(s));
+            }
+            for (const auto& feature : n.features) if (const auto* variable = std::get_if<VariableCapture>(&feature)) {
+                Symbol s; s.ty = ofCapture(captureType(n)); s.declaration = at(variable->position);
+                s.isCapture = true;
+                symbols.insert_or_assign(variable->name,std::move(s));
             }
         });
         return symbols;

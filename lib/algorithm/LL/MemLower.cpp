@@ -404,6 +404,7 @@ auto MemLower::lower(const AST::RuleMember &mem) -> Parser::LowerMeta {
             else push(LangAPI::Variable::createStatement(LangAPI::Variable{.name = binding,
                 .type = value.type, .value = expression}));
             fun_ctx->action_locals.insert(capture->name);
+            fun_ctx->action_types[capture->name] = value.type;
         }
         fun_ctx->exports.push_back(LoweredExport {
             .prefix = mem.prefix, .meta = meta, .quantifier = mem.quantifier,

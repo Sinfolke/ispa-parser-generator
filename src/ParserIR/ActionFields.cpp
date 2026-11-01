@@ -25,6 +25,20 @@ struct ActionFields {
             } else if (declaration.isFunction()) {
                 const auto& f = declaration.getFunction();
                 imported_types.emplace(scope + f.name, f.type);
+            } else if (declaration.isClass()) {
+                // Calling an imported Python class yields a box holding an instance of it (typed rules); a box needs
+                // only a forward declaration, so the class is emitted after the generated types like any import.
+                const auto& c = declaration.getClass();
+                if (!c.name.path.empty())
+                    if (const auto* leaf = std::get_if<std::string>(&c.name.path.back())) {
+                        // Fully qualified (python.<module>.<Class>) so every target refers to the same class.
+                        la::Symbol qualified;
+                        std::size_t begin = 0;
+                        for (std::size_t end; (end = scope.find('.', begin)) != std::string::npos; begin = end + 1)
+                            qualified.path.push_back(scope.substr(begin, end - begin));
+                        qualified.path.push_back(*leaf);
+                        imported_types.emplace(scope + *leaf, la::Type{la::ValueType::Box, la::Type{std::move(qualified)}});
+                    }
             } else if (declaration.isVariable()) {
                 const auto& v = declaration.getVariable();
                 imported_types.emplace(scope + v.name, v.type);
@@ -182,6 +196,80 @@ struct ActionFields {
         if (member.isOp()) for (const auto& child : member.getOp().options) this->member(*child);
     }
 };
+}
+namespace {
+    // `Node` in an imported class stands for "the captured value": a typed rule `r | Class` replaces it, in the
+    // __init__ parameter that receives a capture and in the fields of the same name, with that capture's type.
+    bool isNodePlaceholder(const LangAPI::Type& type) {
+        if (type.isSymbol()) {
+            const auto& path = type.getSymbol().path;
+            if (path.size() == 1 && std::holds_alternative<std::string>(path.front()) &&
+                std::get<std::string>(path.front()) == "Node") return true;
+        }
+        // `list[Node]`, `Optional[Node]`...: the capture's whole type replaces the annotation.
+        for (const auto& parameter : type.template_parameters)
+            if (const auto* inner = std::get_if<LangAPI::Type>(&parameter); inner && isNodePlaceholder(*inner)) return true;
+        return false;
+    }
+    LangAPI::Class* findClass(LangAPI::Declarations& declarations, const std::string& qualified, const std::string& prefix = "") {
+        for (auto& declaration : declarations) {
+            if (declaration.isNamespace()) {
+                auto& ns = declaration.getNamespace();
+                if (auto* found = findClass(ns.declarations, qualified, prefix + ns.name + ".")) return found;
+            } else if (declaration.isClass()) {
+                auto& cls = declaration.getClass();
+                std::string name = prefix;
+                for (const auto& part : cls.name.path) if (const auto* value = std::get_if<std::string>(&part)) {
+                    if (name.size() > prefix.size()) name += ".";
+                    name += *value;
+                }
+                if (name == qualified) return &cls;
+            }
+        }
+        return nullptr;
+    }
+    void specializeImpl(LangAPI::Declarations& python, const AST::PythonAction& action, const std::map<std::string, LangAPI::Type>& types,
+                              const std::string& rule) {
+        if (action.target != "value") return;
+        const auto* expression = std::get_if<UAST::py::Expr>(&action.code);
+        const auto* call = expression ? expression->get<UAST::py::Call>() : nullptr;
+        const auto* callee = call && call->func ? call->func->get<UAST::py::Name>() : nullptr;
+        if (!callee || !callee->id.starts_with("python.")) return;
+        auto* cls = findClass(python, callee->id);
+        if (!cls) return;
+        std::vector<LangAPI::Function*> inits;
+        if (cls->constructor) inits.push_back(&*cls->constructor);
+        for (auto& [declaration, visibility] : cls->data)
+            if (declaration && declaration->isFunction() && declaration->getFunction().name == "__init__")
+                inits.push_back(&declaration->getFunction());
+        const auto specialize = [&](LangAPI::Type& slot, const LangAPI::Type& wanted, const std::string& what) {
+            if (isNodePlaceholder(slot)) slot = wanted;
+            else if (slot != wanted && !(slot.isSymbol() && isNodePlaceholder(wanted)))
+                throw std::runtime_error("Typed rule " + rule + ": " + what + " of " + callee->id + " is used with two different capture types");
+        };
+        for (std::size_t i = 0; i < call->args.size(); ++i) {
+            const auto* argument = call->args[i] ? call->args[i]->get<UAST::py::Name>() : nullptr;
+            if (!argument) continue;
+            const auto name = argument->id;
+            const auto found = types.find(name);
+            if (found == types.end()) continue;
+            std::string parameter;
+            for (auto* init : inits) {
+                if (i >= init->parameters.size()) continue;
+                parameter = init->parameters[i].second;
+                if (isNodePlaceholder(init->parameters[i].first)) specialize(init->parameters[i].first, found->second, "parameter '" + parameter + "'");
+            }
+            if (parameter.empty()) continue;
+            for (auto& [declaration, visibility] : cls->data)
+                if (declaration && declaration->isVariable() && declaration->getVariable().name == parameter &&
+                    isNodePlaceholder(declaration->getVariable().type))
+                    specialize(declaration->getVariable().type, found->second, "field '" + parameter + "'");
+        }
+    }
+}
+void specializeTypedClass(LangAPI::Declarations& python, const AST::PythonAction& action,
+                          const std::map<std::string, LangAPI::Type>& types, const std::string& rule) {
+    specializeImpl(python, action, types, rule);
 }
 auto withActionFields(AST::Tree& tree, const stdu::vector<std::string>& name, const AST::Rule& rule, DataBlock block) -> DataBlock {
     struct { DataBlock block; } production{std::move(block)};

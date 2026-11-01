@@ -90,9 +90,9 @@ class Box:
 ''')
         (grammar / "helpers.isc").write_text("import py helpers; import py stdfun; main: 'x';\n")
 
-        def generate(name, *options):
+        def generate(name, *options, algorithm="LL"):
             result = subprocess.run(
-                [str(binary), "-l", "python", "-a", "LL", "--debug", "false",
+                [str(binary), "-l", "python", "-a", algorithm, "--debug", "false",
                  "--no-nfa-debug", "-o", root / name, *map(str, options)],
                 cwd=root, text=True, capture_output=True,
             )
@@ -219,7 +219,38 @@ assert isinstance(node.data(), Foreign.FlatTypes.modules_expression_WORD)
 assert node.data().value == 'hello'
 """)
 
-    print("Python backend: parsing, helpers, templates, counted repetitions, dynamic patterns, and external imports passed")
+        # typed rule: `a | a_ast` builds the rule value with an imported class (also covers `int(...)` in a class body)
+        typed = root / "typed"
+        typed.mkdir()
+        (typed / "shapes.py").write_text('''class a_ast:
+    type: Node
+    value: Node
+    number: int
+    def __init__(self, type: Node, value: Node) -> None:
+        self.type = type
+        self.value = value
+        self.number = int(type.value.value) + 1
+''')
+        (typed / "typed.isc").write_text(
+            "module typed -> a;\nimport py {a_ast} from shapes;\n"
+            "ID: @ [a-z]+ {@};\nNUM: @ [0-9]+ {@};\n"
+            "a | a_ast: @ NUM '>>' @ ID @{type, value};\n"
+        )
+        generate("Typed", "--dir", typed, typed / "typed.isc")
+        execute('''import Typed
+value = Typed.Parser().parse('41>>abc').data().value.data().value
+assert type(value).__name__ == 'a_ast'
+assert value.number == 42
+assert value.type_.data().value == '41' and value.value.data().value == 'abc'
+''')
+        generate("TypedLR", "--dir", typed, typed / "typed.isc", algorithm="LALR")
+        execute('''import TypedLR
+value = TypedLR.Parser().parse('41>>abc').data().value.data().value
+assert type(value).__name__ == 'a_ast' and value.number == 42
+assert value.type_.data().value == '41' and value.value.data().value == 'abc'
+''')
+
+    print("Python backend: parsing, helpers, templates, counted repetitions, dynamic patterns, external imports, and typed rules passed")
 
 
 if __name__ == "__main__":
