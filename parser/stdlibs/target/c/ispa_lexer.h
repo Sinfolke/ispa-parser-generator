@@ -11,4 +11,6 @@ python_ispa_std_raw_token_RawToken *ispa_lexer_lookup(python_ispa_std_lexer_Lexe
                                                       ispa_vec_int64_t *classes, ispa_vec_ispa_vec_int64_tP *actions,
                                                       python_ispa_std_dfa_api_TdfaLayout *layout, ispa_fn semantic,
                                                       python_ispa_std_refs_Cursor *pos);
+/* dynamic_match(cursor, alternatives, negative, quantifier): tests the runtime strings at the cursor and, on success, advances the scan cursor */
+bool ispa_dynamic_match(ispa_str cursor, ispa_vec_ispa_str *alternatives, bool negative, ispa_str quantifier);
 #endif

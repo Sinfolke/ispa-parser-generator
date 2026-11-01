@@ -4,13 +4,28 @@ typedef python_ispa_std_utility_Pair__int64_t_python_ispa_std_raw_token_RawToken
 typedef ispa_pair *(*ispa_semantic_fn)(void *, int64_t, python_ispa_std_dfa_api_Captures *, int64_t, ispa_str, int64_t, int64_t, ispa_str);
 typedef struct { ispa_fn user; ispa_str text; } ispa_scan_env;
 
+/* ispa_dynamic_match moves the scan cursor: the generated action only sees an immutable slice, so the new absolute offset is passed back here */
+static _Thread_local const char *ispa_dyn_base;
+static _Thread_local int64_t ispa_dyn_adv = -1;
+
+bool ispa_dynamic_match(ispa_str cursor, ispa_vec_ispa_str *alternatives, bool negative, ispa_str quantifier) {
+    const int64_t found = python_ispa_std_dfa_api_dynamic_match(cursor, 0, alternatives, negative, quantifier);
+    if (found < 0) return false;
+    ispa_dyn_adv = (int64_t)(cursor.data - ispa_dyn_base) + found;
+    return true;
+}
+
 /* the core's semantic callback (index, captures, first, length, line, cursor) -> the generated 7-argument action */
 static ispa_pair *ispa_scan_adapter(void *env_, int64_t index, python_ispa_std_dfa_api_Captures *captures, int64_t first, int64_t length,
                                     int64_t line, python_ispa_std_refs_Cursor *cur) {
     ispa_scan_env *e = (ispa_scan_env *)env_;
     ispa_str start = { e->text.data + first, e->text.len - (size_t)first };
     ispa_str at = { e->text.data + cur->pos, e->text.len - (size_t)cur->pos };
-    return ((ispa_semantic_fn)e->user.fn)(e->user.env, index, captures, first, start, length, line, at);
+    ispa_dyn_base = e->text.data;
+    ispa_dyn_adv = -1;
+    ispa_pair *r = ((ispa_semantic_fn)e->user.fn)(e->user.env, index, captures, first, start, length, line, at);
+    if (ispa_dyn_adv >= 0) cur->pos = ispa_dyn_adv;
+    return r;
 }
 
 /* a lexer scans with the same tables token after token: build the core's DfaTables once per generated table */

@@ -109,7 +109,7 @@ namespace C {
     auto Construct::defaultObject(const LangAPI::Class &cls) -> std::string {
         const auto cn = class_cname.at(&cls);
         if (cn == "python_ispa_std_node_Node") return "python_ispa_std_node_Node_blank()";
-        if (cn == "python_ispa_std_raw_token_RawToken") return "python_ispa_std_raw_token_RawToken_empty_token()";
+        if (cn == "python_ispa_std_raw_token_RawToken" || (!token_cname.empty() && cn == token_cname)) return "python_ispa_std_raw_token_RawToken_empty_token()";
         if (cn == "python_ispa_std_match_result_MatchResult") return "python_ispa_std_match_result_MatchResult_new(false, python_ispa_std_node_Node_blank(), NULL)";
         return handlerName(cls) + "(ispa_cur)";
     }
@@ -956,6 +956,14 @@ namespace C {
             if (cls) {
                 const auto fn = prefix() + "_ps" + std::to_string(print_fns.size());
                 print_fns[tn] = fn;
+                if (class_cname.at(cls).starts_with("python_ispa_std_utility_Pair")) {      // a tuple: its members are printed as `item`s
+                    const auto ft = typer->fieldType(*cls, "first"), sd = typer->fieldType(*cls, "second");
+                    if (!ft || !sd) throw Unsupported{"tuple of unknown member types"};
+                    lambda_defs += "static void " + fn + "(ispa_printer* p, " + tn + " v) {\n    " +
+                                   printerCall("node_with_value", "p", {"ISPA_STR(\"item\")", "v->first", "false"}, ft) + ";\n    " +
+                                   printerCall("node_with_value", "p", {"ISPA_STR(\"item\")", "v->second", "true"}, sd) + ";\n}\n\n";
+                    return fn;
+                }
                 if (!typer->findMethod(*cls, "write_to_output")) throw Unsupported{"printing an object without write_to_output: " + tn};
                 const auto owner = class_cname.at(typer->methodOwner(*cls, "write_to_output"));
                 lambda_defs += "static void " + fn + "(ispa_printer* p, " + tn + " v) { " + owner + "_write_to_output((" + owner + "*)v, p); }\n\n";
@@ -1255,6 +1263,7 @@ namespace C {
                     }
                     return class_cname.at(base) + "_make(" + joined(margs, ", ") + ")";
                 }
+                if (in.args.empty() && init && !init->parameters.empty() && !printer) return defaultObject(*base);      // `Token()`: the empty value
                 std::vector<std::string> cargs;
                 for (std::size_t k = 0; init && !printer && k < in.args.size(); ++k) {
                     if (k < init->parameters.size()) {
@@ -1376,6 +1385,12 @@ namespace C {
                             fc.args = c.args;
                             out += convertLibCall(fc, c.symbol);
                             break;
+                        }
+                        case LangAPI::StdlibExports::DfaDynamicMatch: {
+                            if (c.args.size() != 4) throw Unsupported{"dynamic_match needs (cursor, alternatives, negative, quantifier)"};
+                            std::vector<std::string> da;
+                            for (const auto &x : c.args) da.push_back(convertExpr(x));
+                            out += "ispa_dynamic_match(" + joined(da, ", ") + ")"; break;
                         }
                         default: throw Unsupported{"ispa-lib call " + std::to_string(static_cast<int>(c.symbol.exports))};
                     }
