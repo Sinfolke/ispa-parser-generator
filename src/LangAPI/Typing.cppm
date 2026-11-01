@@ -158,10 +158,11 @@ export namespace LangAPI::Typing {
             if (r.type() == RValueType::ToString || r.type() == RValueType::CharToStringConstructor) return Type(ValueType::String);
             if (r.type() == RValueType::CheckVariant) return Type(ValueType::Bool);
             if (r.isSymbol()) return typeOfSymbol(r.getSymbol());
-            if (r.isStorageSymbol()) return typeOfStorage(r.getStorageSymbol());
+            if (r.isStorageSymbol()) return typeOfStorageImpl(r.getStorageSymbol());
             return std::nullopt;
         }
 
+        auto typeOfStorage(const StorageSymbol &st) const -> MaybeType { return typeOfStorageImpl(st); }
         auto typeOf(const FunctionCall &c) const -> MaybeType {
             const auto *sym = std::get_if<std::shared_ptr<Symbol>>(&c.name);
             if (!sym || !*sym) return std::nullopt;
@@ -267,7 +268,7 @@ export namespace LangAPI::Typing {
             return std::nullopt;
         }
 
-        auto typeOfStorage(const StorageSymbol &st) const -> MaybeType {
+        auto typeOfStorageImpl(const StorageSymbol &st) const -> MaybeType {
             MaybeType cur;
             if (!st.what.empty()) cur = typeOf(st.what);
             else if (cur_class) cur = classType(*cur_class);

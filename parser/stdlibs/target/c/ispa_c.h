@@ -74,6 +74,11 @@ static inline int64_t ispa_idx(int64_t i, size_t len) {
     if (i < 0 || (size_t)i >= len) { fprintf(stderr, "ispa: index out of range\n"); abort(); }
     return i;
 }
+static inline int ispa_str_cmp(ispa_str a, ispa_str b) {
+    size_t n = a.len < b.len ? a.len : b.len; int c = memcmp(a.data, b.data, n);
+    return c ? c : (a.len > b.len) - (a.len < b.len);
+}
+static inline ispa_str ispa_str_from_char(char c) { char *p = (char *)ispa_arena_alloc(ispa_cur, 2); p[0] = c; p[1] = 0; return (ispa_str){ p, 1 }; }
 static inline char ispa_str_at(ispa_str s, int64_t i) { return s.data[ispa_idx(i, s.len)]; }
 
 /* ---- typed vector (Python list: reference semantics, so always handled through NAME*) ----
@@ -88,11 +93,17 @@ static inline char ispa_str_at(ispa_str s, int64_t i) { return s.data[ispa_idx(i
         if (v->len) memcpy(nd, v->data, v->len * sizeof(T));                                                   \
         v->data = nd; v->cap = nc;                                                                             \
     }                                                                                                          \
+    static inline NAME *NAME##_from(const T *p, size_t n) { NAME *v = NAME##_new(); NAME##_reserve(v, n); if (n) memcpy(v->data, p, n * sizeof(T)); v->len = n; return v; } \
     static inline void NAME##_push(NAME *v, T x) { NAME##_reserve(v, v->len + 1); v->data[v->len++] = x; }     \
     static inline T NAME##_pop(NAME *v) { if (!v->len) { fprintf(stderr, "ispa: pop from empty\n"); abort(); } return v->data[--v->len]; } \
     static inline T NAME##_get(const NAME *v, int64_t i) { return v->data[ispa_idx(i, v->len)]; }              \
     static inline void NAME##_set(NAME *v, int64_t i, T x) { v->data[ispa_idx(i, v->len)] = x; }               \
     static inline void NAME##_extend(NAME *v, const NAME *o) { for (size_t k = 0; k < o->len; ++k) NAME##_push(v, o->data[k]); } \
+    static inline void NAME##_insert(NAME *v, int64_t i, T x) {                                                \
+        if (i < 0) i += (int64_t)v->len; if (i < 0) i = 0; if ((size_t)i > v->len) i = (int64_t)v->len;      \
+        NAME##_reserve(v, v->len + 1);                                                                         \
+        memmove(v->data + i + 1, v->data + i, (v->len - (size_t)i) * sizeof(T)); v->data[i] = x; v->len++;     \
+    }                                                                                                          \
     static inline void NAME##_clear(NAME *v) { v->len = 0; }
 
 /* ---- map: open addressing keyed by byte strings or integers (filled in with the lowered dict users) ---- */

@@ -26,6 +26,9 @@ namespace C {
         std::unordered_map<const LangAPI::Class *, std::string> class_cname;
         mutable std::vector<std::pair<std::string, std::string>> vec_defs;   // (vector type name, element C type) in dependency order
         mutable std::unordered_set<std::string> vec_seen;
+        LangAPI::Typing::MaybeType array_hint;
+        auto arrayLiteral(const LangAPI::Array &arr, const LangAPI::Type &type) -> std::string;
+        auto convertExprAs(const LangAPI::Expression &e, const LangAPI::Type &expected) -> std::string;
         auto coerce(const std::string &code, const LangAPI::Typing::MaybeType &from, const LangAPI::Type &to) const -> std::string;
         auto vecName(const std::string &elem) const -> std::string;
         auto convertStorage(const LangAPI::StorageSymbol &ss) -> std::string;

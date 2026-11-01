@@ -232,6 +232,26 @@ namespace C {
         return fn + "(" + joined(args, ", ") + ")";
     }
 
+    auto Construct::arrayLiteral(const LangAPI::Array &arr, const LangAPI::Type &type) -> std::string {
+        const auto elem = LangAPI::Typing::Typer::elementType(type);
+        if (!elem) throw Unsupported{"array literal into a non-array"};
+        std::vector<std::string> d;
+        const auto et = typeName(*elem, d);
+        const auto vn = vecName(et);
+        if (arr.values.empty()) return vn + "_new()";
+        std::vector<std::string> items;
+        for (const auto &v : arr.values) items.push_back(coerce(convertExpr(v), typer->typeOf(v), *elem));
+        return vn + "_from((" + et + "[]){" + joined(items, ", ") + "}, " + std::to_string(items.size()) + ")";
+    }
+
+    // an expression whose expected type is known (initialiser, assignment, return): lets `[]` pick its element type
+    auto Construct::convertExprAs(const LangAPI::Expression &e, const LangAPI::Type &expected) -> std::string {
+        const auto saved = array_hint;
+        array_hint = expected;
+        struct R { LangAPI::Typing::MaybeType &r; LangAPI::Typing::MaybeType v; ~R() { r = v; } } restore{array_hint, saved};
+        return convertExpr(e);
+    }
+
     auto Construct::methodCall(const LangAPI::Class &recv_cls, const std::string &name, const std::string &recv,
                                std::vector<std::string> args) -> std::string {
         const auto *owner = typer->methodOwner(recv_cls, name);
@@ -286,8 +306,12 @@ namespace C {
                 const auto *fn = typer->findMethod(*cls, mname);
                 cur = fn ? LangAPI::Typing::MaybeType(fn->type) : std::nullopt;
             } else if (const auto *am = std::get_if<LangAPI::ArrayMethodCall>(&part)) {
+                if (stripped.isValueType() && (stripped.getValueType() == LangAPI::ValueType::String || stripped.getValueType() == LangAPI::ValueType::NonOwnedString) &&
+                    am->method == LangAPI::ArrayMethods::Size) {
+                    out = "(int64_t)(" + out + ").len"; cur = LangAPI::Type(LangAPI::ValueType::Int); continue;
+                }
                 if (!stripped.isValueType() || stripped.getValueType() != LangAPI::ValueType::Array)
-                    throw Unsupported{"array method on a non-array"};
+                    throw Unsupported{"array method " + std::to_string(static_cast<int>(am->method)) + " on valuetype " + (stripped.isValueType() ? std::to_string(static_cast<int>(stripped.getValueType())) : std::string("symbol"))};
                 std::vector<std::string> d;
                 const auto elemT = *LangAPI::Typing::Typer::elementType(stripped);
                 const auto vn = vecName(typeName(elemT, d));
@@ -302,6 +326,9 @@ namespace C {
                     case AM::PythonPop:
                         if (!a.empty()) throw Unsupported{"pop(index)"};
                         out = vn + "_pop(" + out + ")"; cur = elemT; break;
+                    case AM::PythonInsert:
+                        if (a.size() != 2) throw Unsupported{"insert arity"};
+                        out = vn + "_insert(" + out + ", " + a[0] + ", " + a[1] + ")"; cur = LangAPI::Type(LangAPI::ValueType::Void); break;
                     case AM::Clear: case AM::PythonClear: out = vn + "_clear(" + out + ")"; cur = LangAPI::Type(LangAPI::ValueType::Void); break;
                     case AM::Extend: case AM::PythonExtend:
                         out = vn + "_extend(" + out + ", " + a.at(0) + ")"; cur = LangAPI::Type(LangAPI::ValueType::Void); break;
@@ -329,6 +356,15 @@ namespace C {
         if (r.isString()) return "ISPA_STR(" + cString(r.getString().value) + ")";
         if (r.isSymbol()) return convertSymbolValue(r.getSymbol());
         if (r.isStorageSymbol()) return convertStorage(r.getStorageSymbol());
+        if (r.isArray()) {
+            const auto &arr = r.getArray();
+            if (!arr.template_parameters.empty())
+                if (const auto *t = std::get_if<std::shared_ptr<LangAPI::Type>>(&arr.template_parameters[0]); t && *t)
+                    return arrayLiteral(arr, LangAPI::Type(LangAPI::ValueType::Array, **t));
+            if (arr.values.empty() && array_hint) return arrayLiteral(arr, *array_hint);
+            throw Unsupported{"array literal of unknown element type"};
+        }
+        if (r.type() == LangAPI::RValueType::CharToStringConstructor) return "ispa_str_from_char(" + convertExpr(r.getCharToStringConstructor().what) + ")";
         if (r.type() == LangAPI::RValueType::Instance) {
             if (cur_class.empty()) throw Unsupported{"instance outside a method"};
             return "self";
@@ -349,7 +385,7 @@ namespace C {
                 case LangAPI::ExpressionValueType::Break: out += "break"; break;
                 case LangAPI::ExpressionValueType::Continue: out += "continue"; break;
                 case LangAPI::ExpressionValueType::Return: {
-                    auto value = convertExpr(v.getReturn().value);
+                    auto value = cur_return ? convertExprAs(v.getReturn().value, *cur_return) : convertExpr(v.getReturn().value);
                     if (cur_return && !value.empty()) value = coerce(value, typer->typeOf(v.getReturn().value), *cur_return);
                     out += "return" + (value.empty() ? std::string() : " " + value);
                     break;
@@ -368,17 +404,17 @@ namespace C {
                     const bool sym_lhs = std::holds_alternative<LangAPI::Symbol>(a.name);
                     LangAPI::Typing::MaybeType lt;
                     if (sym_lhs) lt = typer->typeOf(LangAPI::RValue(std::get<LangAPI::Symbol>(a.name)));
-                    else lt = typer->typeOf(LangAPI::RValue(std::get<LangAPI::StorageSymbol>(a.name)));
-                    auto rhs = convertExpr(a.value);
+                    else lt = typer->typeOfStorage(std::get<LangAPI::StorageSymbol>(a.name));
+                    auto rhs = lt ? convertExprAs(a.value, *lt) : convertExpr(a.value);
                     if (lt && a.type == LangAPI::OperatorType::Assign) rhs = coerce(rhs, typer->typeOf(a.value), *lt);
                     // element assignment: v[i] = x  ->  NAME_set(v, i, x)
                     if (!sym_lhs) {
                         const auto &st = std::get<LangAPI::StorageSymbol>(a.name);
                         if (!st.path.empty() && std::holds_alternative<LangAPI::StorageOffset>(st.path.back())) {
-                            auto prefix = st;
+                            std::vector<LangAPI::StorageSymbol::PathPart> kept(st.path.begin(), st.path.end() - 1);
+                            LangAPI::StorageSymbol prefix(st.what, kept);
                             const auto idx = convertExpr(std::get<LangAPI::StorageOffset>(st.path.back()).offset);
-                            prefix.path.pop_back();
-                            const auto ct = typer->typeOf(LangAPI::RValue(prefix));
+                            const auto ct = typer->typeOfStorage(prefix);
                             if (!ct || !LangAPI::Typing::Typer::isValue(*ct, LangAPI::ValueType::Array)) throw Unsupported{"element assignment into a map/other container"};
                             std::vector<std::string> dd;
                             const auto vn = vecName(typeName(*LangAPI::Typing::Typer::elementType(*ct), dd));
@@ -391,7 +427,7 @@ namespace C {
                         }
                     }
                     const auto lhs = sym_lhs ? convertSymbolValue(std::get<LangAPI::Symbol>(a.name))
-                                             : convertRValue(LangAPI::RValue(std::get<LangAPI::StorageSymbol>(a.name)));
+                                             : convertStorage(std::get<LangAPI::StorageSymbol>(a.name));
                     if (lt && a.type == LangAPI::OperatorType::Add && LangAPI::Typing::Typer::isValue(*lt, LangAPI::ValueType::String))
                         out += lhs + " = ISPA_CONCAT(" + lhs + ", " + rhs + ")";
                     else out += lhs + " " + op + " " + rhs;
@@ -499,6 +535,7 @@ namespace C {
             using EE = LangAPI::ExpressionElement;
             if (strs && el == EE::Add) { lhs = "ISPA_CONCAT(" + lhs + ", " + rhs + ")"; }
             else if (strs && el == EE::Equal) { lhs = "ispa_str_eq(" + lhs + ", " + rhs + ")"; lt = LangAPI::Type(LangAPI::ValueType::Bool); }
+            else if (strs && p == 4) { lhs = "(ispa_str_cmp(" + lhs + ", " + rhs + ") " + opText(el) + " 0)"; lt = LangAPI::Type(LangAPI::ValueType::Bool); }
             else if (strs && el == EE::NotEqual) { lhs = "!ispa_str_eq(" + lhs + ", " + rhs + ")"; lt = LangAPI::Type(LangAPI::ValueType::Bool); }
             else {
                 lhs = lhs + " " + opText(el) + " " + rhs;
@@ -544,7 +581,7 @@ namespace C {
             if (!d.empty()) throw Unsupported{"local type: " + d.front()};
             locals.back().insert(v.name);
             if (v.value.empty()) o.writeln("{} {} = {0};", t, cIdent(v.name));
-            else o.writeln("{} {} = {};", t, cIdent(v.name), coerce(convertExpr(v.value), typer->typeOf(v.value), declared));
+            else o.writeln("{} {} = {};", t, cIdent(v.name), coerce(convertExprAs(v.value, declared), typer->typeOf(v.value), declared));
         } else if (st.isIf()) {
             const auto &i = st.getIf();
             o.writeln("if ({}) {", convertExpr(i.expr));
