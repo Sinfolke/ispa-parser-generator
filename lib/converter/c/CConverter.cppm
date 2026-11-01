@@ -20,6 +20,7 @@ namespace C {
         std::vector<std::string> diagnostics;                    // survey: constructs that could not be emitted
         std::size_t emitted_functions = 0, skipped_functions = 0;
         std::unordered_set<std::string> defined;                 // C names of every class/enum/alias, filled before emission
+        std::vector<std::string> init_globals;                   // non-literal global initialisers, run by <stem>_init_globals()
         std::unordered_set<std::string> generic_classes;         // classes with type parameters (instantiated on demand)
 
         struct ClassInfo {
@@ -50,6 +51,8 @@ namespace C {
 
         auto emitDeclarations(const LangAPI::Declarations &decls, ::Converter::Writer &types, ::Converter::Writer &protos,
                               ::Converter::Writer &impls) -> void;
+        auto emitGlobal(const LangAPI::Variable &v, ::Converter::Writer &types, ::Converter::Writer &protos,
+                        ::Converter::Writer &impls) -> void;
         auto emitClass(const LangAPI::Class &cls, ::Converter::Writer &types, ::Converter::Writer &protos,
                        ::Converter::Writer &impls) -> void;
         auto emitFunction(const LangAPI::Function &fn, const std::string &owner, ::Converter::Writer &protos,
