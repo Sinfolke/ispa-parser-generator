@@ -321,7 +321,9 @@ namespace C {
 
     auto Construct::convertStatements(const LangAPI::Statements &st, Converter::Writer &o) -> void {
         locals.emplace_back();
+        typer->pushScope();
         for (const auto &s : st) convertStatement(s, o);
+        typer->popScope();
         locals.pop_back();
     }
 
@@ -329,8 +331,14 @@ namespace C {
         if (st.isVariable()) {
             const auto &v = st.getVariable();
             std::vector<std::string> d;
-            if (v.type.isValueType() && v.type.getValueType() == LangAPI::ValueType::Undef) throw Unsupported{"local without a declared type"};
-            const auto t = typeName(v.type, d);
+            auto declared = v.type;
+            if (declared.isValueType() && declared.getValueType() == LangAPI::ValueType::Undef) {
+                const auto inferred = typer->typeOf(v.value);
+                if (!inferred) throw Unsupported{"local without a declared type"};
+                declared = *inferred;
+            }
+            typer->declare(v.name, declared);
+            const auto t = typeName(declared, d);
             if (!d.empty()) throw Unsupported{"local type: " + d.front()};
             locals.back().insert(v.name);
             if (v.value.empty()) o.writeln("{} {} = {0};", t, cIdent(v.name));
@@ -383,6 +391,7 @@ namespace C {
         locals.clear();
         locals.emplace_back();
         for (const auto &[t, n] : fn.parameters) locals.back().insert(n);
+        typer->beginFunction(owner.empty() ? nullptr : cur_class_decl, fn);
         cur_return = &fn.type;
         Converter::Writer body;
         std::string why;
@@ -438,6 +447,9 @@ namespace C {
             diagnostics.push_back(c_name + ": generic class (" + std::to_string(cls.template_parameters.size()) + " parameters) not instantiated yet");
             return;
         }
+        const auto *saved_decl = cur_class_decl;
+        cur_class_decl = &cls;
+        struct Restore { const LangAPI::Class *&r; const LangAPI::Class *v; ~Restore() { r = v; } } restore{cur_class_decl, saved_decl};
         std::vector<const LangAPI::Function *> virtuals;
         for (const auto &[decl, vis] : cls.data)
             if (decl->isFunction() && decl->getFunction().is_virtual) virtuals.push_back(&decl->getFunction());
@@ -513,6 +525,7 @@ namespace C {
         generic_classes.clear();
         diagnostics.clear();
         init_globals.clear();
+        typer = std::make_unique<LangAPI::Typing::Typer>(*source);
         collect(*source);
         emitted_functions = skipped_functions = 0;
         Converter::Writer types, protos, impls;

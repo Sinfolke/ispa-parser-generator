@@ -3,6 +3,7 @@ export module C.Init;
 import Converter.Writer;
 import Converter.Construct;
 import LangAPI;
+import LangAPI.Typing;
 import std;
 
 // C backend. Lowered classes become structs whose first member is the base struct (so a derived pointer is a valid
@@ -20,6 +21,8 @@ namespace C {
         std::vector<std::string> diagnostics;                    // survey: constructs that could not be emitted
         std::size_t emitted_functions = 0, skipped_functions = 0;
         std::unordered_set<std::string> defined;                 // C names of every class/enum/alias, filled before emission
+        std::unique_ptr<LangAPI::Typing::Typer> typer;           // shared static typing (LangAPI.Typing)
+        const LangAPI::Class *cur_class_decl = nullptr;
         std::vector<std::string> init_globals;                   // non-literal global initialisers, run by <stem>_init_globals()
         std::unordered_set<std::string> generic_classes;         // classes with type parameters (instantiated on demand)
 
