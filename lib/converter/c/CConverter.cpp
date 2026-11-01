@@ -110,7 +110,7 @@ namespace C {
         const auto cn = class_cname.at(&cls);
         if (cn == "python_ispa_std_node_Node") return "python_ispa_std_node_Node_blank()";
         if (cn == "python_ispa_std_raw_token_RawToken" || (!token_cname.empty() && cn == token_cname)) return "python_ispa_std_raw_token_RawToken_empty_token()";
-        if (cn == "python_ispa_std_match_result_MatchResult") return "python_ispa_std_match_result_MatchResult_new(false, python_ispa_std_node_Node_blank(), NULL)";
+        if (cn == "python_ispa_std_match_result_MatchResult") return "python_ispa_std_match_result_MatchResult_new(false, python_ispa_std_node_Node_blank(), " + std::string(isLocal("pos") ? "pos" : "NULL") + ")";      // a failed match keeps the caller's cursor
         return handlerName(cls) + "(ispa_cur)";
     }
 

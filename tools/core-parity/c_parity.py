@@ -28,8 +28,11 @@ def build(ispa, work, grammar, sanitize):
     common = ['-a', algorithm, '--no-incremental', '--no-ai-recovery', '--no-debug-instrumentation']
     # the application is lowered together with the library it runs on (the library itself is compiled separately)
     imports = ''.join(f'import py ispa_std.{name};\n' for name in MODULES)
-    (gen / 'parser.isc').write_text(imports + (directory / entry).read_text())
-    run([ispa, '-l', 'c', *common, '--dir', str(LIBRARY), '--dir', str(directory), str(gen / 'parser.isc'), '-o', str(gen / 'parser')], env=env)
+    # sibling grammar files (token lists) are merged in front of the entry; a leading `module ...;` line stays first
+    body = ''.join(f.read_text() for f in sorted(directory.glob('*.isc')) if f.name != entry) + (directory / entry).read_text()
+    head, _, rest = body.partition('\n')
+    (gen / 'parser.isc').write_text(head + '\n' + imports + rest if head.startswith('module ') else imports + body)
+    run([ispa, '-l', 'c', *common, '--dir', str(LIBRARY), str(gen / 'parser.isc'), '-o', str(gen / 'parser')], env=env)
     run([ispa, '-l', 'cpp', *common, '--dir', str(directory), str(directory / entry), '-o', str(gen_cpp / 'generated')], env=env)
     flags = ['-std=c11', '-O1', '-g', '-w'] + (['-fsanitize=address,undefined'] if sanitize else [])
     sources = [gen / 'parser.c', HERE / 'c' / 'run.c', RUNTIME / 'ispa_lexer.c', RUNTIME / 'ispa_print.c', RUNTIME / 'ispa_c.c', RUNTIME / 'lowered' / 'ispa_std.c']
