@@ -272,7 +272,15 @@ struct python_ispa_std_lexer__SharedState {
 	bool eof_processed;
 	ispa_vec_python_ispa_std_lexer_CheckpointP* checkpoints;
 };
+typedef struct python_ispa_std_lexer_Lexer_base_vt {
+	python_ispa_std_raw_token_RawToken* (*makeToken)(python_ispa_std_lexer_Lexer_base* self, python_ispa_std_refs_Cursor*);
+	void (*init)(python_ispa_std_lexer_Lexer_base* self);
+	python_ispa_std_lexer_Lexer_base* (*clone)(python_ispa_std_lexer_Lexer_base* self);
+	void (*on_token)(python_ispa_std_lexer_Lexer_base* self, python_ispa_std_raw_token_RawToken*);
+	void (*on_eof)(python_ispa_std_lexer_Lexer_base* self);
+} python_ispa_std_lexer_Lexer_base_vt;
 struct python_ispa_std_lexer_Lexer_base {
+	const python_ispa_std_lexer_Lexer_base_vt* vt;
 	python_ispa_std_dfa_api_SourceText* _src;
 	bool _has_input;
 	ispa_vec_python_ispa_std_raw_token_RawTokenP* tokens;
@@ -440,6 +448,8 @@ struct python_ispa_std_match_result_MatchResult {
 typedef struct python_ispa_std_parser_base_Parser_base_vt {
 	void (*before_parse)(python_ispa_std_parser_base_Parser_base* self);
 	ispa_any (*parseLazy)(python_ispa_std_parser_base_Parser_base* self);
+	void (*parseFromTokens)(python_ispa_std_parser_base_Parser_base* self);
+	python_ispa_std_match_result_MatchResult* (*lazyParse)(python_ispa_std_parser_base_Parser_base* self);
 } python_ispa_std_parser_base_Parser_base_vt;
 struct python_ispa_std_parser_base_Parser_base {
 	const python_ispa_std_parser_base_Parser_base_vt* vt;
@@ -917,6 +927,11 @@ python_ispa_std_lexer__SharedState* python_ispa_std_lexer_get__SharedState_handl
 void python_ispa_std_lexer_free__SharedState_handler(python_ispa_std_lexer__SharedState* handler);
 python_ispa_std_lexer__SharedState* python_ispa_std_lexer__SharedState_new(int64_t pos);
 void python_ispa_std_lexer__SharedState___init__(python_ispa_std_lexer__SharedState* self, int64_t pos);
+static inline python_ispa_std_raw_token_RawToken* python_ispa_std_lexer_Lexer_base_makeToken_v(python_ispa_std_lexer_Lexer_base* self, python_ispa_std_refs_Cursor* cur) { return self->vt->makeToken(self, cur); }
+static inline void python_ispa_std_lexer_Lexer_base_init_v(python_ispa_std_lexer_Lexer_base* self) {  self->vt->init(self); }
+static inline python_ispa_std_lexer_Lexer_base* python_ispa_std_lexer_Lexer_base_clone_v(python_ispa_std_lexer_Lexer_base* self) { return self->vt->clone(self); }
+static inline void python_ispa_std_lexer_Lexer_base_on_token_v(python_ispa_std_lexer_Lexer_base* self, python_ispa_std_raw_token_RawToken* token) {  self->vt->on_token(self, token); }
+static inline void python_ispa_std_lexer_Lexer_base_on_eof_v(python_ispa_std_lexer_Lexer_base* self) {  self->vt->on_eof(self); }
 python_ispa_std_lexer_Lexer_base* python_ispa_std_lexer_get_Lexer_base_handler(ispa_arena* arena);
 void python_ispa_std_lexer_free_Lexer_base_handler(python_ispa_std_lexer_Lexer_base* handler);
 python_ispa_std_lexer_Lexer_base* python_ispa_std_lexer_Lexer_base_new(void);
@@ -1155,6 +1170,8 @@ void python_ispa_std_match_result_MatchResult___init__(python_ispa_std_match_res
 python_ispa_std_match_result_MatchResult* python_ispa_std_match_result_MatchResult_failed(python_ispa_std_lexer_TokenCursor* it);
 static inline void python_ispa_std_parser_base_Parser_base_before_parse_v(python_ispa_std_parser_base_Parser_base* self) {  self->vt->before_parse(self); }
 static inline ispa_any python_ispa_std_parser_base_Parser_base_parseLazy_v(python_ispa_std_parser_base_Parser_base* self) { return self->vt->parseLazy(self); }
+static inline void python_ispa_std_parser_base_Parser_base_parseFromTokens_v(python_ispa_std_parser_base_Parser_base* self) {  self->vt->parseFromTokens(self); }
+static inline python_ispa_std_match_result_MatchResult* python_ispa_std_parser_base_Parser_base_lazyParse_v(python_ispa_std_parser_base_Parser_base* self) { return self->vt->lazyParse(self); }
 python_ispa_std_parser_base_Parser_base* python_ispa_std_parser_base_get_Parser_base_handler(ispa_arena* arena);
 void python_ispa_std_parser_base_free_Parser_base_handler(python_ispa_std_parser_base_Parser_base* handler);
 python_ispa_std_parser_base_Parser_base* python_ispa_std_parser_base_Parser_base_new(void);

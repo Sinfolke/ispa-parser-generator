@@ -1790,8 +1790,15 @@ void python_ispa_std_lexer__SharedState___init__(python_ispa_std_lexer__SharedSt
 	(self)->eof_processed = false;
 	(self)->checkpoints = ispa_vec_python_ispa_std_lexer_CheckpointP_new();
 }
+static python_ispa_std_raw_token_RawToken* python_ispa_std_lexer_Lexer_base_makeToken_as_python_ispa_std_lexer_Lexer_base(python_ispa_std_lexer_Lexer_base* self, python_ispa_std_refs_Cursor* cur) { return python_ispa_std_lexer_Lexer_base_makeToken((python_ispa_std_lexer_Lexer_base*)self, cur); }
+static void python_ispa_std_lexer_Lexer_base_init_as_python_ispa_std_lexer_Lexer_base(python_ispa_std_lexer_Lexer_base* self) {  python_ispa_std_lexer_Lexer_base_init((python_ispa_std_lexer_Lexer_base*)self); }
+static python_ispa_std_lexer_Lexer_base* python_ispa_std_lexer_Lexer_base_clone_as_python_ispa_std_lexer_Lexer_base(python_ispa_std_lexer_Lexer_base* self) { return python_ispa_std_lexer_Lexer_base_clone((python_ispa_std_lexer_Lexer_base*)self); }
+static void python_ispa_std_lexer_Lexer_base_on_token_as_python_ispa_std_lexer_Lexer_base(python_ispa_std_lexer_Lexer_base* self, python_ispa_std_raw_token_RawToken* token) {  python_ispa_std_lexer_Lexer_base_on_token((python_ispa_std_lexer_Lexer_base*)self, token); }
+static void python_ispa_std_lexer_Lexer_base_on_eof_as_python_ispa_std_lexer_Lexer_base(python_ispa_std_lexer_Lexer_base* self) {  python_ispa_std_lexer_Lexer_base_on_eof((python_ispa_std_lexer_Lexer_base*)self); }
+static const python_ispa_std_lexer_Lexer_base_vt python_ispa_std_lexer_Lexer_base_as_python_ispa_std_lexer_Lexer_base_vtable = { .makeToken = python_ispa_std_lexer_Lexer_base_makeToken_as_python_ispa_std_lexer_Lexer_base, .init = python_ispa_std_lexer_Lexer_base_init_as_python_ispa_std_lexer_Lexer_base, .clone = python_ispa_std_lexer_Lexer_base_clone_as_python_ispa_std_lexer_Lexer_base, .on_token = python_ispa_std_lexer_Lexer_base_on_token_as_python_ispa_std_lexer_Lexer_base, .on_eof = python_ispa_std_lexer_Lexer_base_on_eof_as_python_ispa_std_lexer_Lexer_base };
 python_ispa_std_lexer_Lexer_base* python_ispa_std_lexer_get_Lexer_base_handler(ispa_arena* arena) {
 	python_ispa_std_lexer_Lexer_base* h = (python_ispa_std_lexer_Lexer_base*)ispa_arena_calloc(arena, sizeof(python_ispa_std_lexer_Lexer_base));
+	h->vt = &python_ispa_std_lexer_Lexer_base_as_python_ispa_std_lexer_Lexer_base_vtable;
 	return h;
 }
 void python_ispa_std_lexer_free_Lexer_base_handler(python_ispa_std_lexer_Lexer_base* handler) { (void)handler; }
@@ -1848,10 +1855,10 @@ void python_ispa_std_lexer_Lexer_base_on_eof(python_ispa_std_lexer_Lexer_base* s
 	ispa_vec_python_ispa_std_raw_token_RawTokenP_push(((self)->tokens), python_ispa_std_lexer_Lexer_base_empty_token((self)));
 }
 void python_ispa_std_lexer_Lexer_base_push(python_ispa_std_lexer_Lexer_base* self, python_ispa_std_raw_token_RawToken* token) {
-	python_ispa_std_lexer_Lexer_base_on_token((self), token);
+	python_ispa_std_lexer_Lexer_base_on_token_v((self), token);
 }
 void python_ispa_std_lexer_Lexer_base_push_eof(python_ispa_std_lexer_Lexer_base* self) {
-	python_ispa_std_lexer_Lexer_base_on_eof((self));
+	python_ispa_std_lexer_Lexer_base_on_eof_v((self));
 }
 void python_ispa_std_lexer_Lexer_base_append_token(python_ispa_std_lexer_Lexer_base* self, python_ispa_std_raw_token_RawToken* token) {
 	ispa_vec_python_ispa_std_raw_token_RawTokenP_push(((self)->tokens), token);
@@ -2036,7 +2043,7 @@ ispa_vec_python_ispa_std_raw_token_RawTokenP* python_ispa_std_lexer_Lexer_base_m
 	int64_t n = (int64_t)(((self)->_src)->text).len;
 	while (((((cur)->pos) < (n)))) {
 		int64_t before = (cur)->pos;
-		python_ispa_std_raw_token_RawToken* token = python_ispa_std_lexer_Lexer_base_makeToken((self), cur);
+		python_ispa_std_raw_token_RawToken* token = python_ispa_std_lexer_Lexer_base_makeToken_v((self), cur);
 		if (((((cur)->pos) == (before)))) {
 			python_ispa_std_failures_internal_error(ISPA_STR("no matches at position {}, on character {}, and no exception can handle it"), ISPA_STR("Lexer TDFA generation"), true, ispa_vec_ispa_str_from((ispa_str[]){python_ispa_std_format_int_to_string((cur)->pos), python_ispa_std_chars_at(((self)->_src)->text, (cur)->pos)}, 2));
 		}
@@ -2237,7 +2244,7 @@ void python_ispa_std_lexer_LazyIterator_ensure_token(python_ispa_std_lexer_LazyI
 				python_ispa_std_refs_Cursor* cur = python_ispa_std_refs_Cursor_new((state)->pos, (owner)->line);
 				python_ispa_std_raw_token_RawToken* raw = python_ispa_std_lexer_Lexer_base_empty_token((owner));
 				if ((((((((owner)->bound) < (INT64_C(0))))) || (((((state)->pos) < ((owner)->bound))))))) {
-					raw = python_ispa_std_lexer_Lexer_base_makeToken((owner), cur);
+					raw = python_ispa_std_lexer_Lexer_base_makeToken_v((owner), cur);
 				}
 				(state)->pos = (cur)->pos;
 				if ((((python_ispa_std_raw_token_RawToken_empty((raw))) && ((owner)->external_boundary)))) {
@@ -2285,7 +2292,7 @@ void python_ispa_std_lexer_LazyIterator_consumeExternal(python_ispa_std_lexer_La
 	if (((((((end) < (begin)))) || ((((end) > ((int64_t)(origin).len))))))) {
 		python_ispa_std_failures_logic_error(ISPA_STR("External parser returned an invalid source cursor"));
 	}
-	python_ispa_std_lexer_Lexer_base* branch = python_ispa_std_lexer_Lexer_base_clone(((self)->owner));
+	python_ispa_std_lexer_Lexer_base* branch = python_ispa_std_lexer_Lexer_base_clone_v(((self)->owner));
 	if (((((self)->token_index) < ((int64_t)(((self)->state)->checkpoints)->len)))) {
 		python_ispa_std_lexer_Lexer_base_restoreCheckpoint((branch), ispa_vec_python_ispa_std_lexer_CheckpointP_get((((self)->state)->checkpoints), (self)->token_index));
 	}
@@ -3081,7 +3088,9 @@ python_ispa_std_match_result_MatchResult* python_ispa_std_match_result_MatchResu
 }
 static void python_ispa_std_parser_base_Parser_base_before_parse_as_python_ispa_std_parser_base_Parser_base(python_ispa_std_parser_base_Parser_base* self) {  python_ispa_std_parser_base_Parser_base_before_parse((python_ispa_std_parser_base_Parser_base*)self); }
 static ispa_any python_ispa_std_parser_base_Parser_base_parseLazy_as_python_ispa_std_parser_base_Parser_base(python_ispa_std_parser_base_Parser_base* self) { return python_ispa_std_parser_base_Parser_base_parseLazy((python_ispa_std_parser_base_Parser_base*)self); }
-static const python_ispa_std_parser_base_Parser_base_vt python_ispa_std_parser_base_Parser_base_as_python_ispa_std_parser_base_Parser_base_vtable = { .before_parse = python_ispa_std_parser_base_Parser_base_before_parse_as_python_ispa_std_parser_base_Parser_base, .parseLazy = python_ispa_std_parser_base_Parser_base_parseLazy_as_python_ispa_std_parser_base_Parser_base };
+static void python_ispa_std_parser_base_Parser_base_parseFromTokens_as_python_ispa_std_parser_base_Parser_base(python_ispa_std_parser_base_Parser_base* self) {  python_ispa_std_parser_base_Parser_base_parseFromTokens((python_ispa_std_parser_base_Parser_base*)self); }
+static python_ispa_std_match_result_MatchResult* python_ispa_std_parser_base_Parser_base_lazyParse_as_python_ispa_std_parser_base_Parser_base(python_ispa_std_parser_base_Parser_base* self) { return python_ispa_std_parser_base_Parser_base_lazyParse((python_ispa_std_parser_base_Parser_base*)self); }
+static const python_ispa_std_parser_base_Parser_base_vt python_ispa_std_parser_base_Parser_base_as_python_ispa_std_parser_base_Parser_base_vtable = { .before_parse = python_ispa_std_parser_base_Parser_base_before_parse_as_python_ispa_std_parser_base_Parser_base, .parseLazy = python_ispa_std_parser_base_Parser_base_parseLazy_as_python_ispa_std_parser_base_Parser_base, .parseFromTokens = python_ispa_std_parser_base_Parser_base_parseFromTokens_as_python_ispa_std_parser_base_Parser_base, .lazyParse = python_ispa_std_parser_base_Parser_base_lazyParse_as_python_ispa_std_parser_base_Parser_base };
 python_ispa_std_parser_base_Parser_base* python_ispa_std_parser_base_get_Parser_base_handler(ispa_arena* arena) {
 	python_ispa_std_parser_base_Parser_base* h = (python_ispa_std_parser_base_Parser_base*)ispa_arena_calloc(arena, sizeof(python_ispa_std_parser_base_Parser_base));
 	h->vt = &python_ispa_std_parser_base_Parser_base_as_python_ispa_std_parser_base_Parser_base_vtable;
@@ -3138,7 +3147,7 @@ ispa_any python_ispa_std_parser_base_Parser_base_parse_tokens(python_ispa_std_pa
 	if ((!(python_ispa_std_lexer_Lexer_base_hasInput(((self)->lexer))))) {
 		python_ispa_std_lexer_Lexer_base_makeTokens(((self)->lexer));
 	}
-	python_ispa_std_parser_base_Parser_base_parseFromTokens((self));
+	python_ispa_std_parser_base_Parser_base_parseFromTokens_v((self));
 	return (self)->tree;
 }
 void python_ispa_std_parser_base_Parser_base_before_parse(python_ispa_std_parser_base_Parser_base* self) {
@@ -3148,7 +3157,7 @@ ispa_any python_ispa_std_parser_base_Parser_base_parseLazy(python_ispa_std_parse
 	if ((!((self)->has_text))) {
 		python_ispa_std_failures_api_error(ISPA_STR("Can't parse because no input text is provided"), ispa_vec_ispa_str_new());
 	}
-	python_ispa_std_match_result_MatchResult* result = python_ispa_std_parser_base_Parser_base_lazyParse((self));
+	python_ispa_std_match_result_MatchResult* result = python_ispa_std_parser_base_Parser_base_lazyParse_v((self));
 	if ((result)->status) {
 		(self)->tree = python_ispa_std_node_Node_data(((result)->node));
 	}
@@ -3783,7 +3792,9 @@ void python_ispa_std_parser_ll_Resume___init__(python_ispa_std_parser_ll_Resume*
 }
 static void python_ispa_std_parser_ll_LLParser_before_parse_as_python_ispa_std_parser_base_Parser_base(python_ispa_std_parser_base_Parser_base* self) {  python_ispa_std_parser_ll_LLParser_before_parse((python_ispa_std_parser_ll_LLParser*)self); }
 static ispa_any python_ispa_std_parser_ll_LLParser_parseLazy_as_python_ispa_std_parser_base_Parser_base(python_ispa_std_parser_base_Parser_base* self) { return python_ispa_std_parser_ll_LLParser_parseLazy((python_ispa_std_parser_ll_LLParser*)self); }
-static const python_ispa_std_parser_base_Parser_base_vt python_ispa_std_parser_ll_LLParser_as_python_ispa_std_parser_base_Parser_base_vtable = { .before_parse = python_ispa_std_parser_ll_LLParser_before_parse_as_python_ispa_std_parser_base_Parser_base, .parseLazy = python_ispa_std_parser_ll_LLParser_parseLazy_as_python_ispa_std_parser_base_Parser_base };
+static void python_ispa_std_parser_ll_LLParser_parseFromTokens_as_python_ispa_std_parser_base_Parser_base(python_ispa_std_parser_base_Parser_base* self) {  python_ispa_std_parser_base_Parser_base_parseFromTokens((python_ispa_std_parser_base_Parser_base*)self); }
+static python_ispa_std_match_result_MatchResult* python_ispa_std_parser_ll_LLParser_lazyParse_as_python_ispa_std_parser_base_Parser_base(python_ispa_std_parser_base_Parser_base* self) { return python_ispa_std_parser_base_Parser_base_lazyParse((python_ispa_std_parser_base_Parser_base*)self); }
+static const python_ispa_std_parser_base_Parser_base_vt python_ispa_std_parser_ll_LLParser_as_python_ispa_std_parser_base_Parser_base_vtable = { .before_parse = python_ispa_std_parser_ll_LLParser_before_parse_as_python_ispa_std_parser_base_Parser_base, .parseLazy = python_ispa_std_parser_ll_LLParser_parseLazy_as_python_ispa_std_parser_base_Parser_base, .parseFromTokens = python_ispa_std_parser_ll_LLParser_parseFromTokens_as_python_ispa_std_parser_base_Parser_base, .lazyParse = python_ispa_std_parser_ll_LLParser_lazyParse_as_python_ispa_std_parser_base_Parser_base };
 python_ispa_std_parser_ll_LLParser* python_ispa_std_parser_ll_get_LLParser_handler(ispa_arena* arena) {
 	python_ispa_std_parser_ll_LLParser* h = (python_ispa_std_parser_ll_LLParser*)ispa_arena_calloc(arena, sizeof(python_ispa_std_parser_ll_LLParser));
 	h->base_python_ispa_std_parser_base_Parser_base.vt = &python_ispa_std_parser_ll_LLParser_as_python_ispa_std_parser_base_Parser_base_vtable;
@@ -3849,7 +3860,7 @@ ispa_any python_ispa_std_parser_ll_LLParser_parseLazy(python_ispa_std_parser_ll_
 	if ((!((self)->base_python_ispa_std_parser_base_Parser_base.has_text))) {
 		python_ispa_std_failures_api_error(ISPA_STR("Can't parse because no input text is provided"), ispa_vec_ispa_str_new());
 	}
-	python_ispa_std_match_result_MatchResult* result = python_ispa_std_parser_base_Parser_base_lazyParse((python_ispa_std_parser_base_Parser_base*)(self));
+	python_ispa_std_match_result_MatchResult* result = python_ispa_std_parser_base_Parser_base_lazyParse_v((python_ispa_std_parser_base_Parser_base*)(self));
 	bool at_end = python_ispa_std_lexer_TokenCursor_isEnd_v(((result)->it));
 	ispa_vec_ispa_str* messages = python_ispa_std_lexer_TokenCursor_getErrors_v(((result)->it));
 	int64_t i = INT64_C(0);

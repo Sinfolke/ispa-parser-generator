@@ -71,6 +71,18 @@ namespace C {
                 for (const auto *k : chain) slot_root[{k, m}] = chain.back();
             }
         }
+        // Extension points of the library: generated lexers/parsers override these, so the library build (which does not see
+        // the generated classes) must give them slots. Found by running every core-parity grammar in application mode.
+        static const std::map<std::string, std::vector<std::string>> open_methods = {
+            {"python_ispa_std_lexer_Lexer_base", {"clone", "init", "makeToken", "on_eof", "on_token"}},
+            {"python_ispa_std_parser_base_Parser_base", {"lazyParse", "parseFromTokens"}},
+        };
+        for (const auto &[cls, cname] : class_cname) {
+            const auto it = open_methods.find(cname);
+            if (it == open_methods.end()) continue;
+            for (const auto &m : it->second)
+                if (definesMethod(*cls, m) && !slot_root.contains({cls, m})) slot_root[{cls, m}] = cls;
+        }
         for (const auto &[key, root] : slot_root)
             if (key.first == root) root_slots[root].push_back(key.second);
         for (auto &[root, names] : root_slots) {       // declaration order
@@ -1221,6 +1233,9 @@ namespace C {
             }
         for (const auto &d : decls) {
             if (d.isNamespace()) {
+                // application build: the lowered library is compiled separately (lowered/ispa_std.c); it stays indexed only
+                const bool library = scope.empty() && d.getNamespace().name == "python";
+                if (library && app_mode) continue;
                 scope.push_back(d.getNamespace().name);
                 emitDeclarations(d.getNamespace().declarations, types, protos, impls);
                 scope.pop_back();
@@ -1235,6 +1250,61 @@ namespace C {
         }
     }
 
+    // IspaLib symbols (types and base classes of generated code) become the lowered library classes they stand for, so the
+    // generated classes see ordinary declarations. Node<T>/MatchResult<T> payloads are type-erased (ispa_any): the
+    // template arguments are dropped.
+    namespace {
+        auto libPath(LangAPI::StdlibExports e) -> std::optional<std::vector<std::string>> {
+            using S = LangAPI::StdlibExports;
+            const auto P = [](std::initializer_list<const char *> l) { std::vector<std::string> v = {"python", "ispa_std"}; for (auto x : l) v.emplace_back(x); return v; };
+            switch (e) {
+                case S::Node: return P({"node", "Node"});
+                case S::MatchResult: return P({"match_result", "MatchResult"});
+                case S::Lexer: return P({"lexer", "Lexer_base"});
+                case S::Parser: return P({"parser_ll", "LLParser"});
+                case S::LRParser: return P({"lr", "LRParser"});
+                case S::LRGeneralizedParser: return P({"lr_conflicts", "LRGeneralizedParser"});
+                case S::LexerMakeTokenParameter: return P({"refs", "Cursor"});
+                case S::ParserFunctionParameter: case S::LexerTokenIterator: case S::LexerLazyIterator: return P({"lexer", "TokenCursor"});
+                case S::DfaCaptures: return P({"dfa_api", "Captures"});
+                case S::TdfaLayout: return P({"dfa_api", "TdfaLayout"});
+                case S::DFADebug: return P({"dfa_api", "DFADebug"});
+                case S::ASTPrinter: return P({"ast_printer", "ASTPrinter"});
+                case S::RecoveryDecision: return P({"recovery", "Decision"});
+                case S::RecoveryState: return P({"recovery", "State"});
+                case S::RecoveryTokenSet: return P({"recovery", "TokenSet"});
+                case S::RecoveryPolicy: return P({"recovery", "Policy"});
+                case S::RecoveryHandler: return P({"recovery", "Handler"});
+                default: return std::nullopt;
+            }
+        }
+        auto libType(const LangAPI::IspaLibSymbol &s) -> std::optional<LangAPI::Type> {
+            using S = LangAPI::StdlibExports;
+            const auto I = LangAPI::Type(LangAPI::ValueType::Int);
+            switch (s.exports) {
+                case S::DfaState: case S::DfaClassTable: return LangAPI::Type(LangAPI::ValueType::Array, I);
+                case S::DfaTable: case S::DfaAcceptTable: case S::DfaLRTable: return LangAPI::Type(LangAPI::ValueType::Array, LangAPI::Type(LangAPI::ValueType::Array, I));
+                case S::LRValue: return LangAPI::Type(LangAPI::ValueType::Any);
+                default: break;
+            }
+            if (const auto p = libPath(s.exports)) return LangAPI::Type(LangAPI::Symbol(*p));
+            return std::nullopt;
+        }
+    }
+
+    auto Construct::mapLibrary() -> void {
+        owned_tree = *source;
+        LangAPI::Traverse::forEach<LangAPI::Type>(owned_tree, [&](LangAPI::Type &t) {
+            if (!t.isIspaLibSymbol()) return;
+            if (const auto m = libType(t.getIspaLibSymbol())) t = *m;
+        });
+        LangAPI::Traverse::forEach<LangAPI::Class>(owned_tree, [&](LangAPI::Class &c) {
+            for (auto &[vis, base] : c.inherit_members)
+                if (const auto *lib = std::get_if<LangAPI::IspaLibSymbol>(&base))
+                    if (const auto p = libPath(lib->exports)) base = LangAPI::Symbol(*p);
+        });
+    }
+
     auto Construct::construct() -> void {
         scope.clear();
         defined.clear();
@@ -1246,16 +1316,26 @@ namespace C {
         init_globals.clear();
         thunks_done.clear();
         vec_defs.clear(); vec_seen.clear(); class_cname.clear(); fwd_w = {};
-        typer = std::make_unique<LangAPI::Typing::Typer>(*source);
+        mapLibrary();
+        typer = std::make_unique<LangAPI::Typing::Typer>(owned_tree);
         typer->instantiate_class = [this](const LangAPI::Class &c, const std::vector<LangAPI::Type> &a) { return instantiateClass(c, a); };
         typer->instantiate_function = [this](const LangAPI::Function &f, const std::vector<LangAPI::Type> &a) { return instantiateFunction(f, a); };
         class_clones.clear(); fn_clones.clear(); class_insts.clear(); fn_insts.clear(); pending.clear();
         generic_decl.clear(); generic_scope.clear(); generic_fn_scope.clear();
-        collect(*source);
+        app_mode = false;
+        for (const auto &d : owned_tree)
+            if (!(d.isNamespace() && d.getNamespace().name == "python")) app_mode = true;
+        collect(owned_tree);
         analyzeVirtuals();
+        if (app_mode && std::getenv("ISPA_C_SURVEY"))     // library methods the application overrides (they need slots in the library build)
+            for (const auto &[key, root] : slot_root) {
+                const auto &cn = class_cname.at(key.first);
+                if (!cn.starts_with("python_ispa_std_") && class_cname.at(root).starts_with("python_ispa_std_"))
+                    std::cerr << "OVERRIDE " << class_cname.at(root) << "::" << key.second << " by " << cn << "\n";
+            }
         emitted_functions = skipped_functions = 0;
         Converter::Writer types, protos, impls;
-        emitDeclarations(*source, types, protos, impls);
+        emitDeclarations(owned_tree, types, protos, impls);
         while (!pending.empty()) {       // monomorphized instances discovered while emitting
             const auto p = pending.back();
             pending.pop_back();
