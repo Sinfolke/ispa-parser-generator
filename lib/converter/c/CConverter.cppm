@@ -71,7 +71,7 @@ namespace C {
         auto emitDeclarations(const LangAPI::Declarations &decls, ::Converter::Writer &types, ::Converter::Writer &protos,
                               ::Converter::Writer &impls) -> void;
         auto emitGlobal(const LangAPI::Variable &v, ::Converter::Writer &types, ::Converter::Writer &protos,
-                        ::Converter::Writer &impls) -> void;
+                        ::Converter::Writer &impls, const std::string &owner_c_name = {}) -> void;
         auto emitClass(const LangAPI::Class &cls, ::Converter::Writer &types, ::Converter::Writer &protos,
                        ::Converter::Writer &impls) -> void;
         auto emitFunction(const LangAPI::Function &fn, const std::string &owner, ::Converter::Writer &protos,

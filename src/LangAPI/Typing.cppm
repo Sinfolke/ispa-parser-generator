@@ -273,6 +273,10 @@ export namespace LangAPI::Typing {
             }
             if (const auto it = globals_by_bare.find(parts.back()); it != globals_by_bare.end())
                 for (const auto &[full, v] : it->second) if (suffixMatches(full, parts)) return v->type;
+            if (parts.size() >= 2) {   // Class::static_field
+                Symbol cls_sym(std::vector<std::string>(parts.begin(), parts.end() - 1));
+                if (const auto *cls = findClass(cls_sym)) if (const auto t = fieldType(*cls, parts.back())) return t;
+            }
             if (parts.size() >= 2)   // Enum::Item
                 if (const auto it = enums_by_bare.find(parts[parts.size() - 2]); it != enums_by_bare.end()) {
                     auto prefix = std::vector<std::string>(parts.begin(), parts.end() - 1);

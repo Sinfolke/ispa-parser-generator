@@ -54,7 +54,8 @@ namespace C {
                 for (const auto &[vis, base] : d.getClass().inherit_members)
                     if (const auto *bs = std::get_if<LangAPI::Symbol>(&base)) { info.bases.emplace_back(symbolName(*bs), symbolName(*bs)); }
                 for (const auto &[decl, vis] : d.getClass().data) {
-                    if (decl->isVariable()) info.fields.insert(cIdent(decl->getVariable().name));
+                    if (decl->isVariable() && decl->getVariable().is_static) functions.insert(n + "_" + cIdent(decl->getVariable().name));
+                    else if (decl->isVariable()) info.fields.insert(cIdent(decl->getVariable().name));
                     else if (decl->isFunction()) { info.methods[decl->getFunction().name] = &decl->getFunction(); functions.insert(n + "_" + cIdent(decl->getFunction().name)); }
                 }
                 classes[n] = std::move(info);
@@ -687,9 +688,9 @@ namespace C {
     // Namespace-level variables: `extern T x;` in the header, a definition in the source. Literal initialisers are static
     // initialisers; anything else is assigned by <stem>_init_globals() (called by the facade before the first parse).
     auto Construct::emitGlobal(const LangAPI::Variable &v, Converter::Writer &, Converter::Writer &protos,
-                               Converter::Writer &impls) -> void {
+                               Converter::Writer &impls, const std::string &owner_c_name) -> void {
         std::vector<std::string> diag;
-        const auto name = prefix() + "_" + cIdent(v.name);
+        const auto name = owner_c_name.empty() ? prefix() + "_" + cIdent(v.name) : owner_c_name + "_" + cIdent(v.name);
         const auto t = typeName(v.type, diag);
         for (auto &x : diag) diagnostics.push_back(name + ": " + x);
         protos.writeln("extern {} {};", t, name);
@@ -741,7 +742,7 @@ namespace C {
             else diagnostics.push_back(c_name + ": library base class not mapped");
         if (!virtuals.empty()) types.writeln("const {}_vt* vt;", c_name);
         for (const auto &[decl, vis] : cls.data)
-            if (decl->isVariable()) types.writeln("{} {};", typeName(decl->getVariable().type, diag), cIdent(decl->getVariable().name));
+            if (decl->isVariable() && !decl->getVariable().is_static) types.writeln("{} {};", typeName(decl->getVariable().type, diag), cIdent(decl->getVariable().name));
         types.decreaseIndentation();
         types.writeln("};");
 
@@ -755,6 +756,8 @@ namespace C {
         impls.writeln("}");
         impls.writeln("void {}_free_{}_handler({}* handler) { (void)handler; }", pfx, name, c_name);
 
+        for (const auto &[decl, vis] : cls.data)
+            if (decl->isVariable() && decl->getVariable().is_static) emitGlobal(decl->getVariable(), types, protos, impls, c_name);
         for (const auto &[decl, vis] : cls.data)
             if (decl->isFunction()) emitFunction(decl->getFunction(), name, protos, impls);
         if (cls.constructor) emitFunction(*cls.constructor, name, protos, impls);
